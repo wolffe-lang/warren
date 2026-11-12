@@ -1,0 +1,7 @@
+quiet 1.0
+send ihello warren\x1b
+quiet 0.4
+send \x1b[6~
+quiet 0.4
+send :q!\r
+quiet 0.5

@@ -1,0 +1,59 @@
+warren-rec 1
+size 80 24
+o 10
+[6n$ [0m
+i 2
+ec
+o 110
+[0;91me[0m[0m[0m[K[0;90mcho ho hello[0m[12D[K[0m[0;91mec[0m[0m[0m[K[0;90mho ho hello[0m[11D
+i 1
+	
+o 62
+[K[0m[2D[0mecho[0m [0m[0m[0m[K[0;90mho hello[0m[8D
+i 9
+ho hello
+o 627
+[K[0m[5D[0mecho[0m [0;36mh[0m[0m[0m[K[0;90mo hello[0m[7D[K[0m[6D[0mecho[0m [0;36mho[0m[0m[0m[K[0;90m hello[0m[6D[K[0m[7D[0mecho[0m [0;36mho[0m [0m[0m[0m[K[0;90mhello[0m[5D[K[0m[8D[0mecho[0m [0;36mho[0m [0;36mh[0m[0m[0m[K[0;90mello[0m[4D[K[0m[9D[0mecho[0m [0;36mho[0m [0;36mhe[0m[0m[0m[K[0;90mllo[0m[3D[K[0m[10D[0mecho[0m [0;36mho[0m [0;36mhel[0m[0m[0m[K[0;90mlo[0m[2D[K[0m[11D[0mecho[0m [0;36mho[0m [0;36mhell[0m[0m[0m[K[0;90mo[0m[1D[K[0m[12D[0mecho[0m [0;36mho[0m [0;36mhello[0m[0m[0m[0m[0m
+ho hello
+[6n$ [0m
+i 5
+ls /
+o 397
+[0;91ml[0m[0m[0m[K[0;90mexit[0m[4D[K[0m[0mls[0m[0m[0m[K[0;90m /[0m[2D[K[0m[2D[0mls[0m [0m[0m[0m[K[0;90m/[0m[1D[K[0m[3D[0mls[0m [0;36m/[0m[0m[0m[K[0;90mbin/[0m[4D[K[0m[0m
+bin   etc   lib.usr-is-merged  mnt   repo  sample  srv	usr
+boot  home  lib64	       opt   root  sbin    sys	var
+dev   lib   media	       proc  run   src	   tmp	work
+[6n$ [0m
+i 1
+l
+o 41
+[0;91ml[0m[0m[0m[K[0;90ms /[0m[3D
+i 2
+		
+o 815
+[K[0m[0m
+[J[0m[1A[3C[0m
+[0mcompletions 1-10/37[0m
+  last (command)                         ld.gold (command)[0m
+  lastb (command)                        ld.so (command)[0m
+  lastlog (command)                      ldattach (command)[0m
+  ld (command)                           ldconfig (command)[0m
+  ld.bfd (command)                       ldconfig.real (command)[0m[0m[6A[61D[0m[0m
+[J[0m[1A[3C[0m
+[0mcompletions 1-10/37[0m
+> last (command)                         ld.gold (command)[0m
+  lastb (command)                        ld.so (command)[0m
+  lastlog (command)                      ldattach (command)[0m
+  ld (command)                           ldconfig (command)[0m
+  ld.bfd (command)                       ldconfig.real (command)[0m[0m[6A[61D
+i 1
+
+o 48
+[0m
+[J[0m[1A[3C[0m[K[0;90ms /[0m[3D
+i 5
+exit
+o 244
+[K[0m[0;91mle[0m[0m[0m[K[0;90mxit[0m[3D[K[0m[2D[0;91mlex[0m[0m[0m[K[0;90mit[0m[2D[K[0m[3D[0;91mlexi[0m[0m[0m[K[0;90mt[0m[1D[K[0m[4D[0;91mlexit[0m[0m[0m[0m[0m
+pelt: line 3: lexit: not found
+[6n$ [0m
