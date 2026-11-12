@@ -141,6 +141,14 @@ see it broken.
   `wide-overwrite-lead`, `wide-overwrite-tail`, `wide-erase-tail`,
   `wide-dch-tail`, `wide-ich-split`). A resize that would cut a pair blanks
   the surviving half (**ruled**; the reference keeps an orphan, D5).
+- **G2a one-column exception (ruled).** At cols = 1, a naturally wide
+  character is kept whole (base, marks and rendition) in one width-1 cell.
+  When widened, its width 2 is regenerated from the pinned width table.
+  Rows must print wide at one column, widen to 2 and to 80, and narrow from
+  80 to 1 and back with identical logical content. This is the only case
+  where a naturally wide scalar is represented by a width-1 cell. At one
+  column the server may send such a width-1 record; the client clips or
+  substitutes its physical glyph. Nowhere else may it do so.
 - **G3 cursor.** 1 <= row <= rows and 1 <= col <= cols. `pending_wrap`
   implies col = cols. The flag is set by printing into the last column
   whether or not autowrap is on (measured), and is consulted only when
@@ -170,7 +178,8 @@ For a code point with width w (section 5):
    selector is kept as a mark and does not change the width (`emoji-vs16`).
 2. If `pending_wrap` and autowrap: mark the row `wrapped`, move to column 1
    of the next row (scrolling the region if on its bottom row), clear the flag.
-3. If w = 2 and col = cols: with autowrap, wrap as in 2 first, leaving the
+3. Except for G2a at one column, if w = 2 and col = cols: with autowrap,
+   wrap as in 2 first, leaving the
    last column as it was and outside the extent (`wide-last-column-wrap`);
    without autowrap, the character is not stored.
 4. In insert mode, shift the row right by w from the cursor first; cells
