@@ -24,7 +24,15 @@ Expected parser throughput on one CPU is at least 5 MB/s natively and 30 kB/s un
 
 ## Evidence index
 
-Pending implementation and recorded takes. Red rows precede their fixes. Each record will identify its exact commit, digest and actual step exits.
+This is a parser-only work in progress, not a completed emulator or a merge-ready gate. Decoder fixtures were committed at `471d60e` and failed their assertion before the decoder implementation at `1501549`. Transition rows at `afa646c` failed their assertion before the implementation at `0f472e4`. Cap and every-split checks at `110536e` passed natively.
+
+At `a04faca`, the repository's macOS gate passed (eight tests; the long measurement entry fell back from checked execution to native). The parser's own native and lupin entries passed. The separate throughput step failed because lupin exhausted its 50-million-step budget. The native runner measured 983,040 input bytes in 0.234395 seconds, about 4.19 MB/s, below the predicted 5 MB/s. That is end-to-end runner time, including startup, not an isolated inner-loop rate.
+
+The first allocation witness incorrectly queried the live-region counter without creating a named region: its zero was not a retained-memory measurement. The next revision uses a named region and a smaller, 61,440-byte finite take to fit lupin's budget. That revision still needs its recorded run; no corrected memory number is claimed.
+
+Linux execution and additional black-box parser-edge probes are queued. The first wait exceeded the hand-back threshold before either ran. No whole-screen oracle agreement, Linux pass, PAX pass, hostile-input soak or plant result is claimed. The plant and PR remain to be made. The initial fixed-cap implementation and its additional cap checks were committed together with the transition work rather than in a separate observed-red cap series; that gap must not be described as red-first evidence.
+
+The README and architecture map were refreshed for this partial slice. `src/proto` and `docs/PROTOCOL.md` were not changed.
 
 ## Done-when
 
