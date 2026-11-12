@@ -1,0 +1,83 @@
+//! member: false
+//! Finite deterministic hostile-input checks, each inside a hard region cap.
+use vt
+use std.mem.budget
+use std.io
+
+fn invariants(p: vt.Parser) {
+    assert(p.state >= 0 && p.state <= 9)
+    assert(p.utf_left >= 0 && p.utf_left <= 3)
+    assert(p.param_count >= 0 && p.param_count <= 32)
+    assert(p.inter_count >= 0 && p.inter_count <= 2)
+    assert(p.payload_len >= 0 && p.payload_len <= 4096)
+    assert(p.output_count >= 0 && p.output_count <= 2)
+    assert(p.params.len == 192 && p.subs.len == 32)
+    assert(p.inter.len == 2 && p.payload.len == 4096)
+    if p.output_count > 0 {
+        assert(p.first_kind >= 1 && p.first_kind <= 5)
+        if p.first_kind == 1 {
+            assert(p.first_value >= 32 && p.first_value <= 1114111)
+            assert(p.first_value < 55296 || p.first_value > 57343)
+        }
+    }
+}
+
+fn test_random_bytes() {
+    var seed = 1
+    while seed <= 8 {
+        region fuzz(cap: 32768) {
+            var p = vt.new()
+            let stable = budget.charged(fuzz)
+            var rng = seed
+            var i = 0
+            while i < 2048 {
+                rng = rng * 48271 % 2147483647
+                vt.advance_in_place(mut p, (rng % 256) as byte)
+                invariants(p)
+                i += 1
+            }
+            assert(budget.charged(fuzz) == stable, "parser-hostile-allocation")
+        }
+        seed += 1
+    }
+}
+
+fn test_unterminated_and_saturating() {
+    region hostile(cap: 32768) {
+        var p = vt.new()
+        let stable = budget.charged(hostile)
+        var i = 0
+        while i < 65536 {
+            vt.advance_in_place(mut p, 27 as byte)
+            assert(p.state == 1 && p.output_count == 0)
+            i += 1
+        }
+        vt.advance_in_place(mut p, 93 as byte)
+        i = 0
+        while i < 8192 { vt.advance_in_place(mut p, 97 as byte); i += 1 }
+        assert(p.state == 7 && p.payload_len == 4096 && p.payload_overflow)
+        vt.advance_in_place(mut p, 7 as byte)
+        assert(p.state == 0 && p.output_count == 0)
+        vt.advance_in_place(mut p, 27 as byte)
+        vt.advance_in_place(mut p, 80 as byte)
+        i = 0
+        while i < 65536 { vt.advance_in_place(mut p, 97 as byte); i += 1 }
+        assert(p.state == 8 && p.payload_len == 0)
+        vt.advance_in_place(mut p, 24 as byte)
+        vt.advance_in_place(mut p, 27 as byte)
+        vt.advance_in_place(mut p, 91 as byte)
+        i = 0
+        while i < 4096 { vt.advance_in_place(mut p, 57 as byte); i += 1 }
+        assert(p.params[0] == 65535)
+        vt.advance_in_place(mut p, 109 as byte)
+        assert(p.output_count == 1 && p.first_kind == 4)
+        assert(budget.charged(hostile) == stable, "parser-hostile-allocation")
+    }
+}
+
+fn main() -> int {
+    test_random_bytes()
+    test_unterminated_and_saturating()
+    io.write_line("PASS parser-hostile seeds=8 random-bytes=16384 esc-bytes=65536 ignored-string-bytes=65536 region-cap=32768")
+    0
+}

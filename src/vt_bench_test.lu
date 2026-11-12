@@ -3,6 +3,7 @@
 use vt
 use std.mem.budget
 use std.io
+use std.time
 
 fn main() -> int {
     region measured {
@@ -13,6 +14,7 @@ fn main() -> int {
     let baseline = budget.charged(measured)
     var prints = 0
     var rounds = 0
+    let started = time.monotonic_ns()
     while rounds < 4096 {
         for b in pattern {
             vt.advance_in_place(mut p, b)
@@ -20,8 +22,9 @@ fn main() -> int {
         }
         rounds += 1
     }
+    let elapsed = time.monotonic_ns() - started
     let grown = budget.charged(measured) - baseline
-    io.write_line("MEASURE parser-throughput bytes={pattern.len * rounds} prints={prints} retained-charged={retained} advance-charged={grown}")
+    io.write_line("MEASURE parser-throughput bytes={pattern.len * rounds} prints={prints} retained-charged={retained} advance-charged={grown} feed-nanoseconds={elapsed}")
     assert(prints == 8192, "parser-benchmark-tokens")
     assert(grown == 0, "parser-advance-allocation")
     io.write_line("PASS parser-throughput")
