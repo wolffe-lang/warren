@@ -261,10 +261,32 @@ by asserting that a cleanup function was called.
 `proto.AckState` is the small pure stop-and-wait model: consecutive sends,
 exact ACK, ignored stale ACK, no seq reuse after image reset. The codec's
 assembly model checks same-type fragment chains and aggregate bounds.
-The tables above deliberately remain paper, rather than a second complete
-server model whose state could drift from the real implementation. W2 must
-exercise each transition through the real event dispatcher, supplemented
-by a pure scheduling/partial-write model now; it must run live socketpair,
-pty, child-exit, catchable-signal and terminal-restoration rows on Linux and
-macOS, then the static server/client on PAX under QEMU. No I/O rows are
-claimed by this lane.
+`server_model.transition(Connection, event) -> Step` is the small pure
+connection-table model. It allocates no resources and executes no actions;
+`Step` carries next phase, membership, an action mask and a valid flag.
+The codec test module drives its branches alongside native, checked and
+lupin protocol rows. Phases are 0 accepted, 1 attached, 2 commanding,
+3 draining, 4 closed. Membership must equal (phase == attached), and every
+transition out of attached clears it once.
+
+Classified events (after wire/policy checks): 0 HELLO deadline, 1 bad first
+frame/magic, 2 version mismatch, 3 wrong uid, 4 no-session, 5 small attach,
+6 valid attach, 7 command HELLO, 8 input event, 9 valid resize, 10 exact ACK,
+11 redraw, 12 detach, 13 EOF/read/write failure, 14 output overflow,
+15 session ended, 16 COMMAND, 17 PING, 18 malformed/wrong-role,
+19 writable, 20 queue drained, 21 drain deadline, 22 small resize,
+23 read-only refusal, 24 future ACK, 25 stale ACK, 26 error while a partial
+message makes BYE unsafe. Network messages must not fabricate timer events.
+
+Action bits: 1 unregister/close/free, 2 REFUSE, 4 WELCOME, 8 join membership,
+16 recompute size after a membership change or resize, 32 force-full,
+64 route input, 128 BYE, 256 REPLY, 512 PONG, 1024 release acknowledged image,
+2048 flush bounded output, 4096 consider paced damage, 8192 ignore. A force
+full action sets a flag, not a second outstanding image. REFUSE/BYE reason
+selection and actual resources stay in the event dispatcher, not this model.
+
+The pane/server tables remain paper, not a second complete server. W2 must
+exercise each transition through the real event dispatcher and must run live
+socketpair, pty, child-exit, catchable-signal and terminal-restoration rows on
+Linux and macOS, then the static server/client on PAX under QEMU. No I/O rows
+are claimed by this lane.

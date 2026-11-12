@@ -130,7 +130,8 @@ nightly run and a manual dispatch run everything.
 | `src/vt/` | the emulator: parser, grid, scrollback (pure) |
 | `src/proto/` | the wire protocol's frames (pure) |
 | `src/layout/` | tabs and the split tree (pure) |
-| `src/server/` | the server and its event loop |
+| `src/server/` | the server and its event loop (not implemented) |
+| `src/server_model/` | pure connection transitions/actions, without I/O |
 | `src/client/` | the client: input parser and renderer |
 | `src/cmd/` | `warren <verb>` and the command dispatcher |
 | `src/config/` | the configuration and layout files |

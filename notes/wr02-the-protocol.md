@@ -101,6 +101,9 @@ binary/pin serves it. SOURCES records the public references and digests.
   stale ACK, repaint counts and a pure partial-write model.
 - `src/protocol_rows.lu`: full native entry point; `protocol_small.lu`:
   compact checked/lupin entry point; `protocol_fuzz.lu`: bounded Linux fuzz.
+- `src/server_model/model.lu`: the pure accepted/attached/commanding/draining/
+  closed transition model, with membership and abstract action masks; its
+  classified-event rows run with compact protocol coverage.
 - `tests/proto/rig/`: recorder manifests and steps, with an explicit checked
   observation verifier (the command's exit zero is not a program verdict).
   Final exact-head record digests and END lines belong to the PR evidence.
