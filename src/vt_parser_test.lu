@@ -10,7 +10,12 @@ fn expect_print(data: List[byte], expected: List[int]) {
         if step.count > 0 && step.first.kind == 1 { (mut got).push(step.first.value) }
         if step.count > 1 && step.second.kind == 1 { (mut got).push(step.second.value) }
     }
-    assert(got == expected, "parser-decoder")
+    assert(got.len == expected.len, "parser-decoder-length")
+    var i = 0
+    while i < got.len {
+        assert(got[i] == expected[i], "parser-decoder-scalar")
+        i += 1
+    }
 }
 
 fn test_decoder() {
