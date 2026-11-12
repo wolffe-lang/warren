@@ -1,0 +1,27 @@
+//! member: false
+//! Native finite resource row. Its million controls exceed lupin's step budget;
+//! the smaller event entry runs the same semantics under the interpreter.
+use vt
+use std.mem.budget
+use std.io
+
+fn main() -> int {
+    region flat(cap: 65536) {
+        var pane = vt.new(1, 1, 0)
+        var pattern = "\u{1b}]2;0\u{7}\u{7}".bytes()
+        let stable = budget.charged(flat)
+        var i = 0
+        while i < 1000000 {
+            pattern[4] = (48 + i % 10) as byte
+            vt.feed(mut pane, pattern)
+            i += 1
+        }
+        let grown = budget.charged(flat) - stable
+        assert(grown == 0, "grid-events-flat-memory")
+        let events = vt.take_events(mut pane)
+        assert(events.len == 2 && events[0].kind == 1 && events[1].kind == 2)
+        assert(events[1].value == 1000000 && pane.title_length == 1 && pane.title_storage[0] as int == 57)
+        io.write_line("PASS grid-events-flat-memory title-changes=1000000 bells=1000000 feed-charged={grown} region-cap=65536")
+    }
+    0
+}

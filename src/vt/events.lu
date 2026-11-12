@@ -1,0 +1,53 @@
+//! member: true
+//! Bounded event storage and a red-first drain seam.
+
+/// A coalesced final-state notification: 1 title changed (read Vt title),
+/// 2 bell (value=count), 3 mode (private_mode, mode, value), or 4 clipboard
+/// (payload=decoded bytes). Notifications are not a history of input controls.
+pub struct Event {
+    kind: int, private_mode: bool, mode: int, value: int, payload: List[byte],
+}
+
+/// Fixed pending event state. The clipboard buffer keeps its latest encoded
+/// payload; no input control allocates another event or another buffer.
+pub struct EventState {
+    title_changed: bool, bell_pending: bool, bell_count: int,
+    mode_changed: List[bool],
+    clipboard_pending: bool, clipboard_length: int, clipboard_encoded: List[byte],
+}
+
+fn new_byte_buffer() -> List[byte] {
+    var data = List[byte]()
+    (mut data).reserve(4096)
+    var i = 0
+    while i < 4096 { (mut data).push(0 as byte); i += 1 }
+    data
+}
+
+fn new_mode_values() -> List[int] {
+    var values = List[int]()
+    (mut values).reserve(32)
+    var i = 0
+    while i < 32 { (mut values).push(0); i += 1 }
+    values[4] = 1
+    values[6] = 1
+    values
+}
+
+fn new_events() -> EventState {
+    var changed = List[bool]()
+    (mut changed).reserve(32)
+    var i = 0
+    while i < 32 { (mut changed).push(false); i += 1 }
+    EventState {
+        title_changed: false, bell_pending: false, bell_count: 0,
+        mode_changed: changed, clipboard_pending: false, clipboard_length: 0,
+        clipboard_encoded: new_byte_buffer(),
+    }
+}
+
+/// Drain seam, not implemented until the event rows are observed red.
+pub fn take_events(mut pane: Vt) -> List[Event] {
+    pane.events.title_changed = false
+    List[Event]()
+}

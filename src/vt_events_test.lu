@@ -1,0 +1,56 @@
+//! member: false
+//! Final-state event semantics, including the named title policy.
+use vt
+
+fn test_titles_and_bells() {
+    var pane = vt.new(5, 2, 0)
+    vt.feed(mut pane, "\u{1b}]2;old\u{7}\u{1b}]0;a\u{7f}b\u{7}\u{7}\u{7}".bytes())
+    let events = vt.take_events(mut pane)
+    assert(events.len == 2, "grid-events-coalesced")
+    assert(events[0].kind == 1 && events[0].payload.len == 0)
+    assert(pane.title_length == 2 && pane.title_storage[0] as int == 97 && pane.title_storage[1] as int == 98)
+    assert(events[1].kind == 2 && events[1].value == 2)
+    assert(vt.take_events(mut pane).len == 0)
+}
+
+fn test_latest_mode_values() {
+    var pane = vt.new(5, 2, 0)
+    vt.feed(mut pane, "\u{1b}[?7l\u{1b}[?7h\u{1b}[?7l".bytes())
+    let events = vt.take_events(mut pane)
+    assert(events.len == 1 && events[0].kind == 3)
+    assert(events[0].private_mode && events[0].mode == 7 && events[0].value == 0)
+    assert(!pane.modes.autowrap && vt.take_events(mut pane).len == 0)
+    vt.feed(mut pane, "\u{1b}[4h".bytes())
+    let ansi = vt.take_events(mut pane)
+    assert(ansi.len == 1 && !ansi[0].private_mode && ansi[0].mode == 4 && ansi[0].value == 1)
+}
+
+fn test_latest_clipboard_and_no_reads() {
+    var pane = vt.new(5, 2, 0)
+    vt.feed(mut pane, "\u{1b}]52;c;YQ==\u{7}\u{1b}]52;c;Yg==\u{7}\u{1b}]52;c;?\u{7}\u{1b}]52;c;!!!!\u{7}\u{1b}]52;c;YR==\u{7}".bytes())
+    let events = vt.take_events(mut pane)
+    assert(events.len == 1 && events[0].kind == 4)
+    assert(events[0].payload.len == 1 && events[0].payload[0] as int == 98)
+    assert(vt.take_events(mut pane).len == 0)
+    vt.feed(mut pane, "\u{1b}]52;c;\u{7}".bytes())
+    let cleared = vt.take_events(mut pane)
+    assert(cleared.len == 1 && cleared[0].kind == 4 && cleared[0].payload.len == 0)
+}
+
+fn test_bell_saturation() {
+    var pane = vt.new(1, 1, 0)
+    pane.events.bell_pending = true
+    pane.events.bell_count = 9223372036854775806
+    vt.feed(mut pane, "\u{7}\u{7}\u{7}".bytes())
+    let events = vt.take_events(mut pane)
+    assert(events.len == 1 && events[0].kind == 2 && events[0].value == 9223372036854775807)
+    assert(pane.events.bell_count == 0 && !pane.events.bell_pending)
+}
+
+fn main() -> int {
+    test_titles_and_bells()
+    test_latest_mode_values()
+    test_latest_clipboard_and_no_reads()
+    test_bell_saturation()
+    0
+}

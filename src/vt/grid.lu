@@ -35,6 +35,8 @@ pub struct Vt {
     region_top: int, region_bottom: int,
     tabs: List[bool], default_tabs: bool,
     pen: Pen, modes: Modes, parser: Parser,
+    title_storage: List[byte], title_length: int,
+    mode_values: List[int], events: EventState,
     scrollback_cap_bytes: int,
 }
 
@@ -76,6 +78,8 @@ pub fn new(cols: int, rows: int, scrollback_cap_bytes: int) -> Vt {
         pen: Pen { flags: 0, foreground: 0 - 1, background: 0 - 1 },
         modes: Modes { autowrap: true, origin: false, insert: false,
             newline: false, cursor_visible: true },
-        parser: new_parser(), scrollback_cap_bytes: scrollback_cap_bytes,
+        parser: new_parser(), title_storage: new_byte_buffer(), title_length: 0,
+        mode_values: new_mode_values(), events: new_events(),
+        scrollback_cap_bytes: scrollback_cap_bytes,
     }
 }
