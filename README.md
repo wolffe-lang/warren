@@ -5,9 +5,11 @@ for PAX first, and measured on x86-64 Linux and macOS arm64 from the first
 pull request. It takes its ideas from tmux, zellij and herdr, and none of
 their code.
 
-**Status: W0, the map. Nothing is implemented.** The repository holds the
-pins, the module tree as compiling stubs, tiered CI, and the documents that
-say what will be built and how it will be measured. The `warren` binary this
+**Status: W0, the map. No part of the multiplexer is implemented.** The
+repository holds the pins, the module tree as compiling stubs, tiered CI, a
+pinned reference emulator with a harness that reads its screen cell for cell,
+a survey of tmux, zellij and herdr, a recorded corpus, and the predictions
+and drafts the next milestones are written from. The `warren` binary this
 tree builds prints that it is a scaffold and exits 1.
 [MAP](docs/MAP.md) separates what is planned from what is measured.
 
@@ -55,21 +57,52 @@ tree builds prints that it is a scaffold and exits 1.
 | Compiler | wolf 0.2.39, whole release archives pinned by SHA-256 |
 | Reference interpreter | lupin 0.1.61, pinned the same way |
 | Standard library | wolf-std at commit `77cf3210`, newer than the one the wolf archive bundles |
+| Reference emulator | xterm 390 (Ubuntu `390-1ubuntu3`), binary SHA-256 pinned; run headless under Xvfb |
+| Second black box | tmux 3.4 (Ubuntu `3.4-1ubuntu0.2`), binary SHA-256 pinned |
+| Oracle image | Ubuntu 24.04 by digest, packages from the Ubuntu snapshot archive at `20261101T000000Z` |
 
 `wolf-toolchain.toml` pins the archive bytes and the standard library's
 commit and tree. `tools/fetch-toolchain.py` stages them into `.wolf-bin/`,
 refuses anything whose digest differs, and replaces the bundled standard
-library with the pinned one. Nothing is installed globally.
+library with the pinned one. `warren-oracle.toml`, `ci/packages.txt` and
+`ci/oracle-binaries.lock` bind the oracle image's base, its whole package
+list and each oracle binary; an image that differs in any of them is refused
+before a row runs. Nothing is installed globally.
 
 ## Build and measure
 
 ```sh
-bash tools/gate unit      # pin metadata and the CI tier planner; needs python3 only
-bash tools/gate linux     # the pinned toolchain, the build, the tests (or: macos)
+bash tools/gate unit       # pins, tier planner, harness mutations, corpus digests; python3 only
+bash tools/gate macos      # the above, the pinned toolchain, the build, the tests
+bash tools/in-container    # Linux: builds the oracle image, holds it to its pins, runs
+                           # `tools/gate linux` inside (WARREN_ENGINE=podman also works)
 ```
 
-The gate prints one `START`/`END name exit=N` pair per step. A step that is
-skipped says so; a count of steps is never a pass.
+The gate prints one `START`/`END name exit=N` pair per step. No step skips:
+a missing oracle is red.
+
+What the Linux gate measures today is the harness, not a multiplexer:
+
+- **Eight cases** whose expected screens are committed, three of them
+  written by hand from the control-sequence document before any take. Each
+  is dumped twice and both takes must be identical.
+- **Three planted mutations**, on the live dumps and on the committed ones:
+  a wrong attribute, a wrong cursor position and a dropped wide-character
+  continuation must each go red at its own row.
+- **A census of 151 small streams** that isolate one question each (what
+  clears a pending wrap, what an erased cell keeps, malformed input). Their
+  dumps are held by digest; `tests/vt/census.txt` is the readable form.
+- **32 seeded fuzz streams** and **five recordings** (yew twice, one under
+  resize; quarry; pelt with its completion menu; den's log), dumped twice and
+  held by digest.
+- **Session rows against tmux:** what it tells a pane, that its text and
+  cursor agree with the reference on six cases, and how it sizes a session
+  shared by two clients.
+
+[SCREEN-DUMP](docs/SCREEN-DUMP.md) describes the dump, how the reference is
+read, every normalisation by name, and what the mechanism cannot show.
+[SURVEY](docs/SURVEY.md) and [TERM](docs/TERM.md) are the survey and the
+recommendation on what programs inside are told.
 
 Unlabelled pull requests run the unit gate. The `ci` label requests the Linux
 gate, and `full-matrix` requests Linux and macOS. Pushes to `trunk`, the
@@ -86,6 +119,11 @@ nightly run and a manual dispatch run everything.
 | `src/client/` | the client: input parser and renderer |
 | `src/cmd/` | `warren <verb>` and the command dispatcher |
 | `src/config/` | the configuration and layout files |
+| `tools/oracle/` | the reference emulator's driver, the dump format and comparison |
+| `tools/corpus/` | the pty recorder and the seeded fuzz generator |
+| `tools/session/` | session rows against tmux |
+| `tests/vt/`, `tests/corpus/` | cases, the census, recordings, digests |
+| `notes/` | each lane's note; the drafts for the emulator and the wire protocol |
 
 The three pure modules do no I/O. They are tested on every host and under the
 reference interpreter.
