@@ -1,0 +1,15 @@
+//! member: true
+//! Incremental terminal parser. Token kinds: 0 none, 1 print, 2 execute,
+//! 3 ESC, 4 CSI, 5 OSC. Sequence metadata belongs to Parser until the next
+//! advance call. This test seam deliberately emits no tokens yet.
+
+pub struct Token { kind: int, value: int }
+pub struct Step { count: int, first: Token, second: Token }
+pub struct Parser { state: int }
+
+pub fn new() -> Parser { Parser { state: 0 } }
+
+pub fn advance(mut p: Parser, b: byte) -> Step {
+    p.state = b as int
+    Step { count: 0, first: Token { kind: 0, value: 0 }, second: Token { kind: 0, value: 0 } }
+}
