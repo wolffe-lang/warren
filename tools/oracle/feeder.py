@@ -172,32 +172,36 @@ SEPARATORS = (b'\x1b[0;48;2;3;141;59m', b'\x1b[0;48;2;59;141;3m')
 def pass_spread(term, out, layout):
     """Make print screen state every cell's rendition.
 
-    The screen is widened to twice its columns. Working from the right, each
-    cell (a wide character as its pair) is copied to twice its column with
-    DECCRA, and the column before it gets a separator: a blank on a background
-    no stream uses, alternating between two so that neighbours differ. Print
-    screen writes a rendition whenever the colours change, so every copied
-    cell is printed with its own."""
+    The screen is widened to three times its columns and two more. Each cell
+    (a wide character as its pair) is copied with DECCRA into the fresh area
+    on the right, to column cols + 2c, and the column before it gets a
+    separator: a blank on a background no stream uses, alternating between
+    two so that neighbours differ. Print screen writes a rendition whenever
+    the colours change, so every copied cell is printed with its own. The
+    copies land on cells that were never written, so no copy can disturb a
+    wide character that is still waiting to be copied."""
     cols, rows = size_of(term)
     continuation = json.load(open(layout))
     term.write(b'\x1b[?6l\x1b[?69l\x1b[4l\x1b[?7h\x1b[r')
-    term.write(b'\x1b[8;%d;%dt' % (rows, 2 * cols))
+    wide = 3 * cols + 2
+    term.write(b'\x1b[8;%d;%dt' % (rows, wide))
     deadline = time.monotonic() + term.timeout
-    while size_of(term) != (2 * cols, rows):
+    while size_of(term) != (wide, rows):
         if time.monotonic() > deadline:
             raise TimeoutError('the emulator did not widen')
         time.sleep(0.01)
     for row in range(1, rows + 1):
         skip = set(continuation[row - 1])
         chunk = []
-        for col in range(cols, 0, -1):
+        for col in range(1, cols + 1):
             if col in skip:
                 continue
             last = col + 1 if col + 1 in skip else col
-            chunk.append(b'\x1b[%d;%d;%d;%d;1;%d;%d;1$v' % (row, col, row, last, row, 2 * col))
-            chunk.append(SEPARATORS[col % 2] + b'\x1b[%d;%dH \x1b[0m' % (row, 2 * col - 1))
+            to = cols + 2 * col
+            chunk.append(SEPARATORS[col % 2] + b'\x1b[%d;%dH \x1b[0m' % (row, to - 1))
+            chunk.append(b'\x1b[%d;%d;%d;%d;1;%d;%d;1$v' % (row, col, row, last, row, to))
             if last != col:                 # the slot of the skipped second half
-                chunk.append(SEPARATORS[col % 2] + b'\x1b[%d;%dH \x1b[0m' % (row, 2 * col + 2))
+                chunk.append(SEPARATORS[col % 2] + b'\x1b[%d;%dH \x1b[0m' % (row, to + 2))
         term.write(b''.join(chunk))
     term.write(b'\x1b[i')
     term.sync()

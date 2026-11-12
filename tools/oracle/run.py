@@ -4,6 +4,8 @@
   run.py dump INPUT [--cols N --rows N] [-o FILE]   one stream, one dump
   run.py cases DIR --out DIR                        every DIR/NAME.in against DIR/NAME.screen,
                                                     each dumped twice (determinism)
+  run.py digests DIR --out DIR --manifest FILE      every stream in DIR dumped twice, the dump's
+                                                    digest held to the manifest
   run.py selftest SCREEN...                         the planted mutations fail by name
   run.py mutations DIR --out DIR                    the same, on live dumps of DIR's cases
 
@@ -164,7 +166,7 @@ def parse_print(data, rows):
     result = []
     for raw in lines:
         line = decode(raw)
-        clusters, state, at = [], {}, 0
+        clusters, state, at, stated = [], {}, 0, False
         while at < len(line):
             cp = line[at]
             if cp == 0x1b and at + 1 < len(line) and line[at + 1] == 0x23:
@@ -173,11 +175,14 @@ def parse_print(data, rows):
                 end = line.index(0x6d, at)
                 sgr_to_attrs(''.join(chr(c) for c in line[at + 2:end]), state)
                 at = end + 1
+                stated = True
             elif clusters and is_combining(cp):
                 clusters[-1][0].append(cp)
                 at += 1
             else:
-                clusters.append([[cp], attrs_text(state)])
+                # The third field: a rendition was written just before this cell.
+                clusters.append([[cp], attrs_text(state), stated])
+                stated = False
                 at += 1
         result.append(clusters)
     return result
@@ -219,20 +224,20 @@ def lay_out(clusters, sums, limit):
                 return
             found.append(cells)
             return
-        chars, attrs = clusters[index]
+        chars, attrs, stated = clusters[index]
         name = explains(chars, sums[col])
         if name is None:
             return
-        search(index + 1, col + 1, cells + [[1, name, attrs]])
+        search(index + 1, col + 1, cells + [[1, name, attrs, stated]])
         if col + 1 < len(sums) and sums[col + 1] == '0000' and name != REPLACEMENT:
-            tail = [[0, '-', attrs]] if col + 1 < limit else []
-            search(index + 1, col + 2, cells + [[2, name, attrs]] + tail)
+            tail = [[0, '-', attrs, False]] if col + 1 < limit else []
+            search(index + 1, col + 2, cells + [[2, name, attrs, stated]] + tail)
 
     search(0, 0, [])
     if len(found) != 1:
         raise OracleError('print and checksums %s: %s against %s' % (
             'disagree' if not found else 'have two readings',
-            ' '.join(code_points(c) for c, _ in clusters[:12]), ' '.join(sums[:12])))
+            ' '.join(code_points(c[0]) for c in clusters[:12]), ' '.join(sums[:12])))
     return found[0]
 
 
@@ -288,16 +293,20 @@ def colours(attrs):
 
 
 def finish(screen, a, s):
-    """Replace pass A's renditions with pass S's, and hold A to the print rule.
+    """Replace pass A's renditions with pass S's, and hold the two together.
 
-    The rule, measured: print screen writes a rendition before a cell when the
-    cell's differs from the last one written, unless the cell has no
-    rendition flags and its colours are the last ones written."""
+    Pass A's print does not state every cell's rendition (a plain cell after a
+    bold one with the same colours gets no reset, and a never-written cell
+    gets none at all), so its renditions are not used. Where it did write one
+    outright before a character, pass S must agree."""
     cols, rows = screen['size']
     printed = parse_print(s['print'], rows)
     for r in range(rows):
         from_a = screen['rows'][r]
-        line = printed[r]
+        # The original cells come first in the widened row; skip them. Past
+        # pass A's extent they are blanks, one cluster each.
+        skip = sum(1 for cell in from_a if cell[0] != 0) + cols - len(from_a)
+        line = printed[r][skip:]
         row, at = [], 0
         for col in range(cols):
             if col < len(from_a) and from_a[col][0] == 0:
@@ -306,7 +315,7 @@ def finish(screen, a, s):
             wide = col < len(from_a) and from_a[col][0] == 2
             if at + 1 >= len(line) or line[at][0] != [0x20] or line[at][1] != SEPARATOR_BG[(col + 1) % 2]:
                 raise OracleError('row %d: pass S lost its separator before column %d' % (r + 1, col + 1))
-            chars, attrs = line[at + 1]
+            chars, attrs, _ = line[at + 1]
             if any(bg in attrs for bg in SEPARATOR_BG):
                 raise OracleError('row %d column %d: the stream uses a separator colour' % (r + 1, col + 1))
             name = from_a[col][1] if col < len(from_a) else 'U+0020'
@@ -322,16 +331,12 @@ def finish(screen, a, s):
                 at += 1
         if at != len(line):
             raise OracleError('row %d: pass S printed more than the screen' % (r + 1))
-        current = '-'
+        # Where pass A wrote a rendition outright before a character, it is
+        # that cell's own, and pass S must have read the same.
         for col, (cell_a, cell) in enumerate(zip(from_a, row)):
-            if cell[0] == 0:
-                continue
-            flags = [part for part in cell[2].split(',') if '=' not in part and part != '-']
-            if cell[2] != current and (flags or colours(cell[2]) != colours(current)):
-                current = cell[2]
-            if cell_a[2] != current:
-                raise OracleError('row %d column %d: pass A printed %s where the rule gives %s' % (
-                    r + 1, col + 1, cell_a[2], current))
+            if cell_a[3] and cell[1] != 'U+0020' and cell_a[2] != cell[2]:
+                raise OracleError('row %d column %d: pass A printed %s, pass S %s' % (
+                    r + 1, col + 1, cell_a[2], cell[2]))
         screen['rows'][r] = row
     return screen
 
@@ -405,6 +410,54 @@ def cmd_cases(args):
     return 1 if failed else 0
 
 
+def cmd_digests(args):
+    """Every stream in DIR dumped twice; the dump's digest against a manifest."""
+    import hashlib
+    out = Path(args.out)
+    manifest_path = Path(args.manifest)
+    known = {}
+    if manifest_path.exists() and not args.write:
+        known = dict(line.split() for line in manifest_path.read_text().splitlines())
+    streams = sorted(Path(args.dir).glob('*.in')) + sorted(Path(args.dir).glob('*.rec'))
+    if not streams:
+        print('FAIL oracle-digests: no streams in ' + args.dir)
+        return 1
+    failed, lines = 0, []
+    with Display() as display:
+        for path in streams:
+            name = path.stem
+            cols, rows = case_size(path)
+            try:
+                first = dump(display, path, cols, rows, out / name / 'take-1')
+                second = dump(display, path, cols, rows, out / name / 'take-2')
+            except (OracleError, ValueError, subprocess.TimeoutExpired) as error:
+                print('FAIL oracle-run %s: %s' % (name, error))
+                failed += 1
+                continue
+            text = S.dumps(first)
+            (out / name / 'got.screen').write_text(text)
+            if first != second:
+                print('FAIL oracle-determinism %s: two takes differ' % name)
+                failed += 1
+                continue
+            digest = hashlib.sha256(text.encode()).hexdigest()
+            lines.append('%s %s' % (name, digest))
+            if args.write:
+                continue
+            if known.get(name) != digest:
+                print('FAIL oracle-digest %s: dump %s, manifest %s' % (name, digest, known.get(name)))
+                failed += 1
+    if args.write:
+        manifest_path.write_text('\n'.join(lines) + '\n')
+        print('WROTE %s (%d dumps)' % (manifest_path, len(lines)))
+    missing = sorted(set(known) - {line.split()[0] for line in lines}) if not args.write else []
+    for name in missing:
+        print('FAIL oracle-digest %s: in the manifest, not dumped' % name)
+    failed += len(missing)
+    print('oracle-digests: %d streams, two takes each, %d failed' % (len(streams), failed))
+    return 1 if failed else 0
+
+
 def selftest(screens):
     """Every planted mutation must go red at its own row, on some screen."""
     failed = 0
@@ -451,6 +504,11 @@ def main():
     p.add_argument('--out', required=True)
     p.add_argument('--expected', help='directory of NAME.screen (default: beside the cases)')
     p.add_argument('--write', action='store_true', help='record expected screens (review them)')
+    p = sub.add_parser('digests')
+    p.add_argument('dir')
+    p.add_argument('--out', required=True)
+    p.add_argument('--manifest', required=True)
+    p.add_argument('--write', action='store_true')
     p = sub.add_parser('selftest')
     p.add_argument('screens', nargs='+')
     p = sub.add_parser('mutations')
@@ -459,6 +517,8 @@ def main():
     args = parser.parse_args()
     if args.command == 'cases':
         return cmd_cases(args)
+    if args.command == 'digests':
+        return cmd_digests(args)
     if args.command == 'selftest':
         return selftest([(Path(s).stem, Path(s).read_text()) for s in args.screens])
     if args.command == 'mutations':

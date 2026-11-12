@@ -58,16 +58,17 @@ checksum per cell (DECRQCRA, configured to give the code point), and a
 print screen with renditions.
 
 Print screen has two limits, both measured. It stops each row at the last
-written cell. And it writes a rendition before a cell only when the cell's
-differs from the last one written and the cell either has a rendition flag of
-its own or different colours: a plain cell after a bold one, colours equal,
-is printed as if it were bold.
+written cell. And it does not state every cell's rendition: a plain cell
+after a bold one with the same colours is printed with no reset, as if it
+were bold, and a cell that was never written is printed with none at all.
 
-**Pass S** closes both. After the replay the screen is widened to twice its
-columns, every cell is copied (DECCRA) to twice its column, and a separator
-blank on a background no stream uses is written before it. Print screen must
-then state every cell's rendition. Pass A's print is held to the measured rule
-on every dump, so the rule is checked each time it is relied on.
+**Pass S** closes both. After the replay the screen is widened to three
+times its columns, and every cell is copied (DECCRA) into the fresh columns
+on the right, each behind a separator blank on a background no stream uses.
+Print screen writes a rendition whenever the colours change, so it must then
+state every cell's. Pass A's renditions are not used; where pass A did write
+one outright before a character, the two passes must agree, and a dump on
+which they do not is refused.
 
 The per-cell checksum tells a wide character's second half (it answers zero)
 from a blank. Because the emulator's replacement for a malformed byte and any
@@ -104,5 +105,5 @@ Every place where a dump is not compared as written, by name.
   background; such a dump is refused by name rather than guessed.
 - A wide character cut in half by a narrower screen. The reference keeps an
   orphan half that cannot be copied whole; such a dump is refused.
-- SGR with more than 29 parameters: the reference misreads it. Corpora stay
-  below that.
+- A control sequence with 31 or more parameters: the reference misreads it
+  (measured on SGR). Corpora stay well below that.
