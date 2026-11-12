@@ -2,8 +2,9 @@
 # The gate. Every END is a real child exit; a step's own output is indented so
 # that only START, END and a red step's FAIL lines sit at column 0.
 #   tools/gate unit     needs python3 only
-#   tools/gate linux    the unit steps, then the pinned toolchain and the build
-#   tools/gate macos    the same on macOS
+#   tools/gate macos    the unit steps, then the pinned toolchain, the build, the tests
+#   tools/gate linux    the same, then the oracle rows; run it through tools/in-container,
+#                       which holds the image to its pins first
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
@@ -35,8 +36,25 @@ scaffold_run() {
   [ "$rc" -eq 1 ] || { echo "FAIL scaffold-run: exit $rc, expected 1"; return 1; }
   [ "$(grep -c 'not implemented$' target/gate/scaffold.out)" -eq 7 ] || { echo 'FAIL scaffold-run: expected seven modules'; return 1; }
 }
+fuzz_generator() {
+  python3 -I tools/corpus/fuzz.py --digests 32 2048 > target/gate/fuzz.sha256
+  diff -u tests/corpus/fuzz.sha256 target/gate/fuzz.sha256 || { echo 'FAIL fuzz-generator: a seed no longer gives its stream'; return 1; }
+  echo 'PASS fuzz-generator seeds=32 bytes=2048'
+}
+corpus_digests() {
+  local fail=0 name want have
+  while read -r name want; do
+    have=$(python3 -I -c 'import hashlib,sys; print(hashlib.sha256(open(sys.argv[1],"rb").read()).hexdigest())' "tests/corpus/$name")
+    if [ "$have" = "$want" ]; then echo "PASS corpus-digest $name"; else echo "FAIL corpus-digest $name: $have"; fail=1; fi
+  done < tests/corpus/recordings.sha256
+  [ "$(ls tests/corpus/*.rec | wc -l)" -eq "$(wc -l < tests/corpus/recordings.sha256)" ] || { echo 'FAIL corpus-digest: a recording is not in the manifest'; fail=1; }
+  return "$fail"
+}
 step pin-metadata python3 -I tools/check-pins.py
 step tier-planner python3 -I ci/tiers-test.py
+step harness-mutations python3 -I tools/oracle/run.py selftest tests/vt/expected/*.screen
+step fuzz-generator fuzz_generator
+step corpus-digests corpus_digests
 [ "$mode" != unit ] || exit 0
 case "$mode" in macos|linux) ;; *) echo 'FAIL gate-mode'; exit 2 ;; esac
 fetch=(python3 -I tools/fetch-toolchain.py)
@@ -48,3 +66,24 @@ step build "$WOLF" build --deny-warnings src/warren.lu -o "$root/target/native/w
 step scaffold-run scaffold_run "$root/target/native/warren"
 step wolf-test "$WOLF" test --deny-warnings src
 step lupin-pure "$LUPIN" run src/pure_test.lu
+[ "$mode" = linux ] || exit 0
+# The oracle rows. No step here skips: without the pinned binaries it is red.
+oracle_identity() {
+  [ "$(xterm -version)" = 'XTerm(390)' ] || { echo "FAIL oracle-identity: $(xterm -version 2>&1)"; return 1; }
+  [ "$(tmux -V)" = 'tmux 3.4' ] || { echo "FAIL oracle-identity: $(tmux -V 2>&1)"; return 1; }
+  diff -u ci/oracle-binaries.lock /opt/oracle-binaries.txt || { echo 'FAIL oracle-identity: not the pinned image'; return 1; }
+  echo 'PASS oracle-identity xterm=390 tmux=3.4'
+}
+export LC_ALL=C.UTF-8
+work=target/oracle
+mkdir -p "$work/fuzz"
+step oracle-identity oracle_identity
+step case-streams python3 -I tests/vt/cases.py "$work/cases"
+step oracle-cases python3 -I tools/oracle/run.py cases "$work/cases" --expected tests/vt/expected --out "$work/cases-out"
+step oracle-mutations python3 -I tools/oracle/run.py mutations "$work/cases" --out "$work/cases-out"
+step census-streams python3 -I tests/vt/census.py "$work/census"
+step oracle-census python3 -I tools/oracle/run.py digests "$work/census" --out "$work/census-out" --manifest tests/vt/census.sha256
+step fuzz-streams python3 -I tools/corpus/fuzz.py --digests 32 2048 --dir "$work/fuzz"
+step oracle-fuzz python3 -I tools/oracle/run.py digests "$work/fuzz" --out "$work/fuzz-out" --manifest tests/corpus/fuzz-screens.sha256
+step oracle-corpus python3 -I tools/oracle/run.py digests tests/corpus --out "$work/corpus-out" --manifest tests/corpus/recording-screens.sha256
+step tmux-rows python3 -I tools/session/tmux_rows.py --cases "$work/cases" --expected tests/vt/expected --out "$root/target/tmux"
