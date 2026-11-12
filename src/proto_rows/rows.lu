@@ -1,6 +1,7 @@
 //! member: true
 //! Pure protocol inputs with test-only PASS reporting; separate from proto.
 use proto
+use server_model
 
 fn payload(kind: int) -> List[byte] {
     var b = List[byte]()
@@ -409,9 +410,41 @@ fn test_full_socket_queue() {
     print("PASS proto-full-4096-queue-and-independent-client")
 }
 
+fn test_connection_transitions() {
+    var cases = 0
+    // phase, classified event, next phase, action mask (SERVER's pure model).
+    for row in [
+        [0, 0, 4, 1], [0, 1, 4, 1], [0, 2, 3, 2],
+        [0, 3, 4, 1], [0, 4, 3, 2], [0, 5, 3, 132],
+        [0, 6, 1, 60], [0, 7, 2, 4], [0, 23, 3, 2],
+        [1, 8, 1, 64], [1, 9, 1, 48], [1, 10, 1, 5120],
+        [1, 11, 1, 32], [1, 12, 3, 144], [1, 13, 4, 17],
+        [1, 14, 3, 144], [1, 15, 3, 144], [1, 17, 1, 512],
+        [1, 18, 3, 144], [1, 22, 3, 144], [1, 24, 3, 144],
+        [1, 25, 1, 8192], [1, 26, 4, 17],
+        [2, 16, 3, 256], [2, 17, 2, 512], [2, 8, 3, 128],
+        [2, 13, 4, 1], [2, 26, 4, 1],
+        [3, 19, 3, 2048], [3, 20, 4, 1], [3, 21, 4, 1],
+        [3, 13, 4, 1], [3, 8, 3, 8192], [4, 8, 4, 8192],
+    ] {
+        let phase = row[0] as int
+        let before = server_model.Connection { phase: phase, member: phase == 1 }
+        let next = server_model.transition(before, row[1] as int)
+        assert(next.valid && next.phase == row[2] as int && next.actions == row[3] as int)
+        assert(next.member == (next.phase == 1))
+        assert(before.phase == phase)
+        cases = cases + 1
+    }
+    let wrong = server_model.Connection { phase: 1, member: false }
+    assert(!server_model.transition(wrong, 8).valid)
+    assert(!server_model.transition(server_model.start(), 99).valid)
+    print("PASS server-connection-transition-model rows={cases} invalid=2")
+}
+
 /// Full native rows, including large images and every stalled write offset.
 pub fn all() -> int {
     test_version_before_suffix()
+    test_connection_transitions()
     test_message_roundtrips()
     test_golden_and_refusals()
     test_wide_and_coverage()
@@ -427,6 +460,7 @@ pub fn all() -> int {
 /// all short fragment splits and the stale-ACK model; no large cost loops.
 pub fn compact() -> int {
     test_version_before_suffix()
+    test_connection_transitions()
     test_golden_and_refusals()
     test_wide_and_coverage()
     test_fragment_and_ack_model()
