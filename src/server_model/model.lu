@@ -1,0 +1,62 @@
+//! member: true
+//! Pure connection transition contract; no descriptor, time or process API.
+//! Events are classified after wire validation. See docs/SERVER.md section 7.
+
+/// Connection phase: 0 accepted, 1 attached, 2 commanding, 3 draining, 4 closed.
+/// Membership is held exactly while attached; no OS resources live here.
+pub struct Connection { phase: int, member: bool }
+
+/// The next connection and an abstract action mask; valid=false for an
+/// impossible state or event classification. Actions are not executed here.
+pub struct Step { phase: int, member: bool, actions: int, valid: bool }
+
+/// A newly accepted peer has not joined a session.
+pub fn start() -> Connection { Connection { phase: 0, member: false } }
+
+fn step(phase: int, actions: int) -> Step {
+    Step { phase: phase, member: phase == 1, actions: actions, valid: true }
+}
+
+/// Apply one classified event without I/O. Phases are Connection's.
+/// Event numbers and action bits are the table in SERVER section 7; every
+/// unspecified accepted-state event is invalid, not a guessed wire message.
+/// No allocation, no trap, no mutation of the input and no clock access.
+pub fn transition(c: Connection, event: int) -> Step {
+    if c.phase < 0 || c.phase > 4 || c.member != (c.phase == 1) || event < 0 || event > 26 {
+        return Step { phase: c.phase, member: c.member, actions: 0, valid: false }
+    }
+    if c.phase == 4 { return step(4, 8192) }
+    if c.phase == 3 {
+        if event == 19 { return step(3, 2048) }
+        if event == 20 || event == 21 || event == 13 { return step(4, 1) }
+        return step(3, 8192)
+    }
+    if c.phase == 0 {
+        if event == 0 || event == 1 || event == 3 || event == 18 { return step(4, 1) }
+        if event == 2 || event == 4 || event == 23 { return step(3, 2) }
+        if event == 5 { return step(3, 132) }
+        if event == 6 { return step(1, 60) }
+        if event == 7 { return step(2, 4) }
+        return Step { phase: c.phase, member: false, actions: 0, valid: false }
+    }
+    if event == 13 || event == 26 {
+        if c.member { return step(4, 17) }
+        return step(4, 1)
+    }
+    if event == 17 { return step(c.phase, 512) }
+    if c.phase == 2 {
+        if event == 16 { return step(3, 256) }
+        return step(3, 128)
+    }
+    if event == 8 { return step(1, 64) }
+    if event == 9 { return step(1, 48) }
+    if event == 10 { return step(1, 5120) }
+    if event == 11 { return step(1, 32) }
+    if event == 25 { return step(1, 8192) }
+    if event == 19 { return step(1, 2048) }
+    if event == 12 || event == 14 || event == 15 || event == 18 || event == 22 || event == 24 {
+        return step(3, 144)
+    }
+    // A well-framed wrong-role message is a protocol error as well.
+    step(3, 144)
+}

@@ -16,5 +16,6 @@ for name in ('proto-version-before-versioned-suffix',
              'proto-fragment-all-splits-and-stale-ack-after-reset',
              'proto-golden-all-21-types'):
     assert 'PASS ' + name + '\n' in text, (name, record)
+assert 'PASS server-connection-transition-model rows=' in text, record
 print(text, end='')
 print('PASS proto-checked-observation verdict=exit(0)')
