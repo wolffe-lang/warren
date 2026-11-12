@@ -1,12 +1,12 @@
 //! member: false
 //! Pure parser checks; this entry also runs under lupin.
-use vt.parser
+use vt
 
 fn expect_print(data: List[byte], expected: List[int]) {
-    var p = parser.new()
+    var p = vt.new()
     var got = List[int]()
     for b in data {
-        let step = parser.advance(mut p, b)
+        let step = vt.advance(mut p, b)
         if step.count > 0 && step.first.kind == 1 { (mut got).push(step.first.value) }
         if step.count > 1 && step.second.kind == 1 { (mut got).push(step.second.value) }
     }
