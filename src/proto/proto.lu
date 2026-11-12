@@ -55,7 +55,7 @@ pub struct Result {
 }
 
 fn result(code: int, kind: int, flags: int, used: int, bytes: List[byte]) -> Result {
-    Result { code: code, kind: kind, flags: flags, used: used, bytes: bytes }
+    Result { code: code, kind: kind, flags: flags, used: used, bytes: copy bytes }
 }
 
 fn bad(code: int) -> Result { result(code, 0, 0, 0, List[byte]()) }
@@ -112,7 +112,7 @@ pub fn put_bytes(mut b: List[byte], data: List[byte]) {
 }
 
 struct Reader { bytes: List[byte], at: int, code: int }
-fn reader(bytes: List[byte]) -> Reader { Reader { bytes: bytes, at: 0, code: 0 } }
+fn reader(bytes: List[byte]) -> Reader { Reader { bytes: copy bytes, at: 0, code: 0 } }
 fn fail(mut r: Reader, code: int) { if r.code == 0 { r.code = code } }
 fn number(mut r: Reader, width: int) -> int {
     if r.code != 0 { return 0 }
@@ -129,6 +129,14 @@ fn number(mut r: Reader, width: int) -> int {
     n
 }
 fn check(mut r: Reader, yes: bool) { if !yes { fail(mut r, MALFORMED) } }
+fn range(mut r: Reader, width: int, low: int, high: int) {
+    let n = number(mut r, width)
+    check(mut r, n >= low && n <= high)
+}
+fn scalar_number(mut r: Reader) {
+    let n = number(mut r, 4)
+    check(mut r, scalar(n))
+}
 fn scalar(n: int) -> bool { n >= 0 && n <= 0x10ffff && (n < 0xd800 || n > 0xdfff) }
 fn size_ok(cols: int, rows: int) -> bool { cols > 0 && rows > 0 && cols * rows <= GRID_MAX }
 fn colour(n: int) -> bool {
@@ -180,18 +188,18 @@ fn dimensions(mut r: Reader, empty: bool) {
 }
 
 fn hello(mut r: Reader) {
-    check(mut r, number(mut r, 4) == 0x004e5257)
+    range(mut r, 4, 0x004e5257, 0x004e5257)
     let lo = number(mut r, 2)
     let hi = number(mut r, 2)
     check(mut r, lo <= hi)
     let role = number(mut r, 1)
     check(mut r, role == 1 || role == 2)
     dimensions(mut r, role == 2)
-    check(mut r, number(mut r, 1) <= 3)
-    check(mut r, number(mut r, 4) <= 31)
+    range(mut r, 1, 0, 3)
+    range(mut r, 4, 0, 31)
     text(mut r, 1)
     text(mut r, 1)
-    check(mut r, number(mut r, 1) <= 3)
+    range(mut r, 1, 0, 3)
     text(mut r, 1)
     let count = number(mut r, 2)
     if count > (r.bytes.len - r.at) / 4 { fail(mut r, MALFORMED); return }
@@ -213,8 +221,8 @@ fn frame(mut r: Reader) {
     let cr = number(mut r, 2)
     let cc = number(mut r, 2)
     check(mut r, cr > 0 && cr <= rows && cc > 0 && cc <= cols)
-    check(mut r, number(mut r, 1) <= 6)
-    check(mut r, number(mut r, 1) <= 1)
+    range(mut r, 1, 0, 6)
+    range(mut r, 1, 0, 1)
     let count = number(mut r, 4)
     if r.code != 0 { return }
     if count > cols * rows || count > (r.bytes.len - r.at) / 26 { fail(mut r, MALFORMED); return }
@@ -248,7 +256,7 @@ fn frame(mut r: Reader) {
             check(mut r, coverage <= columns)
             var k = 0
             while k < scalars && r.code == 0 {
-                check(mut r, scalar(number(mut r, 4)))
+                scalar_number(mut r)
                 k = k + 1
             }
             j = j + 1
@@ -269,24 +277,24 @@ pub fn validate(kind: int, bytes: List[byte]) -> int {
     var r = reader(bytes)
     if kind == 1 { hello(mut r) }
     else if kind == 2 {
-        check(mut r, number(mut r, 1) <= 7)
+        range(mut r, 1, 0, 7)
         let k = number(mut r, 1)
         let code = number(mut r, 4)
         check(mut r, (k == 0 && scalar(code)) || (k == 1 && code >= 1 && code <= 55))
     } else if kind == 3 {
         let k = number(mut r, 1)
         let button = number(mut r, 1)
-        check(mut r, number(mut r, 1) <= 7)
+        range(mut r, 1, 0, 7)
         let col = number(mut r, 2)
         let row = number(mut r, 2)
         check(mut r, k <= 4 && button <= 3 && col > 0 && row > 0)
         check(mut r, (k <= 1 && button > 0) || k == 2 || (k >= 3 && button == 0))
     } else if kind == 4 || kind == 7 || kind == 133 { blob(mut r, 65536) }
-    else if kind == 5 { check(mut r, number(mut r, 1) <= 1) }
+    else if kind == 5 { range(mut r, 1, 0, 1) }
     else if kind == 6 { dimensions(mut r, false) }
-    else if kind == 8 { check(mut r, number(mut r, 4) > 0) }
+    else if kind == 8 { range(mut r, 4, 1, 4294967295) }
     else if kind == 11 {
-        check(mut r, number(mut r, 4) > 0)
+        range(mut r, 4, 1, 4294967295)
         let count = number(mut r, 2)
         check(mut r, count > 0 && count <= (r.bytes.len - r.at) / 2)
         var i = 0
@@ -295,8 +303,8 @@ pub fn validate(kind: int, bytes: List[byte]) -> int {
         text(mut r, 1)
     } else if kind == 12 || kind == 137 { let _nonce = number(mut r, 4) }
     else if kind == 129 {
-        check(mut r, number(mut r, 2) == 1)
-        check(mut r, number(mut r, 4) > 0)
+        range(mut r, 2, 1, 1)
+        range(mut r, 4, 1, 4294967295)
         let _pid = number(mut r, 4)
         text(mut r, 1)
         text(mut r, 1)
@@ -307,8 +315,8 @@ pub fn validate(kind: int, bytes: List[byte]) -> int {
     } else if kind == 131 { frame(mut r) }
     else if kind == 134 { text(mut r, 0) }
     else if kind == 136 {
-        check(mut r, number(mut r, 4) > 0)
-        check(mut r, number(mut r, 1) <= 3)
+        range(mut r, 4, 1, 4294967295)
+        range(mut r, 1, 0, 3)
         blob(mut r, REPLY_MAX)
         blob(mut r, REPLY_MAX)
     }
@@ -322,10 +330,9 @@ pub fn validate(kind: int, bytes: List[byte]) -> int {
 /// FRAME/PASTE/REPLY, whose final fragment need not itself be a payload.
 pub fn decode(bytes: List[byte]) -> Result {
     if bytes.len < 6 { return bad(SHORT) }
-    var r = reader(bytes)
-    let n = number(mut r, 4)
-    let kind = number(mut r, 1)
-    let flags = number(mut r, 1)
+    let n = (bytes[0] as int) + (bytes[1] as int) * 256 + (bytes[2] as int) * 65536 + (bytes[3] as int) * 16777216
+    let kind = bytes[4] as int
+    let flags = bytes[5] as int
     if n > PHYSICAL_MAX { return bad(LIMIT) }
     let code = header(kind, flags)
     if code != 0 { return bad(code) }
