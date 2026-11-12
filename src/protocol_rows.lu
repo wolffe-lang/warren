@@ -67,7 +67,7 @@ fn payload(kind: int) -> List[byte] {
     b
 }
 
-fn image(cols: int, rows: int, distinct: bool, three: bool) -> List[byte] {
+fn image(cols: int, rows: int, separate: bool, three: bool) -> List[byte] {
     var b = List[byte]()
     proto.put(mut b, 1, 4)
     proto.put(mut b, 0, 4)
@@ -78,7 +78,7 @@ fn image(cols: int, rows: int, distinct: bool, three: bool) -> List[byte] {
     proto.put(mut b, 2, 1)
     proto.put(mut b, 1, 1)
     var n = rows
-    if distinct { n = cols * rows }
+    if separate { n = cols * rows }
     proto.put(mut b, n, 4)
     var r = 1
     while r <= rows {
@@ -90,7 +90,7 @@ fn image(cols: int, rows: int, distinct: bool, three: bool) -> List[byte] {
             proto.put(mut b, 0, 4)
             proto.put(mut b, 0, 4)
             var cover = cols
-            if distinct { cover = 1 }
+            if separate { cover = 1 }
             proto.put(mut b, cover, 2)
             proto.put(mut b, 1, 2)
             proto.put(mut b, 1, 1)
@@ -236,12 +236,12 @@ fn test_repaint_costs() {
         var rows = 24
         if dims == 320 { rows = 90 }
         let blank = proto.encode(131, 0, image(dims, rows, false, false))
-        let distinct = proto.encode(131, 0, image(dims, rows, true, false))
+        let separate = proto.encode(131, 0, image(dims, rows, true, false))
         let worst = proto.encode(131, 0, image(dims, rows, true, true))
         assert(blank.code == 0 && blank.bytes.len == 28 + rows * 26)
-        assert(distinct.code == 0 && distinct.bytes.len == 28 + dims * rows * 26)
+        assert(separate.code == 0 && separate.bytes.len == 28 + dims * rows * 26)
         assert(worst.code == 0 && worst.bytes.len == 28 + dims * rows * 34)
-        print("PASS proto-repaint {dims}x{rows} blank={blank.bytes.len} distinct={distinct.bytes.len} worst={worst.bytes.len} frames=1")
+        print("PASS proto-repaint {dims}x{rows} blank={blank.bytes.len} separate={separate.bytes.len} worst={worst.bytes.len} frames=1")
     }
 }
 
