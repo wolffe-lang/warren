@@ -1,0 +1,10 @@
+# Exercises the same image/engine/tool preflight as linux.manifest, no build.
+engine ./engine.sh --network=none --memory=256m
+floor 35 ../../..
+rig preflight.manifest committed=../../..:HEAD:tests/proto/rig/preflight.manifest
+rig linux.manifest committed=../../..:HEAD:tests/proto/rig/linux.manifest
+rig step.sh committed=../../..:HEAD:tests/proto/rig/step.sh
+rig observation.py committed=../../..:HEAD:tests/proto/rig/observation.py
+rig engine.sh committed=../../..:HEAD:tests/proto/rig/engine.sh
+rig preflight.sh committed=../../..:HEAD:tests/proto/rig/preflight.sh
+step preflight-only image=localhost/wr02-oracle:1 tools=bash,python3,gcc,git,curl,xterm,Xvfb,tmux -- true
