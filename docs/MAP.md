@@ -4,14 +4,14 @@
 |---|---|---|
 | W0 | pins, tiered CI, the oracle, the survey, the prediction | the repository half is here; the PAX readiness half is measured in PAX |
 | W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | planned |
-| W2 | server, client, protocol v1; one pane; detach and attach | planned |
+| W2 | server, client, protocol v1; one pane; detach and attach | pure protocol codec and server contract; I/O planned |
 | W3 | split tree, tabs, modes, the hint bar, configuration v1 | planned |
 | W4 | mouse, scrollback, copy mode, search, OSC 52 | planned |
 | W5 | command socket, CLI verbs, layout files, save and restore | planned |
 | W6 | static on the PAX image; rows in PAX's own suites | planned |
 
-Nothing below the first row is implemented. A statement in this file is
-either marked *planned* or names the gate step that measures it.
+The protocol codec is implemented; the server/client and emulator remain
+planned here. A statement is marked *planned* or names its measuring rows.
 
 ## The frame
 
@@ -33,7 +33,9 @@ either marked *planned* or names the gate step that measures it.
   a renderer that applies the server's frames as minimal escape sequences. A
   client that dies leaves the session intact. *Planned.*
 - **The wire protocol** is length-framed and versioned from its first byte.
-  *Planned.*
+  [PROTOCOL](PROTOCOL.md) fixes the bytes; the pure codec is exercised by
+  `src/protocol_rows.lu` and the bounded Linux `src/protocol_fuzz.lu` row.
+  [SERVER](SERVER.md) is the event-loop contract, not a running server.
 - **The compositor** renders each pane's grid into a client's frame with
   borders, the tab bar and the hint bar, and tracks damage so that a keystroke
   repaints cells, not screens. *Planned.*
@@ -43,7 +45,7 @@ either marked *planned* or names the gate step that measures it.
 | Module | Pure | Milestone | Measured today |
 |---|---|---|---|
 | `src/vt` | yes | W1 | exists and compiles (`build`, `wolf-test`, `lupin-pure`) |
-| `src/proto` | yes | W2 | exists and compiles |
+| `src/proto` | yes | W2 | bounded framing, payload validation, encode, assembly and ACK model (`protocol_rows`, `protocol_fuzz`) |
 | `src/layout` | yes | W3 | exists and compiles |
 | `src/server` | no | W2 | exists and compiles |
 | `src/client` | no | W2 | exists and compiles |

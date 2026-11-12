@@ -182,6 +182,19 @@ automated clients and was not asked again.
 | docs/windows-beta.mdx | https://raw.githubusercontent.com/herdrdev/herdr/v0.9.5/docs/next/website/src/content/docs/windows-beta.mdx | 12318 | `8630377ce26963373cac62d20c700c6d19060671cc2d8096650e0196d67b549b` |
 | docs/config-reference.json | https://raw.githubusercontent.com/herdrdev/herdr/v0.9.5/docs/next/website/src/data/config-reference.json | 59081 | `86b27928b1ce20fe20b0a41dc524be9228de0d98ac43ed147064a814cdac35c7` |
 
+## Consulted for protocol v1 (2026-11-12)
+
+| Reference | Identity | Use |
+|---|---|---|
+| PAX `notes/px125-multiplexer-readiness.md`, documents only | branch px125 at `6c559045`; SHA-256 `0242c786ec81713f1b9d564f4c60cfae6a572b7c48d8a4fa6d0010ff3667db4f` | 4096-byte sockets, pty queues, process slots, terminal and daemon evidence; no kernel source opened |
+| wolf-std `std/poll/poll.lu` and all nine `tests/poll/` rows | trunk `be1d10fa2798cc6bc2a1fd0b2e559e283469c9bf`; module SHA-256 `eec27137180e9c818d65054aaf22f69338a787cc3923f32630d3e770a06c5d59` | the actual Waiter surface, its four named unsupported combinations, partial pty writes and hangup posture |
+| wolf-std `docs/sc82-one-wait.md` | same commit; SHA-256 `0a42c592f35abcd9f17e4e420bd465ccfb79b685fdce2933a5a94c81865c85d0` | runtime readiness-set/partial-write/peer-credential contracts M1-M3 and the reported evidence boundary |
+| warren's public protocol/emulator drafts, SCREEN-DUMP and TERM | starting tree `7f4f3380` | wire layout and server state-machine starting contract; at most two marks per cell |
+
+The protocol lane did not read multiplexers' protocols or any source on the
+never-read list. Its codec/model rows open no socket, pty or child process;
+existing oracle gates remain black-box binary runs.
+
 ## Incidental exposure
 
 None. No file of source code from the never-read list was opened or shown.

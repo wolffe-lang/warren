@@ -5,12 +5,16 @@ for PAX first, and measured on x86-64 Linux and macOS arm64 from the first
 pull request. It takes its ideas from tmux, zellij and herdr, and none of
 their code.
 
-**Status: W0, the map. No part of the multiplexer is implemented.** The
-repository holds the pins, the module tree as compiling stubs, tiered CI, a
-pinned reference emulator with a harness that reads its screen cell for cell,
-a survey of tmux, zellij and herdr, a recorded corpus, and the predictions
-and drafts the next milestones are written from. The `warren` binary this
-tree builds prints that it is a scaffold and exits 1.
+**Status: the map and the pure protocol v1 codec. No working multiplexer
+is implemented yet.** The repository holds the pins, the module tree,
+tiered CI, a pinned reference emulator with a harness that reads its screen
+cell for cell, a survey, recorded corpus, and predictions/drafts for the
+next milestones. `src/proto` now implements bounded transport framing,
+message validation/encoding, fragment assembly and connection-wide image
+acknowledgement sequencing; [PROTOCOL](docs/PROTOCOL.md) fixes the bytes and
+[SERVER](docs/SERVER.md) is the event-loop contract and its blocking library
+dependencies. No server, client, socket or pty is implemented. The `warren`
+binary still prints its executable scaffold status and exits 1.
 [MAP](docs/MAP.md) separates what is planned from what is measured.
 
 ## What is planned
@@ -41,7 +45,7 @@ tree builds prints that it is a scaffold and exits 1.
 |---|---|---|
 | W0 | the map: pins, CI, the oracle, the survey, the prediction | in progress |
 | W1 | the emulator | planned |
-| W2 | one pane; detach and attach | planned |
+| W2 | one pane; detach and attach | pure protocol codec and server contract; I/O planned |
 | W3 | panes, tabs, the bar, keys | planned |
 | W4 | mouse, scrollback, copy | planned |
 | W5 | layouts, commands, persistence | planned |
@@ -104,6 +108,15 @@ read, every normalisation by name, and what the mechanism cannot show.
 [SURVEY](docs/SURVEY.md) and [TERM](docs/TERM.md) are the survey and the
 recommendation on what programs inside are told.
 
+The protocol-specific entry points are `src/protocol_rows.lu` (all 21 type
+goldens, round trips/truncations, wide/full coverage, fragments, stale ACK,
+repaint byte costs and a pure partial-write model) and
+`src/protocol_fuzz.lu` (10,000 bounded deterministic malformed inputs, Linux
+under a memory cap). `tests/proto/rig/` records native, checked and lupin
+runs separately. Live socket/pty and renderer/model-cell comparisons belong
+to the [one-pane implementation contract](notes/wr02-draft-wr03-one-pane.md),
+not to the pure codec's evidence.
+
 Unlabelled pull requests run the unit gate. The `ci` label requests the Linux
 gate, and `full-matrix` requests Linux and macOS. Pushes to `trunk`, the
 nightly run and a manual dispatch run everything.
@@ -139,10 +152,11 @@ those programs may be run as black boxes.
 Never read: the source of tmux, zellij, screen, herdr, dvtm, abduco or mosh;
 of any terminal emulator (xterm, alacritty, kitty, wezterm, foot, vte,
 libvterm, libtsm, st); of ncurses, termwiz or the vt100 and vte crates; or of
-any operating-system kernel other than PAX.
+any operating-system kernel.
 
-Organisation-owned code may be consulted: PAX's console and pseudo-terminals,
-yew's terminal layer, pelt, burrow's session code and quarry.
+Organisation-owned terminal/session programs may be consulted without
+opening a kernel implementation. PAX readiness is read from its public
+probe notes and black-box results.
 [SOURCES](docs/SOURCES.md) records what was actually consulted.
 
 ## Licence
