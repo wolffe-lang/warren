@@ -1,7 +1,125 @@
 //! member: true
-//! Screen-dispatch seam; printing and C0 operations are red-first rows next.
+//! Initial screen dispatch: narrow ASCII and BS/HT/LF/VT/FF/CR. Unicode
+//! widths, sequence operations, history and events are later grid slices.
 
-/// Consume bytes incrementally. Dispatch is not implemented at this seam.
+fn blank_cell(mut screen: Screen, at: int, background: int) {
+    screen.cells[at].base = 32
+    screen.cells[at].mark1 = 0
+    screen.cells[at].mark2 = 0
+    screen.cells[at].width = 1
+    screen.cells[at].flags = 0
+    screen.cells[at].foreground = 0 - 1
+    screen.cells[at].background = background
+}
+
+fn copy_cell(mut screen: Screen, to: int, from: int) {
+    screen.cells[to].base = screen.cells[from].base
+    screen.cells[to].mark1 = screen.cells[from].mark1
+    screen.cells[to].mark2 = screen.cells[from].mark2
+    screen.cells[to].width = screen.cells[from].width
+    screen.cells[to].flags = screen.cells[from].flags
+    screen.cells[to].foreground = screen.cells[from].foreground
+    screen.cells[to].background = screen.cells[from].background
+}
+
+fn scroll_up_one(mut screen: Screen, cols: int, top: int, bottom: int, background: int) {
+    var row = top - 1
+    while row < bottom - 1 {
+        var col = 0
+        while col < cols {
+            copy_cell(mut screen, row * cols + col, (row + 1) * cols + col)
+            col += 1
+        }
+        screen.extents[row] = screen.extents[row + 1]
+        screen.wrapped[row] = screen.wrapped[row + 1]
+        row += 1
+    }
+    var col = 0
+    while col < cols { blank_cell(mut screen, (bottom - 1) * cols + col, background); col += 1 }
+    screen.extents[bottom - 1] = 0
+    screen.wrapped[bottom - 1] = false
+}
+
+fn index_line(mut pane: Vt) {
+    pane.pending_wrap = false
+    if pane.cursor_row == pane.region_bottom {
+        if pane.active_alternate {
+            scroll_up_one(mut pane.alternate, pane.cols, pane.region_top, pane.region_bottom, pane.pen.background)
+        } else {
+            scroll_up_one(mut pane.primary, pane.cols, pane.region_top, pane.region_bottom, pane.pen.background)
+        }
+    } else if pane.cursor_row < pane.rows {
+        pane.cursor_row += 1
+    }
+}
+
+fn write_narrow(mut screen: Screen, cols: int, row: int, col: int, cp: int,
+        flags: int, foreground: int, background: int) {
+    let at = (row - 1) * cols + col - 1
+    screen.cells[at].base = cp
+    screen.cells[at].mark1 = 0
+    screen.cells[at].mark2 = 0
+    screen.cells[at].width = 1
+    screen.cells[at].flags = flags
+    screen.cells[at].foreground = foreground
+    screen.cells[at].background = background
+    if screen.extents[row - 1] < col { screen.extents[row - 1] = col }
+}
+
+fn print_ascii(mut pane: Vt, cp: int) {
+    if pane.pending_wrap && pane.modes.autowrap {
+        if pane.active_alternate { pane.alternate.wrapped[pane.cursor_row - 1] = true }
+        else { pane.primary.wrapped[pane.cursor_row - 1] = true }
+        index_line(mut pane)
+        pane.cursor_col = 1
+    }
+    if pane.active_alternate {
+        write_narrow(mut pane.alternate, pane.cols, pane.cursor_row, pane.cursor_col, cp,
+            pane.pen.flags, pane.pen.foreground, pane.pen.background)
+    } else {
+        write_narrow(mut pane.primary, pane.cols, pane.cursor_row, pane.cursor_col, cp,
+            pane.pen.flags, pane.pen.foreground, pane.pen.background)
+    }
+    if pane.cursor_col == pane.cols { pane.pending_wrap = true }
+    else { pane.cursor_col += 1 }
+}
+
+fn execute_c0(mut pane: Vt, cp: int) {
+    if cp == 8 {
+        pane.pending_wrap = false
+        if pane.cursor_col > 1 { pane.cursor_col -= 1 }
+    } else if cp == 9 {
+        var col = pane.cursor_col + 1
+        while col < pane.cols && !pane.tabs[col - 1] { col += 1 }
+        if col > pane.cols { col = pane.cols }
+        pane.cursor_col = col
+    } else if cp == 10 || cp == 11 || cp == 12 {
+        if pane.active_alternate { pane.alternate.wrapped[pane.cursor_row - 1] = false }
+        else { pane.primary.wrapped[pane.cursor_row - 1] = false }
+        index_line(mut pane)
+        if pane.modes.newline { pane.cursor_col = 1 }
+    } else if cp == 13 {
+        pane.cursor_col = 1
+        pane.pending_wrap = false
+    }
+}
+
+fn dispatch_grid_token(mut pane: Vt, kind: int, value: int) {
+    if kind == 1 && value >= 32 && value <= 126 { print_ascii(mut pane, value) }
+    else if kind == 2 { execute_c0(mut pane, value) }
+}
+
+/// Consume bytes with incremental parsing and initial ASCII/C0 screen
+/// operations. The grid is incomplete: Unicode, ESC/CSI/OSC effects,
+/// scrollback, answers and events are not served by this slice yet.
 pub fn feed(mut pane: Vt, data: List[byte]) {
-    for b in data { advance_in_place(mut pane.parser, b) }
+    for b in data {
+        advance_in_place(mut pane.parser, b)
+        if pane.parser.output_count > 0 {
+            dispatch_grid_token(mut pane, pane.parser.first_kind, pane.parser.first_value)
+        }
+        if pane.parser.output_count > 1 {
+            dispatch_grid_token(mut pane, pane.parser.second_kind, pane.parser.second_value)
+        }
+    }
 }
