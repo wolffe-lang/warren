@@ -31,7 +31,7 @@ pub struct Modes {
 pub struct Vt {
     cols: int, rows: int,
     primary: Screen, alternate: Screen, active_alternate: bool,
-    cursor_row: int, cursor_col: int, pending_wrap: bool,
+    cursor_row: int, cursor_col: int, cursor_shape: int, pending_wrap: bool,
     region_top: int, region_bottom: int,
     tabs: List[bool], default_tabs: bool,
     pen: Pen, modes: Modes, parser: Parser,
@@ -72,7 +72,7 @@ pub fn new(cols: int, rows: int, scrollback_cap_bytes: int) -> Vt {
     assert(cols >= 1 && rows >= 1 && scrollback_cap_bytes >= 0)
     Vt {
         cols: cols, rows: rows, primary: new_screen(cols, rows), alternate: new_screen(cols, rows),
-        active_alternate: false, cursor_row: 1, cursor_col: 1, pending_wrap: false,
+        active_alternate: false, cursor_row: 1, cursor_col: 1, cursor_shape: 2, pending_wrap: false,
         region_top: 1, region_bottom: rows,
         tabs: default_tabs(cols), default_tabs: true,
         pen: Pen { flags: 0, foreground: 0 - 1, background: 0 - 1 },

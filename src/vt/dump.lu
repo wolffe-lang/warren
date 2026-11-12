@@ -1,8 +1,140 @@
 //! member: true
-//! Red-first dump seam; format 1 rendering follows its rows.
+//! Deterministic screen-dump format 1. Rendering allocates output, never I/O.
+use std.strbuf
+use std.hex
 
-/// Return screen dump format 1. This seam is intentionally empty.
+fn dump_line(mut out: strbuf.StrBuf, text: str) {
+    strbuf.push_str(mut out, text)
+    strbuf.push_str(mut out, "\n")
+}
+
+fn bool_number(value: bool) -> int { if value { 1 } else { 0 } }
+
+fn codepoint_text(cp: int) -> str {
+    let digits = "0123456789ABCDEF"
+    var n = cp
+    var text = ""
+    while n > 0 {
+        let index = n % 16
+        let digit = digits[index..index + 1]
+        text = "{digit}{text}"
+        n = n / 16
+    }
+    while text.len < 4 { text = "0{text}" }
+    "U+{text}"
+}
+
+fn cell_text(cell: Cell) -> str {
+    if cell.width == 0 { return "-" }
+    var text = codepoint_text(cell.base)
+    if cell.mark1 != 0 { text = "{text}+{codepoint_text(cell.mark1)}" }
+    if cell.mark2 != 0 { text = "{text}+{codepoint_text(cell.mark2)}" }
+    text
+}
+
+fn colour_text(value: int) -> str {
+    if value < 16777216 { return "idx:{value}" }
+    let rgb = value - 16777216
+    "rgb:{rgb / 65536}:{rgb / 256 % 256}:{rgb % 256}"
+}
+
+fn join_attribute(text: str, attribute: str) -> str {
+    if text.len == 0 { return attribute }
+    "{text},{attribute}"
+}
+
+fn cell_attributes(cell: Cell) -> str {
+    var text = ""
+    if cell.flags % 2 == 1 { text = join_attribute(text, "bold") }
+    if cell.flags / 2 % 2 == 1 { text = join_attribute(text, "dim") }
+    if cell.flags / 4 % 2 == 1 { text = join_attribute(text, "italic") }
+    if cell.flags / 8 % 2 == 1 { text = join_attribute(text, "underline") }
+    if cell.flags / 16 % 2 == 1 { text = join_attribute(text, "double-underline") }
+    if cell.flags / 32 % 2 == 1 { text = join_attribute(text, "blink") }
+    if cell.flags / 64 % 2 == 1 { text = join_attribute(text, "inverse") }
+    if cell.flags / 128 % 2 == 1 { text = join_attribute(text, "invisible") }
+    if cell.flags / 256 % 2 == 1 { text = join_attribute(text, "strike") }
+    if cell.foreground >= 0 { text = join_attribute(text, "fg={colour_text(cell.foreground)}") }
+    if cell.background >= 0 { text = join_attribute(text, "bg={colour_text(cell.background)}") }
+    if text.len == 0 { return "-" }
+    text
+}
+
+fn same_cell(a: Cell, b: Cell) -> bool {
+    a.base == b.base && a.mark1 == b.mark1 && a.mark2 == b.mark2 && a.width == b.width &&
+        a.flags == b.flags && a.foreground == b.foreground && a.background == b.background
+}
+
+fn dump_screen(mut out: strbuf.StrBuf, screen: Screen, cols: int, rows: int) {
+    var row = 0
+    while row < rows {
+        dump_line(mut out, "row {row + 1} extent={screen.extents[row]}")
+        var col = 0
+        while col < cols {
+            var end = col
+            if screen.cells[row * cols + col].width == 1 {
+                while end + 1 < cols && same_cell(screen.cells[row * cols + col], screen.cells[row * cols + end + 1]) {
+                    end += 1
+                }
+            }
+            let span = if col == end { "{col + 1}" } else { "{col + 1}-{end + 1}" }
+            let cell = screen.cells[row * cols + col]
+            dump_line(mut out, "{span} {cell.width} {cell_text(cell)} {cell_attributes(cell)}")
+            col = end + 1
+        }
+        row += 1
+    }
+}
+
+/// Return deterministic screen-dump format 1 for the active screen. The pen,
+/// inactive cells and pending notification history are not rendered. Mode
+/// 2026 is stored state, intentionally unlike the reference's unknown mode.
 pub fn dump(pane: Vt) -> str {
-    if pane.cols < 1 { return "" }
-    ""
+    var out = strbuf.new()
+    dump_line(mut out, "warren-screen 1")
+    dump_line(mut out, "size {pane.cols} {pane.rows}")
+    dump_line(mut out, "cursor {pane.cursor_row} {pane.cursor_col} shape={pane.cursor_shape} visible={bool_number(pane.modes.cursor_visible)} pending-wrap={bool_number(pane.pending_wrap)}")
+    dump_line(mut out, "region {pane.region_top} {pane.region_bottom}")
+    var tabs = strbuf.new()
+    var has_tabs = false
+    var col = 0
+    while col < pane.cols {
+        if pane.tabs[col] {
+            if has_tabs { strbuf.push_str(mut tabs, ",") }
+            strbuf.push_str(mut tabs, "{col + 1}")
+            has_tabs = true
+        }
+        col += 1
+    }
+    let tabs_text = if has_tabs { strbuf.to_str(tabs) } else { "-" }
+    dump_line(mut out, "tabs {tabs_text}")
+    let title = if pane.title_length == 0 { "-" } else { hex.encode(pane.title_storage[0..pane.title_length]) }
+    dump_line(mut out, "title {title}")
+    dump_line(mut out, "mode alternate-screen-1047 {bool_number(pane.active_alternate)}")
+    dump_line(mut out, "mode alternate-screen-1049 {bool_number(pane.active_alternate)}")
+    dump_line(mut out, "mode alternate-screen-47 {bool_number(pane.active_alternate)}")
+    dump_line(mut out, "mode alternate-scroll {pane.mode_values[13]}")
+    dump_line(mut out, "mode application-cursor-keys {pane.mode_values[2]}")
+    dump_line(mut out, "mode application-keypad {pane.mode_values[7]}")
+    dump_line(mut out, "mode autowrap {bool_number(pane.modes.autowrap)}")
+    dump_line(mut out, "mode bracketed-paste {pane.mode_values[14]}")
+    dump_line(mut out, "mode cursor-blink {pane.mode_values[5]}")
+    dump_line(mut out, "mode cursor-visible {bool_number(pane.modes.cursor_visible)}")
+    dump_line(mut out, "mode focus-events {pane.mode_values[11]}")
+    dump_line(mut out, "mode insert {bool_number(pane.modes.insert)}")
+    dump_line(mut out, "mode left-right-margins 0")
+    dump_line(mut out, "mode mouse-any-motion {pane.mode_values[10]}")
+    dump_line(mut out, "mode mouse-button-motion {pane.mode_values[9]}")
+    dump_line(mut out, "mode mouse-press-release {pane.mode_values[8]}")
+    dump_line(mut out, "mode mouse-sgr {pane.mode_values[12]}")
+    dump_line(mut out, "mode mouse-urxvt 0")
+    dump_line(mut out, "mode mouse-utf8 0")
+    dump_line(mut out, "mode newline {bool_number(pane.modes.newline)}")
+    dump_line(mut out, "mode origin {bool_number(pane.modes.origin)}")
+    dump_line(mut out, "mode reverse-wrap 0")
+    dump_line(mut out, "mode send-receive 1")
+    dump_line(mut out, "mode synchronized-output {pane.mode_values[15]}")
+    if pane.active_alternate { dump_screen(mut out, pane.alternate, pane.cols, pane.rows) }
+    else { dump_screen(mut out, pane.primary, pane.cols, pane.rows) }
+    strbuf.to_str(out)
 }
