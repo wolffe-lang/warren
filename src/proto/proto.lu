@@ -83,7 +83,7 @@ fn header(kind: int, flags: int) -> int {
 /// Final encode still validates all bytes, so builders cannot bypass it.
 pub fn put(mut b: List[byte], value: int, width: int) {
     if width != 1 && width != 2 && width != 4 { return }
-    var max = 255
+    var max: int = 255
     if width == 2 { max = 65535 }
     if width == 4 { max = 4294967295 }
     if value < 0 || value > max { return }
@@ -117,8 +117,8 @@ fn fail(mut r: Reader, code: int) { if r.code == 0 { r.code = code } }
 fn number(mut r: Reader, width: int) -> int {
     if r.code != 0 { return 0 }
     if width > r.bytes.len - r.at { fail(mut r, MALFORMED); return 0 }
-    var n = 0
-    var factor = 1
+    var n: int = 0
+    var factor: int = 1
     var i = 0
     while i < width {
         n = n + (r.bytes[r.at] as int) * factor
