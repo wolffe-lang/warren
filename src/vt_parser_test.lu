@@ -37,7 +37,53 @@ fn test_decoder() {
     expect_octets([226, 128, 128, 240, 144, 128, 128], [8192, 65536])
 }
 
+fn expect_tokens(text: str, expected: List[int]) {
+    var p = vt.new()
+    var got = List[int]()
+    for b in text.bytes() {
+        let step = vt.advance(mut p, b)
+        if step.count > 0 {
+            (mut got).push(step.first.kind)
+            (mut got).push(step.first.value)
+        }
+        if step.count > 1 {
+            (mut got).push(step.second.kind)
+            (mut got).push(step.second.value)
+        }
+    }
+    assert(got.len == expected.len, "parser-transitions-length")
+    var i = 0
+    while i < got.len {
+        assert(got[i] == expected[i], "parser-transitions-token")
+        i += 1
+    }
+}
+
+fn test_transitions() {
+    expect_tokens("\u{1b}[31mX", [4, 109, 1, 88])
+    expect_tokens("\u{1b}[3\r1mX", [2, 13, 4, 109, 1, 88])
+    expect_tokens("\u{1b}[31\u{18}mX", [1, 109, 1, 88])
+    expect_tokens("\u{1b}[31\u{1a}mX", [1, 109, 1, 88])
+    expect_tokens("\u{1b}[31\u{1b}[1mX", [4, 109, 1, 88])
+    expect_tokens("\u{1b}[5 zX", [4, 122, 1, 88])
+    expect_tokens("\u{1b}[?9999hX", [4, 104, 1, 88])
+    expect_tokens("\u{1b}jX", [3, 106, 1, 88])
+    expect_tokens("\u{1b}(0X", [3, 48, 1, 88])
+    expect_tokens("\u{1b}]2;abc\u{7}X", [5, 0, 1, 88])
+    expect_tokens("\u{1b}]2;abc\u{1b}\\X", [5, 0, 1, 88])
+    expect_tokens("\u{1b}]2;abc\nX", [])
+    expect_tokens("\u{1b}Pqqq\u{7}X\u{1b}\\Y", [1, 89])
+    expect_tokens("\u{1b}_app\u{1b}\\X", [1, 88])
+    expect_tokens("\u{1b}^pm\u{1b}\\X", [1, 88])
+    expect_tokens("\u{1b}Xsos\u{1b}\\X", [1, 88])
+    expect_tokens("\u{1b}]2;lost\u{1b}[31mX", [4, 109, 1, 88])
+    expect_tokens("\u{1b}[1?mX", [1, 88])
+    expect_tokens("\u{1b}[1 2mX", [1, 88])
+    expect_tokens("\u{1b}[1   mX", [1, 88])
+}
+
 fn main() -> int {
     test_decoder()
+    test_transitions()
     0
 }
