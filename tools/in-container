@@ -16,15 +16,24 @@ print(h.hexdigest()[:20])
 PY
 )
 image="wr00-oracle:$key"
-"$engine" build --memory "$memory" --build-arg "BUILD_CPUS=$cpus" -f "$root/ci/oracle.Containerfile" -t "$image" "$root"
-mkdir -p "$root/target/oracle"
-"$engine" image inspect "$image" --format '{{.Id}}' | tee "$root/target/oracle/image-id.txt"
-for file in oracle-packages.txt oracle-binaries.txt; do
-  "$engine" run --rm --memory "$memory" "$image" cat "/opt/$file" > "$root/target/oracle/$file"
-done
-diff -u "$root/ci/packages.txt" "$root/target/oracle/oracle-packages.txt"
-diff -u "$root/ci/oracle-binaries.lock" "$root/target/oracle/oracle-binaries.txt"
-echo 'PASS oracle-binary-and-package-pins'
+mkdir -p "$root/target/oracle" "$root/target/gate"
+oracle_image() {
+  "$engine" build --memory "$memory" --build-arg "BUILD_CPUS=$cpus" -f "$root/ci/oracle.Containerfile" -t "$image" "$root" || return 1
+  "$engine" image inspect "$image" --format '{{.Id}}' | tee "$root/target/oracle/image-id.txt"
+  for file in oracle-packages.txt oracle-binaries.txt; do
+    "$engine" run --rm --memory "$memory" "$image" cat "/opt/$file" > "$root/target/oracle/$file" || return 1
+  done
+  diff -u "$root/ci/packages.txt" "$root/target/oracle/oracle-packages.txt" || { echo 'FAIL oracle-image: the package list is not the pin'; return 1; }
+  diff -u "$root/ci/oracle-binaries.lock" "$root/target/oracle/oracle-binaries.txt" || { echo 'FAIL oracle-image: a binary is not the pin'; return 1; }
+  echo 'PASS oracle-binary-and-package-pins'
+}
+# The same START/END shape as tools/gate, so one record reads both.
+start=$SECONDS rc=0
+echo 'START oracle-image'
+oracle_image > "$root/target/gate/oracle-image.log" 2>&1 || rc=$?
+if [ "$rc" -eq 0 ]; then sed 's/^/  /' "$root/target/gate/oracle-image.log"; else awk '/^FAIL / {print; next} {print "  " $0}' "$root/target/gate/oracle-image.log"; fi
+echo "END oracle-image exit=$rc secs=$((SECONDS-start))"
+[ "$rc" -eq 0 ] || exit "$rc"
 if [ "${WARREN_PREPARE_ONLY:-0}" = 1 ]; then exit 0; fi
 if [ "$#" -eq 0 ]; then set -- bash tools/gate linux; fi
 "$engine" run --rm --init --memory "$memory" --pids-limit 4096 \
