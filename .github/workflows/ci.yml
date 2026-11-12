@@ -44,7 +44,8 @@ jobs:
     needs: plan
     if: ${{ contains(fromJSON(needs.plan.outputs.jobs), 'linux') }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # The image's packages come from a snapshot archive that can be slow.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - run: bash tools/in-container
