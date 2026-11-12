@@ -325,9 +325,24 @@ pub fn validate(kind: int, bytes: List[byte]) -> int {
     0
 }
 
-/// One physical frame, before logical assembly; validates the complete
-/// payload when it is not a continuation-capable type. Use append for
-/// FRAME/PASTE/REPLY, whose final fragment need not itself be a payload.
+/// The fixed eight-byte HELLO prefix, independent of the versioned suffix.
+pub struct Version { code: int, minimum: int, maximum: int }
+/// Decode only the permanent prefix; negotiate before validating v1's suffix.
+pub fn hello_version(bytes: List[byte]) -> Version {
+    if bytes.len < 8 { return Version { code: SHORT, minimum: 0, maximum: 0 } }
+    if bytes[0] != 87 as byte || bytes[1] != 82 as byte || bytes[2] != 78 as byte || bytes[3] != 0 as byte {
+        return Version { code: MALFORMED, minimum: 0, maximum: 0 }
+    }
+    let low = (bytes[4] as int) + (bytes[5] as int) * 256
+    let high = (bytes[6] as int) + (bytes[7] as int) * 256
+    var code = 0
+    if low > high { code = MALFORMED }
+    Version { code: code, minimum: low, maximum: high }
+}
+
+/// Decode ONE physical frame, before logical assembly. Payloads are raw:
+/// first negotiate HELLO's fixed prefix, then use append/validate for every
+/// complete logical message. A final fragment is not itself a payload.
 pub fn decode(bytes: List[byte]) -> Result {
     if bytes.len < 6 { return bad(SHORT) }
     let n = (bytes[0] as int) + (bytes[1] as int) * 256 + (bytes[2] as int) * 65536 + (bytes[3] as int) * 16777216
@@ -342,10 +357,6 @@ pub fn decode(bytes: List[byte]) -> Result {
     var body = List[byte]()
     var i = 6
     while i < 6 + n { (mut body).push(bytes[i]); i = i + 1 }
-    if !fragmented(kind) {
-        let message_code = validate(kind, body)
-        if message_code != 0 { return bad(message_code) }
-    }
     result(0, kind, flags, n + 6, body)
 }
 
