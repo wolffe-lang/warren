@@ -194,9 +194,12 @@ Start with `term.open_pty`, `process.command`, argument/environment setup,
 `process.start_session` with the pty slave. Startup must reset signal
 ignore/blocked state and inherit no unrelated masters or sockets; this is
 an end-to-end row, not inferred from the function name. Reap using
-`process.poll` (nonblocking) and consume completed child ownership through
-the appropriate status-taking API, not a blocking wait for an active child.
-The next lane must verify those actual signatures at its new pin.
+`process.poll()` until `Change.changed` is false. A reported ended child is
+already reaped and its runtime handle closed; match `Change.child.slot` to
+the saved owner and retire that handle without calling `wait_status` again
+(it would return `io`). A stopped child remains live and must not be marked
+exited. Never use a blocking wait for an active child. The next lane must
+verify these actual signatures and status accessors at its new pin.
 Environment is the session's with TERM=xterm-256color, COLORTERM=truecolor,
 TERM_PROGRAM=warren, TERM_PROGRAM_VERSION, WARREN and WARREN_PANE set;
 remove other multiplexer markers and LINES/COLUMNS, as TERM.md specifies.
