@@ -1,0 +1,15 @@
+//! member: false
+//! The pure modules alone, as one program with a `main`: the form the
+//! reference interpreter runs. The server, client, command and configuration
+//! modules are not imported here, and never will be.
+use vt
+use proto
+use layout
+
+fn main() -> int {
+    assert(vt.pure())
+    assert(proto.pure())
+    assert(layout.pure())
+    assert(vt.milestone() == "W1")
+    0
+}

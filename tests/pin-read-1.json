@@ -1,0 +1,88 @@
+{
+  "lupin": {
+    "assets": [
+      {
+        "digest": "sha256:7236424618f5bbf1e5f7693cd6333df90b715e1401b08b795668cbb1425ed5af",
+        "id": 733860923,
+        "name": "lupin-0.1.61-aarch64-apple-darwin.tar.gz",
+        "size": 2876085
+      },
+      {
+        "digest": "sha256:3a2b92423e53a6b539e30b8a4f055c09ccac30853f332da3305966550d1ac7d3",
+        "id": 733863161,
+        "name": "lupin-0.1.61-aarch64-unknown-linux-gnu.tar.gz",
+        "size": 3053876
+      },
+      {
+        "digest": "sha256:06c4cc82f1ab7d8f6acdd7d21f43b519a2927c22344947d6c068aec588138436",
+        "id": 733850525,
+        "name": "lupin-0.1.61-x86_64-pc-windows-msvc.zip",
+        "size": 2807410
+      },
+      {
+        "digest": "sha256:61ce849eac0b531803e5bdf1fe07d91d3d69ecb57f83c5e7eb7c5d553cbef41b",
+        "id": 733849563,
+        "name": "lupin-0.1.61-x86_64-unknown-linux-gnu.tar.gz",
+        "size": 3214198
+      },
+      {
+        "digest": "sha256:7e9f5363b98c60e32700623f154460182fa79dd518e9d770005504f18548b9da",
+        "id": 733851163,
+        "name": "lupin-0.1.61-x86_64-unknown-linux-musl.tar.gz",
+        "size": 3229321
+      },
+      {
+        "digest": "sha256:5635d6e05c19b0d878f3e99b5fbac932229be5a61f86ab48f9b784454288affa",
+        "id": 733850527,
+        "name": "lupin.exe",
+        "size": 7359488
+      }
+    ],
+    "commit": "a10cbe5745d6092752217932851d3b9c12c66b4d",
+    "id": 441174610,
+    "published_at": "2026-11-11T02:40:35Z",
+    "tag": "v0.1.61"
+  },
+  "std": {
+    "commit": "77cf3210a82c93dc05ded987c249bb69e79b0a89",
+    "tree": "8ed51cc10bbe18b2fc7734c802af84422873899f"
+  },
+  "wolf": {
+    "assets": [
+      {
+        "digest": "sha256:63de947671c240fc8be3e3480bb36321b0a6ac0b5e12e16bdae164d9050cfde0",
+        "id": 734849433,
+        "name": "wolf-0.2.39-aarch64-apple-darwin.tar.gz",
+        "size": 19918614
+      },
+      {
+        "digest": "sha256:390b6548d6bd8c7eac3ae0a1d09099437564418440de782caca45954463dd344",
+        "id": 734841909,
+        "name": "wolf-0.2.39-aarch64-unknown-linux-gnu.tar.gz",
+        "size": 81134589
+      },
+      {
+        "digest": "sha256:dbb958fe64e348e9b4421553dfa7718a223d36515b09a6d88ca17d0d80adeb9a",
+        "id": 734849315,
+        "name": "wolf-0.2.39-x86_64-pc-windows-msvc.tar.gz",
+        "size": 16662936
+      },
+      {
+        "digest": "sha256:53f75d2b2dd79c0532b21920bc9f073098154aa0133caa2405209a1ef2af0457",
+        "id": 734842310,
+        "name": "wolf-0.2.39-x86_64-unknown-linux-gnu.tar.gz",
+        "size": 85859404
+      },
+      {
+        "digest": "sha256:6cc429551e34935a1e7b6f3edd77ff034ff5be3fb6b7f399f33fe4132b9f594e",
+        "id": 734837854,
+        "name": "wolf-rt-0.2.39-x86_64-unknown-linux-musl.tar.gz",
+        "size": 10438708
+      }
+    ],
+    "commit": "3fc86f77795afbbd6fbe483fef76c08e7f13a840",
+    "id": 441434977,
+    "published_at": "2026-11-11T09:06:11Z",
+    "tag": "v0.2.39"
+  }
+}

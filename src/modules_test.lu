@@ -1,0 +1,30 @@
+//! member: false
+//! The scaffold's only claim: every module of the architecture exists,
+//! names its milestone, and the three pure ones say so.
+use vt
+use proto
+use layout
+use server
+use client
+use cmd
+use config
+
+fn test_milestones() {
+    assert(vt.milestone() == "W1")
+    assert(proto.milestone() == "W2")
+    assert(layout.milestone() == "W3")
+    assert(server.milestone() == "W2")
+    assert(client.milestone() == "W2")
+    assert(cmd.milestone() == "W5")
+    assert(config.milestone() == "W3")
+}
+
+fn test_pure_modules() {
+    assert(vt.pure())
+    assert(proto.pure())
+    assert(layout.pure())
+    assert(!server.pure())
+    assert(!client.pure())
+    assert(!cmd.pure())
+    assert(!config.pure())
+}

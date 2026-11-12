@@ -1,0 +1,16 @@
+//! member: true
+//! The client: one attached terminal, its input parser and renderer.
+//!
+//! Stub. Nothing here is implemented; the module exists so that the tree,
+//! the build and the tests have their final shape from the first commit.
+
+/// The milestone that fills this module in.
+pub fn milestone() -> str {
+    "W2"
+}
+
+/// Whether the module is pure: no I/O, so it runs on every host and under
+/// the reference interpreter.
+pub fn pure() -> bool {
+    false
+}

@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# The gate. Every END is a real child exit; a step's own output is indented so
+# that only START, END and a red step's FAIL lines sit at column 0.
+#   tools/gate unit     needs python3 only
+#   tools/gate linux    the unit steps, then the pinned toolchain and the build
+#   tools/gate macos    the same on macOS
+set -euo pipefail
+root=$(cd "$(dirname "$0")/.." && pwd)
+cd "$root"
+mode=${1:-unit}
+mkdir -p target/gate target/home target/tmp
+export HOME="$root/target/home"
+export XDG_CACHE_HOME="$HOME/cache"
+export XDG_CONFIG_HOME="$HOME/config"
+export TMPDIR="$root/target/tmp"
+export LC_ALL=C TZ=UTC TERM=dumb
+step() {
+  local name=$1 start=$SECONDS rc=0
+  shift
+  printf 'START %s\n' "$name"
+  "$@" > "target/gate/$name.log" 2>&1 || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    sed 's/^/  /' "target/gate/$name.log"
+  else
+    awk '/^FAIL / {print; next} {print "  " $0}' "target/gate/$name.log"
+  fi
+  printf 'END %s exit=%s secs=%s\n' "$name" "$rc" "$((SECONDS-start))"
+  return "$rc"
+}
+scaffold_run() {
+  # The scaffold must say it is one, and must not exit 0.
+  local rc=0
+  "$1" > target/gate/scaffold.out || rc=$?
+  cat target/gate/scaffold.out
+  [ "$rc" -eq 1 ] || { echo "FAIL scaffold-run: exit $rc, expected 1"; return 1; }
+  [ "$(grep -c 'not implemented$' target/gate/scaffold.out)" -eq 7 ] || { echo 'FAIL scaffold-run: expected seven modules'; return 1; }
+}
+step pin-metadata python3 -I tools/check-pins.py
+step tier-planner python3 -I ci/tiers-test.py
+[ "$mode" != unit ] || exit 0
+case "$mode" in macos|linux) ;; *) echo 'FAIL gate-mode'; exit 2 ;; esac
+fetch=(python3 -I tools/fetch-toolchain.py)
+if [ -n "${WARREN_ARCHIVES:-}" ]; then fetch+=(--archive-dir "$WARREN_ARCHIVES"); fi
+step toolchain "${fetch[@]}"
+. tools/toolchain-env.sh
+mkdir -p target/native
+step build "$WOLF" build --deny-warnings src/warren.lu -o "$root/target/native/warren"
+step scaffold-run scaffold_run "$root/target/native/warren"
+step wolf-test "$WOLF" test --deny-warnings src
+step lupin-pure "$LUPIN" run src/pure_test.lu

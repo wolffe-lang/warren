@@ -1,0 +1,29 @@
+//! member: false
+//! warren, a terminal multiplexer. This is the scaffold: it reports that
+//! nothing is implemented, module by module, and exits 1 so that no script
+//! mistakes it for a working multiplexer.
+use std.io
+use vt
+use proto
+use layout
+use server
+use client
+use cmd
+use config
+
+fn line(name: str, milestone: str, pure: bool) -> str {
+    let kind = if pure { "pure" } else { "host" }
+    "{name}\t{milestone}\t{kind}\tnot implemented"
+}
+
+fn main() -> int {
+    io.write_line("warren 0.0.0: scaffold only")
+    io.write_line(line("vt", vt.milestone(), vt.pure()))
+    io.write_line(line("proto", proto.milestone(), proto.pure()))
+    io.write_line(line("layout", layout.milestone(), layout.pure()))
+    io.write_line(line("server", server.milestone(), server.pure()))
+    io.write_line(line("client", client.milestone(), client.pure()))
+    io.write_line(line("cmd", cmd.milestone(), cmd.pure()))
+    io.write_line(line("config", config.milestone(), config.pure()))
+    1
+}
