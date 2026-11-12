@@ -173,6 +173,13 @@ fn test_chunking() {
 fn test_measured_parser_edges() {
     expect_tokens("\u{1b}中X", [1, 88])
     expect_tokens("\u{1b}[31中mX", [1, 109, 1, 88])
+    expect_tokens("\u{1b}(中X", [1, 88])
+    expect_tokens("\u{1b}[中mX", [1, 109, 1, 88])
+    expect_tokens("\u{1b}[1 中mX", [1, 109, 1, 88])
+    expect_tokens("\u{1b}[1?中mX", [1, 109, 1, 88])
+    expect_tokens("\u{1b}[ 1中mX", [1, 109, 1, 88])
+    expect_tokens("\u{1b}\u{fffd}X", [1, 88])
+    expect_tokens("\u{1b}[31\u{fffd}mX", [1, 109, 1, 88])
     expect_tokens("\u{1b}]2;abc\u{18}mX", [1, 109, 1, 88])
     expect_tokens("\u{1b}]2;abc\u{1a}mX", [1, 109, 1, 88])
     expect_tokens("\u{1b}Pabc\u{18}mX", [1, 109, 1, 88])
