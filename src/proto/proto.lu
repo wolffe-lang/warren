@@ -1,16 +1,393 @@
 //! member: true
-//! The wire protocol between server and clients: framing and messages.
-//!
-//! Stub. Nothing here is implemented; the module exists so that the tree,
-//! the build and the tests have their final shape from the first commit.
+//! Protocol v1's pure bounded codec. See docs/PROTOCOL.md.
+//! No I/O; frame bytes are not terminal escape sequences.
 
-/// The milestone that fills this module in.
-pub fn milestone() -> str {
-    "W2"
+pub const SHORT: int = 1
+pub const LIMIT: int = 2
+pub const UNKNOWN: int = 3
+pub const RESERVED: int = 4
+pub const MALFORMED: int = 5
+pub const UTF8: int = 6
+pub const PHYSICAL_MAX: int = 1048576
+pub const FRAME_MAX: int = 16777216
+pub const REPLY_MAX: int = 8388608
+pub const GRID_MAX: int = 262144
+
+pub fn milestone() -> str { "W2" }
+pub fn pure() -> bool { true }
+
+/// Zero is success; every nonzero code has this stable diagnostic name.
+pub fn refusal(code: int) -> str {
+    match code {
+        0 => "ok",
+        1 => "short",
+        2 => "limit",
+        3 => "unknown-type",
+        4 => "reserved-flags",
+        5 => "malformed",
+        6 => "utf8",
+        _ => "invalid-code",
+    }
 }
 
-/// Whether the module is pure: no I/O, so it runs on every host and under
-/// the reference interpreter.
-pub fn pure() -> bool {
-    true
+/// Decode: bytes is the payload, used is the physical bytes consumed.
+/// Encode: bytes is one physical frame, used is its size.
+/// On error bytes is empty and used is zero. Decode leaves trailing stream
+/// bytes for the next call. SHORT means more bytes are needed, not refusal.
+pub struct Result {
+    code: int,
+    kind: int,
+    flags: int,
+    used: int,
+    bytes: List[byte],
+}
+
+fn result(code: int, kind: int, flags: int, used: int, bytes: List[byte]) -> Result {
+    Result { code: code, kind: kind, flags: flags, used: used, bytes: bytes }
+}
+
+fn bad(code: int) -> Result { result(code, 0, 0, 0, List[byte]()) }
+
+pub fn known(kind: int) -> bool { (kind >= 1 && kind <= 12) || (kind >= 129 && kind <= 137) }
+fn fragmented(kind: int) -> bool { kind == 4 || kind == 131 || kind == 136 }
+
+pub fn cap(kind: int) -> int {
+    if kind == 131 { return FRAME_MAX }
+    if kind == 136 { return REPLY_MAX }
+    if kind == 4 { return 65540 }
+    PHYSICAL_MAX
+}
+
+fn header(kind: int, flags: int) -> int {
+    if !known(kind) { return UNKNOWN }
+    if flags < 0 || flags > 1 || (flags == 1 && !fragmented(kind)) { return RESERVED }
+    0
+}
+
+/// Append an unsigned little-endian integer of width 1, 2 or 4. A bad
+/// caller-supplied range is ignored, never truncated or allowed to trap.
+/// Final encode still validates all bytes, so builders cannot bypass it.
+pub fn put(mut b: List[byte], value: int, width: int) {
+    if width != 1 && width != 2 && width != 4 { return }
+    var max = 255
+    if width == 2 { max = 65535 }
+    if width == 4 { max = 4294967295 }
+    if value < 0 || value > max { return }
+    var n = value
+    var i = 0
+    while i < width {
+        (mut b).push((n % 256) as byte)
+        n = n / 256
+        i = i + 1
+    }
+}
+
+pub fn put_text(mut b: List[byte], text: str) {
+    let data = text.bytes()
+    if data.len > 65535 { return }
+    put(mut b, data.len, 2)
+    for x in data { (mut b).push(x) }
+}
+
+pub fn put_bytes(mut b: List[byte], data: List[byte]) {
+    if data.len > FRAME_MAX { return }
+    put(mut b, data.len, 4)
+    for x in data { (mut b).push(x) }
+}
+
+struct Reader { bytes: List[byte], at: int, code: int }
+fn reader(bytes: List[byte]) -> Reader { Reader { bytes: bytes, at: 0, code: 0 } }
+fn fail(mut r: Reader, code: int) { if r.code == 0 { r.code = code } }
+fn number(mut r: Reader, width: int) -> int {
+    if r.code != 0 { return 0 }
+    if width > r.bytes.len - r.at { fail(mut r, MALFORMED); return 0 }
+    var n = 0
+    var factor = 1
+    var i = 0
+    while i < width {
+        n = n + (r.bytes[r.at] as int) * factor
+        r.at = r.at + 1
+        factor = factor * 256
+        i = i + 1
+    }
+    n
+}
+fn check(mut r: Reader, yes: bool) { if !yes { fail(mut r, MALFORMED) } }
+fn scalar(n: int) -> bool { n >= 0 && n <= 0x10ffff && (n < 0xd800 || n > 0xdfff) }
+fn size_ok(cols: int, rows: int) -> bool { cols > 0 && rows > 0 && cols * rows <= GRID_MAX }
+fn colour(n: int) -> bool {
+    n == 0 || (n >= 0x01000000 && n <= 0x010000ff) || (n >= 0x02000000 && n <= 0x02ffffff)
+}
+
+// Validate UTF-8 directly over a checked slice, without constructing a str.
+// A string's forbidden NUL/equals policy is checked in the same linear pass.
+fn text(mut r: Reader, policy: int) {
+    let n = number(mut r, 2)
+    if r.code != 0 { return }
+    if n > r.bytes.len - r.at { fail(mut r, MALFORMED); return }
+    let end = r.at + n
+    if policy == 2 && n == 0 { fail(mut r, MALFORMED); return }
+    while r.at < end && r.code == 0 {
+        let first = number(mut r, 1)
+        if policy > 0 && first == 0 { fail(mut r, MALFORMED); return }
+        if policy == 2 && first == 61 { fail(mut r, MALFORMED); return }
+        if first < 128 { continue }
+        var extra = 0
+        var cp = 0
+        var minimum = 0
+        if first >= 194 && first <= 223 { extra = 1; cp = first - 192; minimum = 128 }
+        else if first >= 224 && first <= 239 { extra = 2; cp = first - 224; minimum = 2048 }
+        else if first >= 240 && first <= 244 { extra = 3; cp = first - 240; minimum = 65536 }
+        else { fail(mut r, UTF8); return }
+        if extra > end - r.at { fail(mut r, UTF8); return }
+        var i = 0
+        while i < extra {
+            let x = number(mut r, 1)
+            if x < 128 || x > 191 { fail(mut r, UTF8); return }
+            cp = cp * 64 + x - 128
+            i = i + 1
+        }
+        if cp < minimum || !scalar(cp) { fail(mut r, UTF8); return }
+    }
+}
+fn blob(mut r: Reader, maximum: int) {
+    let n = number(mut r, 4)
+    if r.code != 0 { return }
+    if n > maximum { fail(mut r, LIMIT); return }
+    if n > r.bytes.len - r.at { fail(mut r, MALFORMED); return }
+    r.at = r.at + n
+}
+fn dimensions(mut r: Reader, empty: bool) {
+    let cols = number(mut r, 2)
+    let rows = number(mut r, 2)
+    check(mut r, size_ok(cols, rows) || (empty && cols == 0 && rows == 0))
+}
+
+fn hello(mut r: Reader) {
+    check(mut r, number(mut r, 4) == 0x004e5257)
+    let lo = number(mut r, 2)
+    let hi = number(mut r, 2)
+    check(mut r, lo <= hi)
+    let role = number(mut r, 1)
+    check(mut r, role == 1 || role == 2)
+    dimensions(mut r, role == 2)
+    check(mut r, number(mut r, 1) <= 3)
+    check(mut r, number(mut r, 4) <= 31)
+    text(mut r, 1)
+    text(mut r, 1)
+    check(mut r, number(mut r, 1) <= 3)
+    text(mut r, 1)
+    let count = number(mut r, 2)
+    if count > (r.bytes.len - r.at) / 4 { fail(mut r, MALFORMED); return }
+    var i = 0
+    while i < count && r.code == 0 {
+        text(mut r, 2)
+        text(mut r, 1)
+        i = i + 1
+    }
+}
+
+fn frame(mut r: Reader) {
+    let seq = number(mut r, 4)
+    let base = number(mut r, 4)
+    check(mut r, seq > 0 && (base == 0 || base == seq - 1))
+    let cols = number(mut r, 2)
+    let rows = number(mut r, 2)
+    check(mut r, size_ok(cols, rows))
+    let cr = number(mut r, 2)
+    let cc = number(mut r, 2)
+    check(mut r, cr > 0 && cr <= rows && cc > 0 && cc <= cols)
+    check(mut r, number(mut r, 1) <= 6)
+    check(mut r, number(mut r, 1) <= 1)
+    let count = number(mut r, 4)
+    if r.code != 0 { return }
+    if count > cols * rows || count > (r.bytes.len - r.at) / 26 { fail(mut r, MALFORMED); return }
+    var previous_end = 0
+    var i = 0
+    while i < count && r.code == 0 {
+        let row = number(mut r, 2)
+        let col = number(mut r, 2)
+        let flags = number(mut r, 2)
+        let fg = number(mut r, 4)
+        let bg = number(mut r, 4)
+        let columns = number(mut r, 2)
+        let records = number(mut r, 2)
+        check(mut r, row > 0 && row <= rows && col > 0 && col <= cols)
+        check(mut r, flags <= 511 && (flags & 24) != 24 && colour(fg) && colour(bg))
+        check(mut r, columns > 0 && columns <= cols - col + 1)
+        check(mut r, records > 0 && records <= columns)
+        if r.code != 0 { return }
+        let start = (row - 1) * cols + col - 1
+        check(mut r, start >= previous_end && (base != 0 || start == previous_end))
+        previous_end = start + columns
+        var coverage = 0
+        var j = 0
+        while j < records && r.code == 0 {
+            let width = number(mut r, 1)
+            let times = number(mut r, 2)
+            let scalars = number(mut r, 1)
+            check(mut r, (width == 1 || width == 2) && times > 0 && scalars >= 1 && scalars <= 3)
+            if r.code != 0 { return }
+            coverage = coverage + width * times
+            check(mut r, coverage <= columns)
+            var k = 0
+            while k < scalars && r.code == 0 {
+                check(mut r, scalar(number(mut r, 4)))
+                k = k + 1
+            }
+            j = j + 1
+        }
+        check(mut r, coverage == columns)
+        i = i + 1
+    }
+    check(mut r, base != 0 || previous_end == cols * rows)
+}
+
+/// Validate ONE complete logical payload. Does not infer terminal widths.
+/// This is the message decoder: no allocation based on a declared count.
+/// Duplicate environment names and delta old-image pairing are stateful
+/// policy checks for the server/image applier, not this byte decoder.
+pub fn validate(kind: int, bytes: List[byte]) -> int {
+    if !known(kind) { return UNKNOWN }
+    if bytes.len > cap(kind) { return LIMIT }
+    var r = reader(bytes)
+    if kind == 1 { hello(mut r) }
+    else if kind == 2 {
+        check(mut r, number(mut r, 1) <= 7)
+        let k = number(mut r, 1)
+        let code = number(mut r, 4)
+        check(mut r, (k == 0 && scalar(code)) || (k == 1 && code >= 1 && code <= 55))
+    } else if kind == 3 {
+        let k = number(mut r, 1)
+        let button = number(mut r, 1)
+        check(mut r, number(mut r, 1) <= 7)
+        let col = number(mut r, 2)
+        let row = number(mut r, 2)
+        check(mut r, k <= 4 && button <= 3 && col > 0 && row > 0)
+        check(mut r, (k <= 1 && button > 0) || k == 2 || (k >= 3 && button == 0))
+    } else if kind == 4 || kind == 7 || kind == 133 { blob(mut r, 65536) }
+    else if kind == 5 { check(mut r, number(mut r, 1) <= 1) }
+    else if kind == 6 { dimensions(mut r, false) }
+    else if kind == 8 { check(mut r, number(mut r, 4) > 0) }
+    else if kind == 11 {
+        check(mut r, number(mut r, 4) > 0)
+        let count = number(mut r, 2)
+        check(mut r, count > 0 && count <= (r.bytes.len - r.at) / 2)
+        var i = 0
+        while i < count && r.code == 0 { text(mut r, 1); i = i + 1 }
+        text(mut r, 1)
+        text(mut r, 1)
+    } else if kind == 12 || kind == 137 { let _nonce = number(mut r, 4) }
+    else if kind == 129 {
+        check(mut r, number(mut r, 2) == 1)
+        check(mut r, number(mut r, 4) > 0)
+        let _pid = number(mut r, 4)
+        text(mut r, 1)
+        text(mut r, 1)
+    } else if kind == 130 || kind == 135 {
+        let code = number(mut r, 2)
+        check(mut r, code >= 1 && code <= 7)
+        text(mut r, 0)
+    } else if kind == 131 { frame(mut r) }
+    else if kind == 134 { text(mut r, 0) }
+    else if kind == 136 {
+        check(mut r, number(mut r, 4) > 0)
+        check(mut r, number(mut r, 1) <= 3)
+        blob(mut r, REPLY_MAX)
+        blob(mut r, REPLY_MAX)
+    }
+    if r.code != 0 { return r.code }
+    if r.at != bytes.len { return MALFORMED }
+    0
+}
+
+/// One physical frame, before logical assembly; validates the complete
+/// payload when it is not a continuation-capable type. Use append for
+/// FRAME/PASTE/REPLY, whose final fragment need not itself be a payload.
+pub fn decode(bytes: List[byte]) -> Result {
+    if bytes.len < 6 { return bad(SHORT) }
+    var r = reader(bytes)
+    let n = number(mut r, 4)
+    let kind = number(mut r, 1)
+    let flags = number(mut r, 1)
+    if n > PHYSICAL_MAX { return bad(LIMIT) }
+    let code = header(kind, flags)
+    if code != 0 { return bad(code) }
+    if n > cap(kind) { return bad(LIMIT) }
+    if flags == 1 && n == 0 { return bad(MALFORMED) }
+    if n > bytes.len - 6 { return bad(SHORT) }
+    var body = List[byte]()
+    var i = 6
+    while i < 6 + n { (mut body).push(bytes[i]); i = i + 1 }
+    if !fragmented(kind) {
+        let message_code = validate(kind, body)
+        if message_code != 0 { return bad(message_code) }
+    }
+    result(0, kind, flags, n + 6, body)
+}
+
+/// Encode a whole unfragmented message or an explicitly supplied physical
+/// fragment. A final continuation fragment must use encode_part; encode
+/// validates a complete logical payload even for fragmented message types.
+pub fn encode(kind: int, flags: int, bytes: List[byte]) -> Result {
+    let h = header(kind, flags)
+    if h != 0 { return bad(h) }
+    if flags == 0 {
+        let code = validate(kind, bytes)
+        if code != 0 { return bad(code) }
+    }
+    encode_part(kind, flags, bytes)
+}
+
+pub fn encode_part(kind: int, flags: int, bytes: List[byte]) -> Result {
+    let code = header(kind, flags)
+    if code != 0 { return bad(code) }
+    if bytes.len > PHYSICAL_MAX || bytes.len > cap(kind) { return bad(LIMIT) }
+    if flags == 1 && bytes.len == 0 { return bad(MALFORMED) }
+    var wire = List[byte]()
+    put(mut wire, bytes.len, 4)
+    put(mut wire, kind, 1)
+    put(mut wire, flags, 1)
+    for x in bytes { (mut wire).push(x) }
+    result(0, kind, flags, wire.len, wire)
+}
+
+pub struct Assembly { kind: int, bytes: List[byte], complete: bool, code: int }
+pub fn assembly() -> Assembly { Assembly { kind: 0, bytes: List[byte](), complete: false, code: 0 } }
+
+/// Append a decoded physical payload. Errors are sticky. Consume the
+/// complete assembly, then construct a new one; never reuse an old image.
+pub fn append(mut s: Assembly, kind: int, flags: int, bytes: List[byte]) -> int {
+    if s.code != 0 { return s.code }
+    let h = header(kind, flags)
+    if h != 0 { s.code = h; return h }
+    if s.complete || (s.kind != 0 && s.kind != kind) { s.code = MALFORMED; return s.code }
+    if bytes.len > PHYSICAL_MAX || bytes.len > cap(kind) - s.bytes.len { s.code = LIMIT; return s.code }
+    if flags == 1 && bytes.len == 0 { s.code = MALFORMED; return s.code }
+    s.kind = kind
+    for x in bytes { (mut s.bytes).push(x) }
+    if flags == 0 {
+        s.code = validate(kind, s.bytes)
+        s.complete = s.code == 0
+    }
+    s.code
+}
+
+/// Pure connection-wide sequencing model. sent is called only after an
+/// entire logical FRAME has been transmitted; only then can ACK release it.
+pub struct AckState { last_sent: int, last_ack: int, pending: int }
+pub fn ack_state() -> AckState { AckState { last_sent: 0, last_ack: 0, pending: 0 } }
+pub fn sent(mut s: AckState, seq: int) -> int {
+    if s.pending != 0 || s.last_sent >= 4294967295 || seq != s.last_sent + 1 { return MALFORMED }
+    s.last_sent = seq
+    s.pending = seq
+    0
+}
+pub fn ack(mut s: AckState, seq: int) -> int {
+    if seq <= 0 || seq > 4294967295 { return MALFORMED }
+    if seq <= s.last_ack { return 0 }
+    if s.pending == 0 || seq != s.pending { return MALFORMED }
+    s.last_ack = seq
+    s.pending = 0
+    0
 }
