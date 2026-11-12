@@ -1,0 +1,122 @@
+//! member: true
+//! Initial CSI cursor addressing, vertical bounds, scroll region and erase.
+
+fn grid_clamp(n: int, low: int, high: int) -> int {
+    if n < low { return low }
+    if n > high { return high }
+    n
+}
+
+fn grid_param(p: Parser, index: int, fallback: int, zero_default: bool) -> int {
+    if index >= p.param_count { return fallback }
+    let n = p.params[index * 6]
+    if n < 0 || (zero_default && n == 0) { return fallback }
+    n
+}
+
+fn simple_grid_params(p: Parser) -> bool {
+    if p.private_marker != 0 || p.inter_count != 0 { return false }
+    var i = 0
+    while i < p.param_count {
+        if p.subs[i] != 1 { return false }
+        i += 1
+    }
+    true
+}
+
+fn move_vertical(mut pane: Vt, amount: int) {
+    var low = 1
+    var high = pane.rows
+    if pane.cursor_row >= pane.region_top && pane.cursor_row <= pane.region_bottom {
+        low = pane.region_top
+        high = pane.region_bottom
+    }
+    pane.cursor_row = grid_clamp(pane.cursor_row + amount, low, high)
+}
+
+fn address_row(pane: Vt, row: int) -> int {
+    if pane.modes.origin {
+        return grid_clamp(pane.region_top + row - 1, pane.region_top, pane.region_bottom)
+    }
+    grid_clamp(row, 1, pane.rows)
+}
+
+fn erase_row(mut screen: Screen, cols: int, row: int, first: int, last: int, background: int) {
+    var col = first
+    while col <= last {
+        blank_cell(mut screen, (row - 1) * cols + col - 1, background)
+        col += 1
+    }
+    if last == cols {
+        if screen.extents[row - 1] >= first { screen.extents[row - 1] = first - 1 }
+        screen.wrapped[row - 1] = false
+    }
+}
+
+fn erase_active_screen(mut screen: Screen, cols: int, rows: int, row: int, col: int,
+        kind: int, mode: int, amount: int, background: int) {
+    if kind == 75 {
+        if mode == 0 { erase_row(mut screen, cols, row, col, cols, background) }
+        else if mode == 1 { erase_row(mut screen, cols, row, 1, col, background) }
+        else { erase_row(mut screen, cols, row, 1, cols, background) }
+    } else if kind == 88 {
+        erase_row(mut screen, cols, row, col, grid_clamp(col + amount - 1, col, cols), background)
+    } else if mode == 0 {
+        erase_row(mut screen, cols, row, col, cols, background)
+        var r = row + 1
+        while r <= rows { erase_row(mut screen, cols, r, 1, cols, background); r += 1 }
+    } else if mode == 1 {
+        var r = 1
+        while r < row { erase_row(mut screen, cols, r, 1, cols, background); r += 1 }
+        erase_row(mut screen, cols, row, 1, col, background)
+    } else if mode == 2 {
+        var r = 1
+        while r <= rows { erase_row(mut screen, cols, r, 1, cols, background); r += 1 }
+    }
+}
+
+fn dispatch_csi(mut pane: Vt, final: int) {
+    if !simple_grid_params(pane.parser) { return }
+    if (final >= 65 && final <= 72) || final == 96 || final == 97 || final == 100 || final == 101 || final == 102 {
+        let pair = final == 72 || final == 102
+        if pane.parser.param_count > (if pair { 2 } else { 1 }) { return }
+        let n = grid_param(pane.parser, 0, 1, true)
+        pane.pending_wrap = false
+        if final == 65 || final == 70 { move_vertical(mut pane, 0 - n) }
+        else if final == 66 || final == 69 || final == 101 { move_vertical(mut pane, n) }
+        else if final == 67 || final == 97 { pane.cursor_col = grid_clamp(pane.cursor_col + n, 1, pane.cols) }
+        else if final == 68 { pane.cursor_col = grid_clamp(pane.cursor_col - n, 1, pane.cols) }
+        else if final == 71 || final == 96 { pane.cursor_col = grid_clamp(n, 1, pane.cols) }
+        else if final == 100 { pane.cursor_row = address_row(pane, n) }
+        else if pair {
+            pane.cursor_row = address_row(pane, n)
+            pane.cursor_col = grid_clamp(grid_param(pane.parser, 1, 1, true), 1, pane.cols)
+        }
+        if final == 69 || final == 70 { pane.cursor_col = 1 }
+    } else if final == 114 {
+        if pane.parser.param_count > 2 { return }
+        let top = grid_param(pane.parser, 0, 1, true)
+        let bottom = grid_clamp(grid_param(pane.parser, 1, pane.rows, true), 1, pane.rows)
+        // A one-row pane keeps its default 1-1 region; an explicit invalid
+        // DECSTBM remains inert, including its cursor and wrap effects.
+        if top >= bottom { return }
+        pane.region_top = top
+        pane.region_bottom = bottom
+        pane.cursor_row = if pane.modes.origin { top } else { 1 }
+        pane.cursor_col = 1
+        pane.pending_wrap = false
+    } else if final == 74 || final == 75 || final == 88 {
+        if pane.parser.param_count > 1 { return }
+        let mode = grid_param(pane.parser, 0, 0, false)
+        if final != 88 && (mode > 2 && !(final == 74 && mode == 3)) { return }
+        let amount = grid_param(pane.parser, 0, 1, true)
+        pane.pending_wrap = false
+        if pane.active_alternate {
+            erase_active_screen(mut pane.alternate, pane.cols, pane.rows, pane.cursor_row,
+                pane.cursor_col, final, mode, amount, pane.pen.background)
+        } else {
+            erase_active_screen(mut pane.primary, pane.cols, pane.rows, pane.cursor_row,
+                pane.cursor_col, final, mode, amount, pane.pen.background)
+        }
+    }
+}

@@ -107,11 +107,13 @@ fn execute_c0(mut pane: Vt, cp: int) {
 fn dispatch_grid_token(mut pane: Vt, kind: int, value: int) {
     if kind == 1 && value >= 32 && value <= 126 { print_ascii(mut pane, value) }
     else if kind == 2 { execute_c0(mut pane, value) }
+    else if kind == 4 { dispatch_csi(mut pane, value) }
 }
 
 /// Consume bytes with incremental parsing and initial ASCII/C0 screen
-/// operations. The grid is incomplete: Unicode, ESC/CSI/OSC effects,
-/// scrollback, answers and events are not served by this slice yet.
+/// operations, cursor addressing, scroll regions and erasure. The grid is
+/// incomplete: Unicode, rendition/mode effects, ESC/OSC, scrollback, answers
+/// and events are not served by this slice yet.
 pub fn feed(mut pane: Vt, data: List[byte]) {
     for b in data {
         advance_in_place(mut pane.parser, b)
