@@ -3,7 +3,7 @@
 use proto
 
 fn main() -> int {
-    var seed = 734527
+    var seed: int = 734527
     var trial = 0
     var accepted = 0
     while trial < 10000 {

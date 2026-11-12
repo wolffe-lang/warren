@@ -1,0 +1,5 @@
+//! member: false
+//! Compact pure protocol coverage, within the checked machine's step budget.
+use proto.rows
+
+fn main() -> int { rows.compact() }

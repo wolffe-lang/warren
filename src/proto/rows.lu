@@ -1,4 +1,4 @@
-//! member: false
+//! member: true
 //! Pure protocol rows; runnable under lupin as well as wolf test.
 use proto
 
@@ -247,7 +247,7 @@ fn test_wide_and_coverage() {
 }
 
 fn test_fragment_and_ack_model() {
-    let p = payload(131)
+    let p = image(2, 1, false, false)
     var split = 1
     while split < p.len {
         var s = proto.assembly()
@@ -349,7 +349,8 @@ fn test_version_before_suffix() {
     print("PASS proto-version-before-versioned-suffix")
 }
 
-fn main() -> int {
+/// Full native rows, including large images and every stalled write offset.
+pub fn all() -> int {
     test_version_before_suffix()
     test_message_roundtrips()
     test_golden_and_refusals()
@@ -358,5 +359,16 @@ fn main() -> int {
     test_repaint_costs()
     test_all_golden_vectors()
     test_partial_write_model()
+    0
+}
+
+/// Compact checked/lupin rows: all message goldens, refusals, wide coverage,
+/// all short fragment splits and the stale-ACK model; no large cost loops.
+pub fn compact() -> int {
+    test_version_before_suffix()
+    test_golden_and_refusals()
+    test_wide_and_coverage()
+    test_fragment_and_ack_model()
+    test_all_golden_vectors()
     0
 }
