@@ -1,0 +1,27 @@
+//! member: false
+//! Bounded throughput and allocation witness; run as a finite test, not a soak.
+use vt
+use std.mem.budget
+use std.io
+
+fn main() -> int {
+    let before = budget.live()
+    var p = vt.new()
+    let retained = budget.live() - before
+    let pattern = "a\u{1b}[31m中\u{1b}]2;t\u{7}".bytes()
+    let baseline = budget.live()
+    var prints = 0
+    var rounds = 0
+    while rounds < 65536 {
+        for b in pattern {
+            let step = vt.advance(mut p, b)
+            if step.count > 0 && step.first.kind == 1 { prints += 1 }
+        }
+        rounds += 1
+    }
+    let grown = budget.live() - baseline
+    assert(prints == 131072, "parser-benchmark-tokens")
+    assert(grown == 0, "parser-advance-allocation")
+    io.println("PASS parser-throughput bytes={pattern.len * rounds} prints={prints} retained-charged={retained} advance-charged={grown}")
+    0
+}
