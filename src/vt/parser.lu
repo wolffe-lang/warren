@@ -183,6 +183,9 @@ fn scalar(mut p: Parser, cp: int) -> int {
     if p.state == 8 { return absent() }
     if cp < 32 { return 2 * 1114112 + cp }
     if p.state == 0 { return 1114112 + cp }
+    // A non-ASCII scalar in an ESC or CSI (including ignore) abandons
+    // that sequence and is itself discarded, as the edge probes measure.
+    if cp > 159 { p.state = 0; return absent() }
     if p.state == 1 || p.state == 2 {
         if cp >= 32 && cp <= 47 {
             intermediate(mut p, cp, true)
