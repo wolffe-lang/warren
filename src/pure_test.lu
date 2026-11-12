@@ -11,5 +11,12 @@ fn main() -> int {
     assert(proto.pure())
     assert(layout.pure())
     assert(vt.milestone() == "W1")
+    var parser = vt.new_parser()
+    for b in "\u{1b}[31m中".bytes() { vt.advance_in_place(mut parser, b) }
+    assert(parser.state == 0 && parser.utf_left == 0)
+    assert(parser.output_count == 1 && parser.first_kind == 1 && parser.first_value == 20013)
+    assert(parser.param_count == 1 && parser.params[0] == 31)
+    for b in "\u{1b}]2;title\u{1b}\\".bytes() { vt.advance_in_place(mut parser, b) }
+    assert(parser.output_count == 1 && parser.first_kind == 5 && parser.payload_len == 7)
     0
 }
