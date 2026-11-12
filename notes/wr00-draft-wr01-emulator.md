@@ -67,7 +67,8 @@ Rules that hold in every state:
 | CAN (0x18), SUB (0x1A) | abandon the sequence; nothing is printed for it, and the bytes that follow are ground text | `can-inside-csi`, `sub-inside-csi` |
 | any other C0 inside escape or a CSI state | executed at once; the sequence continues | `c0-inside-csi`, `lf-inside-csi` |
 | a C0 inside osc-string or string-ignore | part of the string; not executed; BEL ends an OSC and does not end the others | `osc-unterminated-lf`, `dcs-unterminated-bel` |
-| DEL (0x7F) | ignored everywhere | to measure in W1 |
+| DEL (0x7F) | **ruled:** ignored everywhere, including OSC titles | `tests/vt/parser-reference/`: ignored in ESC/CSI/DCS; in OSC the reference changes it to `?`, divergence D8 |
+| a non-ASCII scalar inside ESC or CSI, including their intermediate and ignore states | abandon the sequence and discard that scalar; following bytes are ground text | `tests/vt/parser-reference/`: `esc-nonascii`, `csi-nonascii`, the intermediate/ignore cases and replacement cases |
 
 Caps, all **ruled** (the reference's own are not documented, and it misreads
 a sequence of 31 or more parameters: divergence D4):
@@ -133,7 +134,9 @@ see it broken.
   implies col = cols. The flag is set by printing into the last column
   whether or not autowrap is on (measured), and is consulted only when
   autowrap is on.
-- **G4 region.** 1 <= top < bottom <= rows.
+- **G4 region.** 1 <= top <= bottom <= rows, with top < bottom required
+  only when rows > 1. A one-row pane has top = bottom = 1 (ruled and
+  measured: `one-row-plain`, `one-row-region` in `tests/vt/parser-reference/`).
 - **G5 tab stops** are a set of columns within 1..cols.
 - **G6 extent.** 0 <= extent <= cols, and every cell past the extent is a
   blank of width 1 (it may carry colours).
@@ -237,8 +240,9 @@ The list, with the document's section for each, is in the prediction
 | D5 | an orphan half of a wide character after a narrowing resize | a blank | G2 |
 | D6 | no reflow on resize | section 4 | the survey: every multiplexer reflows |
 | D7 | `SGR 53` (overline) ignored, mode 2026 unknown | 53 consumed without effect; 2026 stored and reported | yew sets 2026 around every frame |
+| D8 | DEL inside an OSC title becomes `?` (`tests/vt/parser-reference/osc-del.in`, title `613f62`) | DEL is silently dropped, yielding title `6162` | titles are display text; dropping the control is cleaner than adding a visible question mark |
 
-Rows for D1 to D7 compare with written expectations, never with the
+Rows for D1 to D8 compare with written expectations, never with the
 reference, and a corpus stream that exercises one is compared under that
 divergence's name or not at all.
 
