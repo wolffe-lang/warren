@@ -2,18 +2,30 @@
 //! Protocol v1's pure bounded codec. See docs/PROTOCOL.md.
 //! No I/O; frame bytes are not terminal escape sequences.
 
+/// More transport bytes are needed.
 pub const SHORT: int = 1
+/// A physical or logical length exceeds its cap.
 pub const LIMIT: int = 2
+/// An unknown type cannot be skipped.
 pub const UNKNOWN: int = 3
+/// A flag is reserved or MORE is forbidden for this type.
 pub const RESERVED: int = 4
+/// A payload, count, range or ordering is malformed.
 pub const MALFORMED: int = 5
+/// A string is not strict UTF-8.
 pub const UTF8: int = 6
+/// Maximum physical payload bytes (header excluded).
 pub const PHYSICAL_MAX: int = 1048576
+/// Maximum logical FRAME payload bytes.
 pub const FRAME_MAX: int = 16777216
+/// Maximum logical REPLY payload bytes.
 pub const REPLY_MAX: int = 8388608
+/// Maximum composed image area in cells.
 pub const GRID_MAX: int = 262144
 
+/// The milestone that implements this module.
 pub fn milestone() -> str { "W2" }
+/// This module opens no I/O resources.
 pub fn pure() -> bool { true }
 
 /// Zero is success; every nonzero code has this stable diagnostic name.
@@ -48,9 +60,11 @@ fn result(code: int, kind: int, flags: int, used: int, bytes: List[byte]) -> Res
 
 fn bad(code: int) -> Result { result(code, 0, 0, 0, List[byte]()) }
 
+/// Whether a number is a v1 message type; total for any int.
 pub fn known(kind: int) -> bool { (kind >= 1 && kind <= 12) || (kind >= 129 && kind <= 137) }
 fn fragmented(kind: int) -> bool { kind == 4 || kind == 131 || kind == 136 }
 
+/// Logical payload cap; unknown types get the physical bound but are refused.
 pub fn cap(kind: int) -> int {
     if kind == 131 { return FRAME_MAX }
     if kind == 136 { return REPLY_MAX }
@@ -82,6 +96,7 @@ pub fn put(mut b: List[byte], value: int, width: int) {
     }
 }
 
+/// Append a string prefix and bytes; a string longer than u16 is ignored.
 pub fn put_text(mut b: List[byte], text: str) {
     let data = text.bytes()
     if data.len > 65535 { return }
@@ -89,6 +104,7 @@ pub fn put_text(mut b: List[byte], text: str) {
     for x in data { (mut b).push(x) }
 }
 
+/// Append a byte-string prefix and contents; inputs above FRAME_MAX ignored.
 pub fn put_bytes(mut b: List[byte], data: List[byte]) {
     if data.len > FRAME_MAX { return }
     put(mut b, data.len, 4)
@@ -339,6 +355,8 @@ pub fn encode(kind: int, flags: int, bytes: List[byte]) -> Result {
     encode_part(kind, flags, bytes)
 }
 
+/// Frame a raw fragment; validate the whole message before fragmenting it.
+/// No complete-payload check is possible here. Header and length checks hold.
 pub fn encode_part(kind: int, flags: int, bytes: List[byte]) -> Result {
     let code = header(kind, flags)
     if code != 0 { return bad(code) }
@@ -352,7 +370,9 @@ pub fn encode_part(kind: int, flags: int, bytes: List[byte]) -> Result {
     result(0, kind, flags, wire.len, wire)
 }
 
+/// A bounded logical-message assembly; fields are codec-owned bookkeeping.
 pub struct Assembly { kind: int, bytes: List[byte], complete: bool, code: int }
+/// Start a new message with no retained payload.
 pub fn assembly() -> Assembly { Assembly { kind: 0, bytes: List[byte](), complete: false, code: 0 } }
 
 /// Append a decoded physical payload. Errors are sticky. Consume the
@@ -376,13 +396,16 @@ pub fn append(mut s: Assembly, kind: int, flags: int, bytes: List[byte]) -> int 
 /// Pure connection-wide sequencing model. sent is called only after an
 /// entire logical FRAME has been transmitted; only then can ACK release it.
 pub struct AckState { last_sent: int, last_ack: int, pending: int }
+/// Start sequencing at zero, with no outstanding image.
 pub fn ack_state() -> AckState { AckState { last_sent: 0, last_ack: 0, pending: 0 } }
+/// Record the next fully transmitted image; non-next/overlapping/wrap is malformed.
 pub fn sent(mut s: AckState, seq: int) -> int {
     if s.pending != 0 || s.last_sent >= 4294967295 || seq != s.last_sent + 1 { return MALFORMED }
     s.last_sent = seq
     s.pending = seq
     0
 }
+/// Release only the exact pending image; ignore stale ACKs, refuse unsent ones.
 pub fn ack(mut s: AckState, seq: int) -> int {
     if seq <= 0 || seq > 4294967295 { return MALFORMED }
     if seq <= s.last_ack { return 0 }
