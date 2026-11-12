@@ -78,8 +78,10 @@ fn dump_screen(mut out: strbuf.StrBuf, screen: Screen, cols: int, rows: int) {
                 }
             }
             let span = if col == end { "{col + 1}" } else { "{col + 1}-{end + 1}" }
-            let cell = screen.cells[row * cols + col]
-            dump_line(mut out, "{span} {cell.width} {cell_text(cell)} {cell_attributes(cell)}")
+            let width = screen.cells[row * cols + col].width
+            let chars = cell_text(screen.cells[row * cols + col])
+            let attributes = cell_attributes(screen.cells[row * cols + col])
+            dump_line(mut out, "{span} {width} {chars} {attributes}")
             col = end + 1
         }
         row += 1

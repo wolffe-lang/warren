@@ -1,0 +1,20 @@
+//! member: false
+//! Three whole-screen comparisons, driven by the existing reference cases.
+use vt
+use std.fs
+use std.io
+
+fn main() -> int {
+    for name in ["sgr", "erase", "pending-wrap"] {
+        region replay {
+            let data = fs.read_bytes("tests/vt/grid-streams/{name}.in") else {
+                assert(false, "grid-case-read")
+                List[byte]()
+            }
+            var pane = vt.new(80, 24, 0)
+            vt.feed(mut pane, data)
+            io.write_line("BEGIN {name}\n{vt.dump(pane)}END {name}")
+        }
+    }
+    0
+}
