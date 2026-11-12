@@ -113,7 +113,9 @@ goldens, round trips/truncations, wide/full coverage, fragments, stale ACK,
 repaint byte costs and a pure partial-write model) and
 `src/protocol_fuzz.lu` (10,000 bounded deterministic malformed inputs, Linux
 under a memory cap). `tests/proto/rig/` records native, checked and lupin
-runs separately. Live socket/pty and renderer/model-cell comparisons belong
+runs separately. `src/protocol_test.lu` puts the compact real-codec rows in
+the ordinary `wolf-test` gate; `src/protocol_small.lu` is their explicit
+checked/lupin entry point. Live socket/pty and renderer/model-cell comparisons belong
 to the [one-pane implementation contract](notes/wr02-draft-wr03-one-pane.md),
 not to the pure codec's evidence.
 

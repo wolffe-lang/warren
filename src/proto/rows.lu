@@ -232,7 +232,7 @@ fn test_wide_and_coverage() {
     assert(validate(131, b) == 0)
     b[40] = 1 as byte
     if validate(131, b) != MALFORMED {
-        print("FAIL proto-wide-boundary: incomplete coverage accepted")
+        print("FAIL proto-wide-boundary incomplete coverage accepted")
         assert(false)
     }
     b = image(2, 1, false, false)
@@ -373,6 +373,41 @@ fn test_version_before_suffix() {
     print("PASS proto-version-before-versioned-suffix")
 }
 
+fn test_full_socket_queue() {
+    let wire = encode(131, 0, image(80, 24, true, false)).bytes
+    assert(wire.len > 4096)
+    var written = 0
+    var read = 0
+    var turns = 0
+    var busy = 0
+    var delivered = List[byte]()
+    while read < wire.len {
+        var n = 4096 - (written - read)
+        if n > wire.len - written { n = wire.len - written }
+        if n == 0 { busy = busy + 1 }
+        written = written + n
+        if turns % 3 != 0 {
+            var count = written - read
+            if count > 127 { count = 127 }
+            var i = 0
+            while i < count {
+                (mut delivered).push(wire[read])
+                read = read + 1
+                i = i + 1
+            }
+        }
+        assert(written >= read && written - read <= 4096)
+        turns = turns + 1
+    }
+    assert(busy > 0 && same(delivered, wire))
+    var first = ack_state()
+    var second = ack_state()
+    assert(sent(mut first, 1) == 0)
+    assert(sent(mut second, 1) == 0 && ack(mut second, 1) == 0)
+    assert(sent(mut second, 2) == 0 && first.pending == 1)
+    print("PASS proto-full-4096-queue-and-independent-client")
+}
+
 /// Full native rows, including large images and every stalled write offset.
 pub fn all() -> int {
     test_version_before_suffix()
@@ -383,6 +418,7 @@ pub fn all() -> int {
     test_repaint_costs()
     test_all_golden_vectors()
     test_partial_write_model()
+    test_full_socket_queue()
     0
 }
 
