@@ -1,5 +1,5 @@
 //! member: false
 //! Full native protocol rows; large byte-cost loops are not checked-tier rows.
-use proto
+use proto_rows
 
-fn main() -> int { proto.all() }
+fn main() -> int { proto_rows.all() }

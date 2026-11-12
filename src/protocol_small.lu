@@ -1,5 +1,5 @@
 //! member: false
 //! Compact pure protocol coverage, within the checked machine's step budget.
-use proto
+use proto_rows
 
-fn main() -> int { proto.compact() }
+fn main() -> int { proto_rows.compact() }

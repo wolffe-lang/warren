@@ -96,7 +96,7 @@ binary/pin serves it. SOURCES records the public references and digests.
   decode, every logical payload validator, encoding, fragment assembly and
   acknowledgement model. Decoded message values retain validated raw payload
   bytes; the module does not hydrate server/session objects or infer widths.
-- `src/proto/rows.lu`: all 21 independent byte goldens, exact round trips,
+- `src/proto_rows/rows.lu`: all 21 independent byte goldens, exact round trips,
   truncations, named refusals, wide/full coverage, short fragment splits,
   stale ACK, repaint counts and a pure partial-write model.
 - `src/protocol_rows.lu`: full native entry point; `protocol_small.lu`:

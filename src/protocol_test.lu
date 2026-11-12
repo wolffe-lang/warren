@@ -1,7 +1,7 @@
 //! member: false
 //! The repository's ordinary wolf-test gate must exercise the real codec.
-use proto
+use proto_rows
 
 fn test_protocol_compact() {
-    assert(proto.compact() == 0)
+    assert(proto_rows.compact() == 0)
 }
