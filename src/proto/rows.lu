@@ -278,17 +278,42 @@ fn test_fragment_and_ack_model() {
     print("PASS proto-fragment-all-splits-and-stale-ack-after-reset")
 }
 
+fn same_pen_image(cols: int, rows: int) -> List[byte] {
+    let blank = image(cols, rows, false, false)
+    var b = List[byte]()
+    var i = 0
+    while i < 22 { (mut b).push(blank[i]); i = i + 1 }
+    var row = 0
+    while row < rows {
+        var j = 0
+        while j < 16 { (mut b).push(blank[22 + row * 26 + j]); j = j + 1 }
+        put(mut b, cols, 2)
+        var col = 0
+        while col < cols {
+            put(mut b, 1, 1)
+            put(mut b, 1, 2)
+            put(mut b, 1, 1)
+            put(mut b, 32 + col % 95, 4)
+            col = col + 1
+        }
+        row = row + 1
+    }
+    b
+}
+
 fn test_repaint_costs() {
     for dims in [80, 320] {
         var rows = 24
         if dims == 320 { rows = 90 }
         let blank = encode(131, 0, image(dims, rows, false, false))
         let separate = encode(131, 0, image(dims, rows, true, false))
+        let same_pen = encode(131, 0, same_pen_image(dims, rows))
         let worst = encode(131, 0, image(dims, rows, true, true))
         assert(blank.code == 0 && blank.bytes.len == 28 + rows * 26)
         assert(separate.code == 0 && separate.bytes.len == 28 + dims * rows * 26)
+        assert(same_pen.code == 0 && same_pen.bytes.len == 28 + rows * (18 + dims * 8))
         assert(worst.code == 0 && worst.bytes.len == 28 + dims * rows * 34)
-        print("PASS proto-repaint {dims}x{rows} blank={blank.bytes.len} separate={separate.bytes.len} worst={worst.bytes.len} frames=1")
+        print("PASS proto-repaint {dims}x{rows} blank={blank.bytes.len} same_pen={same_pen.bytes.len} separate={separate.bytes.len} worst={worst.bytes.len} frames=1")
     }
 }
 
