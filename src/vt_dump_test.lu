@@ -1,0 +1,16 @@
+//! member: false
+//! A minimal total-format row independent of the larger reference cases.
+use vt
+
+fn test_dump_prefix() {
+    var pane = vt.new(3, 1, 0)
+    vt.feed(mut pane, "A".bytes())
+    let text = vt.dump(pane)
+    assert(text.starts_with("warren-screen 1\nsize 3 1\ncursor 1 2 shape=2 visible=1 pending-wrap=0\n"), "grid-dump-format")
+    assert(vt.dump(pane) == text, "grid-dump-deterministic")
+}
+
+fn main() -> int {
+    test_dump_prefix()
+    0
+}

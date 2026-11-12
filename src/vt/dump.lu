@@ -1,0 +1,8 @@
+//! member: true
+//! Red-first dump seam; format 1 rendering follows its rows.
+
+/// Return screen dump format 1. This seam is intentionally empty.
+pub fn dump(pane: Vt) -> str {
+    if pane.cols < 1 { return "" }
+    ""
+}
