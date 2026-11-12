@@ -4,7 +4,7 @@ set -euo pipefail
 root=$PWD
 mode=$1
 mkdir -p target/proto target/tmp target/home
-export TMPDIR="$root/target/tmp" HOME="$root/target/home"
+export TMPDIR="$root/target/tmp"
 export LC_ALL=C TZ=UTC
 if [ "${WARREN_IN_CONTAINER:-0}" != 1 ] && [ "${WARREN_USE_CONTAINER:-0}" = 1 ]; then
   exec "${WARREN_ENGINE:?set WARREN_ENGINE}" run --rm --network=host --memory 12g --pids-limit 256 \
@@ -13,8 +13,14 @@ if [ "${WARREN_IN_CONTAINER:-0}" != 1 ] && [ "${WARREN_USE_CONTAINER:-0}" = 1 ];
     localhost/wr02-oracle:1 taskset -c "${WARREN_CPUS:?set WARREN_CPUS}" \
     bash tests/proto/rig/step.sh "$mode"
 fi
+export HOME="$root/target/home"
 if [ "$mode" = gate-macos ]; then exec bash tools/gate macos; fi
-if [ "$mode" = gate-linux ]; then exec bash tools/gate linux; fi
+if [ "$mode" = gate-linux ]; then
+  diff -u ci/packages.txt /opt/oracle-packages.txt
+  diff -u ci/oracle-binaries.lock /opt/oracle-binaries.txt
+  printf 'PASS proto-oracle-package-and-binary-pins\n'
+  exec bash tools/gate linux
+fi
 . tools/toolchain-env.sh
 case "$mode" in
   native)
