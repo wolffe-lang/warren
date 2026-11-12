@@ -1,20 +1,81 @@
 //! member: true
-//! Incremental terminal parser. Token kinds: 0 none, 1 print, 2 execute,
-//! 3 ESC, 4 CSI, 5 OSC. Sequence metadata belongs to Parser until the next
-//! advance call. This test seam deliberately emits no tokens yet.
+//! Incremental UTF-8 decoder and terminal parser. No I/O or output queue.
+//! A call consumes exactly one byte; a breaking byte is decoded afresh.
 
-/// One parser token: kind and a scalar or final byte.
+/// One token: kind 0 is absent, 1 is a printable scalar, 2 executes a C0,
+/// 3 completes ESC, 4 completes CSI, and 5 completes OSC. `value` is the
+/// scalar or final byte. Sequence metadata is borrowed from Parser.
 pub struct Token { kind: int, value: int }
-/// At most two tokens from a single input byte.
+/// The zero, one or two tokens emitted for one input byte, in order.
 pub struct Step { count: int, first: Token, second: Token }
-/// Persistent decoding and sequence state.
-pub struct Parser { state: int }
+/// Persistent decoding and sequence state, owned by one pane.
+pub struct Parser {
+    state: int,
+    utf_code: int,
+    utf_left: int,
+    utf_lead: int,
+    utf_seen: int,
+}
 
-/// Construct a ground parser with no pending bytes.
-pub fn new() -> Parser { Parser { state: 0 } }
+/// Construct a ground parser with no incomplete UTF-8 prefix.
+pub fn new() -> Parser {
+    Parser { state: 0, utf_code: 0, utf_left: 0, utf_lead: 0, utf_seen: 0 }
+}
 
-/// Consume one byte. Total; sequence payloads remain in the parser.
+fn absent() -> Token { Token { kind: 0, value: 0 } }
+fn emit(mut out: Step, t: Token) {
+    if t.kind != 0 {
+        if out.count == 0 { out.first = t } else { out.second = t }
+        out.count += 1
+    }
+}
+
+fn scalar(mut p: Parser, cp: int) -> Token {
+    p.state = 0
+    if cp >= 32 && cp != 127 && (cp < 128 || cp > 159) {
+        return Token { kind: 1, value: cp }
+    }
+    absent()
+}
+
+/// Consume one byte. Total, with at most two output tokens and no allocation.
+/// An incomplete final UTF-8 prefix remains pending, including across feeds.
 pub fn advance(mut p: Parser, b: byte) -> Step {
-    p.state = b as int
-    Step { count: 0, first: Token { kind: 0, value: 0 }, second: Token { kind: 0, value: 0 } }
+    var out = Step { count: 0, first: absent(), second: absent() }
+    let n = b as int
+    if p.utf_left > 0 {
+        var continuation = n >= 128 && n < 192
+        if p.utf_seen == 1 {
+            // Unicode maximal-subpart handling for overlong and out-of-range
+            // prefixes. Surrogates instead consume all three bytes, as measured.
+            if p.utf_lead == 224 && n < 160 { continuation = false }
+            if p.utf_lead == 240 && n < 144 { continuation = false }
+            if p.utf_lead == 244 && n > 143 { continuation = false }
+        }
+        if continuation {
+            p.utf_code = p.utf_code * 64 + n - 128
+            p.utf_left -= 1
+            p.utf_seen += 1
+            if p.utf_left == 0 {
+                var cp = p.utf_code
+                if cp >= 55296 && cp <= 57343 { cp = 65533 }
+                emit(mut out, scalar(mut p, cp))
+            }
+            return out
+        }
+        p.utf_left = 0
+        emit(mut out, scalar(mut p, 65533))
+    }
+    if n < 128 {
+        emit(mut out, scalar(mut p, n))
+    } else if n >= 194 && n < 245 {
+        p.utf_lead = n
+        p.utf_seen = 1
+        if n < 224 { p.utf_code = n - 192; p.utf_left = 1 }
+        else if n < 240 { p.utf_code = n - 224; p.utf_left = 2 }
+        else { p.utf_code = n - 240; p.utf_left = 3 }
+    } else {
+        emit(mut out, scalar(mut p, 65533))
+    }
+    out
 }
