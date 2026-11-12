@@ -73,6 +73,80 @@ smallest power of two that holds it. REPLY is capped at 8 MiB and paste
 contents at 64 KiB; a physical payload stays at most 1 MiB. The full
 specification will enumerate every remaining ambiguity and its resolution.
 
+## Forbidden
+
+No source from the clean-room exclusion list was read. Only PAX's public
+readiness note was opened in its checkout; its kernel files were not checked
+out. The language's public specification was read for a cross-tier inference
+witness, never compiler/interpreter implementation source. The new module and
+rows open no socket, pty or process; existing oracle gates remain binary
+black-box runs.
+
+## Inputs verified
+
+The starting tree is `7f4f3380`; the prediction was committed at `c7f00ce`
+before code. The repository's wolf 0.2.39 / lupin 0.1.61 / std `77cf3210`
+pins are unchanged and staged by the digest-checking fetcher. The wait
+surface examined separately is std `be1d10fa`, not a claim that this older
+binary/pin serves it. SOURCES records the public references and digests.
+
+## Evidence index
+
+- `src/proto/proto.lu`: bounded physical-frame decode, fixed HELLO-prefix
+  decode, every logical payload validator, encoding, fragment assembly and
+  acknowledgement model. Decoded message values retain validated raw payload
+  bytes; the module does not hydrate server/session objects or infer widths.
+- `src/proto/rows.lu`: all 21 independent byte goldens, exact round trips,
+  truncations, named refusals, wide/full coverage, short fragment splits,
+  stale ACK, repaint counts and a pure partial-write model.
+- `src/protocol_rows.lu`: full native entry point; `protocol_small.lu`:
+  compact checked/lupin entry point; `protocol_fuzz.lu`: bounded Linux fuzz.
+- `tests/proto/rig/`: recorder manifests and steps, with an explicit checked
+  observation verifier (the command's exit zero is not a program verdict).
+  Final exact-head record digests and END lines belong to the PR evidence.
+- `tests/proto/probes/inferred_integer.lu`: five-line independent language
+  witness; not a protocol row or part of the green gate. Its later return
+  fixes the binding as int on compiler tiers, while lupin defaults early.
+  The codec uses explicit int types regardless of that separate issue.
+
+The original full entry point exceeded the checked machine's step budget on
+large cost loops. The compact entry point keeps all message goldens and
+small refusal/width/fragment/ACK cases; large repaint, every write-stall
+offset and malformed fuzz work remain native. The compact checked record
+and lupin each printed all five named PASS lines in the development take.
+No unsupported result was counted as green.
+
+## Prediction scored
+
+Native encoding measured the blank, per-cell-run and three-scalar cases at
+80x24 as 652, 49,948 and 65,308 bytes, and at 320x90 as 2368, 748,828 and
+979,228, each one physical frame: equal to prediction. Same-rendition varied
+ASCII rows are separately held to 15,820 / 232,048. The maximum-grid
+8,912,918-byte payload is a size derivation, not a latency measurement.
+There is no socket-throughput or terminal-repaint-time claim in a pure lane.
+
+The adopted corrections are indexed in PROTOCOL's changes-from-draft section:
+connection-unique sequence numbers, explicit width/scalar/repeat records,
+u32 run count and prefix +2, bounded dimensions/assemblies (16 MiB FRAME
+because the worst legal image exceeds 8 MiB), exact fragmentation, and the
+draft's WELCOME/BYE behavior for tiny clients rather than the survey's other
+proposal. Enum values, exact consumption and stateless/stateful validation
+boundaries are made explicit. SERVER also makes late reaping, read-end
+ownership, safe error insertion and catchable-only terminal cleanup explicit.
+
+## Done-when
+
+- [x] Prediction committed before code; message and repaint bytes predicted.
+- [x] Red rows committed before their codec implementation; bootstrap row
+  separately red before version-first decoding.
+- [x] Protocol byte specification and pure codec; no server I/O.
+- [x] Paper state machine tied to the real wait API and its named blockers.
+- [x] One-pane contract drafted, sized at three coherent PRs / 10–15 days
+  excluding dependency calendar time.
+- [x] README and MAP refreshed; pins and CI untouched.
+Exact-head Linux/macOS records and the one-hunk decode plant are carried in
+the PR evidence, outside the tree whose head they attest.
+
 ## Evidence boundary
 
 The event-loop document is a contract, not an implemented server. At
