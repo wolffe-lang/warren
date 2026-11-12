@@ -1,0 +1,28 @@
+//! member: false
+//! The off-line state-loss plant drives this row by itself.
+use vt
+use std.io
+
+fn test_state_across_calls() {
+    var p = vt.new_parser()
+    vt.advance_in_place(mut p, 27 as byte)
+    assert(p.state == 1 && p.output_count == 0, "parser-state-loss")
+    vt.advance_in_place(mut p, 91 as byte)
+    assert(p.state == 3 && p.output_count == 0, "parser-state-loss")
+    vt.advance_in_place(mut p, 51 as byte)
+    vt.advance_in_place(mut p, 49 as byte)
+    assert(p.state == 4 && p.params[0] == 31, "parser-state-loss")
+    vt.advance_in_place(mut p, 109 as byte)
+    assert(p.state == 0 && p.output_count == 1 && p.first_kind == 4)
+    vt.advance_in_place(mut p, 228 as byte)
+    vt.advance_in_place(mut p, 184 as byte)
+    assert(p.output_count == 0 && p.utf_left == 1)
+    vt.advance_in_place(mut p, 173 as byte)
+    assert(p.output_count == 1 && p.first_kind == 1 && p.first_value == 20013)
+}
+
+fn main() -> int {
+    test_state_across_calls()
+    io.write_line("PASS parser-state-loss")
+    0
+}

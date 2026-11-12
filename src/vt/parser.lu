@@ -39,7 +39,7 @@ pub struct Parser {
 }
 
 /// Construct a ground parser, allocating its bounded buffers once.
-pub fn new() -> Parser {
+pub fn new_parser() -> Parser {
     var values = List[int]()
     (mut values).reserve(192)
     var i = 0

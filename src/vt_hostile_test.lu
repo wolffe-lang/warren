@@ -26,7 +26,7 @@ fn test_random_bytes() {
     var seed = 1
     while seed <= 8 {
         region fuzz(cap: 32768) {
-            var p = vt.new()
+            var p = vt.new_parser()
             let stable = budget.charged(fuzz)
             var rng = seed
             var i = 0
@@ -44,7 +44,7 @@ fn test_random_bytes() {
 
 fn test_unterminated_and_saturating() {
     region hostile(cap: 32768) {
-        var p = vt.new()
+        var p = vt.new_parser()
         let stable = budget.charged(hostile)
         var i = 0
         while i < 65536 {

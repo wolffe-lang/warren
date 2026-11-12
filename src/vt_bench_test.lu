@@ -8,7 +8,7 @@ use std.time
 fn main() -> int {
     region measured {
     let before = budget.charged(measured)
-    var p = vt.new()
+    var p = vt.new_parser()
     let retained = budget.charged(measured) - before
     let pattern = "a\u{1b}[31m中\u{1b}]2;t\u{7}".bytes()
     let baseline = budget.charged(measured)

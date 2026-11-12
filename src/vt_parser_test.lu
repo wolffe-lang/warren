@@ -3,7 +3,7 @@
 use vt
 
 fn expect_print(data: List[byte], expected: List[int]) {
-    var p = vt.new()
+    var p = vt.new_parser()
     var got = List[int]()
     for b in data {
         let step = vt.advance(mut p, b)
@@ -38,7 +38,7 @@ fn test_decoder() {
 }
 
 fn expect_tokens(text: str, expected: List[int]) {
-    var p = vt.new()
+    var p = vt.new_parser()
     var got = List[int]()
     for b in text.bytes() {
         let step = vt.advance(mut p, b)
@@ -102,7 +102,7 @@ fn feed_part(mut p: vt.Parser, data: List[byte]) -> int {
 }
 
 fn test_metadata_and_caps() {
-    var p = vt.new()
+    var p = vt.new_parser()
     feed_part(mut p, "\u{1b}[?38:2::1:2:3;99999999999999999999 $p".bytes())
     assert(p.state == 0)
     assert(p.private_marker == 63)
@@ -143,11 +143,11 @@ fn test_metadata_and_caps() {
 
 fn test_chunking() {
     let data = "a中😀\u{1b}[38:2::1:2:3mX\u{1b}]2;中\u{1b}\\Y".bytes()
-    var whole = vt.new()
+    var whole = vt.new_parser()
     let whole_trace = feed_part(mut whole, data)
     var split = 0
     while split <= data.len {
-        var p = vt.new()
+        var p = vt.new_parser()
         let first_trace = feed_part(mut p, data[0..split])
         let split_trace = feed_trace(mut p, data[split..data.len], first_trace)
         assert(split_trace == whole_trace, "parser-chunking-tokens")
@@ -160,7 +160,7 @@ fn test_chunking() {
         split += 1
     }
     // A partial scalar and a partial sequence have no end-of-feed flush.
-    var p = vt.new()
+    var p = vt.new_parser()
     assert(vt.advance(mut p, 228 as byte).count == 0 && p.utf_left == 2)
     assert(vt.advance(mut p, 184 as byte).count == 0 && p.utf_left == 1)
     assert(vt.advance(mut p, 173 as byte).first.value == 20013)
@@ -188,7 +188,7 @@ fn test_measured_parser_edges() {
     expect_tokens("\u{1b}[3\u{7f}1mX", [4, 109, 1, 88])
     expect_tokens("\u{1b}Pabc\u{7f}def\u{1b}\\X", [1, 88])
     // D8: DEL is dropped from titles, not changed to the reference's '?'.
-    var p = vt.new()
+    var p = vt.new_parser()
     feed_part(mut p, "\u{1b}]2;a\u{7f}b\u{7}".bytes())
     assert(p.output_count == 1 && p.first_kind == 5)
     assert(p.payload_len == 4 && p.payload[2] as int == 97 && p.payload[3] as int == 98)
