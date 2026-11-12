@@ -82,8 +82,98 @@ fn test_transitions() {
     expect_tokens("\u{1b}[1   mX", [1, 88])
 }
 
+fn feed_trace(mut p: vt.Parser, data: List[byte], seed: int) -> int {
+    var fingerprint = seed
+    for b in data {
+        let step = vt.advance(mut p, b)
+        fingerprint = (fingerprint * 31 + step.count) % 1000000007
+        if step.count > 0 {
+            fingerprint = (fingerprint * 31 + step.first.kind * 1114112 + step.first.value) % 1000000007
+        }
+        if step.count > 1 {
+            fingerprint = (fingerprint * 31 + step.second.kind * 1114112 + step.second.value) % 1000000007
+        }
+    }
+    fingerprint
+}
+
+fn feed_part(mut p: vt.Parser, data: List[byte]) -> int {
+    feed_trace(mut p, data, 0)
+}
+
+fn test_metadata_and_caps() {
+    var p = vt.new()
+    feed_part(mut p, "\u{1b}[?38:2::1:2:3;99999999999999999999 $p".bytes())
+    assert(p.state == 0)
+    assert(p.private_marker == 63)
+    assert(p.param_count == 2)
+    assert(p.subs[0] == 6)
+    assert(p.params[0] == 38 && p.params[1] == 2 && p.params[2] == 0 - 1)
+    assert(p.params[3] == 1 && p.params[4] == 2 && p.params[5] == 3)
+    assert(p.params[6] == 65535)
+    assert(p.inter_count == 2 && p.inter[0] == 32 && p.inter[1] == 36)
+    feed_part(mut p, "\u{1b}[1:2:3:4:5:6:7".bytes())
+    assert(p.state == 6 && p.subs[0] == 6)
+    let ignored = vt.advance(mut p, 109 as byte)
+    assert(ignored.count == 0 && p.state == 0)
+    feed_part(mut p, "\u{1b}[".bytes())
+    var i = 0
+    while i < 31 { vt.advance(mut p, 59 as byte); i += 1 }
+    assert(p.param_count == 32 && p.state == 4)
+    let accepted = vt.advance(mut p, 109 as byte)
+    assert(accepted.count == 1 && accepted.first.kind == 4)
+    feed_part(mut p, "\u{1b}[".bytes())
+    i = 0
+    while i < 32 { vt.advance(mut p, 59 as byte); i += 1 }
+    assert(p.param_count == 32 && p.state == 6)
+    assert(vt.advance(mut p, 109 as byte).count == 0)
+    feed_part(mut p, "\u{1b}]".bytes())
+    i = 0
+    while i < 4096 { vt.advance(mut p, 97 as byte); i += 1 }
+    assert(p.payload_len == 4096 && !p.payload_overflow)
+    assert(vt.advance(mut p, 7 as byte).first.kind == 5)
+    feed_part(mut p, "\u{1b}]".bytes())
+    i = 0
+    while i < 4097 { vt.advance(mut p, 97 as byte); i += 1 }
+    assert(p.payload_len == 4096 && p.payload_overflow)
+    assert(vt.advance(mut p, 7 as byte).count == 0 && p.state == 0)
+    feed_part(mut p, "\u{1b}]2;中\u{7}".bytes())
+    assert(p.payload_len == 5 && p.payload[2] as int == 228)
+}
+
+fn test_chunking() {
+    let data = "a中😀\u{1b}[38:2::1:2:3mX\u{1b}]2;中\u{1b}\\Y".bytes()
+    var whole = vt.new()
+    let whole_trace = feed_part(mut whole, data)
+    var split = 0
+    while split <= data.len {
+        var p = vt.new()
+        let first_trace = feed_part(mut p, data[0..split])
+        let split_trace = feed_trace(mut p, data[split..data.len], first_trace)
+        assert(split_trace == whole_trace, "parser-chunking-tokens")
+        assert(p.state == whole.state && p.utf_left == whole.utf_left, "parser-chunking-state")
+        assert(p.param_count == whole.param_count && p.payload_len == whole.payload_len)
+        var k = 0
+        while k < 192 { assert(p.params[k] == whole.params[k]); k += 1 }
+        k = 0
+        while k < p.payload_len { assert(p.payload[k] == whole.payload[k]); k += 1 }
+        split += 1
+    }
+    // A partial scalar and a partial sequence have no end-of-feed flush.
+    var p = vt.new()
+    assert(vt.advance(mut p, 228 as byte).count == 0 && p.utf_left == 2)
+    assert(vt.advance(mut p, 184 as byte).count == 0 && p.utf_left == 1)
+    assert(vt.advance(mut p, 173 as byte).first.value == 20013)
+    feed_part(mut p, "\u{1b}[31".bytes())
+    assert(p.state == 4)
+    let final = vt.advance(mut p, 109 as byte)
+    assert(final.count == 1 && final.first.kind == 4 && p.params[0] == 31)
+}
+
 fn main() -> int {
     test_decoder()
     test_transitions()
+    test_metadata_and_caps()
+    test_chunking()
     0
 }
