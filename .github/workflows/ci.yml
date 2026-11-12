@@ -30,6 +30,8 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          ACTION: ${{ github.event.action }}
+          LABEL: ${{ github.event.label.name }}
           IN_JOBS: ${{ inputs.jobs }}
         run: python3 -I ci/tiers.py plan --github-output "$GITHUB_OUTPUT"
   plan-test:

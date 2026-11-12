@@ -17,6 +17,8 @@ def main():
     plan.add_argument('--event', default=os.environ.get('EVENT', ''))
     plan.add_argument('--labels', default=os.environ.get('LABELS', ''))
     plan.add_argument('--jobs', default=os.environ.get('IN_JOBS', ''))
+    plan.add_argument('--action', default=os.environ.get('ACTION', '') or '-')
+    plan.add_argument('--label', default=os.environ.get('LABEL', '') or '-')
     plan.add_argument('--github-output')
     sub.add_parser('verdict')
     args = p.parse_args()
@@ -33,6 +35,9 @@ def main():
         for job in JOBS:
             if job not in chosen and needs.get(job, {}).get('result', 'skipped') != 'skipped':
                 raise ValueError('unselected job ran: ' + job)
+        # The run says what its tier held: the audit reads this line, not the code.
+        print('tier %s: %d of %d job(s) chosen: %s' % (
+            needs['plan']['outputs']['tier'], len(chosen), len(JOBS), ' '.join(chosen)))
         print('PASS tier ' + needs['plan']['outputs']['tier'])
         return 0
     labels = set(filter(None, args.labels.split(',')))
@@ -49,6 +54,10 @@ def main():
         result = {'tier': 'local', 'jobs': ['plan-test']}
     else:
         raise ValueError('unknown event: ' + args.event)
+    # A run's event, action and labels are not kept by the run API; this line keeps them.
+    print('tiers: event=%s action=%s label=%s labels=%s tier=%s held=%s' % (
+        args.event, args.action, args.label, ','.join(sorted(labels)) or '-',
+        result['tier'], ','.join(result['jobs'])))
     print(json.dumps(result))
     if args.github_output:
         with Path(args.github_output).open('a') as f:
