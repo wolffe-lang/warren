@@ -121,6 +121,71 @@ fn test_feed_allocation() {
     }
 }
 
+fn test_cursor_sequences() {
+    var pane = vt.new(10, 6, 0)
+    vt.feed(mut pane, "\u{1b}[5;5H".bytes())
+    assert(pane.cursor_row == 5 && pane.cursor_col == 5, "grid-cursor-address")
+    vt.feed(mut pane, "\u{1b}[99A\u{1b}[999C".bytes())
+    assert(pane.cursor_row == 1 && pane.cursor_col == 10)
+    vt.feed(mut pane, "\u{1b}[99B\u{1b}[999D".bytes())
+    assert(pane.cursor_row == 6 && pane.cursor_col == 1)
+    vt.feed(mut pane, "\u{1b}[0;0f\u{1b}[5a\u{1b}[2e".bytes())
+    assert(pane.cursor_row == 3 && pane.cursor_col == 6)
+    vt.feed(mut pane, "\u{1b}[2E".bytes())
+    assert(pane.cursor_row == 5 && pane.cursor_col == 1)
+    vt.feed(mut pane, "\u{1b}[3F\u{1b}[8G\u{1b}[4d".bytes())
+    assert(pane.cursor_row == 4 && pane.cursor_col == 8)
+    vt.feed(mut pane, "\u{1b}[0`".bytes())
+    assert(pane.cursor_col == 1)
+    var wrap = vt.new(5, 2, 0)
+    vt.feed(mut wrap, "abcde\u{1b}[1;5HZ".bytes())
+    assert(wrap.cursor_row == 1 && wrap.primary.cells[4].base == 90)
+    vt.feed(mut wrap, "\u{1b}[5 HZ".bytes())
+    assert(wrap.cursor_row == 2 && wrap.primary.cells[5].base == 90)
+}
+
+fn test_scroll_region_and_origin() {
+    var pane = vt.new(10, 6, 0)
+    vt.feed(mut pane, "\u{1b}[2;4r".bytes())
+    assert(pane.region_top == 2 && pane.region_bottom == 4 && pane.cursor_row == 1)
+    vt.feed(mut pane, "\u{1b}[3;3H\u{1b}[99A".bytes())
+    assert(pane.cursor_row == 2)
+    vt.feed(mut pane, "\u{1b}[99B".bytes())
+    assert(pane.cursor_row == 4)
+    vt.feed(mut pane, "\u{1b}[1;1H\u{1b}[99B".bytes())
+    assert(pane.cursor_row == 6)
+    vt.feed(mut pane, "\u{1b}[3;3r".bytes())
+    assert(pane.region_top == 2 && pane.region_bottom == 4 && pane.cursor_row == 6)
+    pane.modes.origin = true
+    vt.feed(mut pane, "\u{1b}[2;99r\u{1b}[99;5H".bytes())
+    assert(pane.region_top == 2 && pane.region_bottom == 6 && pane.cursor_row == 6 && pane.cursor_col == 5)
+    vt.feed(mut pane, "\u{1b}[0d".bytes())
+    assert(pane.cursor_row == 2)
+}
+
+fn test_erase_and_pen() {
+    var pane = vt.new(5, 2, 0)
+    vt.feed(mut pane, "abcde\r\nfghij".bytes())
+    pane.pen.flags = 9
+    pane.pen.foreground = 1
+    pane.pen.background = 5
+    assert(pane.primary.cells[0].flags == 0 && pane.primary.cells[0].background == 0 - 1)
+    vt.feed(mut pane, "\u{1b}[1;3H\u{1b}[K".bytes())
+    assert(pane.primary.extents[0] == 2 && pane.primary.cells[1].base == 98)
+    assert(pane.primary.cells[2].base == 32 && pane.primary.cells[2].flags == 0)
+    assert(pane.primary.cells[2].foreground == 0 - 1 && pane.primary.cells[2].background == 5)
+    assert(pane.cursor_row == 1 && pane.cursor_col == 3 && !pane.pending_wrap)
+    vt.feed(mut pane, "\u{1b}[J".bytes())
+    assert(pane.primary.extents[1] == 0 && pane.primary.cells[9].background == 5)
+    vt.feed(mut pane, "\u{1b}[2J".bytes())
+    assert(pane.cursor_row == 1 && pane.cursor_col == 3 && pane.primary.extents[0] == 0)
+    vt.feed(mut pane, "\u{1b}[1;1Habcd\u{1b}[1;2H\u{1b}[2X".bytes())
+    assert(pane.primary.cells[0].base == 97 && pane.primary.cells[1].base == 32 && pane.primary.cells[3].base == 100)
+    assert(pane.primary.extents[0] == 4)
+    vt.feed(mut pane, "\u{1b}[1K".bytes())
+    assert(pane.primary.cells[0].base == 32 && pane.primary.extents[0] == 4)
+}
+
 fn main() -> int {
     test_rectangular()
     test_tabs_and_ownership()
@@ -128,6 +193,9 @@ fn main() -> int {
     test_ascii_print_and_wrap()
     test_ascii_controls()
     test_ascii_scroll_and_one_row()
+    test_cursor_sequences()
+    test_scroll_region_and_origin()
+    test_erase_and_pen()
     test_feed_allocation()
     test_constructor_charge()
     0
