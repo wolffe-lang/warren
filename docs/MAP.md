@@ -2,7 +2,7 @@
 
 | Stage | Capability | State |
 |---|---|---|
-| W0 | pins, tiered CI, the oracle, the survey, the prediction | in progress |
+| W0 | pins, tiered CI, the oracle, the survey, the prediction | the repository half is here; the PAX readiness half is measured in PAX |
 | W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | planned |
 | W2 | server, client, protocol v1; one pane; detach and attach | planned |
 | W3 | split tree, tabs, modes, the hint bar, configuration v1 | planned |
@@ -63,9 +63,27 @@ either marked *planned* or names the gate step that measures it.
 A row that tests an interrupt writes the byte 0x03 into the pseudo-terminal.
 No row sends a signal from a script.
 
+## The oracle, as measured
+
+| Claim | Gate step |
+|---|---|
+| the image is the pinned one: base, package list, binaries | `oracle-image`, `oracle-identity` |
+| the reference's screen can be read cell for cell, twice the same | `oracle-cases` |
+| a wrong attribute, a wrong cursor and a dropped continuation are each caught by name | `harness-mutations` (committed dumps), `oracle-mutations` (live) |
+| 151 census streams dump to the recorded digests | `oracle-census` |
+| the fuzz generator is stable, and its streams dump to the recorded digests | `fuzz-generator`, `oracle-fuzz` |
+| the recordings are the committed bytes and dump to the recorded digests | `corpus-digests`, `oracle-corpus` |
+| tmux agrees with the reference on text and cursor for six cases | `tmux-rows` |
+
 ## Evidence boundaries
 
+- Every row above measures the harness and the reference emulator. There is
+  no emulator of warren's to compare yet; `src/vt` is a stub.
 - The scaffold proves only that the pins resolve, the module tree compiles on
   the native tier, its tests pass on the checked machine and the reference
   interpreter, and the tier planner plans what the workflow runs.
+- The oracle rows run on Linux only. macOS runs the unit gate, the build and
+  the tests.
+- Recorded digests bind the dumps to this image. A new reference version is
+  a new set of digests and a reviewed diff, never an edit in passing.
 - No statement about PAX is measured yet.
