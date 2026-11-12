@@ -5,16 +5,19 @@ for PAX first, and measured on x86-64 Linux and macOS arm64 from the first
 pull request. It takes its ideas from tmux, zellij and herdr, and none of
 their code.
 
-**Status: the map and the pure protocol v1 codec. No working multiplexer
-is implemented yet.** The repository holds the pins, the module tree,
-tiered CI, a pinned reference emulator with a harness that reads its screen
-cell for cell, a survey, recorded corpus, and predictions/drafts for the
-next milestones. `src/proto` now implements bounded transport framing,
-message validation/encoding, fragment assembly and connection-wide image
-acknowledgement sequencing; [PROTOCOL](docs/PROTOCOL.md) fixes the bytes and
-[SERVER](docs/SERVER.md) is the event-loop contract and its blocking library
-dependencies. No server, client, socket or pty is implemented. The `warren`
-binary still prints its executable scaffold status and exits 1.
+**Status: the map, pure incremental terminal parser and protocol v1 codec.
+No working multiplexer is implemented yet.** The repository holds the pins,
+tiered CI, a pinned reference emulator with a cell-for-cell harness, a survey,
+recorded corpus, and predictions/drafts for the next milestones.
+`src/vt/parser.lu` decodes split UTF-8 and recognises bounded terminal
+sequences; its native test entry is `src/vt_parser_test.lu`, also runnable
+under lupin. The screen grid, resize, history and `vt-dump` are not implemented.
+`src/proto` implements bounded transport framing, message validation/encoding,
+fragment assembly and connection-wide image acknowledgement sequencing;
+[PROTOCOL](docs/PROTOCOL.md) fixes the bytes and [SERVER](docs/SERVER.md) is
+the event-loop contract and its blocking library dependencies. No server,
+client, socket or pty is implemented. The `warren` binary still prints its
+executable scaffold status and exits 1.
 [MAP](docs/MAP.md) separates what is planned from what is measured.
 
 ## What is planned
@@ -44,7 +47,7 @@ binary still prints its executable scaffold status and exits 1.
 | Milestone | What | State |
 |---|---|---|
 | W0 | the map: pins, CI, the oracle, the survey, the prediction | in progress |
-| W1 | the emulator | planned |
+| W1 | the emulator | parser implemented; screen model remains |
 | W2 | one pane; detach and attach | pure protocol codec and server contract; I/O planned |
 | W3 | panes, tabs, the bar, keys | planned |
 | W4 | mouse, scrollback, copy | planned |

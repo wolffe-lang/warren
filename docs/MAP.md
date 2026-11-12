@@ -3,15 +3,17 @@
 | Stage | Capability | State |
 |---|---|---|
 | W0 | pins, tiered CI, the oracle, the survey, the prediction | the repository half is here; the PAX readiness half is measured in PAX |
-| W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | planned |
+| W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | incremental parser implemented; grid and command planned |
 | W2 | server, client, protocol v1; one pane; detach and attach | pure protocol codec and server contract; I/O planned |
 | W3 | split tree, tabs, modes, the hint bar, configuration v1 | planned |
 | W4 | mouse, scrollback, copy mode, search, OSC 52 | planned |
 | W5 | command socket, CLI verbs, layout files, save and restore | planned |
 | W6 | static on the PAX image; rows in PAX's own suites | planned |
 
-The protocol codec is implemented; the server/client and emulator remain
-planned here. A statement is marked *planned* or names its measuring rows.
+The incremental parser and protocol codec are implemented; the screen grid,
+server and client remain planned here. A statement is marked *planned* or
+names its measuring rows. `src/vt_parser_test.lu` exercises the parser without
+a grid.
 
 ## The frame
 
@@ -80,7 +82,8 @@ No row sends a signal from a script.
 ## Evidence boundaries
 
 - Every row above measures the harness and the reference emulator. There is
-  no emulator of warren's to compare yet; `src/vt` is a stub.
+  no grid of warren's to compare yet. `src/vt/parser.lu` is the incremental
+  parser; `src/vt/vt.lu` remains a scaffold.
 - The scaffold proves only that the pins resolve, the module tree compiles on
   the native tier, its tests pass on the checked machine and the reference
   interpreter, and the tier planner plans what the workflow runs.
