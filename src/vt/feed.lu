@@ -111,9 +111,9 @@ fn dispatch_grid_token(mut pane: Vt, kind: int, value: int) {
 }
 
 /// Consume bytes with incremental parsing and initial ASCII/C0 screen
-/// operations, cursor addressing, scroll regions and erasure. The grid is
-/// incomplete: Unicode, rendition/mode effects, ESC/OSC, scrollback, answers
-/// and events are not served by this slice yet.
+/// operations, cursor addressing, scroll regions, erasure and SGR. The grid
+/// is incomplete: Unicode, modes, ESC/OSC, scrollback, answers and events
+/// are not served by this slice yet.
 pub fn feed(mut pane: Vt, data: List[byte]) {
     for b in data {
         advance_in_place(mut pane.parser, b)
