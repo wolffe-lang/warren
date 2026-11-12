@@ -22,6 +22,6 @@ fn main() -> int {
     let grown = budget.live() - baseline
     assert(prints == 131072, "parser-benchmark-tokens")
     assert(grown == 0, "parser-advance-allocation")
-    io.println("PASS parser-throughput bytes={pattern.len * rounds} prints={prints} retained-charged={retained} advance-charged={grown}")
+    io.write_line("PASS parser-throughput bytes={pattern.len * rounds} prints={prints} retained-charged={retained} advance-charged={grown}")
     0
 }
