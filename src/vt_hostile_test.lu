@@ -23,12 +23,12 @@ fn invariants(p: vt.Parser) {
 }
 
 fn test_random_bytes() {
-    var seed = 1
+    var seed: int = 1
     while seed <= 8 {
         region fuzz(cap: 32768) {
             var p = vt.new_parser()
             let stable = budget.charged(fuzz)
-            var rng = seed
+            var rng: int = seed
             var i = 0
             while i < 2048 {
                 rng = rng * 48271 % 2147483647
