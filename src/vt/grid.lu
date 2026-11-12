@@ -1,0 +1,59 @@
+//! member: true
+//! Pane and screen storage. The constructor seam is intentionally empty
+//! until the rectangular-grid rows have been observed red.
+
+/// A cell's scalar payload. Width is 1, 2, or 0 for a wide continuation;
+/// mark fields are zero when absent. Rendition colours are -1 for default,
+/// 0..255 for a palette entry, or 16777216 + packed RGB for true colour.
+pub struct Cell {
+    base: int, mark1: int, mark2: int, width: int,
+    flags: int, foreground: int, background: int,
+}
+
+/// One rectangular screen, stored flat; row metadata is indexed from zero.
+pub struct Screen {
+    cells: List[Cell],
+    extents: List[int],
+    wrapped: List[bool],
+}
+
+/// The current rendition, distinct from every cell already on the screen.
+pub struct Pen { flags: int, foreground: int, background: int }
+
+/// Screen-affecting modes needed by the initial grid operations.
+pub struct Modes {
+    autowrap: bool, origin: bool, insert: bool, newline: bool,
+    cursor_visible: bool,
+}
+
+/// One pane's pure terminal state. Cursor and region coordinates are 1-based;
+/// tab and row arrays are 0-based. History storage is not implemented yet.
+pub struct Vt {
+    cols: int, rows: int,
+    primary: Screen, alternate: Screen, active_alternate: bool,
+    cursor_row: int, cursor_col: int, pending_wrap: bool,
+    region_top: int, region_bottom: int,
+    tabs: List[bool], default_tabs: bool,
+    pen: Pen, modes: Modes, parser: Parser,
+    scrollback_cap_bytes: int,
+}
+
+fn new_screen() -> Screen {
+    Screen { cells: List[Cell](), extents: List[int](), wrapped: List[bool]() }
+}
+
+/// Construct a pane with positive dimensions and a nonnegative history cap.
+/// Invalid constructor arguments are caller contract violations and assert.
+pub fn new(cols: int, rows: int, scrollback_cap_bytes: int) -> Vt {
+    assert(cols >= 1 && rows >= 1 && scrollback_cap_bytes >= 0)
+    Vt {
+        cols: cols, rows: rows, primary: new_screen(), alternate: new_screen(),
+        active_alternate: false, cursor_row: 1, cursor_col: 1, pending_wrap: false,
+        region_top: 1, region_bottom: rows,
+        tabs: List[bool](), default_tabs: true,
+        pen: Pen { flags: 0, foreground: 0 - 1, background: 0 - 1 },
+        modes: Modes { autowrap: true, origin: false, insert: false,
+            newline: false, cursor_visible: true },
+        parser: new_parser(), scrollback_cap_bytes: scrollback_cap_bytes,
+    }
+}

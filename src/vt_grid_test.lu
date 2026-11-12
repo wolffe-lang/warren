@@ -1,0 +1,55 @@
+//! member: false
+//! Red-first constructor and ownership rows for the screen grid.
+use vt
+
+fn test_rectangular() {
+    let pane = vt.new(5, 3, 0)
+    assert(pane.primary.cells.len == 15, "grid-rectangular")
+    assert(pane.alternate.cells.len == 15, "grid-rectangular")
+    assert(pane.primary.extents.len == 3 && pane.primary.wrapped.len == 3)
+    assert(pane.alternate.extents.len == 3 && pane.alternate.wrapped.len == 3)
+    assert(pane.cursor_row == 1 && pane.cursor_col == 1 && !pane.pending_wrap)
+    assert(pane.region_top == 1 && pane.region_bottom == 3)
+    var i = 0
+    while i < 15 {
+        assert(pane.primary.cells[i].base == 32 && pane.primary.cells[i].width == 1)
+        assert(pane.primary.cells[i].mark1 == 0 && pane.primary.cells[i].mark2 == 0)
+        assert(pane.primary.cells[i].flags == 0)
+        assert(pane.primary.cells[i].foreground == 0 - 1 && pane.primary.cells[i].background == 0 - 1)
+        i += 1
+    }
+    i = 0
+    while i < 3 {
+        assert(pane.primary.extents[i] == 0 && !pane.primary.wrapped[i])
+        i += 1
+    }
+}
+
+fn test_tabs_and_ownership() {
+    var pane = vt.new(20, 2, 8388608)
+    assert(pane.tabs.len == 20 && pane.default_tabs)
+    var i = 0
+    while i < 20 {
+        assert(pane.tabs[i] == (i > 0 && i % 8 == 0), "grid-default-tabs")
+        i += 1
+    }
+    pane.primary.cells[0].base = 88
+    pane.primary.extents[0] = 1
+    assert(pane.alternate.cells[0].base == 32 && pane.alternate.extents[0] == 0, "grid-screen-ownership")
+    assert(pane.pen.flags == 0 && pane.modes.autowrap && !pane.modes.origin)
+    assert(pane.scrollback_cap_bytes == 8388608)
+}
+
+fn test_one_row() {
+    let pane = vt.new(1, 1, 0)
+    assert(pane.primary.cells.len == 1 && pane.alternate.cells.len == 1)
+    assert(pane.region_top == 1 && pane.region_bottom == 1, "grid-one-row-region")
+    assert(pane.tabs.len == 1 && !pane.tabs[0])
+}
+
+fn main() -> int {
+    test_rectangular()
+    test_tabs_and_ownership()
+    test_one_row()
+    0
+}
