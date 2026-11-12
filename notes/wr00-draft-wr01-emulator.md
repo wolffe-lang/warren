@@ -98,6 +98,17 @@ a sequence of 31 or more parameters: divergence D4):
 - **P5 no input reaches the host.** No sequence makes `src/vt` do I/O, read a
   file, or change anything outside its own value.
 
+### 1.4 Event invariant
+
+- **E1 bounded final-state notifications (ruled).** Events never allocate per
+  input sequence. Until `take_events`, keep one title-changed flag (the current
+  title is read from the pane), one bell flag with a count saturating at the
+  largest `int`, the latest value per changed supported mode, and only the
+  latest complete clipboard-write payload under the existing 4096-byte OSC
+  cap. `take_events` returns final state, not a history of controls, and clears
+  the pending flags and bell count. A row feeds a million title changes and
+  bells under a hard region cap and requires flat allocation while feeding.
+
 ## 2. The grid
 
 ### 2.1 State
