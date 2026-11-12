@@ -1,0 +1,255 @@
+//! member: false
+//! Pure protocol rows; runnable under lupin as well as wolf test.
+use proto
+
+fn payload(kind: int) -> List[byte] {
+    var b = List[byte]()
+    if kind == 1 {
+        for c in "WRN\0".bytes() { (mut b).push(c) }
+        proto.put(mut b, 1, 2)
+        proto.put(mut b, 1, 2)
+        proto.put(mut b, 1, 1)
+        proto.put(mut b, 80, 2)
+        proto.put(mut b, 24, 2)
+        proto.put(mut b, 3, 1)
+        proto.put(mut b, 31, 4)
+        proto.put_text(mut b, "xterm")
+        proto.put_text(mut b, "")
+        proto.put(mut b, 1, 1)
+        proto.put_text(mut b, "/")
+        proto.put(mut b, 1, 2)
+        proto.put_text(mut b, "A")
+        proto.put_text(mut b, "B")
+    } else if kind == 2 {
+        proto.put(mut b, 7, 1)
+        proto.put(mut b, 0, 1)
+        proto.put(mut b, 0x1f600, 4)
+    } else if kind == 3 {
+        proto.put(mut b, 0, 1)
+        proto.put(mut b, 1, 1)
+        proto.put(mut b, 0, 1)
+        proto.put(mut b, 4, 2)
+        proto.put(mut b, 5, 2)
+    } else if kind == 4 || kind == 7 || kind == 133 {
+        proto.put_bytes(mut b, "abc".bytes())
+    } else if kind == 5 {
+        proto.put(mut b, 1, 1)
+    } else if kind == 6 {
+        proto.put(mut b, 80, 2)
+        proto.put(mut b, 24, 2)
+    } else if kind == 8 || kind == 12 || kind == 137 {
+        proto.put(mut b, 7, 4)
+    } else if kind == 11 {
+        proto.put(mut b, 1, 4)
+        proto.put(mut b, 1, 2)
+        proto.put_text(mut b, "ls")
+        proto.put_text(mut b, "/")
+        proto.put_text(mut b, "p1")
+    } else if kind == 129 {
+        proto.put(mut b, 1, 2)
+        proto.put(mut b, 1, 4)
+        proto.put(mut b, 123, 4)
+        proto.put_text(mut b, "default")
+        proto.put_text(mut b, "0.1")
+    } else if kind == 130 || kind == 135 {
+        proto.put(mut b, 1, 2)
+        proto.put_text(mut b, "done")
+    } else if kind == 131 {
+        return image(80, 24, false, false)
+    } else if kind == 134 {
+        proto.put_text(mut b, "title")
+    } else if kind == 136 {
+        proto.put(mut b, 1, 4)
+        proto.put(mut b, 0, 1)
+        proto.put_bytes(mut b, "yes".bytes())
+        proto.put_bytes(mut b, List[byte]())
+    }
+    b
+}
+
+fn image(cols: int, rows: int, distinct: bool, three: bool) -> List[byte] {
+    var b = List[byte]()
+    proto.put(mut b, 1, 4)
+    proto.put(mut b, 0, 4)
+    proto.put(mut b, cols, 2)
+    proto.put(mut b, rows, 2)
+    proto.put(mut b, 1, 2)
+    proto.put(mut b, 1, 2)
+    proto.put(mut b, 2, 1)
+    proto.put(mut b, 1, 1)
+    var n = rows
+    if distinct { n = cols * rows }
+    proto.put(mut b, n, 4)
+    var r = 1
+    while r <= rows {
+        var c = 1
+        while c <= cols {
+            proto.put(mut b, r, 2)
+            proto.put(mut b, c, 2)
+            proto.put(mut b, 0, 2)
+            proto.put(mut b, 0, 4)
+            proto.put(mut b, 0, 4)
+            var cover = cols
+            if distinct { cover = 1 }
+            proto.put(mut b, cover, 2)
+            proto.put(mut b, 1, 2)
+            proto.put(mut b, 1, 1)
+            proto.put(mut b, cover, 2)
+            var count = 1
+            if three { count = 3 }
+            proto.put(mut b, count, 1)
+            proto.put(mut b, 0x10000, 4)
+            if three {
+                proto.put(mut b, 0x10001, 4)
+                proto.put(mut b, 0x10002, 4)
+            }
+            c = c + cover
+        }
+        r = r + 1
+    }
+    b
+}
+
+fn same(a: List[byte], b: List[byte]) -> bool {
+    if a.len != b.len { return false }
+    var i = 0
+    while i < a.len {
+        if a[i] != b[i] { return false }
+        i = i + 1
+    }
+    true
+}
+
+fn test_message_roundtrips() {
+    var k = 1
+    while k <= 137 {
+        if (k <= 12) || (k >= 129) {
+            let p = payload(k)
+            assert(proto.validate(k, p) == 0)
+            let e = proto.encode(k, 0, p)
+            assert(e.code == 0)
+            let d = proto.decode(e.bytes)
+            assert(d.code == 0 && d.kind == k && d.flags == 0)
+            assert(d.used == e.bytes.len && same(d.bytes, p))
+            var n = 0
+            while n < e.bytes.len {
+                var prefix = List[byte]()
+                var i = 0
+                while i < n { (mut prefix).push(e.bytes[i]); i = i + 1 }
+                assert(proto.decode(prefix).code == proto.SHORT)
+                n = n + 1
+            }
+        }
+        k = k + 1
+    }
+    print("PASS proto-roundtrip-all-types-and-truncations")
+}
+
+fn test_golden_and_refusals() {
+    let e = proto.encode(12, 0, payload(12))
+    var golden = List[byte]()
+    for x in [4, 0, 0, 0, 12, 0, 7, 0, 0, 0] { (mut golden).push(x as byte) }
+    assert(same(e.bytes, golden))
+    let h = payload(1)
+    var i = 0
+    for x in [87, 82, 78, 0, 1, 0, 1, 0] {
+        assert(h[i] == x as byte)
+        i = i + 1
+    }
+    assert(proto.encode(0, 0, List[byte]()).code == proto.UNKNOWN)
+    assert(proto.encode(12, 2, payload(12)).code == proto.RESERVED)
+    assert(proto.encode(12, 1, payload(12)).code == proto.RESERVED)
+    var bad = payload(2)
+    bad[0] = 8 as byte
+    assert(proto.validate(2, bad) == proto.MALFORMED)
+    bad = payload(2)
+    bad[2] = 0 as byte
+    bad[3] = 0xd8 as byte
+    bad[4] = 0 as byte
+    bad[5] = 0 as byte
+    assert(proto.validate(2, bad) == proto.MALFORMED)
+    var title = List[byte]()
+    for x in [2, 0, 0xc0, 0x80] { (mut title).push(x as byte) }
+    assert(proto.validate(134, title) == proto.UTF8)
+    var trailing = payload(12)
+    (mut trailing).push(0 as byte)
+    assert(proto.validate(12, trailing) == proto.MALFORMED)
+    var too_big = List[byte]()
+    for x in [1, 0, 16, 0, 12, 0] { (mut too_big).push(x as byte) }
+    assert(proto.decode(too_big).code == proto.LIMIT)
+    print("PASS proto-golden-and-named-refusals")
+}
+
+fn test_wide_and_coverage() {
+    var b = image(2, 1, false, false)
+    // Run covers two columns, one width-2 record repeated once.
+    b[40] = 2 as byte
+    b[41] = 1 as byte
+    assert(proto.validate(131, b) == 0)
+    b[40] = 1 as byte
+    assert(proto.validate(131, b) == proto.MALFORMED)
+    b = image(2, 1, false, false)
+    b[22] = 2 as byte
+    assert(proto.validate(131, b) == proto.MALFORMED)
+    b = image(2, 1, false, false)
+    b[26] = 0xff as byte
+    b[27] = 0xff as byte
+    assert(proto.validate(131, b) == proto.MALFORMED)
+    print("PASS proto-wide-boundary-and-full-coverage")
+}
+
+fn test_fragment_and_ack_model() {
+    let p = payload(131)
+    var split = 1
+    while split < p.len {
+        var s = proto.assembly()
+        var a = List[byte]()
+        var b = List[byte]()
+        var i = 0
+        while i < p.len {
+            if i < split { (mut a).push(p[i]) } else { (mut b).push(p[i]) }
+            i = i + 1
+        }
+        assert(proto.append(mut s, 131, 1, a) == 0)
+        assert(!s.complete)
+        assert(proto.append(mut s, 131, 0, b) == 0 && s.complete)
+        assert(same(s.bytes, p))
+        split = split + 1
+    }
+    var s = proto.assembly()
+    assert(proto.append(mut s, 131, 1, "x".bytes()) == 0)
+    assert(proto.append(mut s, 4, 0, payload(4)) == proto.MALFORMED)
+    var a = proto.ack_state()
+    assert(proto.sent(mut a, 1) == 0)
+    assert(proto.ack(mut a, 1) == 0)
+    // An image reset changes base, not the connection sequence.
+    assert(proto.sent(mut a, 2) == 0)
+    assert(proto.ack(mut a, 1) == 0 && a.pending == 2)
+    assert(proto.ack(mut a, 3) == proto.MALFORMED)
+    assert(proto.ack(mut a, 2) == 0 && a.pending == 0)
+    assert(proto.sent(mut a, 1) == proto.MALFORMED)
+    print("PASS proto-fragment-all-splits-and-stale-ack-after-reset")
+}
+
+fn test_repaint_costs() {
+    for dims in [80, 320] {
+        var rows = 24
+        if dims == 320 { rows = 90 }
+        let blank = proto.encode(131, 0, image(dims, rows, false, false))
+        let distinct = proto.encode(131, 0, image(dims, rows, true, false))
+        let worst = proto.encode(131, 0, image(dims, rows, true, true))
+        assert(blank.code == 0 && blank.bytes.len == 28 + rows * 26)
+        assert(distinct.code == 0 && distinct.bytes.len == 28 + dims * rows * 26)
+        assert(worst.code == 0 && worst.bytes.len == 28 + dims * rows * 34)
+        print("PASS proto-repaint {dims}x{rows} blank={blank.bytes.len} distinct={distinct.bytes.len} worst={worst.bytes.len} frames=1")
+    }
+}
+
+fn main() -> int {
+    test_message_roundtrips()
+    test_golden_and_refusals()
+    test_wide_and_coverage()
+    test_fragment_and_ack_model()
+    test_repaint_costs()
+    0
+}
