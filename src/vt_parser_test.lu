@@ -170,10 +170,28 @@ fn test_chunking() {
     assert(final.count == 1 && final.first.kind == 4 && p.params[0] == 31)
 }
 
+fn test_measured_parser_edges() {
+    expect_tokens("\u{1b}中X", [1, 88])
+    expect_tokens("\u{1b}[31中mX", [1, 109, 1, 88])
+    expect_tokens("\u{1b}]2;abc\u{18}mX", [1, 109, 1, 88])
+    expect_tokens("\u{1b}]2;abc\u{1a}mX", [1, 109, 1, 88])
+    expect_tokens("\u{1b}Pabc\u{18}mX", [1, 109, 1, 88])
+    expect_tokens("\u{1b}Pabc\u{1a}mX", [1, 109, 1, 88])
+    expect_tokens("\u{1b}\u{7f}jX", [3, 106, 1, 88])
+    expect_tokens("\u{1b}[3\u{7f}1mX", [4, 109, 1, 88])
+    expect_tokens("\u{1b}Pabc\u{7f}def\u{1b}\\X", [1, 88])
+    // D8: DEL is dropped from titles, not changed to the reference's '?'.
+    var p = vt.new()
+    feed_part(mut p, "\u{1b}]2;a\u{7f}b\u{7}".bytes())
+    assert(p.output_count == 1 && p.first_kind == 5)
+    assert(p.payload_len == 4 && p.payload[2] as int == 97 && p.payload[3] as int == 98)
+}
+
 fn main() -> int {
     test_decoder()
     test_transitions()
     test_metadata_and_caps()
     test_chunking()
+    test_measured_parser_edges()
     0
 }
