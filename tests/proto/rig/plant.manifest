@@ -1,0 +1,3 @@
+rig plant.manifest committed=../../..:HEAD:tests/proto/rig/plant.manifest
+rig step.sh committed=../../..:HEAD:tests/proto/rig/step.sh
+step proto-native tools=bash,python3 script=step.sh -- native

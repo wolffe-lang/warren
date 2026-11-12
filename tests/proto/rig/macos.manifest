@@ -1,0 +1,8 @@
+floor 15 ../../..
+rig macos.manifest committed=../../..:HEAD:tests/proto/rig/macos.manifest
+rig step.sh committed=../../..:HEAD:tests/proto/rig/step.sh
+rig observation.py committed=../../..:HEAD:tests/proto/rig/observation.py
+step gate-macos tools=bash,python3 script=step.sh -- gate-macos
+step proto-native needs=gate-macos tools=bash,python3 script=step.sh -- native
+step proto-checked needs=gate-macos tools=bash,python3 script=step.sh -- checked
+step proto-lupin needs=gate-macos tools=bash,python3 script=step.sh -- lupin
