@@ -464,7 +464,7 @@ def selftest(screens):
     for name, text in screens:
         base = S.loads(text)
         if S.compare(base, base):
-            print('FAIL harness-mutation-identity: %s differs from itself' % name)
+            print('FAIL harness-mutation-identity %s differs from itself' % name)
             failed += 1
     for mutation, make in S.MUTATIONS.items():
         seen = False
@@ -481,11 +481,11 @@ def selftest(screens):
             if row in rows and row in rows_text:
                 print('PASS harness-mutation-%s on %s: red at %s' % (mutation, name, row))
             else:
-                print('FAIL harness-mutation-%s: not detected on %s (rows red: %s)' % (
+                print('FAIL harness-mutation-%s not detected on %s (rows red: %s)' % (
                     mutation, name, ' '.join(rows) or 'none'))
                 failed += 1
         if not seen:
-            print('FAIL harness-mutation-%s: no screen it applies to' % mutation)
+            print('FAIL harness-mutation-%s no screen it applies to' % mutation)
             failed += 1
     return 1 if failed else 0
 
