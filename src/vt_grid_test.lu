@@ -186,6 +186,47 @@ fn test_erase_and_pen() {
     assert(pane.primary.cells[0].base == 32 && pane.primary.extents[0] == 4)
 }
 
+fn test_sgr_cells() {
+    var pane = vt.new(20, 2, 0)
+    vt.feed(mut pane, "A\u{1b}[1mB\u{1b}[0;2mC\u{1b}[0;3mD\u{1b}[0;4mE\u{1b}[0;5mF\u{1b}[0;7mG\u{1b}[0;8mH\u{1b}[0;9mI\u{1b}[0;31mJ\u{1b}[0;92mK\u{1b}[0;38;5;196mL\u{1b}[0;48;2;1;2;3mM\u{1b}[0m".bytes())
+    assert(pane.primary.cells[1].flags == 1, "grid-sgr-bold")
+    assert(pane.primary.cells[2].flags == 2 && pane.primary.cells[3].flags == 4)
+    assert(pane.primary.cells[4].flags == 8 && pane.primary.cells[5].flags == 32)
+    assert(pane.primary.cells[6].flags == 64 && pane.primary.cells[7].flags == 128 && pane.primary.cells[8].flags == 256)
+    assert(pane.primary.cells[9].foreground == 1 && pane.primary.cells[10].foreground == 10)
+    assert(pane.primary.cells[11].foreground == 196)
+    assert(pane.primary.cells[12].background == 16777216 + 65536 + 512 + 3)
+    assert(pane.pen.flags == 0 && pane.pen.foreground == 0 - 1)
+}
+
+fn test_sgr_colours_and_divergences() {
+    var pane = vt.new(20, 2, 0)
+    vt.feed(mut pane, "\u{1b}[38:5:196mX\u{1b}[38:2::1:2:3mY\u{1b}[38:2:4:5:6mZ".bytes())
+    assert(pane.primary.cells[0].foreground == 196)
+    assert(pane.primary.cells[1].foreground == 16777216 + 65536 + 512 + 3)
+    assert(pane.primary.cells[2].foreground == 16777216 + 262144 + 1280 + 6)
+    vt.feed(mut pane, "\u{1b}[0;4:3mA\u{1b}[58;2;1;2;3mB\u{1b}[53mC".bytes())
+    assert(pane.primary.cells[3].flags == 8 && pane.primary.cells[3].foreground == 0 - 1)
+    assert(pane.primary.cells[4].flags == 8 && pane.primary.cells[5].flags == 8)
+    vt.feed(mut pane, "\u{1b}[0;38;5mD\u{1b}[38;2;1;2mE\u{1b}[38;2;999;0;0mF".bytes())
+    assert(pane.primary.cells[6].foreground == 0)
+    assert(pane.primary.cells[7].foreground == 16777216 + 65536 + 512)
+    assert(pane.primary.cells[8].foreground == pane.primary.cells[7].foreground)
+    vt.feed(mut pane, "\u{1b}[0;38;5;1;1;48;5;2mG".bytes())
+    assert(pane.primary.cells[9].flags == 1 && pane.primary.cells[9].foreground == 1 && pane.primary.cells[9].background == 2)
+}
+
+fn test_sgr_resets_and_wrap() {
+    var pane = vt.new(20, 2, 0)
+    vt.feed(mut pane, "\u{1b}[1;2;3;4;5;7;8;9m\u{1b}[22;23;24;25;27;28;29mX\u{1b}[21mY\u{1b}[24mZ".bytes())
+    assert(pane.primary.cells[0].flags == 0 && pane.primary.cells[1].flags == 16 && pane.primary.cells[2].flags == 0)
+    var wrap = vt.new(5, 2, 0)
+    vt.feed(mut wrap, "abcde\u{1b}[1mZ".bytes())
+    assert(wrap.cursor_row == 2 && wrap.primary.cells[5].flags == 1)
+    vt.feed(mut wrap, "\u{1b}[>4;2mQ".bytes())
+    assert(wrap.primary.cells[6].flags == 1)
+}
+
 fn main() -> int {
     test_rectangular()
     test_tabs_and_ownership()
@@ -196,6 +237,9 @@ fn main() -> int {
     test_cursor_sequences()
     test_scroll_region_and_origin()
     test_erase_and_pen()
+    test_sgr_cells()
+    test_sgr_colours_and_divergences()
+    test_sgr_resets_and_wrap()
     test_feed_allocation()
     test_constructor_charge()
     0
