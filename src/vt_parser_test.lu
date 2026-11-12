@@ -18,17 +18,23 @@ fn expect_print(data: List[byte], expected: List[int]) {
     }
 }
 
+fn expect_octets(data: List[int], expected: List[int]) {
+    var octets = List[byte]()
+    for n in data { (mut octets).push(n as byte) }
+    expect_print(octets, expected)
+}
+
 fn test_decoder() {
     expect_print("a中😀b".bytes(), [97, 20013, 128512, 98])
-    expect_print([97, 195, 40, 98], [97, 65533, 40, 98])
-    expect_print([97, 228, 184, 40, 98], [97, 65533, 40, 98])
-    expect_print([97, 237, 160, 128, 98], [97, 65533, 98])
-    expect_print([97, 192, 175, 98], [97, 65533, 65533, 98])
-    expect_print([97, 244, 144, 128, 128, 98], [97, 65533, 65533, 65533, 65533, 98])
-    expect_print([97, 128, 255, 98], [97, 65533, 65533, 98])
-    expect_print([194, 155, 51, 49, 109, 88], [51, 49, 109, 88])
-    expect_print([155, 51, 49, 109, 88], [65533, 51, 49, 109, 88])
-    expect_print([226, 128, 128, 240, 144, 128, 128], [8192, 65536])
+    expect_octets([97, 195, 40, 98], [97, 65533, 40, 98])
+    expect_octets([97, 228, 184, 40, 98], [97, 65533, 40, 98])
+    expect_octets([97, 237, 160, 128, 98], [97, 65533, 98])
+    expect_octets([97, 192, 175, 98], [97, 65533, 65533, 98])
+    expect_octets([97, 244, 144, 128, 128, 98], [97, 65533, 65533, 65533, 65533, 98])
+    expect_octets([97, 128, 255, 98], [97, 65533, 65533, 98])
+    expect_octets([194, 155, 51, 49, 109, 88], [51, 49, 109, 88])
+    expect_octets([155, 51, 49, 109, 88], [65533, 51, 49, 109, 88])
+    expect_octets([226, 128, 128, 240, 144, 128, 128], [8192, 65536])
 }
 
 fn main() -> int {
