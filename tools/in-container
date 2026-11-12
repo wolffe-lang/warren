@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Build the oracle image from its pins, hold it to them, and run the Linux gate inside.
+#   WARREN_ENGINE   docker (default) or podman
+#   WARREN_CPUS     CPUs for the build and the gate, as taskset takes them (default 0)
+#   WARREN_MEMORY   the container's memory limit (default 6g)
+set -euo pipefail
+root=$(cd "$(dirname "$0")/.." && pwd)
+engine=${WARREN_ENGINE:-docker}
+cpus=${WARREN_CPUS:-0}
+memory=${WARREN_MEMORY:-6g}
+key=$(python3 -I - "$root" <<'PY'
+import hashlib, pathlib, sys
+r = pathlib.Path(sys.argv[1]); h = hashlib.sha256()
+h.update((r / 'ci/oracle.Containerfile').read_bytes())
+print(h.hexdigest()[:20])
+PY
+)
+image="wr00-oracle:$key"
+"$engine" build --memory "$memory" --build-arg "BUILD_CPUS=$cpus" -f "$root/ci/oracle.Containerfile" -t "$image" "$root"
+mkdir -p "$root/target/oracle"
+"$engine" image inspect "$image" --format '{{.Id}}' | tee "$root/target/oracle/image-id.txt"
+for file in oracle-packages.txt oracle-binaries.txt; do
+  "$engine" run --rm --memory "$memory" "$image" cat "/opt/$file" > "$root/target/oracle/$file"
+done
+diff -u "$root/ci/packages.txt" "$root/target/oracle/oracle-packages.txt"
+diff -u "$root/ci/oracle-binaries.lock" "$root/target/oracle/oracle-binaries.txt"
+echo 'PASS oracle-binary-and-package-pins'
+if [ "${WARREN_PREPARE_ONLY:-0}" = 1 ]; then exit 0; fi
+if [ "$#" -eq 0 ]; then set -- bash tools/gate linux; fi
+"$engine" run --rm --init --memory "$memory" --pids-limit 4096 \
+  -e WARREN_ARCHIVES -v "$root:$root" -w "$root" "$image" taskset -c "$cpus" "$@"

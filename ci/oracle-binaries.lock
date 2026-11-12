@@ -1,0 +1,4 @@
+xterm|XTerm(390)|5415c1445d44e4c347fe51e30dd8f014de7e489873cfc82fe32af628dc01d4c4|/usr/bin/xterm
+tmux|tmux 3.4|fa8ff3fccdd7cd5f1a0b376288561085e00189f340e450bf9b95cd701f6758ae|/usr/bin/tmux
+Xvfb|xvfb 2:21.1.12-1ubuntu1.9|0081b27338b510ec5e2068a93c6db31480872de9bb082f347f3747ef1648e794|/usr/bin/Xvfb
+infocmp|ncurses 6.4.20240113|66b83d77b4108f205b0b9c839a63dcc656ddc33a3e343638ff67c0e781fa75ea|/usr/bin/infocmp
