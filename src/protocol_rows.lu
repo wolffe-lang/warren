@@ -120,6 +120,51 @@ fn same(a: List[byte], b: List[byte]) -> bool {
     true
 }
 
+fn golden(kind: int, hex: str) {
+    let chars = hex.bytes()
+    var want = List[byte]()
+    var i = 0
+    while i < chars.len {
+        var hi = chars[i] as int
+        var lo = chars[i + 1] as int
+        if hi >= 97 { hi = hi - 87 } else { hi = hi - 48 }
+        if lo >= 97 { lo = lo - 87 } else { lo = lo - 48 }
+        (mut want).push((hi * 16 + lo) as byte)
+        i = i + 2
+    }
+    var p = payload(kind)
+    if kind == 131 { p = image(1, 1, false, false) }
+    let got = proto.encode(kind, 0, p)
+    assert(got.code == 0 && same(got.bytes, want))
+    let d = proto.decode(want)
+    assert(d.code == 0 && d.kind == kind && same(d.bytes, p))
+}
+
+fn test_all_golden_vectors() {
+    golden(1, "27000000010057524e00010001000150001800031f0000000500787465726d00000101002f0100010041010042")
+    golden(2, "060000000200070000f60100")
+    golden(3, "07000000030000010004000500")
+    golden(4, "07000000040003000000616263")
+    golden(5, "01000000050001")
+    golden(6, "04000000060050001800")
+    golden(7, "07000000070003000000616263")
+    golden(8, "04000000080007000000")
+    golden(9, "000000000900")
+    golden(10, "000000000a00")
+    golden(11, "110000000b0001000000010002006c7301002f02007031")
+    golden(12, "040000000c0007000000")
+    golden(129, "1800000081000100010000007b000000070064656661756c740300302e31")
+    golden(130, "08000000820001000400646f6e65")
+    golden(131, "300000008300010000000000000001000100010001000201010000000100010000000000000000000000010001000101000100000100")
+    golden(132, "000000008400")
+    golden(133, "07000000850003000000616263")
+    golden(134, "07000000860005007469746c65")
+    golden(135, "08000000870001000400646f6e65")
+    golden(136, "10000000880001000000000300000079657300000000")
+    golden(137, "04000000890007000000")
+    print("PASS proto-golden-all-21-types")
+}
+
 fn test_message_roundtrips() {
     var k = 1
     while k <= 137 {
@@ -187,7 +232,10 @@ fn test_wide_and_coverage() {
     b[41] = 1 as byte
     assert(proto.validate(131, b) == 0)
     b[40] = 1 as byte
-    assert(proto.validate(131, b) == proto.MALFORMED)
+    if proto.validate(131, b) != proto.MALFORMED {
+        print("FAIL proto-wide-boundary: incomplete coverage accepted")
+        assert(false)
+    }
     b = image(2, 1, false, false)
     b[22] = 2 as byte
     assert(proto.validate(131, b) == proto.MALFORMED)
@@ -245,11 +293,70 @@ fn test_repaint_costs() {
     }
 }
 
+fn test_partial_write_model() {
+    let wire = proto.encode(131, 0, image(80, 24, false, false)).bytes
+    var stall = 0
+    while stall <= wire.len {
+        var sent = 0
+        var drained = 0
+        var delivered = List[byte]()
+        // A 4096-byte socket model: busy can take zero, never lose suffix.
+        while drained < wire.len {
+            let old_sent = sent
+            var take_count = wire.len - sent
+            if take_count > 4096 - (sent - drained) { take_count = 4096 - (sent - drained) }
+            if drained == stall { take_count = 0 }
+            sent = sent + take_count
+            if sent == drained {
+                // A later writable turn resumes from exactly the old offset.
+                sent = old_sent + 1
+            }
+            (mut delivered).push(wire[drained])
+            drained = drained + 1
+            assert(sent >= drained && sent - drained <= 4096)
+        }
+        assert(same(delivered, wire))
+        assert(proto.decode(delivered).code == 0)
+        stall = stall + 1
+    }
+    // Every permitted short-write count of a tiny packet, including >length.
+    let ping = proto.encode(12, 0, payload(12)).bytes
+    var chunk = 1
+    while chunk <= 4096 {
+        var pos = 0
+        var delivered = List[byte]()
+        while pos < ping.len {
+            var n = chunk
+            if n > ping.len - pos { n = ping.len - pos }
+            var i = 0
+            while i < n { (mut delivered).push(ping[pos + i]); i = i + 1 }
+            pos = pos + n
+        }
+        assert(same(delivered, ping))
+        chunk = chunk + 1
+    }
+    print("PASS proto-partial-write-4096-and-every-stall-offset")
+}
+
+fn test_version_before_suffix() {
+    var p = List[byte]()
+    for x in [87, 82, 78, 0, 2, 0, 3, 0, 255] { (mut p).push(x as byte) }
+    let v = proto.hello_version(p)
+    assert(v.code == 0 && v.minimum == 2 && v.maximum == 3)
+    let wire = proto.encode_part(1, 0, p)
+    assert(wire.code == 0 && proto.decode(wire.bytes).code == 0)
+    assert(proto.validate(1, p) != 0)
+    print("PASS proto-version-before-versioned-suffix")
+}
+
 fn main() -> int {
+    test_version_before_suffix()
     test_message_roundtrips()
     test_golden_and_refusals()
     test_wide_and_coverage()
     test_fragment_and_ack_model()
     test_repaint_costs()
+    test_all_golden_vectors()
+    test_partial_write_model()
     0
 }

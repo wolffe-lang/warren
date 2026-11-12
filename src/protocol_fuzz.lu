@@ -1,0 +1,55 @@
+//! member: false
+//! A bounded deterministic fuzz row, Linux only under the gate's memory cap.
+use proto
+
+fn main() -> int {
+    var seed = 734527
+    var trial = 0
+    var accepted = 0
+    while trial < 10000 {
+        seed = (seed * 48271) % 2147483647
+        let length = seed % 513
+        var bytes = List[byte]()
+        var i = 0
+        while i < length {
+            seed = (seed * 48271) % 2147483647
+            (mut bytes).push((seed % 256) as byte)
+            i = i + 1
+        }
+        let kind = 1 + trial % 12
+        let code = proto.validate(kind, bytes)
+        assert(code >= 0 && code <= proto.UTF8)
+        let raw = proto.decode(bytes)
+        assert(raw.code >= 0 && raw.code <= proto.UTF8)
+        if raw.code == 0 { assert(raw.used <= bytes.len) }
+        if bytes.len >= 6 {
+            // Make the header plausible; mutate payloads of every server type.
+            let n = bytes.len - 6
+            bytes[0] = (n % 256) as byte
+            bytes[1] = (n / 256) as byte
+            bytes[2] = 0 as byte
+            bytes[3] = 0 as byte
+            bytes[4] = (129 + trial % 9) as byte
+            bytes[5] = 0 as byte
+            let d = proto.decode(bytes)
+            assert(d.code >= 0 && d.code <= proto.UTF8)
+            if d.code == 0 {
+                var a = proto.assembly()
+                let c = proto.append(mut a, d.kind, d.flags, d.bytes)
+                assert(c >= 0 && c <= proto.UTF8)
+                if c == 0 { accepted = accepted + 1 }
+            }
+        }
+        trial = trial + 1
+    }
+    // Advertised counts must be refused before looping or allocating them.
+    var huge = List[byte]()
+    for x in [255, 255, 255, 255] { (mut huge).push(x as byte) }
+    assert(proto.validate(4, huge) == proto.LIMIT)
+    assert(proto.validate(7, huge) == proto.LIMIT)
+    var title = List[byte]()
+    for x in [255, 255] { (mut title).push(x as byte) }
+    assert(proto.validate(134, title) == proto.MALFORMED)
+    print("PASS proto-fuzz trials={trial} max_input=512 accepted_mutants={accepted} count_bombs=3")
+    0
+}
