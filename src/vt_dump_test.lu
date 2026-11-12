@@ -8,6 +8,9 @@ fn test_dump_prefix() {
     let text = vt.dump(pane)
     assert(text.starts_with("warren-screen 1\nsize 3 1\ncursor 1 2 shape=2 visible=1 pending-wrap=0\n"), "grid-dump-format")
     assert(vt.dump(pane) == text, "grid-dump-deterministic")
+    var wrap = vt.new(4, 1, 0)
+    vt.feed(mut wrap, "abcd\u{1b}[4 q".bytes())
+    assert(vt.dump(wrap).starts_with("warren-screen 1\nsize 4 1\ncursor 1 4 shape=4 visible=1 pending-wrap=1\n"), "grid-cursor-style")
 }
 
 fn main() -> int {
