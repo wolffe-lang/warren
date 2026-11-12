@@ -85,7 +85,8 @@ fn print_ascii(mut pane: Vt, cp: int) {
 }
 
 fn execute_c0(mut pane: Vt, cp: int) {
-    if cp == 8 {
+    if cp == 7 { register_bell(mut pane) }
+    else if cp == 8 {
         pane.pending_wrap = false
         if pane.cursor_col > 1 { pane.cursor_col -= 1 }
     } else if cp == 9 {
@@ -108,12 +109,14 @@ fn dispatch_grid_token(mut pane: Vt, kind: int, value: int) {
     if kind == 1 && value >= 32 && value <= 126 { print_ascii(mut pane, value) }
     else if kind == 2 { execute_c0(mut pane, value) }
     else if kind == 4 { dispatch_csi(mut pane, value) }
+    else if kind == 5 { dispatch_osc(mut pane) }
 }
 
 /// Consume bytes with incremental parsing and initial ASCII/C0 screen
-/// operations, cursor addressing, scroll regions, erasure and SGR. The grid
-/// is incomplete: Unicode, modes, ESC/OSC, scrollback, answers and events
-/// are not served by this slice yet.
+/// operations, cursor addressing, scroll regions, erasure, SGR, titles,
+/// stored mode state and bounded final-state events. The grid is incomplete:
+/// Unicode, insertion/deletion, alternate-screen and other ESC operations,
+/// scrollback and answers are not served by this slice yet.
 pub fn feed(mut pane: Vt, data: List[byte]) {
     for b in data {
         advance_in_place(mut pane.parser, b)

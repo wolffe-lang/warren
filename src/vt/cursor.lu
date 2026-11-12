@@ -76,6 +76,7 @@ fn erase_active_screen(mut screen: Screen, cols: int, rows: int, row: int, col: 
 }
 
 fn dispatch_csi(mut pane: Vt, final: int) {
+    if final == 104 || final == 108 { dispatch_mode_sequence(mut pane, final); return }
     if final == 109 && pane.parser.private_marker == 0 && pane.parser.inter_count == 0 {
         apply_sgr(mut pane)
         return

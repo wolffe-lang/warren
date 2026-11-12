@@ -1,5 +1,7 @@
 //! member: true
-//! Bounded event storage and a red-first drain seam.
+//! Bounded, coalesced final-state notifications. Only draining creates event
+//! records; incoming controls mutate fixed storage and scalar flags.
+use std.base64
 
 /// A coalesced final-state notification: 1 title changed (read Vt title),
 /// 2 bell (value=count), 3 mode (private_mode, mode, value), or 4 clipboard
@@ -46,8 +48,199 @@ fn new_events() -> EventState {
     }
 }
 
-/// Drain seam, not implemented until the event rows are observed red.
+fn event_mode_code(index: int) -> int {
+    if index == 0 { return 4 }
+    if index == 1 { return 20 }
+    if index == 2 { return 1 }
+    if index == 3 { return 6 }
+    if index == 4 { return 7 }
+    if index == 5 { return 12 }
+    if index == 6 { return 25 }
+    if index == 7 { return 66 }
+    if index == 8 { return 1000 }
+    if index == 9 { return 1002 }
+    if index == 10 { return 1003 }
+    if index == 11 { return 1004 }
+    if index == 12 { return 1006 }
+    if index == 13 { return 1007 }
+    if index == 14 { return 2004 }
+    if index == 15 { return 2026 }
+    0 - 1
+}
+
+fn event_mode_index(private_mode: bool, code: int) -> int {
+    var i = if private_mode { 2 } else { 0 }
+    let end = if private_mode { 16 } else { 2 }
+    while i < end {
+        if event_mode_code(i) == code { return i }
+        i += 1
+    }
+    0 - 1
+}
+
+fn change_mode_value(mut pane: Vt, index: int, value: int) {
+    if pane.mode_values[index] != value {
+        pane.mode_values[index] = value
+        pane.events.mode_changed[index] = true
+    }
+}
+
+fn set_grid_mode(mut pane: Vt, private_mode: bool, code: int, enabled: bool) {
+    let index = event_mode_index(private_mode, code)
+    if index < 0 { return }
+    let value = if enabled { 1 } else { 0 }
+    change_mode_value(mut pane, index, value)
+    if !private_mode {
+        if code == 4 { pane.modes.insert = enabled }
+        else if code == 20 { pane.modes.newline = enabled }
+    } else if code == 6 {
+        pane.modes.origin = enabled
+        pane.cursor_row = if enabled { pane.region_top } else { 1 }
+        pane.cursor_col = 1
+        pane.pending_wrap = false
+    } else if code == 7 {
+        pane.modes.autowrap = enabled
+    } else if code == 25 {
+        pane.modes.cursor_visible = enabled
+    } else if index >= 8 && index <= 10 && enabled {
+        var other = 8
+        while other <= 10 {
+            if other != index { change_mode_value(mut pane, other, 0) }
+            other += 1
+        }
+    }
+}
+
+fn dispatch_mode_sequence(mut pane: Vt, final: int) {
+    if pane.parser.inter_count != 0 { return }
+    if pane.parser.private_marker != 0 && pane.parser.private_marker != 63 { return }
+    let private_mode = pane.parser.private_marker == 63
+    var i = 0
+    while i < pane.parser.param_count {
+        if pane.parser.subs[i] == 1 {
+            let code = pane.parser.params[i * 6]
+            set_grid_mode(mut pane, private_mode, code, final == 104)
+        }
+        i += 1
+    }
+}
+
+fn register_bell(mut pane: Vt) {
+    pane.events.bell_pending = true
+    if pane.events.bell_count < 9223372036854775807 { pane.events.bell_count += 1 }
+}
+
+fn base64_digit(n: int) -> int {
+    if n >= 65 && n <= 90 { return n - 65 }
+    if n >= 97 && n <= 122 { return n - 97 + 26 }
+    if n >= 48 && n <= 57 { return n - 48 + 52 }
+    if n == 43 { return 62 }
+    if n == 47 { return 63 }
+    0 - 1
+}
+
+// Validate in place so malformed writes cannot replace a previous valid
+// pending clipboard value. Decoding uses std.base64 only when drained.
+fn valid_clipboard_base64(p: Parser, start: int) -> bool {
+    let end = p.payload_len
+    if (end - start) % 4 != 0 { return false }
+    var i = start
+    while i < end {
+        let a = base64_digit(p.payload[i] as int)
+        let b = base64_digit(p.payload[i + 1] as int)
+        if a < 0 || b < 0 { return false }
+        let c = p.payload[i + 2] as int
+        let d = p.payload[i + 3] as int
+        if c == 61 { return d == 61 && i + 4 == end && b % 16 == 0 }
+        let cv = base64_digit(c)
+        if cv < 0 { return false }
+        if d == 61 { return i + 4 == end && cv % 4 == 0 }
+        if base64_digit(d) < 0 { return false }
+        i += 4
+    }
+    true
+}
+
+fn dispatch_osc(mut pane: Vt) {
+    var command: int = 0
+    var split = 0
+    while split < pane.parser.payload_len && pane.parser.payload[split] as int != 59 {
+        let n = pane.parser.payload[split] as int
+        if n < 48 || n > 57 { return }
+        command = command * 10 + n - 48
+        if command > 65535 { command = 65535 }
+        split += 1
+    }
+    if split == 0 || split == pane.parser.payload_len { return }
+    if command == 0 || command == 2 {
+        let length = pane.parser.payload_len - split - 1
+        var changed = pane.title_length != length
+        var i = 0
+        while i < length {
+            let b = pane.parser.payload[split + 1 + i]
+            if pane.title_storage[i] != b { changed = true }
+            pane.title_storage[i] = b
+            i += 1
+        }
+        pane.title_length = length
+        if changed { pane.events.title_changed = true }
+    } else if command == 52 {
+        var start = split + 1
+        while start < pane.parser.payload_len && pane.parser.payload[start] as int != 59 { start += 1 }
+        if start == pane.parser.payload_len { return }
+        start += 1
+        if pane.parser.payload_len - start == 1 && pane.parser.payload[start] as int == 63 { return }
+        if !valid_clipboard_base64(pane.parser, start) { return }
+        let length = pane.parser.payload_len - start
+        var i = 0
+        while i < length {
+            pane.events.clipboard_encoded[i] = pane.parser.payload[start + i]
+            i += 1
+        }
+        pane.events.clipboard_length = length
+        pane.events.clipboard_pending = true
+    }
+}
+
+fn plain_event(kind: int, private_mode: bool, mode: int, value: int) -> Event {
+    Event { kind: kind, private_mode: private_mode, mode: mode, value: value, payload: List[byte]() }
+}
+
+/// Return coalesced final-state notifications in title, bell, mode-table,
+/// clipboard order, then clear their pending flags and the bell count.
+/// Title bytes remain in Vt. Clipboard reads and invalid writes never enter
+/// the pending state. Allocation is bounded by supported modes and 4096 bytes.
 pub fn take_events(mut pane: Vt) -> List[Event] {
-    pane.events.title_changed = false
-    List[Event]()
+    var out = List[Event]()
+    (mut out).reserve(19)
+    if pane.events.title_changed {
+        (mut out).push(plain_event(1, false, 0, 0))
+        pane.events.title_changed = false
+    }
+    if pane.events.bell_pending {
+        (mut out).push(plain_event(2, false, 0, pane.events.bell_count))
+        pane.events.bell_pending = false
+        pane.events.bell_count = 0
+    }
+    var i = 0
+    while i < 16 {
+        if pane.events.mode_changed[i] {
+            (mut out).push(plain_event(3, i >= 2, event_mode_code(i), pane.mode_values[i]))
+            pane.events.mode_changed[i] = false
+        }
+        i += 1
+    }
+    if pane.events.clipboard_pending {
+        let text = str_from_utf8(pane.events.clipboard_encoded[0..pane.events.clipboard_length]) else {
+            assert(false, "clipboard-storage-utf8")
+            ""
+        }
+        let payload = base64.decode(text) else {
+            assert(false, "clipboard-storage-base64")
+            List[byte]()
+        }
+        (mut out).push(Event { kind: 4, private_mode: false, mode: 0, value: 0, payload: payload })
+        pane.events.clipboard_pending = false
+    }
+    out
 }
