@@ -15,15 +15,16 @@ fn main() -> int {
     var rounds = 0
     while rounds < 4096 {
         for b in pattern {
-            let step = vt.advance(mut p, b)
-            if step.count > 0 && step.first.kind == 1 { prints += 1 }
+            vt.advance_in_place(mut p, b)
+            if p.output_count > 0 && p.first_kind == 1 { prints += 1 }
         }
         rounds += 1
     }
     let grown = budget.charged(measured) - baseline
+    io.write_line("MEASURE parser-throughput bytes={pattern.len * rounds} prints={prints} retained-charged={retained} advance-charged={grown}")
     assert(prints == 8192, "parser-benchmark-tokens")
     assert(grown == 0, "parser-advance-allocation")
-    io.write_line("PASS parser-throughput bytes={pattern.len * rounds} prints={prints} retained-charged={retained} advance-charged={grown}")
+    io.write_line("PASS parser-throughput")
     }
     0
 }

@@ -31,6 +31,11 @@ pub struct Parser {
     payload_overflow: bool,
     string_osc: bool,
     ignore_escape: bool,
+    output_count: int,
+    first_kind: int,
+    first_value: int,
+    second_kind: int,
+    second_value: int,
 }
 
 /// Construct a ground parser, allocating its bounded buffers once.
@@ -52,14 +57,20 @@ pub fn new() -> Parser {
         params: values, subs: counts, param_count: 0, inter: [0, 0],
         inter_count: 0, private_marker: 0, payload: payload, payload_len: 0,
         payload_overflow: false, string_osc: false, ignore_escape: false,
+        output_count: 0, first_kind: 0, first_value: 0, second_kind: 0, second_value: 0,
     }
 }
 
-fn absent() -> Token { Token { kind: 0, value: 0 } }
-fn emit(mut out: Step, t: Token) {
-    if t.kind != 0 {
-        if out.count == 0 { out.first = t } else { out.second = t }
-        out.count += 1
+// Internal tokens fit in one int: kind * 1114112 + scalar/final. Returning
+// record values here charges transient allocations under the interpreter.
+fn absent() -> int { 0 }
+fn emit(mut p: Parser, token: int) {
+    if token != 0 {
+        let kind = token / 1114112
+        let value = token % 1114112
+        if p.output_count == 0 { p.first_kind = kind; p.first_value = value }
+        else { p.second_kind = kind; p.second_value = value }
+        p.output_count += 1
     }
 }
 
@@ -135,13 +146,13 @@ fn payload_scalar(mut p: Parser, cp: int) {
     }
 }
 
-fn end_osc(mut p: Parser) -> Token {
+fn end_osc(mut p: Parser) -> int {
     p.state = 0
     if p.payload_overflow { return absent() }
-    Token { kind: 5, value: 0 }
+    5 * 1114112
 }
 
-fn scalar(mut p: Parser, cp: int) -> Token {
+fn scalar(mut p: Parser, cp: int) -> int {
     // DEL and encoded C1 have no effect in any state.
     if cp == 127 || (cp >= 128 && cp <= 159) { return absent() }
     if cp == 24 || cp == 26 {
@@ -170,8 +181,8 @@ fn scalar(mut p: Parser, cp: int) -> Token {
         return absent()
     }
     if p.state == 8 { return absent() }
-    if cp < 32 { return Token { kind: 2, value: cp } }
-    if p.state == 0 { return Token { kind: 1, value: cp } }
+    if cp < 32 { return 2 * 1114112 + cp }
+    if p.state == 0 { return 1114112 + cp }
     if p.state == 1 || p.state == 2 {
         if cp >= 32 && cp <= 47 {
             intermediate(mut p, cp, true)
@@ -185,7 +196,7 @@ fn scalar(mut p: Parser, cp: int) -> Token {
                 }
             }
             p.state = 0
-            return Token { kind: 3, value: cp }
+            return 3 * 1114112 + cp
         }
         return absent()
     }
@@ -196,7 +207,7 @@ fn scalar(mut p: Parser, cp: int) -> Token {
     }
     if cp >= 64 && cp <= 126 {
         p.state = 0
-        return Token { kind: 4, value: cp }
+        return 4 * 1114112 + cp
     }
     if cp >= 32 && cp <= 47 {
         intermediate(mut p, cp, false)
@@ -210,11 +221,16 @@ fn scalar(mut p: Parser, cp: int) -> Token {
     absent()
 }
 
-/// Consume exactly one byte. Total, at most two tokens, no allocation.
-/// An incomplete UTF-8 prefix remains pending across feed boundaries.
-/// The caller must consume sequence metadata before advancing again.
-pub fn advance(mut p: Parser, b: byte) -> Step {
-    var out = Step { count: 0, first: absent(), second: absent() }
+/// Consume one byte and expose zero, one or two tokens in the parser's
+/// output fields. Total; no per-byte value or buffer allocation. An
+/// incomplete UTF-8 prefix persists across feed boundaries. Consume tokens
+/// and sequence metadata before the next call.
+pub fn advance_in_place(mut p: Parser, b: byte) {
+    p.output_count = 0
+    p.first_kind = 0
+    p.first_value = 0
+    p.second_kind = 0
+    p.second_value = 0
     let n = b as int
     if p.utf_left > 0 {
         var continuation = n >= 128 && n < 192
@@ -232,20 +248,38 @@ pub fn advance(mut p: Parser, b: byte) -> Step {
             if p.utf_left == 0 {
                 var cp = p.utf_code
                 if cp >= 55296 && cp <= 57343 { cp = 65533 }
-                emit(mut out, scalar(mut p, cp))
+                let token = scalar(mut p, cp)
+                emit(mut p, token)
             }
-            return out
+            return
         }
         p.utf_left = 0
-        emit(mut out, scalar(mut p, 65533))
+        let token = scalar(mut p, 65533)
+        emit(mut p, token)
     }
-    if n < 128 { emit(mut out, scalar(mut p, n)) }
-    else if n >= 194 && n < 245 {
+    if n < 128 {
+        let token = scalar(mut p, n)
+        emit(mut p, token)
+    } else if n >= 194 && n < 245 {
         p.utf_lead = n
         p.utf_seen = 1
         if n < 224 { p.utf_code = n - 192; p.utf_left = 1 }
         else if n < 240 { p.utf_code = n - 224; p.utf_left = 2 }
         else { p.utf_code = n - 240; p.utf_left = 3 }
-    } else { emit(mut out, scalar(mut p, 65533)) }
-    out
+    } else {
+        let token = scalar(mut p, 65533)
+        emit(mut p, token)
+    }
+}
+
+/// Convenience value form of `advance_in_place`. At most two tokens, total.
+/// Returning records carries a transient interpreter allocation; a bounded
+/// streaming consumer uses the in-place form instead.
+pub fn advance(mut p: Parser, b: byte) -> Step {
+    advance_in_place(mut p, b)
+    Step {
+        count: p.output_count,
+        first: Token { kind: p.first_kind, value: p.first_value },
+        second: Token { kind: p.second_kind, value: p.second_value },
+    }
 }
