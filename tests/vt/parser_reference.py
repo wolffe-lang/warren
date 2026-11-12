@@ -9,6 +9,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+import subprocess
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -42,6 +43,37 @@ def main():
     assert {p.stem for p in base.glob('*.in')} == names
     assert {p.stem for p in base.glob('*.screen')} == names
     assert len(names) == 19
+    if len(sys.argv) > 1:
+        done = subprocess.run(sys.argv[1:], cwd=ROOT, capture_output=True, text=True, timeout=120)
+        assert done.returncode == 0, done.stderr
+        candidate = {}
+        for line in done.stdout.splitlines():
+            fields = line.split()
+            kind, name = fields[:2]
+            if kind == 'BEGIN':
+                assert name not in candidate, name
+                candidate[name] = {'prints': [], 'title': b''}
+            elif kind == 'PRINT':
+                candidate[name]['prints'].append(int(fields[2]))
+            elif kind == 'OSC':
+                command, sep, text = bytes.fromhex(fields[2]).partition(b';')
+                if sep and command in (b'0', b'2'):
+                    candidate[name]['title'] = text
+            else:
+                raise ValueError('unexpected parser trace: ' + line)
+        projected = {c['name'] for c in manifest['cases'] if c['size'][1] != 1}
+        assert set(candidate) == projected, 'projection case set'
+        for case in manifest['cases']:
+            name = case['name']
+            if name not in projected:
+                continue
+            got = screen.loads((base / (name + '.screen')).read_text())
+            expected = [int(cp, 16) for cell in got['rows'][0][:got['extents'][0]]
+                        if cell[0] != 0 for cp in cell[1].replace('U+', '').split('+')]
+            title = b'ab' if case['classification'] == 'D8' else bytes.fromhex(got['title'])
+            assert candidate[name]['prints'] == expected, name + ' printed scalars'
+            assert candidate[name]['title'] == title, name + ' title'
+            print('PASS parser-reference-projection %s text,title classification=%s' % (name, case['classification']))
     return 0
 
 

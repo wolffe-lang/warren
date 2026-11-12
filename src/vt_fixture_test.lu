@@ -1,0 +1,39 @@
+//! member: false
+//! End-to-end parser projection, not a screen emulator. Each byte stream is
+//! the same one the pinned reference consumed. The Python row compares only
+//! printed scalars and the last OSC title; grid state is not projected.
+use vt
+use std.fs
+use std.io
+use std.hex
+
+fn token(name: str, kind: int, value: int) {
+    if kind == 1 { io.write_line("PRINT {name} {value}") }
+}
+
+fn main() -> int {
+    let names = ["csi-del", "csi-entry-nonascii", "csi-ignore-intermediate-nonascii",
+        "csi-ignore-nonascii", "csi-intermediate-nonascii", "csi-nonascii",
+        "csi-replacement", "dcs-can", "dcs-del", "dcs-sub", "esc-del",
+        "esc-nonascii", "escape-intermediate-nonascii", "escape-replacement",
+        "osc-can", "osc-del", "osc-sub"]
+    for name in names {
+        region fixture {
+            let data = fs.read_bytes("tests/vt/parser-reference/{name}.in") else {
+                assert(false, "parser-fixture-read")
+                List[byte]()
+            }
+            var p = vt.new_parser()
+            io.write_line("BEGIN {name}")
+            for b in data {
+                vt.advance_in_place(mut p, b)
+                if p.output_count > 0 { token(name, p.first_kind, p.first_value) }
+                if p.output_count > 1 { token(name, p.second_kind, p.second_value) }
+                if p.output_count > 0 && p.first_kind == 5 {
+                    io.write_line("OSC {name} {hex.encode(p.payload[0..p.payload_len])}")
+                }
+            }
+        }
+    }
+    0
+}
