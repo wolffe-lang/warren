@@ -1,0 +1,7 @@
+//! member: true
+//! Screen-dispatch seam; printing and C0 operations are red-first rows next.
+
+/// Consume bytes incrementally. Dispatch is not implemented at this seam.
+pub fn feed(mut pane: Vt, data: List[byte]) {
+    for b in data { advance_in_place(mut pane.parser, b) }
+}

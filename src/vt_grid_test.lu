@@ -66,10 +66,55 @@ fn test_constructor_charge() {
     }
 }
 
+fn test_ascii_print_and_wrap() {
+    var pane = vt.new(4, 2, 0)
+    vt.feed(mut pane, "abcd".bytes())
+    assert(pane.primary.cells[0].base == 97 && pane.primary.cells[3].base == 100, "grid-ascii-print")
+    assert(pane.primary.extents[0] == 4 && pane.cursor_row == 1 && pane.cursor_col == 4 && pane.pending_wrap)
+    vt.feed(mut pane, "X".bytes())
+    assert(pane.primary.wrapped[0] && pane.primary.cells[4].base == 88)
+    assert(pane.primary.extents[1] == 1 && pane.cursor_row == 2 && pane.cursor_col == 2 && !pane.pending_wrap)
+    assert(pane.alternate.cells[0].base == 32)
+}
+
+fn test_ascii_controls() {
+    var pane = vt.new(5, 3, 0)
+    vt.feed(mut pane, "ab\rZ".bytes())
+    assert(pane.primary.cells[0].base == 90 && pane.primary.cells[1].base == 98)
+    assert(pane.primary.extents[0] == 2 && pane.cursor_col == 2)
+    vt.feed(mut pane, "\nX".bytes())
+    assert(pane.cursor_row == 2 && pane.cursor_col == 3 && pane.primary.cells[6].base == 88)
+    var wrap = vt.new(5, 2, 0)
+    vt.feed(mut wrap, "abcde\bZ".bytes())
+    assert(wrap.primary.cells[3].base == 90 && wrap.primary.cells[4].base == 101)
+    assert(wrap.cursor_col == 5 && !wrap.pending_wrap)
+    var tabs = vt.new(20, 2, 0)
+    vt.feed(mut tabs, "\tX".bytes())
+    assert(tabs.primary.cells[8].base == 88 && tabs.cursor_col == 10)
+    var tabwrap = vt.new(4, 2, 0)
+    vt.feed(mut tabwrap, "abcd\tZ".bytes())
+    assert(tabwrap.primary.cells[4].base == 90 && tabwrap.cursor_row == 2)
+}
+
+fn test_ascii_scroll_and_one_row() {
+    var pane = vt.new(4, 2, 0)
+    vt.feed(mut pane, "a\r\nb\r\nc".bytes())
+    assert(pane.primary.cells[0].base == 98 && pane.primary.cells[4].base == 99)
+    assert(pane.primary.extents[0] == 1 && pane.primary.extents[1] == 1)
+    var one = vt.new(2, 1, 0)
+    vt.feed(mut one, "a\r\nb".bytes())
+    assert(one.region_top == 1 && one.region_bottom == 1)
+    assert(one.primary.cells[0].base == 98 && one.primary.cells[1].base == 32)
+    assert(one.cursor_row == 1 && one.cursor_col == 2 && !one.pending_wrap)
+}
+
 fn main() -> int {
     test_rectangular()
     test_tabs_and_ownership()
     test_one_row()
+    test_ascii_print_and_wrap()
+    test_ascii_controls()
+    test_ascii_scroll_and_one_row()
     test_constructor_charge()
     0
 }
