@@ -1,6 +1,8 @@
 //! member: false
 //! Red-first constructor and ownership rows for the screen grid.
 use vt
+use std.mem.budget
+use std.io
 
 fn test_rectangular() {
     let pane = vt.new(5, 3, 0)
@@ -47,9 +49,27 @@ fn test_one_row() {
     assert(pane.tabs.len == 1 && !pane.tabs[0])
 }
 
+fn test_constructor_charge() {
+    region small(cap: 16777216) {
+        let before = budget.charged(small)
+        let pane = vt.new(80, 24, 8388608)
+        let charge = budget.charged(small) - before
+        assert(pane.primary.cells.len == 1920 && pane.alternate.cells.len == 1920)
+        io.write_line("MEASURE grid-constructor cols=80 rows=24 history-cap=8388608 charged={charge}")
+    }
+    region large(cap: 67108864) {
+        let before = budget.charged(large)
+        let pane = vt.new(320, 90, 8388608)
+        let charge = budget.charged(large) - before
+        assert(pane.primary.cells.len == 28800 && pane.alternate.cells.len == 28800)
+        io.write_line("MEASURE grid-constructor cols=320 rows=90 history-cap=8388608 charged={charge}")
+    }
+}
+
 fn main() -> int {
     test_rectangular()
     test_tabs_and_ownership()
     test_one_row()
+    test_constructor_charge()
     0
 }

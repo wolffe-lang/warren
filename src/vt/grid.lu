@@ -1,6 +1,6 @@
 //! member: true
-//! Pane and screen storage. The constructor seam is intentionally empty
-//! until the rectangular-grid rows have been observed red.
+//! Pane and screen storage. A screen is flat to make rectangular bounds
+//! and in-place cell mutation explicit; both screens own their arrays.
 
 /// A cell's scalar payload. Width is 1, 2, or 0 for a wide continuation;
 /// mark fields are zero when absent. Rendition colours are -1 for default,
@@ -38,8 +38,30 @@ pub struct Vt {
     scrollback_cap_bytes: int,
 }
 
-fn new_screen() -> Screen {
-    Screen { cells: List[Cell](), extents: List[int](), wrapped: List[bool]() }
+fn new_screen(cols: int, rows: int) -> Screen {
+    var cells = List[Cell]()
+    (mut cells).reserve(cols * rows)
+    var i = 0
+    while i < cols * rows {
+        (mut cells).push(Cell { base: 32, mark1: 0, mark2: 0, width: 1,
+            flags: 0, foreground: 0 - 1, background: 0 - 1 })
+        i += 1
+    }
+    var extents = List[int]()
+    var wrapped = List[bool]()
+    (mut extents).reserve(rows)
+    (mut wrapped).reserve(rows)
+    i = 0
+    while i < rows { (mut extents).push(0); (mut wrapped).push(false); i += 1 }
+    Screen { cells: cells, extents: extents, wrapped: wrapped }
+}
+
+fn default_tabs(cols: int) -> List[bool] {
+    var tabs = List[bool]()
+    (mut tabs).reserve(cols)
+    var i = 0
+    while i < cols { (mut tabs).push(i > 0 && i % 8 == 0); i += 1 }
+    tabs
 }
 
 /// Construct a pane with positive dimensions and a nonnegative history cap.
@@ -47,10 +69,10 @@ fn new_screen() -> Screen {
 pub fn new(cols: int, rows: int, scrollback_cap_bytes: int) -> Vt {
     assert(cols >= 1 && rows >= 1 && scrollback_cap_bytes >= 0)
     Vt {
-        cols: cols, rows: rows, primary: new_screen(), alternate: new_screen(),
+        cols: cols, rows: rows, primary: new_screen(cols, rows), alternate: new_screen(cols, rows),
         active_alternate: false, cursor_row: 1, cursor_col: 1, pending_wrap: false,
         region_top: 1, region_bottom: rows,
-        tabs: List[bool](), default_tabs: true,
+        tabs: default_tabs(cols), default_tabs: true,
         pen: Pen { flags: 0, foreground: 0 - 1, background: 0 - 1 },
         modes: Modes { autowrap: true, origin: false, insert: false,
             newline: false, cursor_visible: true },
