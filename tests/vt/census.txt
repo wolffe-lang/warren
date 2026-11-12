@@ -1,0 +1,639 @@
+== alt-1049-restores-cursor
+cursor 1,4 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=3  |abZ|
+== alt-1049-twice
+cursor 1,5 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+modes alternate-screen-1047=1 alternate-screen-1049=1 alternate-screen-47=1
+r1  ext=4  |   y|
+== alt-47-keeps
+cursor 1,4 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+modes alternate-screen-1047=1 alternate-screen-1049=1 alternate-screen-47=1
+r1  ext=3  |alt|
+== alt-region-shared
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=3-9 title=t
+modes alternate-screen-1047=1 alternate-screen-1049=1 alternate-screen-47=1
+r1  ext=1  |Z|
+== alt-rendition-carries
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+modes alternate-screen-1047=1 alternate-screen-1049=1 alternate-screen-47=1
+r1  ext=1  |x_______________________________________________________________________________| 1:bold,fg=idx:1 2:fg=idx:9
+r2  ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r3  ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r4  ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r5  ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r6  ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r7  ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r8  ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r9  ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r10 ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r11 ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r12 ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r13 ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r14 ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r15 ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r16 ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r17 ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r18 ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r19 ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r20 ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r21 ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r22 ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r23 ext=0  |________________________________________________________________________________| 1:fg=idx:9
+r24 ext=0  |________________________________________________________________________________| 1:fg=idx:9
+== apc
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== bce-ech
+cursor 1,1 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=6  |___def| 1:bg=idx:5 4:-
+== bce-ed
+cursor 1,1 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r2  ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r3  ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r4  ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r5  ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r6  ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r7  ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r8  ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r9  ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r10 ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r11 ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r12 ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r13 ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r14 ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r15 ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r16 ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r17 ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r18 ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r19 ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r20 ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r21 ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r22 ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r23 ext=0  |________________________________________________________________________________| 1:bg=idx:4
+r24 ext=0  |________________________________________________________________________________| 1:bg=idx:4
+== bce-el
+cursor 1,1 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=0  |________________________________________________________________________________| 1:fg=idx:9,bg=idx:2
+== bce-ich-dch
+cursor 2,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=8  |a__bcdef| 2:bg=idx:6 4:-
+r2  ext=4  |adef                                                                          __| 1:bg=idx:6 5:- 79:bg=idx:6
+== bce-il-scroll
+cursor 24,1 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r24 ext=0  |________________________________________________________________________________| 1:bg=idx:1
+== bs-first-column
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |Z|
+== c0-inside-csi
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X| 1:fg=idx:1 2:-
+== c1-as-utf8-csi
+cursor 1,5 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=4  |31mX|
+== c1-raw-csi
+cursor 1,6 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=5  |�31mX|
+== can-inside-csi
+cursor 1,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  |mX|
+== charset-dec-graphics
+cursor 1,5 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=4  |┌─┐q|
+== charset-so-si
+cursor 1,4 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=3  |q─q|
+== cht-cbt
+cursor 1,18 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=17 |                Y|
+== cnl-cpl
+cursor 4,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r4  ext=1  |z|
+r7  ext=1  |Z|
+== combining-after-wide
+cursor 1,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  |中́<|
+== combining-after-wrap
+cursor 1,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyý|
+== combining-first-cell
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |a|
+== combining-many
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |é́|
+== csi-gt
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== csi-huge-param
+cursor 1,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |                                                                               X|
+== csi-intermediate-unknown
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== csi-many-params
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X| 1:bold 2:-
+== csi-private-unknown
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== csi-unknown-final
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== cud-outside-region
+cursor 24,2 shape=2 visible=1 pending-wrap=0 region=5-10 title=t
+r24 ext=1  |Z|
+== cup-clamp
+cursor 24,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r24 ext=80 |                                                                               Z|
+== cup-zero
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |Z|
+== cuu-outside-region
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=5-10 title=t
+r1  ext=1  |Z|
+== cuu-stops-at-region
+cursor 5,2 shape=2 visible=1 pending-wrap=0 region=5-10 title=t
+r5  ext=1  |Z|
+== dcs-unterminated-bel
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |Y|
+== dcs
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== decaln
+cursor 1,1 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r2  ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r3  ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r4  ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r5  ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r6  ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r7  ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r8  ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r9  ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r10 ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r11 ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r12 ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r13 ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r14 ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r15 ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r16 ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r17 ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r18 ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r19 ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r20 ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r21 ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r22 ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r23 ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+r24 ext=80 |EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE|
+== decrc-never-saved
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |Z|
+== decsc-origin
+cursor 4,3 shape=2 visible=1 pending-wrap=0 region=3-9 title=t
+modes origin=1
+r4  ext=2  | Z|
+== decsc-rendition
+cursor 5,6 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r5  ext=5  |    Z| 5:bold,fg=idx:1 6:-
+== decstbm-homes
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=3-9 title=t
+r1  ext=1  |Z|
+== decstbm-inverted
+cursor 5,6 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r5  ext=5  |    Z|
+== decstbm-one-row
+cursor 5,6 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r5  ext=5  |    Z|
+== decstbm-origin-homes
+cursor 3,2 shape=2 visible=1 pending-wrap=0 region=3-9 title=t
+modes origin=1
+r3  ext=1  |Z|
+== decstbm-past-bottom
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=3-24 title=t
+r1  ext=1  |Z|
+== decstr
+cursor 3,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  |ab|
+r3  ext=1  |Z|
+== ed2-cursor
+cursor 5,6 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r5  ext=5  |    x|
+== ed3
+cursor 24,1 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |a|
+r2  ext=1  |a|
+r3  ext=1  |a|
+r4  ext=1  |a|
+r5  ext=1  |a|
+r6  ext=1  |a|
+r7  ext=1  |a|
+r8  ext=1  |a|
+r9  ext=1  |a|
+r10 ext=1  |a|
+r11 ext=1  |a|
+r12 ext=1  |a|
+r13 ext=1  |a|
+r14 ext=1  |a|
+r15 ext=1  |a|
+r16 ext=1  |a|
+r17 ext=1  |a|
+r18 ext=1  |a|
+r19 ext=1  |a|
+r20 ext=1  |a|
+r21 ext=1  |a|
+r22 ext=1  |a|
+r23 ext=1  |a|
+== emoji-vs16
+cursor 1,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  |❤️x|
+== emoji
+cursor 1,4 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=3  |😀<x|
+== esc-inside-csi
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X| 1:bold 2:-
+== esc-unknown
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== hpr-vpr
+cursor 3,7 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r3  ext=6  |     Z|
+== il-outside-region
+cursor 1,1 shape=2 visible=1 pending-wrap=0 region=3-4 title=t
+r1  ext=1  |1|
+r2  ext=1  |2|
+r3  ext=1  |3|
+r4  ext=1  |4|
+== insert-mode
+cursor 1,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+modes insert=1
+r1  ext=5  |XYabc|
+== lf-below-region
+cursor 24,3 shape=2 visible=1 pending-wrap=0 region=5-10 title=t
+r24 ext=2  |aZ|
+== lf-bottom-of-screen
+cursor 24,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r23 ext=1  |a|
+r24 ext=2  | Z|
+== lf-inside-csi
+cursor 2,4 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  |ab|
+r2  ext=3  |  X| 3:bold,fg=idx:1 4:-
+== lnm
+cursor 2,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+modes newline=1
+r1  ext=1  |a|
+r2  ext=1  |b|
+== nel
+cursor 2,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  |ab|
+r2  ext=1  |Z|
+== origin-clamps
+cursor 9,6 shape=2 visible=1 pending-wrap=0 region=3-9 title=t
+modes origin=1
+r9  ext=5  |    Z|
+== osc-0
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=both
+r1  ext=1  |X|
+== osc-bel
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=abc
+r1  ext=1  |X|
+== osc-icon-only
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== osc-st
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=abc
+r1  ext=1  |X|
+== osc-unknown
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== osc-unterminated-lf
+cursor 1,1 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+== osc-utf8
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=中
+r1  ext=1  |X|
+== pm
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== rep
+cursor 1,7 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=6  |aaaaaa|
+== resize-alt
+cursor 2,21 shape=2 visible=1 pending-wrap=0 region=1-10 title=t
+size 60x10
+modes alternate-screen-1047=1 alternate-screen-1049=1 alternate-screen-47=1
+r1  ext=60 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=20 |yyyyyyyyyyyyyyyyyyyy|
+== resize-narrower
+cursor 3,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+size 60x24
+r1  ext=60 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=20 |yyyyyyyyyyyyyyyyyyyy|
+r3  ext=2  |ab|
+== resize-region-tabs
+cursor 1,5 shape=2 visible=1 pending-wrap=0 region=1-30 title=t
+size 100x30
+tabs 5
+== resize-shorter
+cursor 10,4 shape=2 visible=1 pending-wrap=0 region=1-10 title=t
+size 80x10
+r1  ext=2  |15|
+r2  ext=2  |16|
+r3  ext=2  |17|
+r4  ext=2  |18|
+r5  ext=2  |19|
+r6  ext=2  |20|
+r7  ext=2  |21|
+r8  ext=2  |22|
+r9  ext=2  |23|
+r10 ext=3  |end|
+== resize-taller
+cursor 30,4 shape=2 visible=1 pending-wrap=0 region=1-30 title=t
+size 80x30
+r1  ext=2  |11|
+r2  ext=2  |12|
+r3  ext=2  |13|
+r4  ext=2  |14|
+r5  ext=2  |15|
+r6  ext=2  |16|
+r7  ext=2  |17|
+r8  ext=2  |18|
+r9  ext=2  |19|
+r10 ext=2  |20|
+r11 ext=2  |21|
+r12 ext=2  |22|
+r13 ext=2  |23|
+r14 ext=2  |24|
+r15 ext=2  |25|
+r16 ext=2  |26|
+r17 ext=2  |27|
+r18 ext=2  |28|
+r19 ext=2  |29|
+r20 ext=2  |30|
+r21 ext=2  |31|
+r22 ext=2  |32|
+r23 ext=2  |33|
+r24 ext=2  |34|
+r25 ext=2  |35|
+r26 ext=2  |36|
+r27 ext=2  |37|
+r28 ext=2  |38|
+r29 ext=2  |39|
+r30 ext=3  |end|
+== resize-wider
+cursor 3,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+size 100x24
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=20 |yyyyyyyyyyyyyyyyyyyy|
+r3  ext=2  |ab|
+== ri-top-of-screen
+cursor 1,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  | Z|
+r2  ext=1  |a|
+== ris
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |Z|
+== sgr-22-clears-both
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== sgr-256-out-of-range
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== sgr-bright-bg
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X| 1:fg=idx:15,bg=idx:8 2:-
+== sgr-colon-256
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X| 1:fg=idx:196 2:-
+== sgr-colon-rgb-empty-space
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X| 1:fg=rgb:1:2:3 2:-
+== sgr-colon-rgb-no-space
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X| 1:fg=rgb:1:2:3 2:-
+== sgr-double-underline
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X| 1:double-underline 2:-
+== sgr-empty-is-reset
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== sgr-mixed-after-38
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X| 1:bold,fg=idx:1,bg=idx:2 2:-
+== sgr-overline
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== sgr-resets
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== sgr-rgb-out-of-range
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== sgr-truncated-256
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X| 1:fg=idx:0 2:-
+== sgr-truncated-rgb
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X| 1:fg=rgb:1:2:0 2:-
+== sgr-underline-colon
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X| 1:fg=idx:0 2:-
+== sgr-underline-colour-colon
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X| 1:fg=idx:0 2:-
+== sgr-underline-colour
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X| 1:bold,dim,italic 2:-
+== sos
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |X|
+== su-sd
+cursor 10,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r3  ext=1  |2|
+r4  ext=1  |3|
+r12 ext=1  |x|
+== sub-inside-csi
+cursor 1,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  |mX|
+== tab-to-end
+cursor 1,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |                                                                               Z|
+== utf8-beyond
+cursor 1,4 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=3  |a􏿿b|
+== utf8-ff
+cursor 1,4 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=3  |a�b|
+== utf8-lone-continuation
+cursor 1,4 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=3  |a�b|
+== utf8-low-sixteen-zero
+cursor 1,4 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=3  |a𐀀b|
+== utf8-overlong
+cursor 1,4 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=3  |a􏿿b|
+== utf8-real-replacement
+cursor 1,4 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=3  |a�b|
+== utf8-surrogate
+cursor 1,4 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=3  |a�b|
+== utf8-truncated-2
+cursor 1,5 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=4  |a�(b|
+== utf8-truncated-3
+cursor 1,5 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=4  |a�(b|
+== wide-dch-tail
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=3  | ab|
+== wide-erase-tail
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=4  |  中<|
+== wide-ich-split
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=5  |   ab|
+== wide-insert-mode
+cursor 1,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+modes insert=1
+r1  ext=4  |中<ab|
+== wide-last-column-nowrap
+cursor 1,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+modes autowrap=0
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyZ|
+== wide-last-column-wrap
+cursor 2,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=79 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=2  |中<|
+== wide-overwrite-lead
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  |x|
+== wide-overwrite-tail
+cursor 1,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  | x|
+== wrap-bs
+cursor 1,80 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyZy|
+== wrap-cha-same
+cursor 1,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyZ|
+== wrap-cr
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=80 |Zyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+== wrap-cub
+cursor 1,80 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyZy|
+== wrap-cud
+cursor 2,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=80 |                                                                               Z|
+== wrap-cuf
+cursor 1,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyZ|
+== wrap-cup-same
+cursor 1,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyZ|
+== wrap-cuu
+cursor 1,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyZ|
+== wrap-da1
+cursor 2,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=1  |Z|
+== wrap-dch
+cursor 1,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyZ|
+== wrap-decawm-off-on
+cursor 2,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=1  |Z|
+== wrap-decom
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+modes origin=1
+r1  ext=80 |Zyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+== wrap-decsc-decrc
+cursor 2,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=1  |Z|
+== wrap-decsc
+cursor 2,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=1  |Z|
+== wrap-decscusr
+cursor 2,2 shape=4 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=1  |Z|
+== wrap-decstbm
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=80 |Zyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+== wrap-dectcem
+cursor 2,2 shape=2 visible=0 pending-wrap=0 region=1-24 title=t
+modes cursor-visible=0
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=1  |Z|
+== wrap-dl
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |Z|
+== wrap-ech
+cursor 1,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyZ|
+== wrap-ed
+cursor 1,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyZ|
+== wrap-el
+cursor 1,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyZ|
+== wrap-el1
+cursor 1,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |                                                                               Z|
+== wrap-ht
+cursor 2,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=1  |Z|
+== wrap-hts
+cursor 2,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+tabs 9,17,25,33,41,49,57,65,73,80
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=1  |Z|
+== wrap-ich
+cursor 1,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyZ|
+== wrap-il
+cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=1  |Z|
+r2  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+== wrap-ind
+cursor 2,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=80 |                                                                               Z|
+== wrap-irm
+cursor 2,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+modes insert=1
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=1  |Z|
+== wrap-lf
+cursor 2,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=80 |                                                                               Z|
+== wrap-nothing
+cursor 2,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=1  |Z|
+== wrap-ri
+cursor 1,80 shape=2 visible=1 pending-wrap=1 region=1-24 title=t
+r1  ext=80 |                                                                               Z|
+r2  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+== wrap-sgr
+cursor 2,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=1  |Z| 1:bold 2:-
+== wrap-title
+cursor 2,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=u
+r1  ext=80 |yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy|
+r2  ext=1  |Z|
+== zero-width-joiner
+cursor 1,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  |ab|
