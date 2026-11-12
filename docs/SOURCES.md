@@ -5,6 +5,26 @@ consulted, with a digest where the document is a file, and what it was used
 for. The lists of what may and may not be read are in the README. The
 reference programs were run as binaries and never opened as implementations.
 
+## Consulted for the incremental parser (2026-11-12)
+
+- The adopted emulator contract in `notes/wr00-draft-wr01-emulator.md`, its
+  scope table in `notes/wr00-the-map.md`, and the census byte streams.
+- The pinned reference emulator, run only as a binary for nineteen additional
+  synthetic edge streams. `tests/vt/parser-reference/manifest.json` binds each
+  input and whole-screen snapshot to SHA-256 and the existing emulator and
+  package pins. The package list and all four oracle binary digests matched.
+- The pinned wolf-std modules' documented interfaces for lists, raw bytes,
+  region accounting, file I/O, hex encoding and the monotonic clock. Clock
+  reads occur only in the measurement entry, never inside `src/vt`.
+- The pinned lupin binary's CLI help and release README for its observation
+  interface. No evaluation-step count is exposed for a successful run; the
+  measurement therefore reports a bytes-per-step lower bound from its fixed
+  50,000,000-step ceiling, not an invented exact count.
+
+The primary terminal documents already listed below have not been fetched
+again for this parser-only slice. Their clause check and the Unicode width
+sweep remain part of the screen-model work.
+
 ## Consulted for the scaffold (2026-11-12)
 
 | Reference | Identity | Use |

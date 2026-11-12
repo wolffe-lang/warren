@@ -85,6 +85,29 @@ bash tools/in-container    # Linux: builds the oracle image, holds it to its pin
                            # `tools/gate linux` inside (WARREN_ENGINE=podman also works)
 ```
 
+The parser's additional entries can be run after staging the tools:
+
+```sh
+root=$PWD
+. tools/toolchain-env.sh
+"$LUPIN" run src/vt_parser_test.lu
+"$LUPIN" run src/vt_hostile_test.lu
+"$LUPIN" run src/vt_bench_test.lu
+"$WOLF" build --deny-warnings src/vt_fixture_test.lu -o target/parser-fixture
+python3 -I tests/vt/parser_reference.py "$PWD/target/parser-fixture"
+python3 -I tests/vt/parser_reference.py "$LUPIN" run src/vt_fixture_test.lu
+```
+
+Nineteen extra synthetic reference screens are committed under
+`tests/vt/parser-reference/`. Seventeen drive a **parser projection** of
+printed text and titles: sixteen agree and one uses the named D8 policy
+(DEL is dropped from a title, rather than changed to `?`). The other two
+measure a one-row region. These are not whole-screen comparisons with
+warren; the grid does not exist yet. The finite hostile row uses capped
+regions, and the measurement entry reports retained region charge and feed
+rate separately from process startup. [The note](notes/wr01-the-emulator.md)
+records the prediction, failed takes and scope boundaries.
+
 The gate prints one `START`/`END name exit=N` pair per step. No step skips:
 a missing oracle is red.
 
