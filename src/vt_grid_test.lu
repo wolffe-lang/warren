@@ -85,7 +85,7 @@ fn test_ascii_controls() {
     vt.feed(mut pane, "\nX".bytes())
     assert(pane.cursor_row == 2 && pane.cursor_col == 3 && pane.primary.cells[6].base == 88)
     var wrap = vt.new(5, 2, 0)
-    vt.feed(mut wrap, "abcde\bZ".bytes())
+    vt.feed(mut wrap, "abcde\u{8}Z".bytes())
     assert(wrap.primary.cells[3].base == 90 && wrap.primary.cells[4].base == 101)
     assert(wrap.cursor_col == 5 && !wrap.pending_wrap)
     var tabs = vt.new(20, 2, 0)
