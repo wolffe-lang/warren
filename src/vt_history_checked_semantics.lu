@@ -1,0 +1,4 @@
+//! member: false
+//! Separate checked-machine semantics budget; see the shared original rows.
+use vt_history_test
+fn main() -> int { vt_history_test.checked_semantics(); 0 }

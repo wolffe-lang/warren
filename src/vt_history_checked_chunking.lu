@@ -1,0 +1,4 @@
+//! member: false
+//! Checked-machine every-split row with an explicitly smaller fitting ring.
+use vt_history_test
+fn main() -> int { vt_history_test.checked_chunking(); 0 }
