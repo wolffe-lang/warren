@@ -1,0 +1,194 @@
+//! member: false
+//! Native-only corpus R1/R3/R8 witness; WRP1 is the owned test driver's framing.
+use std.fs
+use std.io
+use std.mem.budget
+
+struct CorpusInput { data: List[byte], at: int }
+
+fn read_u32(mut input: CorpusInput) -> int {
+    if input.at > input.data.len - 4 { return 0 - 1 }
+    var value: int = 0
+    var weight: int = 1
+    var i = 0
+    while i < 4 { value += input.data[input.at] as int * weight; input.at += 1; weight *= 256; i += 1 }
+    value
+}
+
+fn content_scalar(mut out: List[int], cp: int, flags: int, fg: int, bg: int) {
+    (mut out).push(0); (mut out).push(cp); (mut out).push(flags); (mut out).push(fg); (mut out).push(bg)
+}
+
+fn logical_content(pane: Vt) -> List[int] {
+    var out = List[int]()
+    var reader = new_history_reader()
+    var seen = false
+    var id: int = 0 - 1
+    var at = pane.history.head
+    var record = 0
+    while record < pane.history.records {
+        let next_id = history_get_word(pane.history, at, 8, 8)
+        if seen && next_id != id { (mut out).push(0 - 1) }
+        seen = true; id = next_id
+        history_reader_start(mut reader, pane.history, at)
+        while history_reader_next(mut reader, pane.history) {
+            if reader.kind == 0 { content_scalar(mut out, reader.value, reader.flags, reader.foreground, reader.background) }
+        }
+        at = (at + history_get_word(pane.history, at, 0, 4)) % pane.history.bytes.len
+        record += 1
+    }
+    var end = if pane.active_alternate && pane.saved_primary.valid { pane.saved_primary.row } else { pane.cursor_row }
+    var row = 0
+    while row < pane.rows {
+        var used = pane.primary.extents[row] > 0
+        var col = 0
+        while !used && col < pane.cols {
+            if pane.primary.cells[row * pane.cols + col].background != 0 - 1 { used = true }
+            col += 1
+        }
+        if used && row + 1 > end { end = row + 1 }
+        row += 1
+    }
+    row = 0
+    while row < end {
+        let next_id = pane.primary.line_ids[row]
+        if seen && next_id != id { (mut out).push(0 - 1) }
+        seen = true; id = next_id
+        var col = 0
+        while col < pane.primary.extents[row] {
+            let cell = row * pane.cols + col
+            if pane.primary.cells[cell].width != 0 {
+                content_scalar(mut out, pane.primary.cells[cell].base, pane.primary.cells[cell].flags,
+                    pane.primary.cells[cell].foreground, pane.primary.cells[cell].background)
+                if pane.primary.cells[cell].mark1 != 0 { content_scalar(mut out, pane.primary.cells[cell].mark1,
+                    pane.primary.cells[cell].flags, pane.primary.cells[cell].foreground, pane.primary.cells[cell].background) }
+                if pane.primary.cells[cell].mark2 != 0 { content_scalar(mut out, pane.primary.cells[cell].mark2,
+                    pane.primary.cells[cell].flags, pane.primary.cells[cell].foreground, pane.primary.cells[cell].background) }
+            }
+            col += 1
+        }
+        row += 1
+    }
+    out
+}
+
+fn same_content(a: List[int], b: List[int]) {
+    assert(a.len == b.len, "corpus-resize-content-length")
+    var i = 0
+    while i < a.len { assert(a[i] == b[i], "corpus-resize-content-value-and-rendition"); i += 1 }
+}
+
+fn corpus_screen_invariants(screen: Screen, cols: int, rows: int) {
+    var row = 0
+    while row < rows {
+        assert(screen.extents[row] >= 0 && screen.extents[row] <= cols, "corpus-grid-extent-bounds")
+        var col = 0
+        while col < cols {
+            let at = row * cols + col
+            let width = screen.cells[at].width
+            if width == 2 { assert(col + 1 < cols && screen.cells[at + 1].width == 0, "corpus-grid-wide-lead") }
+            if width == 0 { assert(col > 0 && screen.cells[at - 1].width == 2, "corpus-grid-wide-tail") }
+            if col >= screen.extents[row] {
+                assert(width == 1 && screen.cells[at].base == 32 && screen.cells[at].mark1 == 0 && screen.cells[at].mark2 == 0,
+                    "corpus-grid-past-extent-is-blank")
+            }
+            col += 1
+        }
+        row += 1
+    }
+}
+
+fn check_properties(pane: Vt) {
+    corpus_screen_invariants(pane.primary, pane.cols, pane.rows)
+    corpus_screen_invariants(pane.alternate, pane.cols, pane.rows)
+    region same_size(cap: 33554432) {
+        var same = copy pane
+        let cols = same.cols
+        let rows = same.rows
+        let before = dump(same)
+        let stable = budget.charged(same_size)
+        assert(resize(mut same, cols, rows) == "", "corpus-resize-same-size")
+        assert(budget.charged(same_size) == stable, "corpus-resize-same-size-allocation")
+        assert(dump(same) == before, "corpus-resize-same-size-exact-state")
+    }
+    let aw: List[int] = [1, 7, 160, 40]
+    let ah: List[int] = [8, 5, 40, 12]
+    let bw: List[int] = [79, 120, 9, 1]
+    let bh: List[int] = [24, 30, 6, 20]
+    var pair = 0
+    while pair < aw.len {
+        region property_pair(cap: 33554432) {
+            var direct = copy pane
+            var via = copy pane
+            let before = logical_content(direct)
+            let evicted = direct.history.evicted
+            // Both final legs really resize: R7 resets do not apply to an R8
+            // no-op, so comparing that no-op to a real resize would be false.
+            let cols = if bw[pair] == pane.cols && bh[pair] == pane.rows { bw[pair] + 1 } else { bw[pair] }
+            assert(resize(mut direct, cols, bh[pair]) == "")
+            assert(resize(mut via, aw[pair], ah[pair]) == "")
+            assert(resize(mut via, cols, bh[pair]) == "")
+            assert(direct.history.evicted == evicted && via.history.evicted == evicted, "corpus-resize-no-cap-eviction")
+            same_content(before, logical_content(direct))
+            same_content(before, logical_content(via))
+            assert(dump(direct) == dump(via), "corpus-resize-path-independence")
+            corpus_screen_invariants(direct.primary, cols, bh[pair])
+            corpus_screen_invariants(via.primary, cols, bh[pair])
+            corpus_screen_invariants(direct.alternate, cols, bh[pair])
+            corpus_screen_invariants(via.alternate, cols, bh[pair])
+        }
+        pair += 1
+    }
+}
+
+fn main() -> int {
+    var file = fs.stdin()
+    var buffer = List[byte]()
+    (mut buffer).reserve(4096)
+    var data = List[byte]()
+    (mut data).reserve(65536)
+    while true {
+        let count = fs.read_into(mut file, mut buffer, 4096) else |error| match error {
+            eof => 0,
+            io => { return 1 },
+        }
+        if count == 0 { break }
+        for raw in buffer { if data.len == 65536 { return 2 }; (mut data).push(raw) }
+    }
+    if data.len < 13 || data[0] != 87 as byte || data[1] != 82 as byte || data[2] != 80 as byte || data[3] != 49 as byte { return 2 }
+    var input = CorpusInput { data: data, at: 4 }
+    let cols = read_u32(mut input)
+    let rows = read_u32(mut input)
+    if !valid_vt_size(cols, rows) { return 2 }
+    var pane = new(cols, rows, 1048576)
+    var fed: int = 0
+    var resizes = 0
+    var rolling: int = 0
+    var ended = false
+    while input.at < input.data.len {
+        let kind = input.data[input.at] as int
+        input.at += 1
+        if kind == 0 { ended = true; break }
+        if kind == 1 {
+            let length = read_u32(mut input)
+            if length < 0 || length > input.data.len - input.at { return 2 }
+            let start = input.at
+            var i = 0
+            while i < length { rolling = (rolling * 257 + input.data[start + i] as int) % 2147483647; i += 1 }
+            feed(mut pane, input.data[start..start + length])
+            input.at += length; fed += length
+        } else if kind == 2 {
+            let width = read_u32(mut input)
+            let height = read_u32(mut input)
+            if resize(mut pane, width, height) != "" { return 2 }
+            resizes += 1
+        } else { return 2 }
+    }
+    if !ended || input.at != input.data.len { return 2 }
+    io.write_line("BASE-DUMP-BEGIN")
+    io.write(dump(pane))
+    io.write_line("BASE-DUMP-END")
+    check_properties(pane)
+    io.write_line("CORPUS-PROPERTIES bytes={fed} resizes={resizes} rolling={rolling} pairs=4")
+    0
+}
