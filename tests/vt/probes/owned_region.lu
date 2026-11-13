@@ -1,0 +1,19 @@
+//! member: false
+//! Language-surface witness for reclaimable storage owned by a pane value.
+struct Owner { arena: region }
+
+fn make_owner() -> Owner {
+    let arena = region()
+    Owner { arena: arena }
+}
+
+fn main() -> int {
+    let owner = make_owner()
+    let arena = owner.arena
+    in arena {
+        var bytes = List[byte]()
+        (mut bytes).push(65 as byte)
+        assert(bytes[0] as int == 65)
+    }
+    0
+}
