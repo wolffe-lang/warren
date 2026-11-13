@@ -22,15 +22,119 @@ fn new_reflow_state() -> ReflowState {
         cursor: new_reflow_anchor(), saved: new_reflow_anchor(), bottom: new_reflow_anchor() }
 }
 
+fn reset_reflow_anchor(mut anchor: ReflowAnchor) {
+    anchor.row = 0
+    anchor.col = 1
+    anchor.found = false
+}
+
 fn reflow_start(mut state: ReflowState) {
     state.row = 0
+    state.col = 1
+    state.line_id = 0 - 1
+    state.offset = 0
+    state.started = false
+    state.last_row = 0
+    state.last_col = 0
+    state.painting = false
+    state.paint_col = 1
+    reset_reflow_anchor(mut state.cursor)
+    reset_reflow_anchor(mut state.saved)
+    reset_reflow_anchor(mut state.bottom)
+}
+
+fn reflow_map_glyph(mut anchor: ReflowAnchor, id: int, offset: int,
+        natural: int, physical: int, row: int, col: int) {
+    if anchor.id != id || anchor.offset < offset || anchor.offset >= offset + natural { return }
+    anchor.row = row
+    anchor.col = col + grid_clamp(anchor.offset - offset, 0, physical - 1)
+    anchor.found = true
+}
+
+fn reflow_map_end(mut anchor: ReflowAnchor, id: int, offset: int, row: int, col: int, cols: int) {
+    if anchor.id != id || anchor.offset < offset { return }
+    anchor.row = row
+    anchor.col = grid_clamp(col + anchor.offset - offset, 1, cols)
+    anchor.found = true
+}
+
+fn reflow_end_anchors(mut state: ReflowState, cols: int) {
+    reflow_map_end(mut state.cursor, state.line_id, state.offset, state.row, state.col, cols)
+    reflow_map_end(mut state.saved, state.line_id, state.offset, state.row, state.col, cols)
+    reflow_map_end(mut state.bottom, state.line_id, state.offset, state.row, state.col, cols)
+}
+
+fn reflow_select_row(state: ReflowState, mut output: Screen, first: int, last: int, emit: bool) {
+    if !emit || state.row < first || state.row > last { return }
+    let row = state.row - first + 1
+    output.extents[row - 1] = 0
+    output.wrapped[row - 1] = false
+    assign_row_line(mut output, row, state.line_id, state.offset)
+}
+
+fn reflow_mark(state: ReflowState, mut output: Screen, cols: int, first: int, last: int, cp: int, emit: bool) {
+    if !emit || state.last_row < first || state.last_row > last { return }
+    let at = (state.last_row - first) * cols + state.last_col - 1
+    if output.cells[at].mark1 == 0 { output.cells[at].mark1 = cp }
+    else if output.cells[at].mark2 == 0 { output.cells[at].mark2 = cp }
+}
+
+fn reflow_scalar(mut state: ReflowState, mut output: Screen, cols: int,
+        first: int, last: int, cp: int, kind: int, flags: int,
+        foreground: int, background: int, emit: bool) {
+    if kind == 1 {
+        if !state.painting { state.paint_col = state.col; state.painting = true }
+        if emit && state.row >= first && state.row <= last && state.paint_col <= cols {
+            blank_cell(mut output, (state.row - first) * cols + state.paint_col - 1, background)
+        }
+        state.paint_col += 1
+        return
+    }
+    state.painting = false
+    let natural = scalar_width(cp)
+    if natural == 0 { reflow_mark(state, mut output, cols, first, last, cp, emit); return }
+    let physical = if cols == 1 { 1 } else { natural }
+    if state.col + physical - 1 > cols {
+        if emit && state.row >= first && state.row <= last { output.wrapped[state.row - first] = true }
+        state.row += 1
+        state.col = 1
+        reflow_select_row(state, mut output, first, last, emit)
+    }
+    reflow_map_glyph(mut state.cursor, state.line_id, state.offset, natural, physical, state.row, state.col)
+    reflow_map_glyph(mut state.saved, state.line_id, state.offset, natural, physical, state.row, state.col)
+    reflow_map_glyph(mut state.bottom, state.line_id, state.offset, natural, physical, state.row, state.col)
+    if emit && state.row >= first && state.row <= last {
+        write_glyph(mut output, cols, state.row - first + 1, state.col, cp, physical, flags, foreground, background)
+    }
+    state.last_row = state.row
+    state.last_col = state.col
+    state.col += physical
+    state.offset += natural
+    reflow_end_anchors(mut state, cols)
 }
 
 fn reflow_record(mut state: ReflowState, source: History, at: int,
         mut reader: HistoryReader, mut output: Screen, cols: int,
         first: int, last: int, emit: bool) {
-    assert(source.records > 0 && at >= 0 && cols > 0 && first >= 1 && last >= first)
-    if emit { output.extents[0] = output.extents[0] }
-    reader.value = 0
-    state.row = 0
+    assert(cols > 0 && first >= 1 && last >= first)
+    assert(cols <= output.cells.len / (last - first + 1))
+    let id = history_get_word(source, at, 8, 8)
+    let offset = history_get_word(source, at, 16, 4)
+    if !state.started || id != state.line_id {
+        if state.started { reflow_end_anchors(mut state, cols); state.row += 1 }
+        else { state.row = 1; state.started = true }
+        state.col = 1
+        state.line_id = id
+        state.offset = offset
+        state.last_row = 0
+        state.last_col = 0
+        state.painting = false
+        reflow_select_row(state, mut output, first, last, emit)
+    } else { assert(offset == state.offset, "reflow-fragment-continuity") }
+    history_reader_start(mut reader, source, at)
+    while history_reader_next(mut reader, source) {
+        reflow_scalar(mut state, mut output, cols, first, last, reader.value,
+            reader.kind, reader.flags, reader.foreground, reader.background, emit)
+    }
+    reflow_end_anchors(mut state, cols)
 }
