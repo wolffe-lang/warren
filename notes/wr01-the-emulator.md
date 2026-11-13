@@ -212,8 +212,12 @@ recording comparisons passed natively; the recording setup retained its paired
 unseeded-title-only proof. At `f4b660b`, all 188 frozen streams pass complete
 frames under the explicit named policies above: nine previously non-matching
 fuzz streams are resolved as D9 and/or source-bounded report limits, not silently
-called reference agreements. The complete new platform gate is still running;
-fresh 200×4096-byte fuzz, reference widths and the full resource take remain
+called reference agreements. The complete macOS gate at `f4b660b` passed:
+14 explicit checked-machine entries, aggregate 71 tests (69 checked and two
+named native fallbacks), complete native/CLI/census/recording comparisons,
+bytewise/random P2 and corpus-wide primary R1/R3/R8 properties, native width
+vector, private capacity/codec/resize rows and their declared interpreter legs.
+Fresh 200×4096-byte fuzz, reference widths and the full resource take remain
 separate pending evidence.
 
 > PAX corpus leg: not run, no boot fixture in this repository yet

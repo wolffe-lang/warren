@@ -284,8 +284,35 @@ step budget, so semantic/allocation/chunking entries are split without raising
 that budget. The original 4096-byte native/lupin split sweep is retained;
 the checked split sweep uses a declared 512-byte ring that fits the fixture.
 
-One standalone read-only host preflight has passed. Prepare the complete
-host take before acquiring a pool slot; no heavy work is assigned to the
-other pool host. The first grid review leaves this exact Done-when row open:
+## Current comparison checkpoint and remaining take
+
+At `f4b660b`, the complete macOS gate passed, including all 188 frozen
+complete-frame comparisons, all 74 D9 original/repaired replays, bytewise/random
+P2 and corpus-wide primary content/rendition/path/no-op properties. The seven
+report-limited fuzz streams are explicitly LIMITED; D9's three repaired-reference
+frames retain exact background cell/field/value bounds. The 37-dump reference
+bundle additionally measured twenty same-SGR background controls, all agreeing:
+explicit background setters win in either order with 7/27. These finite binary
+bundles are not the full prepared Linux take.
+
+The scalar plant was observed red by name and against the pinned reference at
+shortest prefix AZ (two bytes), with all earlier prefixes checked; the unplanted
+control agrees at all four measured prefixes. Its final-head rebase/retake is
+still required. The red-first finite G6/R1 row at `5021b75` confirms a defect:
+CUP(1,5) followed by U+0301 on an otherwise blank 12×2 pane stores space+acute
+at column 4 but leaves extent 0 on both primary and alternate. Resizing the
+primary to 6×4 then loses the mark entirely. All three named assertions failed;
+no implementation correction has been made. `combine_cell` writes the mark
+without updating writtenness or extent. This is outside the existing fuzz
+pieces, which always introduce a combining mark with a preceding ASCII base.
+
+Before the one prepared Linux take: settle that invariant row, add the fresh
+200-seed 4096-byte comparison/P2/resize-property drive and its 5000-seed nightly
+configuration, prepare all commands against one committed snapshot with fresh
+targets, then run a standalone preflight. Include the assigned-scalar reference
+width sweep, actual native width vector, full 100000000-byte resource/RSS witness,
+remaining complete interpreter recordings, pure/native/checked gates and plants.
+Retain every named divergence and failure; never use candidate output as a golden
+or conceal report-limited fields. The full Linux take has not run.
 
 > PAX corpus leg: not run, no boot fixture in this repository yet
