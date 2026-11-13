@@ -92,10 +92,13 @@ stable-ID assignment and the path-independent reflow source remain pending.
 ## Feed integration continuation
 
 Framing, run encoding/reading and bounded fragment/counter rows now exist.
-The constructor seam allocates Vt's fixed ring and row metadata, but screen
-removals are not wired into history yet. The next coherent step connects
-stable logical-line IDs and start offsets to a primary-screen monotonic ID
-allocator. A physical row may produce one or more encoded fragments;
+The constructor allocates Vt's fixed ring and row metadata. Primary scroll
+removals are now connected to whole addressed fragments, with native/lupin
+rows for regions, alternates, SU, ED3/RIS, lifetime IDs, feed charge and every
+split of a mixed line-edit/scroll stream. Natural offsets at one column and
+a reserved coordinate-overflow ID have direct rows too. The implementation
+uses stable logical-line IDs and start offsets with a primary-screen
+monotonic allocator. A physical row may produce one or more encoded fragments;
 fragments need not be maximal, and no fragment boundary is a logical newline.
 This permits appending the row leaving the top directly, without rewriting
 an open record or keeping a per-line index. A reusable LineCoordinate value
@@ -115,8 +118,8 @@ including SU, never the alternate screen or a lower region; ED3/RIS empty
 history without changing the screen incorrectly. Disabled history should
 have a fast path while still reporting prefix loss to resize bookkeeping.
 
-Once Vt actually allocates its configured history, change generic screen-only
-constructor rows to cap zero and ownership rows to a small configured cap.
+History allocation is now real in Vt. Generic screen-only constructor rows
+use cap zero and ownership rows use a small configured cap.
 Keep default-8MiB pane/ring rows native-only; interpreter entries explicitly
 configure a smaller ring under the unchanged cap, as the ledger finding
 requires. This is a tiered test configuration, not a hidden skip or an

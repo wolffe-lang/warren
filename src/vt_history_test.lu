@@ -80,6 +80,24 @@ fn test_history_feed_charge() {
     }
 }
 
+fn test_wide_natural_offsets_and_reserved_overflow_id() {
+    var one = vt.new(1, 2, 4096)
+    vt.feed(mut one, "中\u{301}XY".bytes())
+    assert(one.history.records == 1 && one.history.newest_length == 41)
+    assert(one.primary.line_ids[0] == 0 && one.primary.line_offsets[0] == 2, "history-one-column-natural-offset")
+    assert(one.primary.line_ids[1] == 0 && one.primary.line_offsets[1] == 3)
+    var boundary = vt.new(4, 2, 4096)
+    // Counter seam: the screen already continues a very long logical line.
+    boundary.primary.line_offsets[0] = 4294967294
+    boundary.primary.next_line_id = 7
+    vt.feed(mut boundary, "abcdXYZQR".bytes())
+    assert(boundary.history.records == 2 && boundary.history.used == 76)
+    assert(boundary.history.bytes[8] == 0 as byte && boundary.history.bytes[46] == 7 as byte, "history-reserved-overflow-id-reused")
+    assert(boundary.history.bytes[16] == 254 as byte && boundary.history.bytes[17] == 255 as byte)
+    assert(boundary.primary.line_ids[0] == 7 && boundary.primary.line_offsets[0] == 2)
+    assert(boundary.primary.line_ids[1] == 7 && boundary.primary.line_offsets[1] == 6)
+}
+
 fn same_history(a: vt.Vt, b: vt.Vt) {
     assert(vt.dump(a) == vt.dump(b), "history-chunk-screen")
     assert(a.primary.next_line_id == b.primary.next_line_id, "history-chunk-id-allocation")
@@ -125,6 +143,7 @@ fn main() -> int {
     test_edits_repair_logical_breaks()
     test_clear_and_lifetime_ids()
     test_history_feed_charge()
+    test_wide_natural_offsets_and_reserved_overflow_id()
     test_history_chunking()
     0
 }

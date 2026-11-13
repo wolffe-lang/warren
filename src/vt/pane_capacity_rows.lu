@@ -1,0 +1,18 @@
+//! member: false
+//! Native-only whole-pane default history witness, separate from screen rows.
+use std.mem.budget
+use std.io
+
+fn main() -> int {
+    region frame(cap: 16777216) {
+        let before = budget.charged(frame)
+        let pane = new(80, 24, 8388608)
+        let retained = budget.charged(frame) - before
+        assert(pane.history.bytes.len == 8388608 && pane.history.used == 0)
+        assert(pane.primary.cells.len == 1920 && pane.alternate.cells.len == 1920)
+        assert(pane.primary.line_ids[0] == 0 && pane.primary.line_ids[23] == 23)
+        assert(retained >= 8388656 && retained <= 9437184, "pane-native-default-history-budget")
+        io.write_line("MEASURE pane-default cols=80 rows=24 history-cap=8388608 retained={retained}")
+    }
+    0
+}

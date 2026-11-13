@@ -13,6 +13,8 @@ fn test_private_capacity() {
         ensure_tab_capacity(mut pane, 64)
         assert(pane.primary.cells.len >= 96 && pane.primary.extents.len >= 32, "capacity-growth")
         assert(pane.primary.wrapped.len == pane.primary.extents.len)
+        assert(pane.primary.line_ids.len == pane.primary.extents.len && pane.primary.line_offsets.len == pane.primary.extents.len)
+        assert(pane.primary.overflow_ids.len == pane.primary.extents.len && pane.primary.next_line_id == 2)
         assert(pane.cols == 4 && pane.rows == 2 && pane.primary.cells[0].base == 97)
         assert(pane.primary.cells[4].base == 20013 && pane.primary.cells[5].width == 0)
         assert(pane.primary.extents[0] == 2 && pane.primary.extents[1] == 2)

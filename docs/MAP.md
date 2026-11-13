@@ -3,7 +3,7 @@
 | Stage | Capability | State |
 |---|---|---|
 | W0 | pins, tiered CI, the oracle, the survey, the prediction | the repository half is here; the PAX readiness half is measured in PAX |
-| W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | parser and initial grid/queries implemented; history/reflow and command remain |
+| W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | parser, grid/queries and history retention implemented; reflow and command remain |
 | W2 | server, client, protocol v1; one pane; detach and attach | pure protocol codec and server contract; I/O planned |
 | W3 | split tree, tabs, modes, the hint bar, configuration v1 | planned |
 | W4 | mouse, scrollback, copy mode, search, OSC 52 | planned |
@@ -14,8 +14,9 @@ The incremental parser, initial grid and protocol codec are implemented;
 server and client remain planned here. A statement is marked *planned* or
 names its measuring rows. `src/vt_parser_test.lu` exercises parsing alone;
 `vt_grid_test`, `vt_unicode_test`, `vt_ops_test`, `vt_screen_state_test`,
-`vt_graphics_test` and `vt_answers_test` exercise the current screen subset.
-They are not a claim that history, reflow or the full corpus agree yet.
+`vt_graphics_test`, `vt_answers_test` and `vt_history_test` exercise the current
+screen/retention subset. They are not a claim that reflow or the full corpus
+agree yet.
 
 ## The frame
 
