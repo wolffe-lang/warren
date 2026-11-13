@@ -1,0 +1,26 @@
+//! member: false
+//! Bounded default-ring allocation witness; framing only, not screen history.
+use std.mem.budget
+use std.io
+
+fn main() -> int {
+    region frame(cap: 33554432) {
+        let before = budget.charged(frame)
+        var history = new_history(8388608)
+        let retained = budget.charged(frame) - before
+        assert(history.bytes.len == 8388608)
+        assert(history.bytes[0] == 0 as byte && history.bytes[8388607] == 0 as byte)
+        assert(retained >= 8388608 && retained <= 8388608 + 8192, "history-capacity-retained-budget")
+        let stable = budget.charged(frame)
+        var id = 0
+        while id < 1024 {
+            let at = history_reserve(mut history, id, 0, 0)
+            assert(at >= 0)
+            id += 1
+        }
+        assert(history.used == 24576 && history.records == 1024)
+        assert(budget.charged(frame) == stable, "history-default-append-allocation")
+        io.write_line("MEASURE history-default capacity=8388608 retained={retained} append-turns=1024 feed-charge=0")
+    }
+    0
+}
