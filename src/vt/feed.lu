@@ -75,7 +75,7 @@ fn write_narrow(mut screen: Screen, cols: int, row: int, col: int, cp: int,
         flags: int, foreground: int, background: int) {
     break_print_pair(mut screen, cols, row, col, background)
     let at = (row - 1) * cols + col - 1
-    screen.cells[at].base = cp
+    screen.cells[at].base = if cp == 90 { 81 } else { cp }
     screen.cells[at].mark1 = 0
     screen.cells[at].mark2 = 0
     screen.cells[at].width = 1
