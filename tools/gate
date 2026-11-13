@@ -74,11 +74,11 @@ step version-answer-lupin python3 -I tests/vt/version_answer.py "$LUPIN" run src
 # Framing/capacity rows live beside the pure members to exercise private
 # storage policy. The native default ring and smaller interpreter ledger
 # are deliberately separate entries; the interpreter cap is not increased.
-for entry in capacity_rows history_rows history_capacity_rows; do
+for entry in capacity_rows history_rows history_codec_rows history_fragment_rows line_coordinate_rows history_capacity_rows; do
   step "vt-$entry-build" "$WOLF" build --deny-warnings "src/vt/$entry.lu" -o "$root/target/native/vt-$entry"
   step "vt-$entry-native" "$root/target/native/vt-$entry"
 done
-for entry in capacity_rows history_rows history_ledger_rows; do
+for entry in capacity_rows history_rows history_codec_rows line_coordinate_rows history_ledger_rows; do
   step "vt-$entry-lupin" "$LUPIN" run "src/vt/$entry.lu"
 done
 [ "$mode" = linux ] || exit 0

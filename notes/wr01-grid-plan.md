@@ -89,6 +89,39 @@ paint, exact encoded byte counts, and flat repeated encode/read charge.
 This is still groundwork: feed/history integration, 65536-cell splitting,
 stable-ID assignment and the path-independent reflow source remain pending.
 
+## Feed integration continuation
+
+Framing, run encoding/reading and bounded fragment/counter rows now exist;
+none is wired into Vt yet. The next coherent step adds row metadata for a
+stable logical-line ID and start offset, plus a primary-screen monotonic ID
+allocator. A physical row may produce one or more encoded fragments;
+fragments need not be maximal, and no fragment boundary is a logical newline.
+This permits appending the row leaving the top directly, without rewriting
+an open record or keeping a per-line index. A reusable LineCoordinate value
+avoids returning allocated records during feed. Initial/blanked rows get
+fresh IDs; copying rows copies their addresses; RIS must not recycle lifetime
+IDs. Wraps join IDs and advance offsets by natural glyph widths, including
+the one-column wide exception. Structural breaks/line edits must repair
+joined-row addresses to agree with wrapped edges, rather than leaving stale
+same-ID suffixes behind a newly inserted hard line.
+
+A row can cross the 2^32 coordinate boundary at most once under the area cap.
+If its continuation ID is reserved before that row leaves the screen, keep
+that one overflow ID in bounded row metadata so later encoding reuses it;
+it must not allocate a second identity for the same suffix. Feed integration
+must cover history only for primary upward removal with region top 1,
+including SU, never the alternate screen or a lower region; ED3/RIS empty
+history without changing the screen incorrectly. Disabled history should
+have a fast path while still reporting prefix loss to resize bookkeeping.
+
+Once Vt actually allocates its configured history, change generic screen-only
+constructor rows to cap zero and ownership rows to a small configured cap.
+Keep default-8MiB pane/ring rows native-only; interpreter entries explicitly
+configure a smaller ring under the unchanged cap, as the ledger finding
+requires. This is a tiered test configuration, not a hidden skip or an
+increased interpreter budget. Resize/reflow and its canonical resize-only
+source remain the major step after feed integration.
+
 One standalone read-only host preflight has passed. Prepare the complete
 host take before acquiring a pool slot; no heavy work is assigned to the
 other pool host. The first grid review leaves this exact Done-when row open:
