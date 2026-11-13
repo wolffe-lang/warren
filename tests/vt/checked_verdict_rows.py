@@ -10,9 +10,9 @@ validate = runpy.run_path(str(ROOT / 'tests/vt/checked_rows.py'))['validate']
 def main():
     pin = {'version': '0.2.39', 'rev': '3fc86f77795afbbd6fbe483fef76c08e7f13a840'}
     good = {'protocol': 1, 'impl': 'wolfgang', 'impl_version': pin['version'], 'commit': '3fc86f7',
-            'verdict': 'ok', 'phase_reached': 'run', 'diagnostics': [], 'warnings': []}
+            'verdict': 'exit(0)', 'phase_reached': 'run', 'diagnostics': [], 'warnings': []}
     validate(good, pin)
-    for change in ({'verdict': 'trap(assert)'}, {'verdict': 'fail(W0313)'}, {'verdict': 'unknown'},
+    for change in ({'verdict': 'trap(assert)'}, {'verdict': 'fail(W0313)'}, {'verdict': 'unsupported'}, {'verdict': 'exit(7)'}, {'verdict': 'unknown'},
                    {'phase_reached': 'typecheck'}, {'impl_version': 'other'}, {'commit': ''},
                    {'commit': 'deadbee'}, {'warnings': ['W0313']}, {'diagnostics': ['E0301']}):
         try:

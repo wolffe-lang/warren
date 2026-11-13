@@ -18,7 +18,7 @@ def validate(record, pin):
     commit = record.get('commit')
     if record.get('impl_version') != pin['version'] or not isinstance(commit, str) or not 7 <= len(commit) <= 40 or not pin['rev'].startswith(commit):
         raise ValueError('checked machine identity differs from the pin')
-    if record.get('verdict') != 'ok' or record.get('phase_reached') != 'run':
+    if record.get('verdict') != 'exit(0)' or record.get('phase_reached') != 'run':
         raise ValueError('checked verdict=%r phase=%r' % (record.get('verdict'), record.get('phase_reached')))
     if record.get('diagnostics') or record.get('warnings'):
         raise ValueError('checked observation has diagnostics or warnings')
