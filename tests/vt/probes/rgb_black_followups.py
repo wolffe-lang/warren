@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""21 dumps and8 SGR observations: at most50 terminal processes.
+"""28 dumps and15 SGR observations: at most71 terminal processes.
 
 Measure RGB blank extents, D13 bold-clear/order controls and its full-stream
 source-repaired frame. No native output supplies expected data.
@@ -38,8 +38,9 @@ def cases():
       'indexed-before-bold-cleared':C+b'38;5;0m'+C+b'1mm'+C+b'22mn',
       'bright-black-cleared':C+b'1;90mm'+C+b'22mn',
     }
+    for code in range(31,38):controls['strict-bold-legacy-%d'%code]=C+('1;%dmm'%code).encode()
     result.update({name:(HEAD+body,12,4,True) for name,body in controls.items()})
-    assert len(result)==20 and sum(row[3] for row in result.values())==8
+    assert len(result)==27 and sum(row[3] for row in result.values())==15
     return result
 
 
@@ -52,9 +53,9 @@ def main():
     assert bg==(a.baseline/'fresh-0032/background-repaired.in').read_bytes()
     repaired,edits=black_repair(bg)
     selected['fresh-0032-D13']=(repaired,80,24,False)
-    m={'schema':1,'dump_budget':21,'pen_budget':8,'terminal_process_budget':50,
+    m={'schema':1,'dump_budget':28,'pen_budget':15,'terminal_process_budget':71,
       'pins_sha256':hashlib.sha256((ROOT/'warren-oracle.toml').read_bytes()).hexdigest(),'cases':{},'errors':[]}
-    print('BUNDLE dumps-at-most=21 pen-statuses-at-most=8 terminal-processes-at-most=50',flush=True)
+    print('BUNDLE dumps-at-most=28 pen-statuses-at-most=15 terminal-processes-at-most=71',flush=True)
     with oracle.Display() as display:
         for name,(data,cols,rows,pen) in selected.items():
             path=a.out/(name+'.in');path.write_bytes(data);work=a.out/name
@@ -78,7 +79,7 @@ def main():
             except (AssertionError,oracle.OracleError,ValueError,OSError) as error:
                 entry['error']=str(error);m['errors'].append(name);print('MEASURE-ERROR',name,str(error),flush=True)
             m['cases'][name]=entry;(a.out/'manifest.json').write_text(json.dumps(m,indent=2)+'\n')
-    print('MEASUREMENTS cases=21 errors=%d'%len(m['errors']),flush=True)
+    print('MEASUREMENTS cases=28 errors=%d'%len(m['errors']),flush=True)
     return bool(m['errors'])
 
 
