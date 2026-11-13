@@ -103,6 +103,7 @@ fn dump_line(mut input: DumpInput) -> int {
         input.header[length] = value as byte
         length += 1
     }
+    0 - 3
 }
 
 fn header_starts(input: DumpInput, length: int, text: str) -> bool {
