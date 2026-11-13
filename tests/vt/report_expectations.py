@@ -26,7 +26,10 @@ def recompose_no_bold(name,background_reference,no_bold_reference):
     assert background_reference['size']==no_bold_reference['size']
     for r,row in enumerate(background_reference['rows']):
         for c,cell in enumerate(row):
-            before=parts(cell[2]); after=parts(no_bold_reference['rows'][r][c][2])
+            # Apply only the comparator's already documented N1 before
+            # bounding observable foreground forms; no new normalization.
+            before=parts(screen.normalise(cell)[2])
+            after=parts(screen.normalise(no_bold_reference['rows'][r][c])[2])
             without=[value for value in before if value!='bold']
             old_fg,new_fg=foreground(before),foreground(after)
             if old_fg!=new_fg:
