@@ -1,0 +1,123 @@
+warren-screen 1
+size 80 24
+cursor 2 1 shape=4 visible=1 pending-wrap=0
+region 21 24
+tabs -
+title 72776c6f6b
+mode alternate-screen-1047 1
+mode alternate-screen-1049 1
+mode alternate-screen-47 1
+mode alternate-scroll 0
+mode application-cursor-keys 0
+mode application-keypad 0
+mode autowrap 0
+mode bracketed-paste 0
+mode cursor-blink 0
+mode cursor-visible 1
+mode focus-events 0
+mode insert 0
+mode left-right-margins 0
+mode mouse-any-motion 0
+mode mouse-button-motion 0
+mode mouse-press-release 0
+mode mouse-sgr 1
+mode mouse-urxvt 0
+mode mouse-utf8 0
+mode newline 0
+mode origin 0
+mode reverse-wrap 0
+mode send-receive 1
+mode synchronized-output ?
+row 1 extent=23
+1-6 1 U+0020 fg=rgb:203:21:180,bg=idx:0
+7 2 U+FF21 underline,blink,bg=idx:5
+8 0 - underline,blink,bg=idx:5
+9 2 U+FF21 underline,blink,bg=idx:5
+10 0 - underline,blink,bg=idx:5
+11 1 U+0034 blink,bg=idx:5
+12 1 U+002C blink,bg=idx:5
+13 1 U+0065 blink,bg=idx:5
+14 1 U+0046 blink,bg=idx:5
+15 1 U+0053 blink,bg=idx:5
+16 1 U+0055 blink,bg=idx:5
+17 1 U+0021 blink,bg=idx:5
+18 1 U+0078 blink,bg=idx:5
+19 1 U+0037 blink,bg=idx:5
+20 1 U+0078+U+0308 blink,fg=idx:10
+21 2 U+3042 blink,fg=idx:10
+22 0 - blink,fg=idx:10
+23 1 U+0064+U+20D7 blink,fg=idx:10
+24 1 U+0020 fg=idx:10
+25-80 1 U+0020 fg=idx:103
+row 2 extent=27
+1 1 U+0040 blink,fg=idx:10
+2 1 U+0067 blink,fg=idx:10
+3 1 U+0023 blink,fg=idx:10
+4 1 U+007C blink,fg=idx:10
+5 1 U+0059 blink,fg=idx:10
+6 1 U+007D blink,fg=idx:10
+7 1 U+0070 blink,fg=idx:10
+8 1 U+0045 blink,fg=idx:10
+9 1 U+0058 blink,fg=idx:10
+10 1 U+003E blink,fg=idx:10
+11 1 U+005F blink,fg=idx:10
+12 1 U+0032 blink,fg=idx:10
+13 1 U+005A blink,fg=idx:10
+14 1 U+0044 blink,fg=idx:10
+15 1 U+004B blink,fg=idx:10
+16 1 U+003C blink,fg=idx:10
+17 1 U+002D blink,fg=idx:10
+18 1 U+004A blink,fg=idx:10
+19 1 U+0047 blink,fg=idx:10
+20 1 U+0050 blink,fg=idx:10
+21 1 U+0026 blink,fg=idx:10
+22 1 U+0075+U+0301 blink,fg=idx:10
+23-24 1 U+0020 bg=idx:5
+25 1 U+0075+U+20D7 blink,fg=idx:10
+26 1 U+0022 blink,fg=idx:10
+27 1 U+007A blink,fg=idx:10
+28-80 1 U+0020 fg=idx:10
+row 3 extent=0
+1-80 1 U+0020 fg=idx:10
+row 4 extent=0
+1-80 1 U+0020 fg=idx:10
+row 5 extent=0
+1-80 1 U+0020 fg=idx:10
+row 6 extent=0
+1-80 1 U+0020 fg=idx:10
+row 7 extent=0
+1-80 1 U+0020 fg=idx:10
+row 8 extent=0
+1-80 1 U+0020 fg=idx:10
+row 9 extent=0
+1-80 1 U+0020 fg=idx:10
+row 10 extent=0
+1-80 1 U+0020 fg=idx:10
+row 11 extent=0
+1-80 1 U+0020 fg=idx:10
+row 12 extent=0
+1-80 1 U+0020 fg=idx:10
+row 13 extent=0
+1-80 1 U+0020 fg=idx:10
+row 14 extent=0
+1-80 1 U+0020 fg=idx:10
+row 15 extent=0
+1-80 1 U+0020 fg=idx:10
+row 16 extent=0
+1-80 1 U+0020 fg=idx:10
+row 17 extent=0
+1-80 1 U+0020 fg=idx:10
+row 18 extent=0
+1-80 1 U+0020 fg=idx:10
+row 19 extent=0
+1-80 1 U+0020 fg=idx:10
+row 20 extent=0
+1-80 1 U+0020 fg=idx:10
+row 21 extent=0
+1-80 1 U+0020 fg=idx:10
+row 22 extent=0
+1-80 1 U+0020 fg=idx:10
+row 23 extent=0
+1-80 1 U+0020 fg=idx:10
+row 24 extent=0
+1-80 1 U+0020 fg=idx:10
