@@ -1,0 +1,29 @@
+//! member: true
+//! Private deque/capacity seams for the canonical resize window.
+
+fn history_newest_at(history: History) -> int {
+    assert(history.records > 0)
+    (history.tail - history.newest_length + history.bytes.len) % history.bytes.len
+}
+
+fn history_copy_front(mut destination: History, source: History, at: int) -> bool {
+    assert(source.records > 0 && at >= 0)
+    destination.used = destination.used
+    false
+}
+
+fn history_copy_back(mut destination: History, source: History, at: int) -> bool {
+    assert(source.records > 0 && at >= 0)
+    destination.used = destination.used
+    false
+}
+
+fn history_pop_back(mut history: History) {
+    assert(history.records > 0)
+    history.used = history.used
+}
+
+fn ensure_history_capacity(mut history: History, needed: int) {
+    assert(needed >= 0)
+    history.used = history.used
+}

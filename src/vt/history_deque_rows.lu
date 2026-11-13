@@ -1,0 +1,60 @@
+//! member: false
+//! Canonical-window deque ownership, wrapped copies and retained capacity.
+use std.mem.budget
+
+fn test_history_deque() {
+    region frame(cap: 1048576) {
+        var pane = new(4, 1, 256)
+        feed(mut pane, "1\r\n2\r\n3\r\n4".bytes())
+        assert(pane.history.records == 3 && pane.history.used == 111)
+        var canonical = new_history(128)
+        assert(history_encode_line(mut canonical, pane.primary, 4, 1, 1, 3, 0))
+        let newest = history_newest_at(pane.history)
+        assert(history_copy_front(mut canonical, pane.history, newest), "resize-deque-prepend")
+        history_pop_back(mut pane.history)
+        assert(pane.history.records == 2 && pane.history.used == 74 && pane.history.evicted == 0)
+        assert(history_copy_front(mut canonical, pane.history, history_newest_at(pane.history)))
+        history_pop_back(mut pane.history)
+        assert(canonical.records == 3 && canonical.used == 111 && canonical.head == 54)
+        assert(pane.history.records == 1 && pane.history.used == 37)
+        var at = history_newest_at(canonical)
+        var id = 3
+        while id >= 1 {
+            assert(history_get_word(canonical, at, 8, 8) == id, "resize-deque-reverse")
+            at = history_previous(canonical, at)
+            id -= 1
+        }
+        assert(at == 0 - 1)
+        assert(!history_copy_front(mut canonical, pane.history, pane.history.head), "resize-deque-full-is-inert")
+        assert(canonical.used == 111 && canonical.evicted == 0)
+        region growth_turn(cap: 65536) { ensure_history_capacity(mut canonical, 512) }
+        assert(canonical.bytes.len >= 512 && canonical.head == 0 && canonical.tail == 111, "resize-deque-capacity")
+        assert(history_get_word(canonical, canonical.head, 8, 8) == 1)
+        let stable = budget.charged(frame)
+        var turn = 0
+        while turn < 64 {
+            region reuse_turn(cap: 65536) {
+                ensure_history_capacity(mut canonical, 128)
+                ensure_history_capacity(mut canonical, 512)
+                assert(history_copy_back(mut pane.history, canonical, history_newest_at(canonical)))
+                assert(pane.history.records == 2 && pane.history.used == 74)
+                history_pop_back(mut pane.history)
+            }
+            turn += 1
+        }
+        assert(budget.charged(frame) == stable, "resize-deque-outer-owner-plateau")
+        var reader = new_history_reader()
+        at = canonical.head
+        id = 1
+        while id <= 3 {
+            history_reader_start(mut reader, canonical, at)
+            assert(history_reader_next(mut reader, canonical) && reader.value == 49 + id)
+            assert(!history_reader_next(mut reader, canonical))
+            at = (at + history_get_word(canonical, at, 0, 4)) % canonical.bytes.len
+            id += 1
+        }
+        assert(at == canonical.tail)
+    }
+}
+
+fn main() -> int { test_history_deque(); 0 }
