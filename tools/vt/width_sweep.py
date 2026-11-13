@@ -164,6 +164,14 @@ def main():
     result = json.loads(result_path.read_text())
     print('MEASURE widths assigned=%d controls=%d disagreements=%d (not an agreement verdict)' %
           (result['measured_scalars'], len(result['controls']), len(result['disagreements'])), flush=True)
+    sys.path.insert(0, str(ROOT / 'tools/vt'))
+    from check_width_policy import validate
+    try:
+        validate(result)
+    except (AssertionError, ValueError, KeyError) as error:
+        print('FAIL width-policy ' + str(error), flush=True)
+        return 1
+    print('PASS width-policy D11 exact350 any-351st-red', flush=True)
     return 0
 
 
