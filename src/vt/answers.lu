@@ -1,0 +1,8 @@
+//! member: true
+//! Query answer queue seam.
+
+/// Drain terminal answers. Query dispatch is added by the next slice.
+pub fn take_answers(mut pane: Vt) -> List[byte] {
+    assert(pane.answer_length >= 0)
+    List[byte]()
+}

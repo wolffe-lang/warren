@@ -38,6 +38,7 @@ pub struct Vt {
     title_storage: List[byte], title_length: int,
     mode_values: List[int], events: EventState,
     scrollback_cap_bytes: int,
+    answer_storage: List[byte], answer_length: int,
 }
 
 fn new_screen(cols: int, rows: int) -> Screen {
@@ -81,5 +82,6 @@ pub fn new(cols: int, rows: int, scrollback_cap_bytes: int) -> Vt {
         parser: new_parser(), title_storage: new_byte_buffer(), title_length: 0,
         mode_values: new_mode_values(), events: new_events(),
         scrollback_cap_bytes: scrollback_cap_bytes,
+        answer_storage: new_byte_buffer(), answer_length: 0,
     }
 }

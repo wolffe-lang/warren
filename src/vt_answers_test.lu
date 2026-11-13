@@ -1,0 +1,70 @@
+//! member: false
+//! Query identity, status, atomic overflow and input-allocation rows.
+use vt
+use std.mem.budget
+use std.hex
+use std.io
+
+fn equal(data: List[byte], text: str) -> bool {
+    if data.len != text.len { return false }
+    var i = 0
+    for b in text.bytes() { if data[i] != b { return false }; i += 1 }
+    true
+}
+
+fn test_identity() {
+    var pane = vt.new(80, 24, 0)
+    vt.feed(mut pane, "\u{1b}[c\u{1b}[0c\u{1b}Z\u{1b}[>c".bytes())
+    assert(equal(vt.take_answers(mut pane), "\u{1b}[?62;22c\u{1b}[?62;22c\u{1b}[?62;22c\u{1b}[>0;1;0c"), "answers-identity")
+    vt.feed(mut pane, "\u{1b}[>q".bytes())
+    let expected = "\u{1b}P>|warren {vt.package_version()}\u{1b}\\"
+    let version = vt.take_answers(mut pane)
+    assert(equal(version, expected), "answers-version")
+    io.write_line("VERSION-ANSWER {hex.encode(version)}")
+    vt.feed(mut pane, "\u{1b}[1c\u{1b}[?c\u{1b}[=c\u{1b}[>1c\u{1b}[>1q\u{1b}[1;0c\u{1b}[0:0c\u{1b}[<c".bytes())
+    assert(vt.take_answers(mut pane).len == 0, "answers-identity-unknown")
+}
+
+fn test_status_and_modes() {
+    var pane = vt.new(80, 24, 0)
+    vt.feed(mut pane, "\u{1b}[5n\u{1b}[7;12H\u{1b}[6n\u{1b}[?6n".bytes())
+    assert(equal(vt.take_answers(mut pane), "\u{1b}[0n\u{1b}[7;12R\u{1b}[?7;12R"), "answers-status")
+    vt.feed(mut pane, "\u{1b}[3;9r\u{1b}[?6h\u{1b}[2;4H\u{1b}[6n\u{1b}[?6n".bytes())
+    assert(equal(vt.take_answers(mut pane), "\u{1b}[2;4R\u{1b}[?2;4R"), "answers-origin")
+    vt.feed(mut pane, "\u{1b}[4$p\u{1b}[4h\u{1b}[4$p\u{1b}[?7$p\u{1b}[?2026$p\u{1b}[?999$p\u{1b}[12$p\u{1b}[?45$p".bytes())
+    assert(equal(vt.take_answers(mut pane), "\u{1b}[4;2$y\u{1b}[4;1$y\u{1b}[?7;1$y\u{1b}[?2026;2$y\u{1b}[?999;0$y\u{1b}[12;3$y\u{1b}[?45;4$y"), "answers-modes")
+    vt.feed(mut pane, "\u{1b}[?5n\u{1b}[7n\u{1b}[>6n\u{1b}[?15n".bytes())
+    assert(vt.take_answers(mut pane).len == 0)
+    var wrap = vt.new(2, 1, 0)
+    vt.feed(mut wrap, "ab\u{1b}[6n".bytes())
+    assert(wrap.pending_wrap && equal(vt.take_answers(mut wrap), "\u{1b}[1;2R"))
+}
+
+fn test_overflow_and_allocation() {
+    region frame(cap: 1048576) {
+        var pane = vt.new(80, 24, 0)
+        let status = "\u{1b}[5n".bytes()
+        let cursor = "\u{1b}[6n".bytes()
+        let stable = budget.charged(frame)
+        var i = 0
+        while i < 1023 { vt.feed(mut pane, status); i += 1 }
+        assert(pane.answer_length == 4092)
+        vt.feed(mut pane, cursor)
+        assert(pane.answer_length == 4092, "answers-overflow-atomic")
+        vt.feed(mut pane, status)
+        assert(pane.answer_length == 4096)
+        i = 0
+        while i < 1024 { vt.feed(mut pane, status); i += 1 }
+        assert(pane.answer_length == 4096 && budget.charged(frame) == stable, "answers-input-allocation")
+        let out = vt.take_answers(mut pane)
+        assert(out.len == 4096 && pane.answer_length == 0)
+        i = 0
+        while i < out.len {
+            assert(out[i] == 27 as byte && out[i + 1] == 91 as byte && out[i + 2] == 48 as byte && out[i + 3] == 110 as byte)
+            i += 4
+        }
+        assert(vt.take_answers(mut pane).len == 0)
+    }
+}
+
+fn main() -> int { test_identity(); test_status_and_modes(); test_overflow_and_allocation(); 0 }
