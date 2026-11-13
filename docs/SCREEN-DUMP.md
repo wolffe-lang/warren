@@ -51,9 +51,10 @@ written; a gap left unwritten before a distant glyph is not. Later edits may
 shift or discard those cells. This internal scalar bit is copied with cells
 and original-screen snapshots; it adds no field to format 1 or the wire.
 Canonical history retains logical content, whose materialized spaces are
-written, separately from unwritten background-only paint. Current measured
-native and interpreter charges are tabulated in
-[`notes/wr01-the-emulator.md`](../notes/wr01-the-emulator.md#grid-follow-on-resource-checkpoint).
+written, separately from unwritten background-only paint. The capacity entries
+`src/vt/pane_capacity_rows.lu` and `src/vt/pane_ledger_rows.lu` assert native
+and interpreter constructor charges; the resize-capacity rows include retained
+growth buffers rather than assuming that replaced arena storage was freed.
 
 ## How the reference emulator is read
 

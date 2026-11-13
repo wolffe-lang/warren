@@ -1,14 +1,13 @@
-# Draft for wr01: the emulator's contract (W1)
+# Emulator contract
 
-Current width amendment: D11 is withdrawn. The pinned Unicode 15.1.0 base table
+Current width policy: D11 is withdrawn. The pinned Unicode 15.1.0 base table
 is overridden by the 350 stated exception scalars in `tests/vt/width-exceptions.json`,
 matching measured glibc 2.39 `wcwidth` and the reference. The exhaustive sweep
 requires zero non-control differences. Jamo/format exceptions of width zero
-attach as marks under section 2.3 and D10; regional indicators are width one,
-so a pair advances two. Earlier D11 text below is retained only as history and
-does not override this amendment.
+attach under section 2.3 and D10; regional indicators are width one,
+so a pair advances two.
 
-An outline for the lane that writes `src/vt`. It is exact where exactness
+The reference contract for `src/vt`. It is exact where exactness
 decides whether two implementations agree: the parser's states, the grid's
 invariants, resize, and what scrollback costs. "Measured" means a census
 stream under `tests/vt/census.py` shows it on the reference emulator (xterm
@@ -293,9 +292,9 @@ The list, with the document's section for each, is in the prediction
 | D6 | no reflow on resize | section 4 | the survey: every multiplexer reflows |
 | D7 | `SGR 53` (overline) ignored, mode 2026 unknown | 53 consumed without effect; 2026 stored and reported | yew sets 2026 around every frame |
 | D8 | DEL inside an OSC title becomes `?` (`tests/vt/parser-reference/osc-del.in`, title `613f62`) | DEL is silently dropped, yielding title `6162` | titles are display text; dropping the control is cleaner than adding a visible question mark |
-| D9 | a pre-restore background reappears after saved-pen restore followed by 7/27; an RGB integer can become invalid palette 15540094 | keep the restored colour value and set form; 7/27 change only inverse | post-restore inverse colour-cache defect; minimal bytes and both observations in `wr01-the-emulator.md` |
+| D9 | a pre-restore background reappears after saved-pen restore followed by 7/27; an RGB integer can become invalid palette 15540094 | keep the restored colour value and set form; 7/27 change only inverse | post-restore inverse colour-cache defect; paired raw fixtures are in `tests/vt/reference/inverse` and `tests/vt/reference/d9` |
 | D10 | a combining mark on an unwritten blank is visible in the full-cell print beyond extent 0; a complete canonical frame is inconsistent | the target cell is written and extends the extent; resize keeps it, with the existing no-left-cell drop rule at column1 | G6 and R1; six named report failures, two strict written-base controls |
-| D11 | exactly 350 assigned scalars differ from the adopted table; libc agrees with the reference on them | keep the explicit Unicode 15.1.0 rule; exact ranges, counts and all measured columns are in `wr01-the-emulator.md` | shared width policy is deferred; no std display-width API exists at this pin |
+| D11 | withdrawn; scalar widths now agree outside control characters | Unicode 15.1.0 plus the explicit exception classes in `tests/vt/width-exceptions.json` | the exhaustive sweep accepts zero non-control differences |
 | D12 | origin-mode CPR wraps a negative relative row after restoring an absolute cursor above the current region; a one-above-top row reports zero | keep the measured absolute placement but report relative CPR row 1 above the region | exact-trigger reference-report inconsistency; DECCIR remains the absolute witness |
 
 Rows for D1 to D12 compare with written expectations, never with the
@@ -408,13 +407,17 @@ One table, generated from the Unicode Character Database at a pinned
 version, decides w for every code point: 0 for combining marks (general
 categories Mn, Me), for U+200B to U+200F and the other default-ignorable
 format characters; 2 for East Asian Wide and Fullwidth and for the emoji
-presentation ranges; 1 otherwise. **Ruled:** keep Unicode 15.1.0's explicit
-rule for this change. The assigned-scalar sweep records exactly 350 differences
-from the reference and libc under D11; its exact-set gate rejects any new,
-missing or changed difference. The original intention to match the reference's
-C-library version is not a claim that these scalar policies agree. Pinned std
-has no display-width API; its padding is byte-counted. The measured std-unavailable,
-libc, reference and actual regional-indicator pair columns are in the main note.
+presentation ranges; 1 otherwise. The Unicode 15.1.0 base is overridden by the
+five explicit classes in `tests/vt/width-exceptions.json`: soft hyphen width1,
+Hangul vowel/trailing jamo and the listed format controls width0, enclosed
+numbers/hexagrams width2, and regional indicators width1. Their exact ranges,
+counts and reason are machine-readable and bound into the generated table.
+These 350 scalar values agree with measured glibc2.39 `wcwidth` and reference
+CPR; the exhaustive assigned-scalar gate accepts zero non-control differences.
+The pinned std has no display-width API; its padding is byte-counted. Current
+libc, reference and native pair measurements are frozen in
+`tests/vt/reference/width-columns-current`; a regional-indicator pair advances
+2 cells without a separate grapheme-joining rule.
 The client is told nothing about this table: an outer terminal with other width
 rules (PAX's console draws every code point in one cell) is the renderer's
 problem, not the grid's.

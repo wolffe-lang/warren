@@ -8,7 +8,7 @@ their code.
 **Status: the map, pure terminal core in progress and protocol v1 codec.
 No working multiplexer is implemented yet.** The repository holds the pins,
 tiered CI, a pinned reference emulator with a cell-for-cell harness, a survey,
-recorded corpus, and predictions/drafts for the next milestones.
+recorded corpus, and reference contracts for the emulator and protocol.
 `src/vt/parser.lu` decodes split UTF-8 and recognises bounded terminal
 sequences; its native test entry is `src/vt_parser_test.lu`, also runnable
 under lupin. The initial grid serves Unicode widths/combining marks, wide-pair
@@ -126,8 +126,8 @@ and primary content/rendition/resize-path checks; the nightly profile uses
 5000 seeds. The complete assigned-scalar width sweep remains separate evidence.
 The finite hostile row uses capped
 regions, and the measurement entry reports retained region charge and feed
-rate separately from process startup. [The note](notes/wr01-the-emulator.md)
-records the prediction, failed takes and scope boundaries.
+rate separately from process startup. The [emulator contract](notes/wr00-draft-wr01-emulator.md)
+defines the invariants and named reference divergences.
 
 The gate prints one `START`/`END name exit=N` pair per step. No step skips:
 a missing oracle is red.
@@ -186,7 +186,7 @@ nightly run and a manual dispatch run everything.
 | `tools/corpus/` | the pty recorder and the seeded fuzz generator |
 | `tools/session/` | session rows against tmux |
 | `tests/vt/`, `tests/corpus/` | cases, the census, recordings, digests |
-| `notes/` | each lane's note; the drafts for the emulator and the wire protocol |
+| `notes/` | emulator, protocol and implementation contracts |
 
 The three pure modules do no I/O. They are tested on every host and under the
 reference interpreter.
