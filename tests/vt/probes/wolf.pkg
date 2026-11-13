@@ -1,0 +1,6 @@
+pkg {
+    name: "vt-memory-probes",
+    version: "0.0.0",
+    edition: "1",
+    capabilities: [fs],
+}

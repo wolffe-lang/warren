@@ -1,0 +1,31 @@
+//! member: false
+//! Measure ordinary buffer replacement before selecting a resize allocator.
+//! Prediction: arena charge grows per replacement, not with the final size.
+use std.mem.budget
+use std.io
+
+struct Storage { bytes: List[byte] }
+
+fn rebuild(mut storage: Storage, size: int) {
+    var next = List[byte]()
+    (mut next).reserve(size)
+    var i = 0
+    while i < size { (mut next).push(0 as byte); i += 1 }
+    storage.bytes = copy next
+}
+
+fn main() -> int {
+    region measured(cap: 262144) {
+        var storage = Storage { bytes: List[byte]() }
+        let before = budget.charged(measured)
+        var i = 0
+        while i < 16 {
+            region temporary { rebuild(mut storage, if i % 2 == 0 { 1024 } else { 4096 }) }
+            i += 1
+        }
+        let charge = budget.charged(measured) - before
+        assert(storage.bytes.len == 4096)
+        io.write_line("MEASURE replacement rounds=16 final-bytes=4096 peak-live-size=4096 arena-charged={charge}")
+    }
+    0
+}
