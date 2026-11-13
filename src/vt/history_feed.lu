@@ -80,7 +80,8 @@ fn retain_primary_row(mut pane: Vt, row: int) {
         history_count_evicted(mut pane.history, 1)
         advance_screen_coordinate(mut pane.line_coordinate, pane.primary, pane.cols, row)
     } else {
-        history_encode_fragments(mut pane.history, pane.primary, pane.cols, row, row, mut pane.line_coordinate)
+        let appended = history_encode_fragments(mut pane.history, pane.primary, pane.cols, row, row, mut pane.line_coordinate)
+        assert(appended >= 0)
     }
     commit_primary_coordinate(mut pane, row)
 }
