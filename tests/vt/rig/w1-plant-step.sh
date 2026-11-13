@@ -6,12 +6,12 @@ root=$PWD
 case "${1:-}" in
  build)
   python3 -I tools/vt/generate_version.py
-  mkdir -p target/native target/plant
-  "$WOLF" build --deny-warnings src/vt_scalar_test.lu -o "$root/target/native/vt-scalar-plant"
+  mkdir -p target/canonical-plant target/plant
+  "$WOLF" build --deny-warnings src/vt_scalar_test.lu -o "$root/target/canonical-plant/vt-scalar-plant"
   ;;
  row)
   rc=0
-  "$root/target/native/vt-scalar-plant" > target/plant/scalar.stdout 2> target/plant/scalar.stderr || rc=$?
+  "$root/target/canonical-plant/vt-scalar-plant" > target/plant/scalar.stdout 2> target/plant/scalar.stderr || rc=$?
   if [ "$rc" -eq 134 ]; then
    python3 -I - <<'PY'
 from pathlib import Path
