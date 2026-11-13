@@ -19,14 +19,8 @@ fn blank_cell_preserving_written(mut screen: Screen, at: int, background: int) {
 }
 
 fn copy_cell(mut screen: Screen, to: int, from: int) {
-    screen.cells[to].base = screen.cells[from].base
-    screen.cells[to].mark1 = screen.cells[from].mark1
-    screen.cells[to].mark2 = screen.cells[from].mark2
-    screen.cells[to].width = screen.cells[from].width
-    screen.cells[to].flags = screen.cells[from].flags
-    screen.cells[to].foreground = screen.cells[from].foreground
-    screen.cells[to].background = screen.cells[from].background
-    screen.cells[to].written = screen.cells[from].written
+    // Cell is scalar-only: an independent value copy, with no region allocation.
+    screen.cells[to] = screen.cells[from]
 }
 
 fn scroll_up_one(mut screen: Screen, cols: int, top: int, bottom: int, background: int) {

@@ -26,14 +26,7 @@ fn new_resize_state(cols: int) -> ResizeState {
 }
 
 fn copy_screen_cell(mut destination: Screen, source: Screen, to: int, from: int) {
-    destination.cells[to].base = source.cells[from].base
-    destination.cells[to].mark1 = source.cells[from].mark1
-    destination.cells[to].mark2 = source.cells[from].mark2
-    destination.cells[to].width = source.cells[from].width
-    destination.cells[to].flags = source.cells[from].flags
-    destination.cells[to].foreground = source.cells[from].foreground
-    destination.cells[to].background = source.cells[from].background
-    destination.cells[to].written = source.cells[from].written
+    destination.cells[to] = source.cells[from]
 }
 
 fn copy_screen_row(mut destination: Screen, source: Screen, cols: int, to: int, from: int) {

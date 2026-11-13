@@ -1,0 +1,37 @@
+//! member: false
+//! Independent scalar-cell copies must not allocate or retain aliases.
+use std.mem.budget
+use std.io
+
+fn cell_copy_rows() {
+    region frame(cap: 1048576) {
+        var source = new_screen(2, 1)
+        var target = new_screen(2, 1)
+        source.cells[0].base = 97
+        source.cells[0].mark1 = 769
+        source.cells[0].mark2 = 770
+        source.cells[0].flags = 511
+        source.cells[0].foreground = 196
+        source.cells[0].background = 16777216 + 65536 + 512 + 3
+        let stable = budget.charged(frame)
+        var i = 0
+        while i < 1024 {
+            let base = source.cells[0].base
+            let written = i % 2 == 0
+            source.cells[0].written = written
+            copy_cell(mut source, 1, 0)
+            copy_screen_cell(mut target, source, 0, 0)
+            source.cells[0].base = 65 + i % 26
+            source.cells[0].written = !written
+            assert(source.cells[1].base == base && target.cells[0].base == base, "cell-copy-independent-value")
+            assert(source.cells[1].written == written && target.cells[0].written == written, "cell-copy-written-value")
+            assert(target.cells[0].flags == 511 && target.cells[0].mark1 == 769 && target.cells[0].mark2 == 770)
+            assert(target.cells[0].foreground == 196 && target.cells[0].background == 16777216 + 65536 + 512 + 3)
+            i += 1
+        }
+        assert(budget.charged(frame) == stable, "cell-copy-zero-allocation")
+        io.write_line("PASS cell-copy-independent-zero-allocation turns=1024")
+    }
+}
+
+fn main() -> int { cell_copy_rows(); 0 }
