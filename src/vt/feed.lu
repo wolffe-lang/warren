@@ -73,6 +73,13 @@ fn print_ascii(mut pane: Vt, cp: int) {
         index_line(mut pane)
         pane.cursor_col = 1
     }
+    if pane.modes.insert {
+        if pane.active_alternate {
+            shift_characters(mut pane.alternate, pane.cols, pane.cursor_row, pane.cursor_col, 1, pane.pen.background, true)
+        } else {
+            shift_characters(mut pane.primary, pane.cols, pane.cursor_row, pane.cursor_col, 1, pane.pen.background, true)
+        }
+    }
     if pane.active_alternate {
         write_narrow(mut pane.alternate, pane.cols, pane.cursor_row, pane.cursor_col, cp,
             pane.pen.flags, pane.pen.foreground, pane.pen.background)
@@ -115,8 +122,8 @@ fn dispatch_grid_token(mut pane: Vt, kind: int, value: int) {
 /// Consume bytes with incremental parsing and initial ASCII/C0 screen
 /// operations, cursor addressing, scroll regions, erasure, SGR, titles,
 /// stored mode state and bounded final-state events. The grid is incomplete:
-/// Unicode, insertion/deletion, alternate-screen and other ESC operations,
-/// scrollback and answers are not served by this slice yet.
+/// Unicode, alternate-screen and other ESC operations, scrollback and
+/// answers are not served by this slice yet.
 pub fn feed(mut pane: Vt, data: List[byte]) {
     for b in data {
         advance_in_place(mut pane.parser, b)

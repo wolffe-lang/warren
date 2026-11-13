@@ -1,0 +1,79 @@
+//! member: true
+//! Narrow-cell editing. Wide-character boundary repair is added with widths.
+
+fn shift_characters(mut screen: Screen, cols: int, row: int, col: int,
+        amount: int, background: int, insert: bool) {
+    let n = grid_clamp(amount, 1, cols - col + 1)
+    let extent = screen.extents[row - 1]
+    if insert {
+        var to = cols
+        while to >= col + n {
+            copy_cell(mut screen, (row - 1) * cols + to - 1, (row - 1) * cols + to - n - 1)
+            to -= 1
+        }
+        var at = col
+        while at < col + n { blank_cell(mut screen, (row - 1) * cols + at - 1, background); at += 1 }
+        if extent >= col { screen.extents[row - 1] = grid_clamp(extent + n, 0, cols) }
+    } else {
+        var to = col
+        while to <= cols - n {
+            copy_cell(mut screen, (row - 1) * cols + to - 1, (row - 1) * cols + to + n - 1)
+            to += 1
+        }
+        var at = cols - n + 1
+        while at <= cols { blank_cell(mut screen, (row - 1) * cols + at - 1, background); at += 1 }
+        if extent >= col { screen.extents[row - 1] = grid_clamp(extent - n, col - 1, cols) }
+    }
+}
+
+fn copy_row(mut screen: Screen, cols: int, to: int, from: int) {
+    var col = 0
+    while col < cols { copy_cell(mut screen, (to - 1) * cols + col, (from - 1) * cols + col); col += 1 }
+    screen.extents[to - 1] = screen.extents[from - 1]
+    screen.wrapped[to - 1] = screen.wrapped[from - 1]
+}
+
+fn blank_row(mut screen: Screen, cols: int, row: int, background: int) {
+    var col = 0
+    while col < cols { blank_cell(mut screen, (row - 1) * cols + col, background); col += 1 }
+    screen.extents[row - 1] = 0
+    screen.wrapped[row - 1] = false
+}
+
+fn shift_lines(mut screen: Screen, cols: int, row: int, bottom: int,
+        amount: int, background: int, insert: bool) {
+    let n = grid_clamp(amount, 1, bottom - row + 1)
+    if insert {
+        var to = bottom
+        while to >= row + n { copy_row(mut screen, cols, to, to - n); to -= 1 }
+        var at = row
+        while at < row + n { blank_row(mut screen, cols, at, background); at += 1 }
+    } else {
+        var to = row
+        while to <= bottom - n { copy_row(mut screen, cols, to, to + n); to += 1 }
+        var at = bottom - n + 1
+        while at <= bottom { blank_row(mut screen, cols, at, background); at += 1 }
+    }
+}
+
+fn dispatch_editing(mut pane: Vt, final: int) {
+    if pane.parser.param_count > 1 { return }
+    let amount = grid_param(pane.parser, 0, 1, true)
+    if final == 64 || final == 80 {
+        pane.pending_wrap = false
+        if pane.active_alternate {
+            shift_characters(mut pane.alternate, pane.cols, pane.cursor_row, pane.cursor_col, amount, pane.pen.background, final == 64)
+        } else {
+            shift_characters(mut pane.primary, pane.cols, pane.cursor_row, pane.cursor_col, amount, pane.pen.background, final == 64)
+        }
+    } else {
+        if pane.cursor_row < pane.region_top || pane.cursor_row > pane.region_bottom { return }
+        pane.pending_wrap = false
+        pane.cursor_col = 1
+        if pane.active_alternate {
+            shift_lines(mut pane.alternate, pane.cols, pane.cursor_row, pane.region_bottom, amount, pane.pen.background, final == 76)
+        } else {
+            shift_lines(mut pane.primary, pane.cols, pane.cursor_row, pane.region_bottom, amount, pane.pen.background, final == 76)
+        }
+    }
+}

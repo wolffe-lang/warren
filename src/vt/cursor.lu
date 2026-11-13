@@ -91,6 +91,7 @@ fn dispatch_csi(mut pane: Vt, final: int) {
         return
     }
     if !simple_grid_params(pane.parser) { return }
+    if final == 64 || final == 80 || final == 76 || final == 77 { dispatch_editing(mut pane, final); return }
     if (final >= 65 && final <= 72) || final == 96 || final == 97 || final == 100 || final == 101 || final == 102 {
         let pair = final == 72 || final == 102
         if pane.parser.param_count > (if pair { 2 } else { 1 }) { return }
