@@ -3,6 +3,7 @@
 use std.fs
 use std.io
 use std.mem.budget
+use std.strbuf
 
 struct CorpusInput { data: List[byte], at: int }
 
@@ -98,6 +99,27 @@ fn corpus_screen_invariants(screen: Screen, cols: int, rows: int) {
     }
 }
 
+fn same_primary_view(a: Vt, b: Vt) {
+    var left = strbuf.new()
+    var right = strbuf.new()
+    dump_screen(mut left, a.primary, a.cols, a.rows)
+    dump_screen(mut right, b.primary, b.cols, b.rows)
+    assert(strbuf.to_str(left) == strbuf.to_str(right), "corpus-resize-primary-row-path-independence")
+    var row = 0
+    while row < a.rows {
+        assert(a.primary.wrapped[row] == b.primary.wrapped[row], "corpus-resize-primary-wrap-path")
+        row += 1
+    }
+    if !a.active_alternate {
+        assert(dump(a) == dump(b), "corpus-resize-path-independence")
+    } else if a.saved_primary.valid {
+        assert(a.saved_primary.row == b.saved_primary.row && a.saved_primary.col == b.saved_primary.col,
+            "corpus-resize-hidden-primary-cursor-path")
+    }
+    // R3 belongs to primary reflow. R6 deliberately clips the alternate:
+    // an intermediate narrow size may lose its cells and clamp its cursor.
+}
+
 fn check_properties(pane: Vt) {
     corpus_screen_invariants(pane.primary, pane.cols, pane.rows)
     corpus_screen_invariants(pane.alternate, pane.cols, pane.rows)
@@ -131,7 +153,7 @@ fn check_properties(pane: Vt) {
             assert(direct.history.evicted == evicted && via.history.evicted == evicted, "corpus-resize-no-cap-eviction")
             same_content(before, logical_content(direct))
             same_content(before, logical_content(via))
-            assert(dump(direct) == dump(via), "corpus-resize-path-independence")
+            same_primary_view(direct, via)
             corpus_screen_invariants(direct.primary, cols, bh[pair])
             corpus_screen_invariants(via.primary, cols, bh[pair])
             corpus_screen_invariants(direct.alternate, cols, bh[pair])
