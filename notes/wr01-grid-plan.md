@@ -193,6 +193,28 @@ Next: CLI/raw and recording replay, complete corpus comparison with named
 divergences, the assigned-scalar width sweep, first-divergent-prefix tooling,
 resource/performance and plants, then the single prepared host take and PR.
 
+## Dump/replay boundary prediction
+
+Add the host-side `warren vt-dump [--cols N --rows N] [FILE|-]` dispatcher
+without changing pure VT I/O posture. No arguments retain the honest scaffold
+status. Unknown/malformed options return 2; input I/O failures return 1. Read
+raw bytes through one reusable 4096-byte buffer, not whole-file text. Add an
+explicit `--replay` mode for warren-rec 1, never auto-detect it in raw input:
+validate its magic/initial size, feed output payloads, skip input payloads,
+and apply resize records. A 64-byte header buffer and scalar decimal parser
+bound replay bookkeeping; payloads stream regardless of their declared size.
+Malformed/truncated recordings return 2 without a partial dump.
+
+The native CLI defaults to 8MiB history. A documented diagnostic
+`--history-bytes` override may reduce it (0..8388608), so native/lupin replay
+comparisons can use the same smaller configured cap without raising the
+interpreter budget. Recording mode takes its initial size from the record;
+raw size flags with replay are usage errors, not silently ignored overrides.
+Argument decoding, file descriptors, replay parsing and output live in the
+command boundary; src/vt remains clock-, environment- and I/O-free. Rows
+cover stdin/file identity, binary bytes, options/refusals, replay output vs
+input/resize, malformed lengths and a multi-chunk stream.
+
 One standalone read-only host preflight has passed. Prepare the complete
 host take before acquiring a pool slot; no heavy work is assigned to the
 other pool host. The first grid review leaves this exact Done-when row open:
