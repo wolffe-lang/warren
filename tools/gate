@@ -53,6 +53,10 @@ corpus_digests() {
 step pin-metadata python3 -I tools/check-pins.py
 step version-generation-rows python3 -I tests/vt/version_generation.py
 step version-generation python3 -I tools/vt/generate_version.py
+step frozen-references python3 -I tools/vt/check_references.py
+step prefix-tool-rows python3 -I tests/vt/prefix_tool_rows.py
+step assigned-scalar-rows python3 -I tests/vt/assigned_rows.py
+step width-sweep-framing python3 -I tests/vt/width_sweep_rows.py
 step tier-planner python3 -I ci/tiers-test.py
 step harness-mutations python3 -I tools/oracle/run.py selftest tests/vt/expected/*.screen
 step fuzz-generator fuzz_generator
