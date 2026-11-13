@@ -1,4 +1,4 @@
 //! member: false
 //! Separate checked-machine allocation budget; unchanged 1024-turn row.
-use vt_history_test
-fn main() -> int { vt_history_test.checked_allocation(); 0 }
+use history_rows
+fn main() -> int { history_rows.checked_allocation(); 0 }

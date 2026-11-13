@@ -1,0 +1,166 @@
+//! member: true
+//! Red-first connection of logical row addresses and the framed history ring.
+use vt
+use std.mem.budget
+
+fn test_primary_history_append() {
+    var pane = vt.new(4, 2, 4096)
+    assert(pane.history.bytes.len == 4096 && pane.history.used == 0)
+    vt.feed(mut pane, "a\r\nb\r\nc".bytes())
+    assert(pane.history.records == 1 && pane.history.used == 37, "history-feed-primary-scroll")
+    assert(pane.history.bytes[36] == 97 as byte && pane.history.bytes[8] == 0 as byte)
+    assert(pane.primary.cells[0].base == 98 && pane.primary.cells[4].base == 99)
+}
+
+fn test_wrap_addresses() {
+    var pane = vt.new(4, 2, 4096)
+    assert(pane.primary.line_ids[0] == 0 && pane.primary.line_ids[1] == 1)
+    vt.feed(mut pane, "abcdXYZQR".bytes())
+    assert(pane.history.records == 1 && pane.history.used == 40)
+    assert(pane.primary.line_ids[0] == 0 && pane.primary.line_offsets[0] == 4, "history-wrapped-line-id")
+    assert(pane.primary.line_ids[1] == 0 && pane.primary.line_offsets[1] == 8)
+    vt.feed(mut pane, "\r\nS".bytes())
+    assert(pane.history.records == 2 && pane.history.used == 80)
+    assert(pane.history.bytes[56] == 4 as byte && pane.history.bytes[76] == 88 as byte)
+    assert(pane.primary.line_ids[0] == 0 && pane.primary.line_offsets[0] == 8)
+    assert(pane.primary.line_ids[1] != 0 && pane.primary.line_offsets[1] == 0, "history-hard-line-is-distinct")
+}
+
+fn test_history_scope_and_scroll_up() {
+    var lower = vt.new(4, 4, 4096)
+    vt.feed(mut lower, "1\r\n2\r\n3\r\n4\u{1b}[2;4r\u{1b}[4;1H\n".bytes())
+    assert(lower.history.records == 0, "history-no-lower-region")
+    vt.feed(mut lower, "\u{1b}[1;3r\u{1b}[3;1H\n".bytes())
+    assert(lower.history.records == 1 && lower.history.bytes[36] == 49 as byte)
+    var alternate = vt.new(4, 2, 4096)
+    vt.feed(mut alternate, "\u{1b}[?1049hx\r\ny\r\nz".bytes())
+    assert(alternate.history.records == 0, "history-no-alternate")
+    var scroll = vt.new(4, 4, 4096)
+    vt.feed(mut scroll, "1\r\n2\r\n3\r\n4\u{1b}[2S".bytes())
+    assert(scroll.history.records == 2 && scroll.history.used == 74, "history-explicit-scroll-up")
+    assert(scroll.history.bytes[36] == 49 as byte && scroll.history.bytes[73] == 50 as byte)
+}
+
+fn test_edits_repair_logical_breaks() {
+    var pane = vt.new(4, 3, 4096)
+    vt.feed(mut pane, "abcdefghijkl\u{1b}[2;1H\u{1b}[L".bytes())
+    assert(pane.primary.line_ids[0] == pane.primary.line_ids[1])
+    assert(pane.primary.line_ids[2] != pane.primary.line_ids[1] && pane.primary.line_offsets[2] == 0, "history-il-breaks-joined-line")
+    var erase = vt.new(4, 3, 4096)
+    vt.feed(mut erase, "abcdefghijkl\u{1b}[2;1H\u{1b}[2K".bytes())
+    assert(erase.primary.line_ids[0] == erase.primary.line_ids[1])
+    assert(erase.primary.line_ids[2] != erase.primary.line_ids[1] && erase.primary.line_offsets[2] == 0)
+}
+
+fn test_clear_and_lifetime_ids() {
+    var pane = vt.new(4, 2, 4096)
+    vt.feed(mut pane, "a\r\nb\r\nc".bytes())
+    let screen = vt.dump(pane)
+    vt.feed(mut pane, "\u{1b}[3J".bytes())
+    assert(pane.history.used == 0 && pane.history.records == 0 && vt.dump(pane) == screen, "history-ed3-leaves-screen")
+    vt.feed(mut pane, "\r\nd".bytes())
+    assert(pane.history.records == 1)
+    let next_id = pane.primary.next_line_id
+    vt.feed(mut pane, "\u{1b}c".bytes())
+    assert(pane.history.used == 0 && pane.primary.line_ids[0] >= next_id, "history-ris-does-not-recycle-ids")
+    var disabled = vt.new(4, 2, 0)
+    vt.feed(mut disabled, "a\r\nb\r\nc".bytes())
+    assert(disabled.history.used == 0 && disabled.history.records == 0 && disabled.history.evicted > 0)
+}
+
+fn test_history_feed_charge() {
+    region frame(cap: 1048576) {
+        var pane = vt.new(8, 2, 4096)
+        let data = "\r\nabcdef".bytes()
+        let stable = budget.charged(frame)
+        var i = 0
+        while i < 1024 { vt.feed(mut pane, data); i += 1 }
+        assert(pane.history.records > 0 && pane.history.used <= 4096 && pane.history.evicted > 0)
+        assert(budget.charged(frame) == stable, "history-feed-allocation")
+    }
+}
+
+fn test_wide_natural_offsets_and_reserved_overflow_id() {
+    var one = vt.new(1, 2, 4096)
+    vt.feed(mut one, "中\u{301}XY".bytes())
+    assert(one.history.records == 1 && one.history.newest_length == 41)
+    assert(one.primary.line_ids[0] == 0 && one.primary.line_offsets[0] == 2, "history-one-column-natural-offset")
+    assert(one.primary.line_ids[1] == 0 && one.primary.line_offsets[1] == 3)
+    var boundary = vt.new(4, 2, 4096)
+    // Counter seam: the screen already continues a very long logical line.
+    boundary.primary.line_offsets[0] = 4294967294
+    boundary.primary.next_line_id = 7
+    vt.feed(mut boundary, "abcdXYZQR".bytes())
+    assert(boundary.history.records == 2 && boundary.history.used == 76)
+    assert(boundary.history.bytes[8] == 0 as byte && boundary.history.bytes[46] == 7 as byte, "history-reserved-overflow-id-reused")
+    assert(boundary.history.bytes[16] == 254 as byte && boundary.history.bytes[17] == 255 as byte)
+    assert(boundary.primary.line_ids[0] == 7 && boundary.primary.line_offsets[0] == 2)
+    assert(boundary.primary.line_ids[1] == 7 && boundary.primary.line_offsets[1] == 6)
+}
+
+fn same_history(a: vt.Vt, b: vt.Vt) {
+    assert(vt.dump(a) == vt.dump(b), "history-chunk-screen")
+    assert(a.primary.next_line_id == b.primary.next_line_id, "history-chunk-id-allocation")
+    var row = 0
+    while row < a.rows {
+        assert(a.primary.line_ids[row] == b.primary.line_ids[row])
+        assert(a.primary.line_offsets[row] == b.primary.line_offsets[row])
+        assert(a.primary.overflow_ids[row] == b.primary.overflow_ids[row])
+        row += 1
+    }
+    assert(a.history.head == b.history.head && a.history.tail == b.history.tail && a.history.used == b.history.used)
+    assert(a.history.records == b.history.records && a.history.evicted == b.history.evicted)
+    var i = 0
+    while i < a.history.bytes.len { assert(a.history.bytes[i] == b.history.bytes[i], "history-chunk-ring"); i += 1 }
+}
+
+fn check_history_chunking(history_cap: int) {
+    let data = "abcdefghijkl\u{1b}[2;1H\u{1b}[L\u{1b}[M\u{1b}[2K\u{1b}[3;1H中\r\nZ\u{1b}[S".bytes()
+    var reference = vt.new(4, 3, history_cap)
+    vt.feed(mut reference, data)
+    assert(reference.history.evicted == 0, "history-chunk-fixture-fits-ring")
+    var split = 0
+    while split <= data.len {
+        region turn(cap: 1048576) {
+            var pane = vt.new(4, 3, history_cap)
+            vt.feed(mut pane, data[0..split])
+            vt.feed(mut pane, data[split..data.len])
+            same_history(reference, pane)
+        }
+        split += 1
+    }
+    region single(cap: 1048576) {
+        var pane = vt.new(4, 3, history_cap)
+        var i = 0
+        while i < data.len { vt.feed(mut pane, data[i..i + 1]); i += 1 }
+        same_history(reference, pane)
+    }
+}
+
+fn test_history_chunking() { check_history_chunking(4096) }
+
+/// Run the exact history addressing/scope/reset/coordinate semantics separately
+/// from the resource and split sweeps under the checked machine's fixed budget.
+pub fn checked_semantics() {
+    test_primary_history_append()
+    test_wrap_addresses()
+    test_history_scope_and_scroll_up()
+    test_edits_repair_logical_breaks()
+    test_clear_and_lifetime_ids()
+    test_wide_natural_offsets_and_reserved_overflow_id()
+}
+
+/// Run the unchanged 1024-turn allocation and eviction row on its own budget.
+pub fn checked_allocation() { test_history_feed_charge() }
+
+/// Run every split plus bytewise feed with a 512-byte ring; all fixture records
+/// fit. Native and lupin retain the original 4096-byte full-ring comparison.
+pub fn checked_chunking() { check_history_chunking(512) }
+
+/// Run the full original native/lupin history suite with its 4096-byte ring.
+pub fn run_full() -> int {
+    checked_semantics()
+    test_history_feed_charge()
+    test_history_chunking()
+    0
+}
