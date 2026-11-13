@@ -15,13 +15,38 @@ glibc 2.39 `wcwidth` and the pinned reference:
 | U+3248–324F, U+4DC0–4DFF | 72 | 2 |
 | U+1F1E6–1F1FF | 26 | 1 |
 
-Two adjacent regional indicators therefore advance two cells. Zero-width jamo
-and format controls use the combining-mark attachment path, including D10 for
-an unwritten base. Reference cell observations and the regenerated native-vector
-and exhaustive sweep reruns are pending at this checkpoint. The sweep now
-requires zero non-control differences, not an allowance of 350; the existing
-351st-difference plants remain red. The ranges, counts, reason and generation
-binding are in `tests/vt/width-exceptions.json` and `width-ranges.json`.
+Two adjacent regional indicators therefore advance two cells. The regenerated
+native vector at `c70c46c` agrees at all 1114112 code points on native Linux and
+macOS (SHA-256 `131bd0d9c2a9f604cf409f87733fafe530b0a97f6e216c4b2f4c12195f65fd9a`).
+The actual replacement-table reference sweep measured 287346 assigned scalars:
+65 controls and **zero non-control differences**. All 350 explicit exceptions
+also agree with glibc 2.39 `wcwidth`. Actual native input, libc `wcswidth` and
+reference CPR measure both the US and GB pairs as two cells. Current measured
+columns, raw pair CPRs and sweep summary are frozen under
+`tests/vt/reference/width-columns-current`, separate from the historical table.
+The sweep permits no mismatch allowance; first- and 351st-difference plants
+remain red. The ranges, counts, reason and generation binding are in
+`tests/vt/width-exceptions.json` and `width-ranges.json`.
+
+The 28-case raw zero-width cell bundle measures U+1160, U+1161, U+11A8,
+U+D7B0, U+D7CB, U+FFF9 and U+13430 after ASCII, after a wide base, on an
+unwritten addressed cell and at the first column. Five jamo and U+13430 attach
+to the ASCII/wide base, agreeing with the current native path. The narrowly
+scoped print decoder now recognizes those Lo/Cf classes, while retaining the
+checksum/layout checks. U+FFF9 is omitted from both reference print passes in
+all four contexts; that observation does not prove a retained cell mark.
+For jamo/U+13430 on blank CUP(1,5), full-cell S prints space+scalar at column5;
+at column1 it retains space+scalar there. Ordinary A reports extent0 in all
+12 cases, so the strict validator still rejects them. Current native behavior
+uses D10's previous-cell/first-column-drop rule; these distinctions await an
+explicit disposition, not an invented reference agreement. All raw inputs,
+A/S bytes, checksums and exact failures are frozen in
+`tests/vt/reference/zero-width`; `check_zero_width.py` checks hashes twice,
+16 complete frames and the 12 retained strict failures.
+
+Native and lupin width/Unicode tests and all188 frozen frames passed at
+`c70c46c`. The post-decoder unit gate passed all30 real END steps at `82e6ff6`.
+The final complete native/checked/interpreter platform takes remain pending.
 
 ## Forbidden
 
