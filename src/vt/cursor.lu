@@ -99,6 +99,10 @@ fn dispatch_csi(mut pane: Vt, final: int) {
         return
     }
     if !simple_grid_params(pane.parser) { return }
+    if final == 98 && pane.parser.param_count <= 1 {
+        repeat_graphic(mut pane, grid_param(pane.parser, 0, 1, true))
+        return
+    }
     if (final == 115 || final == 117) && pane.parser.param_count == 0 {
         if final == 115 { save_cursor(mut pane) } else { restore_cursor(mut pane) }
         return

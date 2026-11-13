@@ -40,6 +40,11 @@ fn reverse_index(mut pane: Vt) {
 }
 
 fn dispatch_escape(mut pane: Vt, final: int) {
+    if pane.parser.inter_count == 1 {
+        if pane.parser.inter[0] == 35 && final == 56 { screen_alignment(mut pane) }
+        else { designate_graphics(mut pane, final) }
+        return
+    }
     if pane.parser.inter_count != 0 { return }
     if final == 68 || final == 69 {
         clear_line_wrap(mut pane)

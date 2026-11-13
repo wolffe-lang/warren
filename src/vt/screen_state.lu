@@ -124,6 +124,9 @@ fn full_reset(mut pane: Vt) {
     pane.g0 = 0
     pane.g1 = 0
     pane.shifted = false
+    pane.last_printed = 0
+    pane.last_mark1 = 0
+    pane.last_mark2 = 0
     pane.cursor_row = 1
     pane.cursor_col = 1
     pane.cursor_shape = 2

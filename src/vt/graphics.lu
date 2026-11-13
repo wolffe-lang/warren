@@ -1,0 +1,86 @@
+//! member: true
+//! DEC VT100 special graphics, repetition and screen alignment.
+
+fn dec_graphic(cp: int) -> int {
+    // VT100 User Guide, chapter 3, table 3-9; Unicode presentations of
+    // its named graphics. No table is allocated during input dispatch.
+    if cp == 95 { return 32 }
+    if cp == 96 { return 0x25c6 }
+    if cp == 97 { return 0x2592 }
+    if cp == 98 { return 0x2409 }
+    if cp == 99 { return 0x240c }
+    if cp == 100 { return 0x240d }
+    if cp == 101 { return 0x240a }
+    if cp == 102 { return 0xb0 }
+    if cp == 103 { return 0xb1 }
+    if cp == 104 { return 0x2424 }
+    if cp == 105 { return 0x240b }
+    if cp == 106 { return 0x2518 }
+    if cp == 107 { return 0x2510 }
+    if cp == 108 { return 0x250c }
+    if cp == 109 { return 0x2514 }
+    if cp == 110 { return 0x253c }
+    if cp == 111 { return 0x23ba }
+    if cp == 112 { return 0x23bb }
+    if cp == 113 { return 0x2500 }
+    if cp == 114 { return 0x23bc }
+    if cp == 115 { return 0x23bd }
+    if cp == 116 { return 0x251c }
+    if cp == 117 { return 0x2524 }
+    if cp == 118 { return 0x2534 }
+    if cp == 119 { return 0x252c }
+    if cp == 120 { return 0x2502 }
+    if cp == 121 { return 0x2264 }
+    if cp == 122 { return 0x2265 }
+    if cp == 123 { return 0x3c0 }
+    if cp == 124 { return 0x2260 }
+    if cp == 125 { return 0xa3 }
+    if cp == 126 { return 0xb7 }
+    cp
+}
+
+fn mapped_graphic(pane: Vt, cp: int) -> int {
+    let charset = if pane.shifted { pane.g1 } else { pane.g0 }
+    if charset == 1 { return dec_graphic(cp) }
+    cp
+}
+
+fn designate_graphics(mut pane: Vt, final: int) {
+    if pane.parser.inter_count != 1 || (final != 48 && final != 66) { return }
+    let charset = if final == 48 { 1 } else { 0 }
+    if pane.parser.inter[0] == 40 { pane.g0 = charset }
+    else if pane.parser.inter[0] == 41 { pane.g1 = charset }
+}
+
+fn repeat_graphic(mut pane: Vt, count: int) {
+    if pane.last_printed == 0 { return }
+    let cp = pane.last_printed
+    let mark1 = pane.last_mark1
+    let mark2 = pane.last_mark2
+    var i = 0
+    while i < count {
+        // This is already mapped: a later designation must not map it again.
+        print_scalar(mut pane, cp)
+        if mark1 != 0 { print_scalar(mut pane, mark1) }
+        if mark2 != 0 { print_scalar(mut pane, mark2) }
+        i += 1
+    }
+}
+
+fn alignment_screen(mut screen: Screen, cols: int, rows: int, flags: int, foreground: int, background: int) {
+    var row = 1
+    while row <= rows {
+        blank_row(mut screen, cols, row, background)
+        var col = 1
+        while col <= cols { write_narrow(mut screen, cols, row, col, 69, flags, foreground, background); col += 1 }
+        row += 1
+    }
+}
+
+fn screen_alignment(mut pane: Vt) {
+    if pane.active_alternate {
+        alignment_screen(mut pane.alternate, pane.cols, pane.rows, pane.pen.flags, pane.pen.foreground, pane.pen.background)
+    } else {
+        alignment_screen(mut pane.primary, pane.cols, pane.rows, pane.pen.flags, pane.pen.foreground, pane.pen.background)
+    }
+}
