@@ -23,11 +23,12 @@ It is not a claim that the remaining W1 gates have passed.
 5. Complete widths, resize/reflow and history only with their invariant and
    resource rows. No Unicode approximation is presented as the final table.
 
-The provisional 64-byte-cell prediction in the main note remains the budget.
-The initial seven-integer cell is 56 bytes of native scalar payload before
-container overhead. At 80×24 the two screens should therefore be near 220 KiB,
-not including parser state or history; the implementation's ledger, not this
-arithmetic, supplies the measurement.
+The provisional 64-byte-cell prediction in the main note is now the approved
+native cell payload target, including a scalar written bit and alignment. The
+former seven-integer payload was 56 bytes; it could not retain erased gaps
+for later edits. The 64-byte size and revised whole-pane charges must be
+measured and asserted, separately from interpreter charges, before the new
+layout is called complete. Neither payload arithmetic is an RSS claim.
 
 ## Continuation order
 
@@ -221,6 +222,62 @@ external startup window title with the explicit OSC 2 seed declared in
 input hashes; do not change the empty constructor or rewrite expected titles.
 Each recording also runs unseeded and must differ in the title alone, making
 the entire effect of the seed visible.
+
+## Written-cell continuation prediction
+
+Retain one scalar written bit per cell, with an approved native payload target
+of 64 bytes including alignment. Blank initialization, full/end erasure and
+unwritten background paint clear it; glyph output, inserted blanks and partial
+erase endpoints set it. Row edits copy it and recompute the last written cell,
+so discarding a distant written suffix does not invent content from erased
+gaps. Wide-pair repair must retain the profile's difference between repaired
+printing/editing blanks and an erase through a pair boundary.
+
+Snapshot copies preserve the bit. Canonical history continues to encode logical
+content, not a physical erasedness bitmap: materialized logical spaces are
+written, background-only paint is not. The history header and wire stay the
+same. Update every capacity witness and published current pane charge after
+measurement; the native default ring's own framing charge is measured separately
+from the larger cells. Interpreter charges keep their separate row and fixed
+budget. Scalar-only Cell copies may use the language's independent value-copy
+rule; allocation and alias-independence rows must guard that optimisation.
+
+## Follow-on comparison and measurement checkpoint
+
+The raw/file/stdin CLI and explicit bounded recording replay now exist;
+input/output remains outside the pure VT module. Eight full cases passed
+native and lupin. All 151 frozen census inputs passed native and lupin,
+with D1-D7 selected by name; five recordings passed natively with the explicit
+startup-title fixture and paired unseeded-title-only proof. Lupin's first
+recording exceeded the observer's 180-second timeout and is not a pass.
+
+At `f688478`, P2 held for all 188 frozen corpus streams under bytewise and
+seeded-random output-record boundaries, preserving every input/resize event.
+The focused binary bundle produced 13 strict native matches and four named
+report limitations, each also held to a written expectation. Remaining
+composite fuzz differences stay red while finite operation-boundary probes
+isolate them; neither a minimal passing probe nor a report limitation excuses
+an unrelated difference.
+
+The shortest-prefix tool verifies every earlier prefix after its bisection
+hint, including a final-equal stream; observer errors are errors. Its
+controlled-observer rows pass. The native/planted/reference witness is still
+pending. The pinned assigned census contains 287346 Unicode 15.1 scalars,
+excluding 2048 surrogate code points; the finite batched CPR sweep is prepared,
+not yet run. Every non-control disagreement will be enumerated, not silently
+accepted as reference agreement.
+
+The resource driver reuses one 2752-byte mixed chunk and child-turn slices;
+its full native entry feeds exactly 100000000 bytes with default 8MiB history.
+Only the 4096-byte, 4096-history smoke has run so far. It shows zero retained
+feed charge on native and lupin. A small native parent records absolute child
+RSS, the child's pre-exec peak and the parent's inherited peak separately,
+and preserves child errors/signals. The full performance/RSS witness remains
+pending. Explicit checked-machine observations are validated by verdict,
+not process exit: the original monolithic history entry exhausted the fixed
+step budget, so semantic/allocation/chunking entries are split without raising
+that budget. The original 4096-byte native/lupin split sweep is retained;
+the checked split sweep uses a declared 512-byte ring that fits the fixture.
 
 One standalone read-only host preflight has passed. Prepare the complete
 host take before acquiring a pool slot; no heavy work is assigned to the
