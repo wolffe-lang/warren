@@ -328,4 +328,38 @@ the one-hunk scalar plant in the recorder's plant mode at that same base head.
 Retain every named divergence and failure; never use candidate output as a
 golden or conceal report-limited fields. The canonical take has not run.
 
+## D12 and the fresh-corpus checkpoint
+
+D12 now preserves an absolute saved-origin row above a later region top,
+clamps a below-bottom restore to that bottom, and reports CPR relative row 1
+when above the top. Reference DECCIR remains the absolute witness. The original
+five wrapped reports stay strict failures; reference-only metadata plus the
+unchanged A/S cell/rendition checks construct their independent complete frames.
+All 28 completion/motion/erase/control frames match native at `62590b9`, including
+CUD/CUU/LF and deferred wrap from above the region. Its complete Mac gate passed
+109 real END steps. No global oracle validator was loosened.
+
+The raw Linux development take has finished, not become a merge record. The
+100000000-byte resource witness passed and the assigned sweep produced exactly
+D11's 350 differences; libc agrees with the reference on those scalars, while
+pinned std has no display-width API. The full interpreter recording leg stopped
+at its 900-second wall deadline on den/unseeded; later recordings did not run.
+The canonical manifest now declares 1800 seconds per observer without increasing
+interpreter limits.
+
+From the initial 62 fresh red frames, the saved-row fix fully resolves 191;
+D9's BG-only reference fixture resolves 12, measured tab1 resolves 28 whole
+frames, and the bounded no-bold fixture resolves 17, leaving 32, 54, 175 and 199.
+32 stays outside both report fixtures. 199's remaining dim/invisible/strike
+blank has no foreground correction and is not a report-limit pass. Sixteen
+plain erased-tail/wide/scroll controls all agree, so no count-only erase change
+is justified. Next, a bounded 40-dump/6-SGR diagnostic isolates exact operation
+prefixes, concealment, styled wide-pair repairs and the separate promotion32
+case. Only measured evidence may justify the next fix or named divergence.
+
+Freeze and check the completed D12/report evidence, retain exact field bounds
+and source bindings, settle all four remaining reds, then prepare the final
+canonical recorder take and same-base recorder plant. Its manifest/preflight
+and RECORD-END must be real execution, never a replay of development logs.
+
 > PAX corpus leg: not run, no boot fixture in this repository yet

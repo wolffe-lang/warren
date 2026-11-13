@@ -246,8 +246,13 @@ boundaries are measured by the focused sparse-edit and full fuzz rows.
   (`origin-clamps`).
 - DECSC saves position, pen, origin mode, the pending wrap and the charsets;
   DECRC restores them (`decsc-rendition`, `decsc-origin`,
-  `wrap-decsc-decrc`). DECRC with nothing saved homes the cursor and resets
-  the pen (`decrc-never-saved`).
+  `wrap-decsc-decrc`). A saved origin-mode absolute row above a later region
+  top is kept, bounded only by row 1; one below its bottom lands on that bottom.
+  From above the region, relative CUU/CUD, LF and deferred print wrap follow
+  their measured screen/region bounds rather than jumping to the top. In that
+  exact above-top state, standard/private CPR clamps its relative row to 1
+  (D12); the absolute dump cursor agrees with reference DECCIR. DECRC with
+  nothing saved homes the cursor and resets the pen (`decrc-never-saved`).
 - Mode 1049: set saves the cursor, switches to the alternate screen and
   clears it to the pen's background, without moving the cursor. The clear
   cancels the active pending wrap; reset switches back and restores the saved
@@ -283,8 +288,9 @@ The list, with the document's section for each, is in the prediction
 | D9 | a pre-restore background reappears after saved-pen restore followed by 7/27; an RGB integer can become invalid palette 15540094 | keep the restored colour value and set form; 7/27 change only inverse | post-restore inverse colour-cache defect; minimal bytes and both observations in `wr01-the-emulator.md` |
 | D10 | a combining mark on an unwritten blank is visible in the full-cell print beyond extent 0; a complete canonical frame is inconsistent | the target cell is written and extends the extent; resize keeps it, with the existing no-left-cell drop rule at column1 | G6 and R1; six named report failures, two strict written-base controls |
 | D11 | exactly 350 assigned scalars differ from the adopted table; libc agrees with the reference on them | keep the explicit Unicode 15.1.0 rule; exact ranges, counts and all measured columns are in `wr01-the-emulator.md` | shared width policy is deferred; no std display-width API exists at this pin |
+| D12 | origin-mode CPR wraps a negative relative row after restoring an absolute cursor above the current region; a one-above-top row reports zero | keep the measured absolute placement but report relative CPR row 1 above the region | exact-trigger reference-report inconsistency; DECCIR remains the absolute witness |
 
-Rows for D1 to D11 compare with written expectations, never with the
+Rows for D1 to D12 compare with written expectations, never with the
 reference, and a corpus stream that exercises one is compared under that
 divergence's name or not at all. D9 is scoped to the first SGR sequence after
 a restore that contains 7 or 27 with no separate colour SGR intervening;

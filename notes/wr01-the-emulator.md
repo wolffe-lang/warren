@@ -248,6 +248,79 @@ advance **4** cells in warren, **2** in libc `wcswidth` and **2** in reference C
 Warren's scalar-width rule does not join a flag pair into a grapheme. The std
 pair column remains unavailable.
 
+## D12: origin-mode CPR above the region
+
+Exact trigger: origin mode is on and a restored absolute cursor row is above
+the current region top. Saved position is preserved above that top, bounded
+only by row 1; below the region bottom the saved row is clamped to that bottom.
+For example, origin on, save row2/col3, change the region to5–8 and restore:
+the reference places X at row2/col3 and DECCIR reports row2/col4 afterwards,
+but CPR reports unsigned row65534. Other captured prefixes report65523/65527.
+A subsequent CUD can also yield reference relative row0. Warren reports relative
+CPR row1 throughout this exact above-top state, for standard and private CPR;
+its absolute dump cursor still agrees with the reference's DECCIR witness.
+The adopted native query subset is unchanged; no DECCIR responder is added.
+
+The original five wrapped-CPR captures remain strict validator failures. Their
+complete frames are built independently from raw absolute DECCIR/documented
+metadata and pinned reference A/S cells, with the exact unsigned arithmetic
+asserted. No raw report is rewritten. The original validator and its complete
+cell/checksum/rendition checks remain unchanged outside this named fixture.
+The first bundle ran eight A and three S passes (five failures happened before
+S); completing just those five S passes avoids inventing missing cell data.
+Three original controls remain strict.
+
+From restored row2 above region5–8, the measured next motions are CUD1→3,
+CUD2→4, CUD99→8, CUU1/99→1 and LF→3. A pending last-column print wraps from
+row2 to3, or from row4 into row5, with the new glyph in column1. All 28 complete
+completion/motion/erase/control frames now match native at `62590b9`, not just
+their cursor coordinates. Its complete macOS gate also passed all109 real
+END steps; native/interpreter restore and CPR rows, all188 frozen frames and
+primary corpus properties passed. The canonical merge record remains pending.
+
+## Fresh 200-stream development checkpoint
+
+The raw Linux development take requested200 seeds of4096 bytes each; complete
+sequences can exceed that requested byte count. It found62 nonmatching frames,
+with all P2 and four primary resize paths passing. It is development evidence,
+not the required recorder-produced merge record. The interpreter recording leg
+stopped at a900-second wall deadline on den's unseeded replay, not an observed
+fuel refusal; no later recording was counted as run. The canonical manifest
+uses a declared1800-second observer wall deadline with interpreter caps unchanged.
+
+At `62590b9`, the complete native200-frame waterfall is:
+
+| Stage | Fully resolved at this stage | Frames still red |
+|---|---:|---:|
+| original development take | — |62|
+| saved-origin placement fix (191;190 still needs its FG report fixture) |1|61|
+| source-only D9 background-repaired reference |12|49|
+| measured absolute-DECCIR tab1 fixture |28|21|
+| field-bounded no-bold reference fixture |17|4|
+
+The tab fixture proves31 column-one stops from138 absolute DECCIR observations
+immediately before source HTS/TBC operations, with nonmoving checksum barriers
+only for synchronization. Twenty-eight complete frames resolve:
+17,19,23,24,27,29,37,49,52,68,87,99,102,113,121,124,129,132,141,145,147,
+165,170,181,187,195,196,198. Streams15,179,192 also need the FG fixture.
+
+The no-bold fixture removes only SGR1, preserves colour arguments and all other
+parameters, and emits nothing when removal empties the sequence, never a reset.
+The pinned reference constructs every cell. Only bold removal and FG xor8 on
+originally-bold cells may differ from the background-repaired reference, with
+existing N1 applied; every other field remains strict. Eighteen streams have
+bounded FG corrections, but175 still has a separate extent mismatch. Seventeen
+complete frames resolve:15,16,48,53,85,112,118,120,137,155,159,163,177,179,180,190,192.
+Stream191 needs no FG correction after the placement fix. Stream199 has no FG
+correction and is not excused as a report limit.
+
+The four remaining red IDs are32 (opposite promotion8 versus0 on m+U+20D7),
+54 and175 (extents), and199 (dim/invisible/strike on a repaired blank). Stream32
+is explicitly outside both report fixtures until independently isolated. Sixteen
+plain erased-tail/wide/scroll controls agree with current semantics; they do not
+explain the two full-stream extent reds. Finite style/operation-boundary probes
+are the next step, before any new rule or implementation correction.
+
 ## Grid follow-on resource checkpoint
 
 The following are measured constructor region charges at `7450229`, asserted
