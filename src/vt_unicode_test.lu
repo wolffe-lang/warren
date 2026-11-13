@@ -1,0 +1,88 @@
+//! member: false
+//! Printing and pair-repair rows from the adopted grid invariants.
+use vt
+use std.mem.budget
+
+fn pairs(screen: vt.Screen, cols: int, rows: int) {
+    var at = 0
+    while at < cols * rows {
+        let w = screen.cells[at].width
+        assert(w >= 0 && w <= 2)
+        if w == 2 { assert(at % cols < cols - 1 && screen.cells[at + 1].width == 0, "unicode-wide-lead") }
+        if w == 0 { assert(at % cols > 0 && screen.cells[at - 1].width == 2, "unicode-wide-tail") }
+        at += 1
+    }
+}
+
+fn test_printing() {
+    var pane = vt.new(8, 2, 0)
+    vt.feed(mut pane, "é中\u{301}\u{20d7}\u{302}X".bytes())
+    assert(pane.primary.cells[0].base == 233, "unicode-print")
+    assert(pane.primary.cells[1].base == 20013 && pane.primary.cells[1].width == 2)
+    assert(pane.primary.cells[2].width == 0)
+    assert(pane.primary.cells[1].mark1 == 769 && pane.primary.cells[1].mark2 == 8407)
+    assert(pane.primary.cells[3].base == 88 && pane.cursor_col == 5)
+    pairs(pane.primary, 8, 2)
+    var marks = vt.new(4, 2, 0)
+    vt.feed(mut marks, "\u{301}abc中\u{301}".bytes())
+    assert(marks.primary.cells[0].mark1 == 0)
+    assert(marks.primary.extents[0] == 3 && marks.primary.wrapped[0])
+    assert(marks.primary.cells[4].base == 20013 && marks.primary.cells[4].mark1 == 769)
+    var pending = vt.new(2, 2, 0)
+    vt.feed(mut pending, "中\u{301}\u{200d}\u{fe0f}".bytes())
+    assert(pending.pending_wrap && pending.cursor_row == 1)
+    assert(pending.primary.cells[0].mark1 == 769 && pending.primary.cells[0].mark2 == 65039)
+    var one = vt.new(1, 2, 0)
+    vt.feed(mut one, "\u{1b}[1;31m中\u{301}".bytes())
+    assert(one.primary.cells[0].base == 20013 && one.primary.cells[0].width == 1, "unicode-one-column")
+    assert(one.primary.cells[0].mark1 == 769 && one.primary.cells[0].flags == 1 && one.primary.cells[0].foreground == 1)
+    var nowrap = vt.new(4, 2, 0)
+    vt.feed(mut nowrap, "abc\u{1b}[?7l中".bytes())
+    assert(nowrap.primary.extents[0] == 3 && nowrap.primary.cells[3].base == 32)
+}
+
+fn test_pair_repair() {
+    var lead = vt.new(6, 2, 0)
+    vt.feed(mut lead, "中中\rX".bytes())
+    assert(lead.primary.cells[0].base == 88 && lead.primary.cells[1].base == 32)
+    assert(lead.primary.cells[2].width == 2)
+    pairs(lead.primary, 6, 2)
+    var tail = vt.new(6, 2, 0)
+    vt.feed(mut tail, "中中\u{1b}[1;2HX".bytes())
+    assert(tail.primary.cells[0].base == 32 && tail.primary.cells[1].base == 88)
+    pairs(tail.primary, 6, 2)
+    var erase = vt.new(6, 2, 0)
+    vt.feed(mut erase, "中中\u{1b}[1;2H\u{1b}[44m\u{1b}[X".bytes())
+    assert(erase.primary.cells[0].base == 32 && erase.primary.cells[1].base == 32)
+    assert(erase.primary.cells[0].background == 4)
+    pairs(erase.primary, 6, 2)
+    var edit = vt.new(6, 2, 0)
+    vt.feed(mut edit, "中中中\u{1b}[1;2H\u{1b}[@".bytes())
+    pairs(edit.primary, 6, 2)
+    assert(edit.primary.cells[0].base == 32 && edit.primary.cells[2].base == 32 && edit.primary.cells[5].base == 32)
+    vt.feed(mut edit, "\u{1b}[1;5H\u{1b}[P".bytes())
+    pairs(edit.primary, 6, 2)
+    var insert = vt.new(6, 2, 0)
+    vt.feed(mut insert, "abcd\r\u{1b}[4h中".bytes())
+    assert(insert.primary.cells[0].width == 2 && insert.primary.cells[2].base == 97 && insert.primary.cells[5].base == 100)
+    pairs(insert.primary, 6, 2)
+}
+
+fn test_bounded_unicode_feed() {
+    region frame(cap: 1048576) {
+        var pane = vt.new(8, 2, 0)
+        let data = "é中\u{301}\u{fe0f}\r\n".bytes()
+        let stable = budget.charged(frame)
+        var i = 0
+        while i < 1024 { vt.feed(mut pane, data); i += 1 }
+        pairs(pane.primary, 8, 2)
+        assert(budget.charged(frame) == stable, "unicode-feed-allocation")
+    }
+}
+
+fn main() -> int {
+    test_printing()
+    test_pair_repair()
+    test_bounded_unicode_feed()
+    0
+}
