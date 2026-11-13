@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 .DS_Store
 .lu-cache/
+/src/vt/build_version.lu

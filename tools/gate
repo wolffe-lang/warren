@@ -51,6 +51,8 @@ corpus_digests() {
   return "$fail"
 }
 step pin-metadata python3 -I tools/check-pins.py
+step version-generation-rows python3 -I tests/vt/version_generation.py
+step version-generation python3 -I tools/vt/generate_version.py
 step tier-planner python3 -I ci/tiers-test.py
 step harness-mutations python3 -I tools/oracle/run.py selftest tests/vt/expected/*.screen
 step fuzz-generator fuzz_generator
