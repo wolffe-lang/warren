@@ -67,4 +67,15 @@ fn test_overflow_and_allocation() {
     }
 }
 
-fn main() -> int { test_identity(); test_status_and_modes(); test_overflow_and_allocation(); 0 }
+fn test_origin_cpr_above_region() {
+    var pane = vt.new(12, 8, 0)
+    vt.feed(mut pane, "\u{1b}[5;8r\u{1b}[?6h".bytes())
+    // The valid absolute position that a saved-origin restore must preserve.
+    pane.cursor_row = 2
+    pane.cursor_col = 3
+    vt.feed(mut pane, "\u{1b}[6n\u{1b}[?6n".bytes())
+    assert(equal(vt.take_answers(mut pane), "\u{1b}[1;3R\u{1b}[?1;3R"),
+        "origin-cpr-above-region-clamps-relative-row-one")
+}
+
+fn main() -> int { test_origin_cpr_above_region(); test_identity(); test_status_and_modes(); test_overflow_and_allocation(); 0 }

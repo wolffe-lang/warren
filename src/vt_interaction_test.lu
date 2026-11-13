@@ -120,8 +120,8 @@ fn test_saved_origin_row_survives_new_region() {
         "saved-origin-absolute-row-above-new-region")
     var below = vt.new(12, 8, 0)
     vt.feed(mut below, "\u{1b}[?6h\u{1b}[7;3H\u{1b}7\u{1b}[1;3r\u{1b}8".bytes())
-    assert(below.modes.origin && below.cursor_row == 7 && below.cursor_col == 3,
-        "saved-origin-absolute-row-below-new-region")
+    assert(below.modes.origin && below.cursor_row == 3 && below.cursor_col == 3,
+        "saved-origin-row-below-new-region-clamps-at-bottom")
 }
 
 fn main() -> int {
