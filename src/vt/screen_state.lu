@@ -101,12 +101,6 @@ fn alternate_mode(mut pane: Vt, code: int, enabled: bool) {
     }
 }
 
-fn reset_pen(mut pane: Vt) {
-    pane.pen.flags = 0
-    pane.pen.foreground = 0 - 1
-    pane.pen.background = 0 - 1
-}
-
 fn soft_reset(mut pane: Vt) {
     reset_pen(mut pane)
     pane.region_top = 1
