@@ -23,10 +23,21 @@ def text_row(result, row, values, attrs='-'):
 
 def expected(suite, name, data, oracle):
     ruled = copy.deepcopy(oracle)
+    labels = []
+    if suite == 'fuzz-baseline':
+        from d9_expectations import written_d9
+        additions, ruled = written_d9(name, data, ruled)
+        labels.extend(additions)
     assert ruled['modes']['synchronized-output'] == '?'
     mode = re.findall(rb'\x1b\[\?2026([hl])', data)
     ruled['modes']['synchronized-output'] = int(bool(mode) and mode[-1] == b'h')
-    labels = ['D7']
+    labels.append('D7')
+    if suite == 'fuzz-baseline':
+        from checkpoint_expectations import written_fuzz_bright
+        from tab_expectations import written_fuzz_tabs
+        for policy in (written_fuzz_bright, written_fuzz_tabs):
+            additions, ruled = policy(name, data, ruled)
+            labels.extend(additions)
     if suite != 'census':
         return labels, ruled
     if name == 'sgr-underline-colon':

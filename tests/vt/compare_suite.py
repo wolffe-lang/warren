@@ -107,7 +107,13 @@ def main():
             for row, detail in differences[:20]:
                 print('FAIL vt-%s-%s %s: %s' % (suite, name, row, detail), flush=True)
             if not differences:
-                print('PASS vt-%s-%s whole-screen %s' % (suite, name, ','.join(labels)), flush=True)
+                limited = any(label.startswith('RPT-') for label in labels)
+                if limited:
+                    print('LIMITED vt-%s-%s reference report cannot express %s' %
+                          (suite, name, ','.join(label for label in labels if label.startswith('RPT-'))), flush=True)
+                classification = 'LIMITED-WRITTEN' if limited else 'WRITTEN-D9' if 'D9' in labels else 'REFERENCE+D7'
+                print('PASS vt-%s-%s complete-frame classification=%s %s' %
+                      (suite, name, classification, ','.join(labels)), flush=True)
             else:
                 print('DIFFERENCES %s/%s total=%d' % (suite, name, len(differences)), flush=True)
             failures += bool(differences)
