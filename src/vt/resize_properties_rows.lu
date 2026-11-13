@@ -1,0 +1,237 @@
+//! member: false
+//! Resize R1-R8: content, path independence, projection, tabs and budgets.
+use std.mem.budget
+
+fn same_ints(a: List[int], b: List[int]) {
+    assert(a.len == b.len, "resize-content-length")
+    var i = 0
+    while i < a.len { assert(a[i] == b[i], "resize-content-scalar"); i += 1 }
+}
+
+fn logical_text(pane: Vt) -> List[int] {
+    var out = List[int]()
+    var reader = new_history_reader()
+    var seen = false
+    var last_id: int = 0 - 1
+    var at = pane.history.head
+    var record = 0
+    while record < pane.history.records {
+        let id = history_get_word(pane.history, at, 8, 8)
+        if seen && id != last_id { (mut out).push(0 - 1) }
+        seen = true
+        last_id = id
+        history_reader_start(mut reader, pane.history, at)
+        while history_reader_next(mut reader, pane.history) { if reader.kind == 0 { (mut out).push(reader.value) } }
+        at = (at + history_get_word(pane.history, at, 0, 4)) % pane.history.bytes.len
+        record += 1
+    }
+    var end = pane.cursor_row
+    var row = 0
+    while row < pane.rows {
+        var used = pane.primary.extents[row] > 0
+        var col = 0
+        while !used && col < pane.cols {
+            if pane.primary.cells[row * pane.cols + col].background != 0 - 1 { used = true }
+            col += 1
+        }
+        if used && row + 1 > end { end = row + 1 }
+        row += 1
+    }
+    row = 0
+    while row < end {
+        let id = pane.primary.line_ids[row]
+        if seen && id != last_id { (mut out).push(0 - 1) }
+        seen = true
+        last_id = id
+        var col = 0
+        while col < pane.primary.extents[row] {
+            let cell_at = row * pane.cols + col
+            if pane.primary.cells[cell_at].width != 0 {
+                (mut out).push(pane.primary.cells[cell_at].base)
+                if pane.primary.cells[cell_at].mark1 != 0 { (mut out).push(pane.primary.cells[cell_at].mark1) }
+                if pane.primary.cells[cell_at].mark2 != 0 { (mut out).push(pane.primary.cells[cell_at].mark2) }
+            }
+            col += 1
+        }
+        row += 1
+    }
+    out
+}
+
+fn screen_pairs(screen: Screen, cols: int, rows: int) {
+    var at = 0
+    while at < cols * rows {
+        let width = screen.cells[at].width
+        if width == 2 { assert(at % cols + 1 < cols && screen.cells[at + 1].width == 0, "resize-wide-lead") }
+        if width == 0 { assert(at % cols > 0 && screen.cells[at - 1].width == 2, "resize-wide-tail") }
+        at += 1
+    }
+}
+
+fn test_custom_tabs_and_hidden_capacity() {
+    var pane = new(20, 2, 4096)
+    assert(resize(mut pane, 4, 2) == "")
+    feed(mut pane, "\u{1b}[3g".bytes())
+    assert(resize(mut pane, 20, 2) == "")
+    var col = 0
+    while col < 20 { assert(!pane.tabs[col], "resize-tbc-clears-hidden-known-stops"); col += 1 }
+    var spare = new(4, 2, 4096)
+    assert(resize(mut spare, 20, 2) == "")
+    feed(mut spare, "\u{1b}H".bytes())
+    assert(resize(mut spare, 28, 2) == "")
+    assert(spare.tabs[0] && spare.tabs[8] && spare.tabs[16] && !spare.tabs[24], "resize-custom-no-new-rounded-stops")
+}
+
+fn test_content_and_path_independence() {
+    let data = "abcdefghij\r\n中\u{301}xy\r\nlast".bytes()
+    let aw: List[int] = [3, 1, 12, 8, 5]
+    let ah: List[int] = [4, 6, 2, 1, 5]
+    let bw: List[int] = [8, 16, 1, 6]
+    let bh: List[int] = [4, 6, 4, 3]
+    var a = 0
+    while a < aw.len {
+        var b = 0
+        while b < bw.len {
+            region pair(cap: 2097152) {
+                var direct = new(8, 4, 4096)
+                var via = new(8, 4, 4096)
+                feed(mut direct, data)
+                feed(mut via, data)
+                let before = logical_text(direct)
+                assert(resize(mut direct, bw[b], bh[b]) == "")
+                assert(resize(mut via, aw[a], ah[a]) == "")
+                assert(resize(mut via, bw[b], bh[b]) == "")
+                assert(direct.history.evicted == 0 && via.history.evicted == 0)
+                same_ints(logical_text(direct), before)
+                same_ints(logical_text(via), before)
+                assert(dump(direct) == dump(via), "resize-r3-path-independence")
+                screen_pairs(via.primary, via.cols, via.rows)
+                screen_pairs(via.alternate, via.cols, via.rows)
+            }
+            b += 1
+        }
+        a += 1
+    }
+}
+
+fn test_one_column_and_unwritten_gap() {
+    var one = new(1, 2, 4096)
+    feed(mut one, "\u{1b}[1;31m中\u{301}".bytes())
+    assert(resize(mut one, 2, 2) == "")
+    assert(one.primary.cells[0].width == 2 && one.primary.cells[1].width == 0)
+    assert(one.primary.cells[0].base == 20013 && one.primary.cells[0].mark1 == 769 && one.primary.cells[0].flags == 1)
+    assert(resize(mut one, 80, 2) == "")
+    assert(one.primary.cells[0].width == 2 && one.primary.cells[0].foreground == 1)
+    var wide = new(80, 2, 4096)
+    feed(mut wide, "\u{1b}[1;31m中\u{301}".bytes())
+    let original = dump(wide)
+    assert(resize(mut wide, 1, 2) == "")
+    assert(wide.primary.cells[0].width == 1 && wide.primary.cells[0].base == 20013)
+    assert(resize(mut wide, 80, 2) == "")
+    assert(dump(wide) == original, "resize-wide-80-1-80")
+    var gap = new(4, 2, 4096)
+    feed(mut gap, "\u{1b}[1;4H中".bytes())
+    assert(gap.primary.extents[0] == 0 && gap.primary.wrapped[0] && gap.primary.cells[4].base == 20013)
+    assert(resize(mut gap, 4, 3) == "")
+    assert(gap.primary.extents[0] == 0 && gap.primary.cells[4].base == 20013, "resize-height-keeps-unwritten-wide-gap")
+    assert(resize(mut gap, 2, 3) == "")
+    assert(resize(mut gap, 4, 3) == "")
+    assert(gap.primary.extents[0] == 0 && gap.primary.cells[4].base == 20013)
+}
+
+fn test_projection_feed_commit_and_eviction() {
+    let data = "x\r\n".repeat(23) + "z"
+    var restore = new(4, 24, 4096)
+    feed(mut restore, data.bytes())
+    feed(mut restore, "\u{1b}[1;2H".bytes())
+    assert(resize(mut restore, 4, 1) == "")
+    assert(restore.cursor_row == 1 && restore.cursor_col == 2 && restore.primary.cells[0].base == 122)
+    assert(resize(mut restore, 4, 24) == "")
+    assert(restore.cursor_row == 1 && restore.cursor_col == 2, "resize-project-regrow-restores-anchor")
+    var commit = new(4, 24, 4096)
+    feed(mut commit, data.bytes())
+    feed(mut commit, "\u{1b}[1;2H".bytes())
+    assert(resize(mut commit, 4, 1) == "")
+    feed(mut commit, "Q".bytes())
+    assert(resize(mut commit, 4, 24) == "")
+    assert(commit.cursor_row == 24 && commit.cursor_col == 3 && commit.primary.cells[93].base == 81, "resize-feed-commits-projection")
+    var evicted = new(4, 24, 37)
+    feed(mut evicted, data.bytes())
+    feed(mut evicted, "\u{1b}[1;2H".bytes())
+    assert(resize(mut evicted, 4, 1) == "")
+    assert(evicted.history.evicted > 0)
+    assert(resize(mut evicted, 4, 24) == "")
+    assert(evicted.primary.cells[0].base == 120 && evicted.primary.cells[4].base == 122 && evicted.primary.extents[2] == 0)
+    assert(evicted.cursor_row == 2, "resize-eviction-never-resurrects-prefix")
+}
+
+fn test_region_saved_cursor_and_incremental_parser() {
+    var pane = new(12, 4, 4096)
+    feed(mut pane, "\u{1b}[2;4r\u{1b}[3g\u{1b}[1;5H\u{1b}H\u{1b}[?6h\u{1b}[2;3H\u{1b}7\u{1b}[2;".bytes())
+    assert(resize(mut pane, 20, 5) == "")
+    assert(pane.region_top == 1 && pane.region_bottom == 5 && pane.modes.origin && !pane.pending_wrap)
+    assert(pane.tabs[4] && !pane.tabs[8] && !pane.tabs[16])
+    feed(mut pane, "3H".bytes())
+    assert(pane.cursor_row == 2 && pane.cursor_col == 3, "resize-keeps-incremental-csi")
+    feed(mut pane, "\u{1b}8".bytes())
+    assert(pane.cursor_row == 3 && pane.cursor_col == 3, "resize-saved-primary-anchor")
+    var utf = new(4, 2, 4096)
+    feed(mut utf, [0xe4 as byte])
+    assert(resize(mut utf, 6, 3) == "")
+    feed(mut utf, [0xb8 as byte, 0xad as byte])
+    assert(utf.primary.cells[0].base == 20013 && utf.primary.cells[1].width == 0, "resize-keeps-incremental-utf8")
+}
+
+fn test_alternate_and_hidden_primary() {
+    var pane = new(6, 3, 4096)
+    feed(mut pane, "primary\u{1b}[?1049h\u{1b}[1;1H\u{1b}[1;31mabc中X".bytes())
+    assert(resize(mut pane, 4, 2) == "")
+    assert(pane.alternate.cells[0].base == 97 && pane.alternate.cells[2].base == 99 && pane.alternate.cells[3].width == 1 && pane.alternate.cells[3].base == 32)
+    screen_pairs(pane.alternate, 4, 2)
+    feed(mut pane, "\u{1b}[?1049l".bytes())
+    let expected: List[int] = [112, 114, 105, 109, 97, 114, 121]
+    same_ints(logical_text(pane), expected)
+    assert(pane.cols == 4 && pane.cursor_row == 1 && pane.cursor_col == 4, "resize-hidden-primary-is-current")
+    var one = new(2, 2, 4096)
+    feed(mut one, "\u{1b}[?1049h中\u{301}".bytes())
+    assert(resize(mut one, 1, 2) == "")
+    assert(one.alternate.cells[0].base == 20013 && one.alternate.cells[0].width == 1)
+    assert(resize(mut one, 80, 2) == "")
+    assert(one.alternate.cells[0].width == 2 && one.alternate.cells[1].width == 0 && one.alternate.cells[0].mark1 == 769)
+}
+
+fn test_resize_peak_charge() {
+    region frame(cap: 2097152) {
+        var pane = new(8, 4, 1024)
+        feed(mut pane, "abcdefghij\r\n中\u{301}xy\r\nlast".bytes())
+        let text = logical_text(pane)
+        assert(resize(mut pane, 3, 4) == "")
+        assert(resize(mut pane, 20, 6) == "")
+        assert(resize(mut pane, 1, 8) == "")
+        assert(resize(mut pane, 8, 4) == "")
+        let stable = budget.charged(frame)
+        var turn = 0
+        while turn < 32 {
+            region child(cap: 131072) {
+                assert(resize(mut pane, 3, 4) == "")
+                assert(resize(mut pane, 20, 6) == "")
+                assert(resize(mut pane, 1, 8) == "")
+                assert(resize(mut pane, 8, 4) == "")
+                same_ints(logical_text(pane), text)
+            }
+            assert(budget.charged(frame) == stable, "resize-peak-charge-plateau")
+            turn += 1
+        }
+    }
+}
+
+fn main() -> int {
+    test_custom_tabs_and_hidden_capacity()
+    test_content_and_path_independence()
+    test_one_column_and_unwritten_gap()
+    test_projection_feed_commit_and_eviction()
+    test_region_saved_cursor_and_incremental_parser()
+    test_alternate_and_hidden_primary()
+    test_resize_peak_charge()
+    0
+}
