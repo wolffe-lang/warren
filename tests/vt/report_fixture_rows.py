@@ -10,6 +10,8 @@ from report_fixture import without_bold, tab_operations, column_one
 def main():
     plain=b'plain'
     assert without_bold(plain)==(plain,[])
+    assert without_bold(b'\x1b[1m')[0]==b'', 'empty removal emits nothing'
+    assert without_bold(b'\x1b[31m\x1b[1mX')[0]==b'\x1b[31mX', 'removal must not become a reset of red'
     fixed, edits=without_bold(b'A\x1b[1mB\x1b[1;4;31mC\x1b[22m')
     assert fixed==b'AB\x1b[4;31mC\x1b[22m' and len(edits)==2
     colors=b'\x1b[38;5;1;48;2;1;1;1m'
