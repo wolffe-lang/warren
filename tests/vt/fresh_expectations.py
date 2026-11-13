@@ -30,7 +30,7 @@ def d9_triggers(data):
             continue
         values = [int(part or b'0') for part in value[1].split(b';')]
         at = 0
-        bg = fg = inverse = False
+        bg = inverse = False
         while at < len(values):
             code = values[at]
             if code in (38, 48, 58):
@@ -40,18 +40,16 @@ def d9_triggers(data):
                 if at + length > len(values):
                     raise ValueError('truncated source colour')
                 bg |= code == 48
-                fg |= code == 38
                 at += length
                 continue
             inverse |= code in (7, 27)
             bg |= code in (0, 49) or 40 <= code <= 47 or 100 <= code <= 107
-            fg |= code in (0, 39) or 30 <= code <= 37 or 90 <= code <= 97
             at += 1
         if armed is not None and inverse and not bg:
             result.append({'offset': offset, 'restore_offset': armed['original_offset'],
                            'restored_background': armed['background']})
             armed = None
-        elif bg or fg:
+        elif bg:
             armed = None
     return result
 

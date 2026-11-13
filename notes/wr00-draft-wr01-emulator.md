@@ -308,8 +308,10 @@ The list, with the document's section for each, is in the prediction
 Rows for the live divergences D1 to D14 compare with written expectations, never with the
 reference, and a corpus stream that exercises one is compared under that
 divergence's name or not at all. D9 is scoped to the first SGR sequence after
-a restore that contains 7 or 27 with no separate colour SGR intervening;
-foreground parameters in that same sequence are allowed in any position.
+a restore that contains 7 or 27 with no separate background setter/reset
+intervening. Foreground setters, separate or in that triggering sequence,
+leave the stale background cache armed; foreground parameters in that same
+sequence are allowed in any position.
 The twenty measured sequences also setting a background (48 palette/RGB,
 4x, 10x or 49) are outside the divergence: the explicit setter wins with
 7/27 either before or after it. Other unmeasured parameter grammars are not
