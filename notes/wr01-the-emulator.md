@@ -278,6 +278,28 @@ their cursor coordinates. Its complete macOS gate also passed all109 real
 END steps; native/interpreter restore and CPR rows, all188 frozen frames and
 primary corpus properties passed. The canonical merge record remains pending.
 
+## D13: bold legacy black
+
+Warren stores legacy SGR 30 as palette index 0 plus the bold flag, exactly as
+38;5;0 does. It never promotes the stored colour to 8: any bold brightening is
+the painter's choice. The exact reference trigger is legacy 30 with bold active,
+in either order; its printed cell becomes index 8 and DECRQSS reports 90.
+This happens on plain `m` too, not only after adding a combining mark.
+
+The measured boundaries stay separate. Legacy 31–37 with bold print indices
+1–7 (their DECRQSS representation is 91–97); explicit indexed 0 stays 0 whether
+set before or after bold; bright 90 stays 8. After 22, the current reference pen
+returns to black 0 and the next glyph uses 0, while the earlier cell remains
+bold/index 8. A following 30 without bold also uses 0. Explicit bright 90 stays
+8 after 22. These controls are not broadened into D13.
+
+The independent full-stream 32 fixture rewrites legacy 30 to 38;5;0 in separate
+reference input, preserving colour arguments and every other control. The
+reference builds every cell; against the background-repaired reference, the
+only change is foreground 8→0 at row 16 column 19, asserted as an exact cell/
+field/value bound. No native output constructs that expected frame. The no-bold
+fixture and its explicit stream-32 refusal remain unchanged.
+
 ## Fresh 200-stream development checkpoint
 
 The raw Linux development take requested200 seeds of4096 bytes each; complete
