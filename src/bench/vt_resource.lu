@@ -1,5 +1,7 @@
 //! member: true
 //! Host-side finite VT feed/resource witness; no clocks enter src/vt.
+use vt
+use std.mem.budget
 use std.io
 
 // One implementation deliberately serves the small smoke and full native take.
@@ -7,8 +9,49 @@ use std.io
 /// bytes; report feed time and allocation, asserting the bounded-storage rows.
 #[allow(w0314)]
 pub fn measure(bytes: int, history_cap: int) -> int {
-    assert(bytes > 0 && history_cap > 0, "vt-resource-arguments")
-    assert(false, "vt-resource-bounded-feed")
-    io.write_line("not implemented")
+    assert(bytes > 0 && bytes <= 100000000 && history_cap > 0 && history_cap <= 8388608, "vt-resource-arguments")
+    region measured(cap: 33554432) {
+        let pattern = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\u{1b}[38;5;42m中a\u{301}\u{308}\u{1b}[0m\r\n".bytes()
+        var chunk = List[byte]()
+        (mut chunk).reserve(pattern.len * 32)
+        var repeat = 0
+        while repeat < 32 {
+            for raw in pattern { (mut chunk).push(raw) }
+            repeat += 1
+        }
+        assert(chunk.len <= 4096, "vt-resource-fixed-chunk")
+        let before = budget.charged(measured)
+        var pane = vt.new(80, 24, history_cap)
+        let retained = budget.charged(measured) - before
+        let stable = budget.charged(measured)
+        var fed = 0
+        var elapsed = 0
+        var peak_turn = 0
+        var report = 0
+        while fed < bytes {
+            let remaining = bytes - fed
+            let count = if remaining < chunk.len { remaining } else { chunk.len }
+            let started = os_clock_ns()
+            region turn {
+                vt.feed(mut pane, chunk[0..count])
+                let used = budget.charged(turn)
+                if used > peak_turn { peak_turn = used }
+            }
+            elapsed += os_clock_ns() - started
+            fed += count
+            assert(budget.charged(measured) == stable, "vt-resource-bounded-feed")
+            assert(pane.history.used <= history_cap && pane.history.bytes.len == history_cap, "vt-resource-history-cap")
+            if fed / 10000000 > report {
+                report = fed / 10000000
+                region progress { io.write_line("MEASURE vt-resource-progress bytes={fed} history-used={pane.history.used}") }
+            }
+        }
+        assert(fed == bytes && pane.history.records > 0, "vt-resource-complete-scrolling-feed")
+        assert(peak_turn <= chunk.len * 32 + 65536, "vt-resource-turn-charge-bound")
+        if bytes == 100000000 { assert(pane.history.used > history_cap - 1024, "vt-resource-default-ring-filled") }
+        let grown = budget.charged(measured) - stable
+        io.write_line("MEASURE vt-resource bytes={fed} history-cap={history_cap} history-used={pane.history.used} history-records={pane.history.records} pane-retained-charged={retained} outer-feed-charge={grown} peak-turn-charged={peak_turn} chunk-bytes={chunk.len} feed-nanoseconds={elapsed}")
+        io.write_line("PASS vt-resource-bounded-feed")
+    }
     0
 }
