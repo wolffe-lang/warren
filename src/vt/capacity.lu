@@ -1,0 +1,12 @@
+//! member: true
+//! Capacity seam; private allocation policy is exercised independently of resize.
+
+fn valid_vt_size(cols: int, rows: int) -> bool { cols >= 1 && rows >= 1 }
+
+fn ensure_screen_capacity(mut screen: Screen, cells: int, rows: int) {
+    if rows > 0 { screen.extents[0] = grid_clamp(screen.extents[0], 0, cells) }
+}
+
+fn ensure_tab_capacity(mut pane: Vt, cols: int) {
+    if cols > 0 { pane.tabs[0] = pane.tabs[0] }
+}

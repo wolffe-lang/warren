@@ -1,0 +1,49 @@
+//! member: false
+//! Private capacity-policy rows: this entry lives beside the VT members.
+use std.mem.budget
+use std.io
+
+fn test_private_capacity() {
+    region frame(cap: 1048576) {
+        var pane = new(4, 2, 0)
+        feed(mut pane, "ab\r\n中".bytes())
+        let before = budget.charged(frame)
+        ensure_screen_capacity(mut pane.primary, 96, 32)
+        ensure_screen_capacity(mut pane.alternate, 96, 32)
+        ensure_tab_capacity(mut pane, 64)
+        assert(pane.primary.cells.len >= 96 && pane.primary.extents.len >= 32, "capacity-growth")
+        assert(pane.primary.wrapped.len == pane.primary.extents.len)
+        assert(pane.cols == 4 && pane.rows == 2 && pane.primary.cells[0].base == 97)
+        assert(pane.primary.cells[4].base == 20013 && pane.primary.cells[5].width == 0)
+        assert(pane.primary.extents[0] == 2 && pane.primary.extents[1] == 2)
+        assert(pane.alternate.cells[0].base == 32 && pane.tabs.len >= 64 && pane.tabs[8])
+        let stable = budget.charged(frame)
+        assert(stable > before)
+        var i = 0
+        while i < 64 {
+            ensure_screen_capacity(mut pane.primary, 8, 2)
+            ensure_screen_capacity(mut pane.primary, 96, 32)
+            ensure_screen_capacity(mut pane.alternate, 8, 2)
+            ensure_screen_capacity(mut pane.alternate, 96, 32)
+            ensure_tab_capacity(mut pane, 4)
+            ensure_tab_capacity(mut pane, 64)
+            i += 1
+        }
+        assert(budget.charged(frame) == stable, "capacity-charge-plateau")
+        assert(pane.primary.cells[4].base == 20013 && pane.primary.cells[5].width == 0)
+        let growth = stable - before
+        io.write_line("MEASURE capacity-growth retained={growth} plateau-turns=64")
+        pane.default_tabs = false
+        ensure_tab_capacity(mut pane, 128)
+        assert(!pane.tabs[72], "capacity-custom-tabs-no-new-stops")
+    }
+}
+
+fn test_private_size_ceiling() {
+    assert(valid_vt_size(80, 24) && valid_vt_size(262144, 1) && valid_vt_size(1, 262144))
+    assert(!valid_vt_size(0, 1) && !valid_vt_size(1, 0))
+    assert(!valid_vt_size(262145, 1) && !valid_vt_size(513, 512), "vt-size-area")
+    assert(!valid_vt_size(9223372036854775807, 9223372036854775807), "vt-size-area-overflow")
+}
+
+fn main() -> int { test_private_capacity(); test_private_size_ceiling(); 0 }

@@ -46,6 +46,15 @@ must be implemented before claiming those policies work. Preserve content
 and rendition in the one-column wide exception and restore natural width
 on widening; no resize implementation exists yet.
 
+The next allocation step first tests private capacity growth independently
+of resize: logical dimensions and visible cell values stay unchanged, backing
+cell/row/tab lengths grow geometrically and never shrink, and repeated
+small/large reservations must plateau on native and lupin. The area check
+uses division before multiplication and refuses rectangles above 262144
+cells, including integer-overflow inputs. This groundwork is not a resize
+or history claim. Reflow later adds reusable source/output workspaces and
+must include their actual peak charges in the ledger.
+
 One standalone read-only host preflight has passed. Prepare the complete
 host take before acquiring a pool slot; no heavy work is assigned to the
 other pool host. The first grid review leaves this exact Done-when row open:
