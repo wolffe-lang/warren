@@ -3,9 +3,11 @@
 import argparse
 import hashlib
 import json
+import math
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tools/oracle'))
@@ -15,12 +17,45 @@ from reference_inputs import inputs, fixture_input
 from expectations import expected
 
 
+def observe(command, data, timeout, label):
+    """Keep a finite observer deadline visible; never change interpreter caps."""
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise ValueError('observer deadline must be finite and positive')
+    started = time.monotonic()
+    deadline = started + timeout
+    process = subprocess.Popen(command, cwd=ROOT, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    first = True
+    try:
+        while True:
+            remaining = deadline - time.monotonic()
+            try:
+                output, errors = process.communicate(input=data if first else None, timeout=max(0.001, min(30, remaining)))
+                return subprocess.CompletedProcess(command, process.returncode, output, errors)
+            except subprocess.TimeoutExpired:
+                first = False
+                if time.monotonic() >= deadline:
+                    process.kill()  # Only the observer PID created here.
+                    output, errors = process.communicate()
+                    raise subprocess.TimeoutExpired(command, timeout, output=output, stderr=errors)
+                print('WAIT observer %s elapsed-seconds=%d deadline-seconds=%g' %
+                      (label, time.monotonic() - started, timeout), flush=True)
+    except BaseException:
+        if process.poll() is None:
+            process.kill()
+        process.communicate()
+        raise
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--suite', choices=('census', 'recordings', 'fuzz-baseline', 'all'), default='all')
     parser.add_argument('--name')
+    parser.add_argument('--observer-timeout', type=float, default=180,
+                        help='wall-clock deadline only; interpreter memory/step caps are unchanged')
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
+    if not math.isfinite(args.observer_timeout) or args.observer_timeout <= 0:
+        parser.error('observer timeout must be finite and positive')
     assert args.command
     index = json.loads((ROOT / 'tests/vt/reference/index.json').read_text())
     assert hashlib.sha256((ROOT / 'tests/vt/recording_setup.json').read_bytes()).hexdigest() == index['fixture_setup_sha256']
@@ -43,7 +78,7 @@ def main():
             command = args.command + ['vt-dump', '--history-bytes', '65536'] + (['--replay'] if replay else [])
             if suite == 'recordings':
                 labels.append('fixture-startup-title')
-                unseeded = subprocess.run(command, cwd=ROOT, input=data, capture_output=True, timeout=180)
+                unseeded = observe(command, data, args.observer_timeout, suite + '/' + name + '/unseeded')
                 assert unseeded.returncode == 0 and not unseeded.stderr
                 unseeded_screen = screen.loads(unseeded.stdout.decode())
                 unseeded_differences = screen.compare(ruled, unseeded_screen)
@@ -51,7 +86,7 @@ def main():
                 assert unseeded_screen['title'] == ''
                 print('PASS fixture-startup-title-%s unseeded-differs-only-title' % name, flush=True)
             prepared = fixture_input(suite, data)
-            result = subprocess.run(command, cwd=ROOT, input=prepared, capture_output=True, timeout=180)
+            result = observe(command, prepared, args.observer_timeout, suite + '/' + name + '/prepared')
             assert result.returncode == 0, (suite, name, result.returncode, result.stderr[:2000])
             assert not result.stderr, (suite, name, result.stderr)
             (output / (name + '.actual.screen')).write_bytes(result.stdout)
