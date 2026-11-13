@@ -225,6 +225,10 @@ fn test_sgr_resets_and_wrap() {
     assert(wrap.cursor_row == 2 && wrap.primary.cells[5].flags == 1)
     vt.feed(mut wrap, "\u{1b}[>4;2mQ".bytes())
     assert(wrap.primary.cells[6].flags == 1)
+    var underline = vt.new(8, 2, 0)
+    vt.feed(mut underline, "\u{1b}[4mA\u{1b}[21mB\u{1b}[4mC\u{1b}[4:0mD".bytes())
+    assert(underline.primary.cells[0].flags == 8 && underline.primary.cells[1].flags == 16, "grid-underline-exclusive")
+    assert(underline.primary.cells[2].flags == 8 && underline.primary.cells[3].flags == 0)
 }
 
 fn test_insert_delete_characters() {
