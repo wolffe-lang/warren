@@ -276,10 +276,20 @@ The list, with the document's section for each, is in the prediction
 | D6 | no reflow on resize | section 4 | the survey: every multiplexer reflows |
 | D7 | `SGR 53` (overline) ignored, mode 2026 unknown | 53 consumed without effect; 2026 stored and reported | yew sets 2026 around every frame |
 | D8 | DEL inside an OSC title becomes `?` (`tests/vt/parser-reference/osc-del.in`, title `613f62`) | DEL is silently dropped, yielding title `6162` | titles are display text; dropping the control is cleaner than adding a visible question mark |
+| D9 | a pre-restore background reappears after saved-pen restore followed by 7/27; an RGB integer can become invalid palette 15540094 | keep the restored colour value and set form; 7/27 change only inverse | post-restore inverse colour-cache defect; minimal bytes and both observations in `wr01-the-emulator.md` |
 
-Rows for D1 to D8 compare with written expectations, never with the
+Rows for D1 to D9 compare with written expectations, never with the
 reference, and a corpus stream that exercises one is compared under that
-divergence's name or not at all.
+divergence's name or not at all. D9 is scoped to the first SGR sequence after
+a restore that contains 7 or 27 with no separate colour SGR intervening;
+foreground parameters in that same sequence are allowed in any position.
+The twenty measured sequences also setting a background (48 palette/RGB,
+4x, 10x or 49) are outside the divergence: the explicit setter wins with
+7/27 either before or after it. Other unmeasured parameter grammars are not
+inferred from these controls. The D9 fixture is a specification-only background
+repair of separate reference input, never a candidate-output golden: exact
+background cell sets and values bound original-versus-repaired observations,
+and every other field must match.
 
 ### 3.2 SGR details (measured)
 

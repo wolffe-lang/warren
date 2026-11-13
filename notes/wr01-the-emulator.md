@@ -106,6 +106,73 @@ The 100 MB history soak and larger/nightly fuzz corpus remain later W1 work.
 The README and architecture map were refreshed; `src/proto` and
 `docs/PROTOCOL.md` were not changed.
 
+## D9: post-restore inverse colour cache
+
+The pinned reference can revive a pre-restore background after a saved pen is
+restored and the next eligible SGR contains 7 or 27. The trigger is measured
+at control-sequence granularity: no separate colour SGR intervenes; foreground
+parameters in that same triggering sequence are allowed in any position.
+A triggering sequence that also sets a background is outside the measured
+D9 divergence for all twenty controls: 7/27 × extended/basic/bright palette,
+default or RGB × either parameter order. The explicit background setter wins
+in both orders; no broader unmeasured grammar is inferred.
+
+Minimal body, omitting the fixture's title/shape setup:
+
+```
+ESC 7   CSI 48;5;181 m   ESC 8   CSI 27 m   X
+hex: 1b37 1b5b34383b353b3138316d 1b38 1b5b32376d 58
+```
+
+The reference reports X with `bg=idx:181`; its direct SGR status report is
+`DCS 1$r 0;48:5:181m ST`. Warren's independently constructed complete
+expectation has X with the restored default background and no attributes.
+Native matches that frame. With saved explicit palette background 0 and an
+intervening RGB(237,31,126), the reference instead revives the RGB integer as
+invalid palette entry 15540094. This is not a colour rule warren copies.
+**D9 keeps the restored colour value and its set form; 7/27 change only
+inverse, never the colours.** The raw twelve-case observations and independent
+written frames are separate under `tests/vt/reference/inverse`: eight
+one-background-field divergences and four matching controls.
+
+For original fuzz streams 10, 16 and 19, an approved repaired-reference
+fixture uses an independent background-only specification tracer. It injects
+the restored background value/form immediately after restores into separate
+input bytes; the pinned reference constructs every expected cell. Native
+original and native repaired replay must both equal the complete expected
+frame. Original versus repaired reference is bound to the exact declared
+background cells (6, 1903 and 19 respectively), field and corrected value;
+any other change is red. No candidate output becomes a golden, and no field
+is ignored or comparator widened. The tracer has its own no-injection,
+default/palette/RGB, foreground-argument and per-screen-cache rows. The frozen
+37-case acquisition has zero capture errors: twelve repaired minimal frames,
+three repaired complex frames, twenty mixed-background controls and two
+bright-blue report measurements. All 74 native original/repaired replays at
+`f4b660b` equal their independent complete frames. Seed 19 additionally has the
+source-proved, explicitly LIMITED column-one tab report described below.
+`tools/vt/check_d9.py` checks input/tracer/pin bindings, raw evidence hashes
+twice, exact background cell/field/value bounds and independent minimal frames.
+
+### Source-bounded report limits
+
+The frozen baseline has seven LIMITED streams, never strict oracle passes.
+Seeds 3 and 22 set bright palette 9 and 10 respectively without ever setting
+their low counterpart; all declared foreground palettes and non-ambiguous
+RGB forms are checked before constructing the complete written frame.
+The printer folds those bold foregrounds to 1 and 2. Quarry's resize checkpoint
+similarly declares foreground palette exactly `{0,11,12,14}`, making its bold
+blue 12 unambiguous despite the reported 4.
+
+Seeds 15, 19, 20, 24 and 29 have literal column-one HTS witnesses: CPL then EL,
+CR then BS, CR then IL, and CR/LF respectively. No later clear may invalidate
+the witness. Seed 20's sole later current-stop clear is independently anchored
+by CHA0 followed by twenty ASCII columns and two fullwidth glyphs: column 25,
+not 1. Altered or ambiguous source witnesses are red. The complete written
+frame adds only that source-proved stop; all other fields still compare.
+The report fixture independently measures HTS at column 1, which DECTABSR
+omits. The named limits are `RPT-TABS-COLUMN-ONE` and
+`RPT-BRIGHT-BOLD-COLOUR`, with mutation/refusal rows in `report_form_rows.py`.
+
 ## Grid follow-on resource checkpoint
 
 The following are measured constructor region charges at `7450229`, asserted
@@ -141,11 +208,13 @@ title-only proof and whole-screen comparison passing. They took roughly
 The remaining full-recording interpreter takes are still pending.
 
 At `4737ff8`, all eight full cases, 151 census inputs and five seeded
-recording comparisons passed natively; the recording setup also retained
-its paired unseeded-title-only proof. All baseline fuzz extent differences
-were fixed, but nine streams still have non-matching fields: named tab/bright
-report limits, an out-of-domain palette report, and unexplained background
-interactions. These are not silently counted as whole-screen passes.
+recording comparisons passed natively; the recording setup retained its paired
+unseeded-title-only proof. At `f4b660b`, all 188 frozen streams pass complete
+frames under the explicit named policies above: nine previously non-matching
+fuzz streams are resolved as D9 and/or source-bounded report limits, not silently
+called reference agreements. The complete new platform gate is still running;
+fresh 200×4096-byte fuzz, reference widths and the full resource take remain
+separate pending evidence.
 
 > PAX corpus leg: not run, no boot fixture in this repository yet
 
