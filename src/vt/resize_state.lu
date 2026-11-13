@@ -125,6 +125,10 @@ fn begin_resize_epoch(mut pane: Vt) {
         resize_anchor_from_screen(mut pane.resize_state.flow.saved, pane.primary, pane.cols,
             pane.saved_primary.row, pane.saved_primary.col)
     } else { pane.resize_state.flow.saved.id = 0 - 1 }
+    if !pane.active_alternate && pane.combine_row > 0 {
+        resize_anchor_from_screen(mut pane.resize_state.flow.combine, pane.primary, pane.cols,
+            pane.combine_row, pane.combine_col)
+    } else { pane.resize_state.flow.combine.id = 0 - 1 }
     resize_anchor_from_screen(mut pane.resize_state.first, pane.primary, pane.cols, 1, 1)
     var bottom = cursor_row
     row = cursor_row

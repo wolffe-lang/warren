@@ -101,6 +101,7 @@ fn set_grid_mode(mut pane: Vt, private_mode: bool, code: int, enabled: bool) {
         if code == 4 { pane.modes.insert = enabled }
         else if code == 20 { pane.modes.newline = enabled }
     } else if code == 6 {
+        clear_combine_anchor(mut pane)
         pane.modes.origin = enabled
         pane.cursor_row = if enabled { pane.region_top } else { 1 }
         pane.cursor_col = 1

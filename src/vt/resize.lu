@@ -15,6 +15,11 @@ fn apply_primary_resize(mut pane: Vt, cols: int, rows: int) {
     if !pane.active_alternate {
         pane.cursor_row = grid_clamp(pane.resize_state.flow.cursor.row - pane.resize_state.first_visible + 1, 1, rows)
         pane.cursor_col = grid_clamp(pane.resize_state.flow.cursor.col, 1, cols)
+        if pane.combine_row > 0 {
+            assert(pane.resize_state.flow.combine.found, "reflow-combine-anchor")
+            pane.combine_row = grid_clamp(pane.resize_state.flow.combine.row - pane.resize_state.first_visible + 1, 1, rows)
+            pane.combine_col = grid_clamp(pane.resize_state.flow.combine.col, 1, cols)
+        }
     }
     if pane.saved_primary.valid {
         assert(pane.resize_state.flow.saved.found, "reflow-saved-anchor")
@@ -67,6 +72,10 @@ fn resize_alternate(mut pane: Vt, cols: int, rows: int) {
     if pane.active_alternate {
         pane.cursor_row = grid_clamp(pane.cursor_row, 1, rows)
         pane.cursor_col = grid_clamp(pane.cursor_col, 1, cols)
+        if pane.combine_row > 0 {
+            pane.combine_row = grid_clamp(pane.combine_row, 1, rows)
+            pane.combine_col = grid_clamp(pane.combine_col, 1, cols)
+        }
     }
     pane.saved_alternate.row = grid_clamp(pane.saved_alternate.row, 1, rows)
     pane.saved_alternate.col = grid_clamp(pane.saved_alternate.col, 1, cols)

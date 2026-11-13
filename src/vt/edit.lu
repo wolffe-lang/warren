@@ -99,6 +99,7 @@ fn dispatch_editing(mut pane: Vt, final: int) {
     if pane.parser.param_count > 1 { return }
     let amount = grid_param(pane.parser, 0, 1, true)
     if final == 64 || final == 80 {
+        clear_combine_anchor(mut pane)
         pane.pending_wrap = false
         if pane.active_alternate {
             shift_characters(mut pane.alternate, pane.cols, pane.cursor_row, pane.cursor_col, amount, pane.pen.background, final == 64)
@@ -107,6 +108,7 @@ fn dispatch_editing(mut pane: Vt, final: int) {
         }
     } else {
         if pane.cursor_row < pane.region_top || pane.cursor_row > pane.region_bottom { return }
+        clear_combine_anchor(mut pane)
         pane.pending_wrap = false
         pane.cursor_col = 1
         if pane.active_alternate {

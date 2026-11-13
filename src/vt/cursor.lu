@@ -116,6 +116,7 @@ fn dispatch_csi(mut pane: Vt, final: int) {
     if (final >= 65 && final <= 72) || final == 96 || final == 97 || final == 100 || final == 101 || final == 102 {
         let pair = final == 72 || final == 102
         if pane.parser.param_count > (if pair { 2 } else { 1 }) { return }
+        clear_combine_anchor(mut pane)
         let n = grid_param(pane.parser, 0, 1, true)
         pane.pending_wrap = false
         if final == 65 || final == 70 { move_vertical(mut pane, 0 - n) }
@@ -136,6 +137,7 @@ fn dispatch_csi(mut pane: Vt, final: int) {
         // A one-row pane keeps its default 1-1 region; an explicit invalid
         // DECSTBM remains inert, including its cursor and wrap effects.
         if top >= bottom { return }
+        clear_combine_anchor(mut pane)
         pane.region_top = top
         pane.region_bottom = bottom
         pane.cursor_row = if pane.modes.origin { top } else { 1 }
@@ -146,6 +148,7 @@ fn dispatch_csi(mut pane: Vt, final: int) {
         let mode = grid_param(pane.parser, 0, 0, false)
         if final != 88 && (mode > 2 && !(final == 74 && mode == 3)) { return }
         let amount = grid_param(pane.parser, 0, 1, true)
+        clear_combine_anchor(mut pane)
         pane.pending_wrap = false
         if final == 74 && mode == 3 { history_clear(mut pane.history); return }
         if pane.active_alternate {

@@ -49,6 +49,7 @@ fn save_cursor(mut pane: Vt) {
 }
 
 fn restore_cursor(mut pane: Vt) {
+    clear_combine_anchor(mut pane)
     // Read scalar projections, never copy a transient saved-cursor record.
     let alt = pane.active_alternate
     let row = if alt { pane.saved_alternate.row } else { pane.saved_primary.row }
@@ -88,6 +89,7 @@ fn alternate_mode(mut pane: Vt, code: int, enabled: bool) {
     }
     if enabled {
         if code == 1049 {
+            clear_combine_anchor(mut pane)
             save_cursor(mut pane)
             clear_screen(mut pane.alternate, pane.cols, pane.rows, pane.pen.background)
             pane.pending_wrap = false
@@ -95,6 +97,7 @@ fn alternate_mode(mut pane: Vt, code: int, enabled: bool) {
         alternate_state(mut pane, true)
     } else {
         if code == 1047 && pane.active_alternate {
+            clear_combine_anchor(mut pane)
             clear_screen(mut pane.alternate, pane.cols, pane.rows, pane.pen.background)
         }
         alternate_state(mut pane, false)
@@ -116,6 +119,7 @@ fn soft_reset(mut pane: Vt) {
 }
 
 fn full_reset(mut pane: Vt) {
+    clear_combine_anchor(mut pane)
     soft_reset(mut pane)
     clear_screen(mut pane.primary, pane.cols, pane.rows, 0 - 1)
     clear_screen(mut pane.alternate, pane.cols, pane.rows, 0 - 1)

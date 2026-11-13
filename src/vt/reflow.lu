@@ -9,7 +9,7 @@ pub struct ReflowAnchor { id: int, offset: int, row: int, col: int, found: bool 
 pub struct ReflowState {
     row: int, col: int, line_id: int, offset: int, started: bool,
     last_row: int, last_col: int, painting: bool, paint_col: int,
-    cursor: ReflowAnchor, saved: ReflowAnchor, bottom: ReflowAnchor,
+    cursor: ReflowAnchor, saved: ReflowAnchor, bottom: ReflowAnchor, combine: ReflowAnchor,
 }
 
 fn new_reflow_anchor() -> ReflowAnchor {
@@ -19,7 +19,8 @@ fn new_reflow_anchor() -> ReflowAnchor {
 fn new_reflow_state() -> ReflowState {
     ReflowState { row: 0, col: 1, line_id: 0 - 1, offset: 0, started: false,
         last_row: 0, last_col: 0, painting: false, paint_col: 1,
-        cursor: new_reflow_anchor(), saved: new_reflow_anchor(), bottom: new_reflow_anchor() }
+        cursor: new_reflow_anchor(), saved: new_reflow_anchor(), bottom: new_reflow_anchor(),
+        combine: new_reflow_anchor() }
 }
 
 fn reset_reflow_anchor(mut anchor: ReflowAnchor) {
@@ -41,6 +42,7 @@ fn reflow_start(mut state: ReflowState) {
     reset_reflow_anchor(mut state.cursor)
     reset_reflow_anchor(mut state.saved)
     reset_reflow_anchor(mut state.bottom)
+    reset_reflow_anchor(mut state.combine)
 }
 
 fn reflow_map_glyph(mut anchor: ReflowAnchor, id: int, offset: int,
@@ -62,6 +64,7 @@ fn reflow_end_anchors(mut state: ReflowState, cols: int) {
     reflow_map_end(mut state.cursor, state.line_id, state.offset, state.row, state.col, cols)
     reflow_map_end(mut state.saved, state.line_id, state.offset, state.row, state.col, cols)
     reflow_map_end(mut state.bottom, state.line_id, state.offset, state.row, state.col, cols)
+    reflow_map_end(mut state.combine, state.line_id, state.offset, state.row, state.col, cols)
 }
 
 fn reflow_select_row(state: ReflowState, mut output: Screen, first: int, last: int, emit: bool) {
@@ -103,6 +106,7 @@ fn reflow_scalar(mut state: ReflowState, mut output: Screen, cols: int,
     reflow_map_glyph(mut state.cursor, state.line_id, state.offset, natural, physical, state.row, state.col)
     reflow_map_glyph(mut state.saved, state.line_id, state.offset, natural, physical, state.row, state.col)
     reflow_map_glyph(mut state.bottom, state.line_id, state.offset, natural, physical, state.row, state.col)
+    reflow_map_glyph(mut state.combine, state.line_id, state.offset, natural, physical, state.row, state.col)
     if emit && state.row >= first && state.row <= last {
         write_glyph(mut output, cols, state.row - first + 1, state.col, cp, physical, flags, foreground, background)
     }
