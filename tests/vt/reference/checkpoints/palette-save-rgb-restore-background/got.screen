@@ -1,0 +1,39 @@
+warren-screen 1
+size 12 4
+cursor 1 2 shape=2 visible=1 pending-wrap=0
+region 1 4
+tabs 9
+title 70726f6265
+mode alternate-screen-1047 0
+mode alternate-screen-1049 0
+mode alternate-screen-47 0
+mode alternate-scroll 0
+mode application-cursor-keys 0
+mode application-keypad 0
+mode autowrap 1
+mode bracketed-paste 0
+mode cursor-blink 0
+mode cursor-visible 1
+mode focus-events 0
+mode insert 0
+mode left-right-margins 0
+mode mouse-any-motion 0
+mode mouse-button-motion 0
+mode mouse-press-release 0
+mode mouse-sgr 0
+mode mouse-urxvt 0
+mode mouse-utf8 0
+mode newline 0
+mode origin 0
+mode reverse-wrap 0
+mode send-receive 1
+mode synchronized-output ?
+row 1 extent=1
+1 1 U+0058 bg=idx:0
+2-12 1 U+0020 -
+row 2 extent=0
+1-12 1 U+0020 -
+row 3 extent=0
+1-12 1 U+0020 -
+row 4 extent=0
+1-12 1 U+0020 -

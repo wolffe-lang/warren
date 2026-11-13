@@ -1,0 +1,259 @@
+{
+  "schema": 1,
+  "complete_dump_count": 11,
+  "pins_sha256": "8d6d781805e6840a6a6becb059453cfa166fb7d53424fd4a89289ad827b7e992",
+  "cases": {
+    "ascii-prefix-0": {
+      "input_sha256": "e7c104e93bdc941c9061f465be51c3b284e99605fb38770a670dc3432a9635c9",
+      "size": [
+        8,
+        2
+      ],
+      "kind": "ascii-prefix-witness",
+      "prefix_bytes": 0,
+      "setup_hex": "1b5d323b70726f6265071b5b322071",
+      "screen_sha256": "03b97daacc362de40939239ca8e4345fd4917f830027f9c0bdbaddb333e41b2c",
+      "classification": "measured",
+      "files": {
+        "ascii-prefix-0/A.json": "37f5a16e4dd8455a311c02a15cae821bca6a3e081147cddd301b317a5786a94c",
+        "ascii-prefix-0/S.json": "04a00add84895485901fe669593ba00c715d40c71f6b89fb77d2cb2564e284c7",
+        "ascii-prefix-0/A.print": "dba5166ad9db9ba648c1032ebbd34dcd0d085b50023b839ef5c68ca1db93a563",
+        "ascii-prefix-0/S.print": "b3f0b387a3a01373a9f22884ab5287b1c599c5fc07f938ea1287e731c7e9e6c2",
+        "ascii-prefix-0/continuation.json": "a683096011db3975a1e401e33b0047d1f2677a11efe85ef12806f016ae039795",
+        "ascii-prefix-0/got.screen": "03b97daacc362de40939239ca8e4345fd4917f830027f9c0bdbaddb333e41b2c",
+        "ascii-prefix-0.in": "e7c104e93bdc941c9061f465be51c3b284e99605fb38770a670dc3432a9635c9"
+      },
+      "input_path": "ascii-prefix-0.in"
+    },
+    "ascii-prefix-1": {
+      "input_sha256": "d1cb75e025dccb75f94ae30133cac47ed013e610a0d3cf3fe4115bde96502315",
+      "size": [
+        8,
+        2
+      ],
+      "kind": "ascii-prefix-witness",
+      "prefix_bytes": 1,
+      "setup_hex": "1b5d323b70726f6265071b5b322071",
+      "screen_sha256": "6ce8e1c25138a97b91cddbcf6a550c447ca5c26d4d549283db15ae1ce8f2ae60",
+      "classification": "measured",
+      "files": {
+        "ascii-prefix-1/A.json": "b9169f5610aadc1c67ba4a7588d576f69f0eb409f112278a1ddebd155bb2941b",
+        "ascii-prefix-1/S.json": "04a00add84895485901fe669593ba00c715d40c71f6b89fb77d2cb2564e284c7",
+        "ascii-prefix-1/A.print": "2054e6934d17e99c57fa1c2716ff25bd4290881c202b5016492c6c626982470a",
+        "ascii-prefix-1/S.print": "19891f9778643895186c28fe54186a78fa1b99f35493ec767deee5495f597b3a",
+        "ascii-prefix-1/continuation.json": "a683096011db3975a1e401e33b0047d1f2677a11efe85ef12806f016ae039795",
+        "ascii-prefix-1/got.screen": "6ce8e1c25138a97b91cddbcf6a550c447ca5c26d4d549283db15ae1ce8f2ae60",
+        "ascii-prefix-1.in": "d1cb75e025dccb75f94ae30133cac47ed013e610a0d3cf3fe4115bde96502315"
+      },
+      "input_path": "ascii-prefix-1.in"
+    },
+    "ascii-prefix-2": {
+      "input_sha256": "318f700880d2283bad248c43675c2300a570d1651df112a9d1ed5fb50d69f679",
+      "size": [
+        8,
+        2
+      ],
+      "kind": "ascii-prefix-witness",
+      "prefix_bytes": 2,
+      "setup_hex": "1b5d323b70726f6265071b5b322071",
+      "screen_sha256": "40efa08d8b1277728795c3409f385d1941e1139a2bae46d4d5f293d1810edea1",
+      "classification": "measured",
+      "files": {
+        "ascii-prefix-2/A.json": "751d1326dcd1b16a704d0d4afe9ae1cfe0d8d512a5dc7407227dd555a4e4ad61",
+        "ascii-prefix-2/S.json": "04a00add84895485901fe669593ba00c715d40c71f6b89fb77d2cb2564e284c7",
+        "ascii-prefix-2/A.print": "48eae1638a9287cda9ae8e8e9f9531b1703d8ed8a5328524fe61f974ddddc89c",
+        "ascii-prefix-2/S.print": "c773047b069bfdfd4876c4ce9f0a1e7e19926db2286e969f4521911bfd795d0f",
+        "ascii-prefix-2/continuation.json": "a683096011db3975a1e401e33b0047d1f2677a11efe85ef12806f016ae039795",
+        "ascii-prefix-2/got.screen": "40efa08d8b1277728795c3409f385d1941e1139a2bae46d4d5f293d1810edea1",
+        "ascii-prefix-2.in": "318f700880d2283bad248c43675c2300a570d1651df112a9d1ed5fb50d69f679"
+      },
+      "input_path": "ascii-prefix-2.in"
+    },
+    "ascii-prefix-3": {
+      "input_sha256": "c7fe3dae0f74cc1e5e712c4a9c9703ca9531db749c5520317ad8c5f7286f937d",
+      "size": [
+        8,
+        2
+      ],
+      "kind": "ascii-prefix-witness",
+      "prefix_bytes": 3,
+      "setup_hex": "1b5d323b70726f6265071b5b322071",
+      "screen_sha256": "2d32fcdc457defb850cdebea0d44d5a3f0cb479511c9b900c7dc7fbe918b78a9",
+      "classification": "measured",
+      "files": {
+        "ascii-prefix-3/A.json": "e2c2b337aa35acdd1749a33faa002fdc6458dcca944cca8063dd8df0e904a9a7",
+        "ascii-prefix-3/S.json": "04a00add84895485901fe669593ba00c715d40c71f6b89fb77d2cb2564e284c7",
+        "ascii-prefix-3/A.print": "96e639eb77e41208b98466937c0def7fa29f7561db6edcc651e5387b0a2c2b02",
+        "ascii-prefix-3/S.print": "18568855418e4eb55c4dccf950f56cba00f63cd9fb33775183c759b18911a63c",
+        "ascii-prefix-3/continuation.json": "a683096011db3975a1e401e33b0047d1f2677a11efe85ef12806f016ae039795",
+        "ascii-prefix-3/got.screen": "2d32fcdc457defb850cdebea0d44d5a3f0cb479511c9b900c7dc7fbe918b78a9",
+        "ascii-prefix-3.in": "c7fe3dae0f74cc1e5e712c4a9c9703ca9531db749c5520317ad8c5f7286f937d"
+      },
+      "input_path": "ascii-prefix-3.in"
+    },
+    "palette-save-rgb-restore-background": {
+      "input_sha256": "b228bca1e97bd4b16e54b0165b301b6812b9811922ad9f6396013c64433c6b87",
+      "size": [
+        12,
+        4
+      ],
+      "kind": "saved-colour-discriminator",
+      "screen_sha256": "2097dd1e7dc3dcaeab975a01c62393bb20c1969c2bdbb7412a0b466549d872fe",
+      "classification": "measured",
+      "files": {
+        "palette-save-rgb-restore-background/A.json": "987ee09324ba63e977d24e4eb248ec2119ea2ae700a210e0fd74ad99297e7566",
+        "palette-save-rgb-restore-background/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "palette-save-rgb-restore-background/A.print": "a3008f157b53c0cf6190c5ad79a37a0ab3b057a231946335dcbdd3dc47b61640",
+        "palette-save-rgb-restore-background/S.print": "3984b83488e18e949f59c6075ec8b1b4e1d8d89a03921acb0f2bb1d710d5da58",
+        "palette-save-rgb-restore-background/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "palette-save-rgb-restore-background/got.screen": "2097dd1e7dc3dcaeab975a01c62393bb20c1969c2bdbb7412a0b466549d872fe",
+        "palette-save-rgb-restore-background.in": "b228bca1e97bd4b16e54b0165b301b6812b9811922ad9f6396013c64433c6b87"
+      },
+      "input_path": "palette-save-rgb-restore-background.in"
+    },
+    "palette-save-rgb-restore-foreground": {
+      "input_sha256": "1f770d1960274a3fd69021b10d9c9d0741a101d94c6388e3eef1640b54c5211e",
+      "size": [
+        12,
+        4
+      ],
+      "kind": "saved-colour-discriminator",
+      "screen_sha256": "855ea612816b2902b410e53b1f1f2203b5c52a61791a0358b2efa20056772bef",
+      "classification": "measured",
+      "files": {
+        "palette-save-rgb-restore-foreground/A.json": "987ee09324ba63e977d24e4eb248ec2119ea2ae700a210e0fd74ad99297e7566",
+        "palette-save-rgb-restore-foreground/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "palette-save-rgb-restore-foreground/A.print": "e64d7cf7836d76c00b40b88ae6a893a29dbfe8a4b8d7350640e21e45edb24feb",
+        "palette-save-rgb-restore-foreground/S.print": "d262d89986122d8169f3065cb13c41b7e51bc29f05c3332647676fb5643de0ab",
+        "palette-save-rgb-restore-foreground/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "palette-save-rgb-restore-foreground/got.screen": "855ea612816b2902b410e53b1f1f2203b5c52a61791a0358b2efa20056772bef",
+        "palette-save-rgb-restore-foreground.in": "1f770d1960274a3fd69021b10d9c9d0741a101d94c6388e3eef1640b54c5211e"
+      },
+      "input_path": "palette-save-rgb-restore-foreground.in"
+    },
+    "1049-palette-save-rgb-restore": {
+      "input_sha256": "f2d966a4c13aac6473c4772057e032840ff5b9734b6c855d757eaf3a51a0cc88",
+      "size": [
+        12,
+        4
+      ],
+      "kind": "saved-colour-discriminator",
+      "screen_sha256": "2097dd1e7dc3dcaeab975a01c62393bb20c1969c2bdbb7412a0b466549d872fe",
+      "classification": "measured",
+      "files": {
+        "1049-palette-save-rgb-restore/A.json": "987ee09324ba63e977d24e4eb248ec2119ea2ae700a210e0fd74ad99297e7566",
+        "1049-palette-save-rgb-restore/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "1049-palette-save-rgb-restore/A.print": "a3008f157b53c0cf6190c5ad79a37a0ab3b057a231946335dcbdd3dc47b61640",
+        "1049-palette-save-rgb-restore/S.print": "3984b83488e18e949f59c6075ec8b1b4e1d8d89a03921acb0f2bb1d710d5da58",
+        "1049-palette-save-rgb-restore/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "1049-palette-save-rgb-restore/got.screen": "2097dd1e7dc3dcaeab975a01c62393bb20c1969c2bdbb7412a0b466549d872fe",
+        "1049-palette-save-rgb-restore.in": "f2d966a4c13aac6473c4772057e032840ff5b9734b6c855d757eaf3a51a0cc88"
+      },
+      "input_path": "1049-palette-save-rgb-restore.in"
+    },
+    "palette-save-rgb-default-restore": {
+      "input_sha256": "0909db88a0c0be0594dd8f20b6ef333e9a88a8191bc912376000e27353fcd2a6",
+      "size": [
+        12,
+        4
+      ],
+      "kind": "saved-colour-discriminator",
+      "screen_sha256": "2097dd1e7dc3dcaeab975a01c62393bb20c1969c2bdbb7412a0b466549d872fe",
+      "classification": "measured",
+      "files": {
+        "palette-save-rgb-default-restore/A.json": "987ee09324ba63e977d24e4eb248ec2119ea2ae700a210e0fd74ad99297e7566",
+        "palette-save-rgb-default-restore/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "palette-save-rgb-default-restore/A.print": "a3008f157b53c0cf6190c5ad79a37a0ab3b057a231946335dcbdd3dc47b61640",
+        "palette-save-rgb-default-restore/S.print": "3984b83488e18e949f59c6075ec8b1b4e1d8d89a03921acb0f2bb1d710d5da58",
+        "palette-save-rgb-default-restore/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "palette-save-rgb-default-restore/got.screen": "2097dd1e7dc3dcaeab975a01c62393bb20c1969c2bdbb7412a0b466549d872fe",
+        "palette-save-rgb-default-restore.in": "0909db88a0c0be0594dd8f20b6ef333e9a88a8191bc912376000e27353fcd2a6"
+      },
+      "input_path": "palette-save-rgb-default-restore.in"
+    },
+    "recording-quarry-resize-1": {
+      "input_sha256": "d22490a357dfdfe5840170d3fae4baa80b62d75f54e1c9637b1a95dc591f8973",
+      "size": [
+        80,
+        24
+      ],
+      "kind": "recording-resize-checkpoint",
+      "recording": "quarry.rec",
+      "resize_index": 1,
+      "original_input_sha256": "7bfb3c8e1e7def493df8e088e1c12163ef7a0af13ea4fc6febe6f1ecd2a7c0cc",
+      "target_size": [
+        100,
+        30
+      ],
+      "screen_sha256": "32eadc3eef836efb9a8eec9430f60048a8a987b8ca1e73f63d619cacd367acea",
+      "classification": "measured",
+      "files": {
+        "recording-quarry-resize-1/A.json": "86c068244c0525d98d9c7d49a6cd55bc7f72c3e1a824fc1641ca2d552fea78d9",
+        "recording-quarry-resize-1/S.json": "6225c391cfe871223b30f12daef577e4261bcfb3221d92d2fea84e259a3cd1db",
+        "recording-quarry-resize-1/A.print": "85b010e1e1b2acbd1dc008c395ae9859ba7eb42b0834b1d633483edec9d20034",
+        "recording-quarry-resize-1/S.print": "450505f6b77f523c04f3fa8d7d472ad19682f393fdfc7f8182e167eea661599f",
+        "recording-quarry-resize-1/continuation.json": "61075316940f2cb133269a42d357ea1fbcdf1f53867e2d40d2787b1331ba7e23",
+        "recording-quarry-resize-1/got.screen": "32eadc3eef836efb9a8eec9430f60048a8a987b8ca1e73f63d619cacd367acea",
+        "recording-quarry-resize-1.rec": "d22490a357dfdfe5840170d3fae4baa80b62d75f54e1c9637b1a95dc591f8973"
+      },
+      "input_path": "recording-quarry-resize-1.rec"
+    },
+    "recording-yew-resize-resize-1": {
+      "input_sha256": "48c589222a52aee289063cd150cfdd168b70297bf2fe9efb606250437e0b7ff5",
+      "size": [
+        80,
+        24
+      ],
+      "kind": "recording-resize-checkpoint",
+      "recording": "yew-resize.rec",
+      "resize_index": 1,
+      "original_input_sha256": "e5452a0c4eb7f7a5f18b01c4700a3519868e4f6c4ab35fbd906393e14e7b1170",
+      "target_size": [
+        100,
+        30
+      ],
+      "screen_sha256": "978ca55331613dec11f116f82daa62b53cabc651cc3d3f1e61d2ebb67dbe0d23",
+      "classification": "measured",
+      "files": {
+        "recording-yew-resize-resize-1/A.json": "dabe6b70bf304b847150282fe29ae69503fd5b63f6dff88e2c8203bcc4313e04",
+        "recording-yew-resize-resize-1/S.json": "6225c391cfe871223b30f12daef577e4261bcfb3221d92d2fea84e259a3cd1db",
+        "recording-yew-resize-resize-1/A.print": "b7de3f87f41880eb5d536d52ac2a1b5da29ac0a874ea285d57f7ffa2326023eb",
+        "recording-yew-resize-resize-1/S.print": "4d6f8eead3cb28f1ef1d5ff14f14a61be541b3384fcea5000d4e318a018c9893",
+        "recording-yew-resize-resize-1/continuation.json": "61075316940f2cb133269a42d357ea1fbcdf1f53867e2d40d2787b1331ba7e23",
+        "recording-yew-resize-resize-1/got.screen": "978ca55331613dec11f116f82daa62b53cabc651cc3d3f1e61d2ebb67dbe0d23",
+        "recording-yew-resize-resize-1.rec": "48c589222a52aee289063cd150cfdd168b70297bf2fe9efb606250437e0b7ff5"
+      },
+      "input_path": "recording-yew-resize-resize-1.rec"
+    },
+    "recording-yew-resize-resize-2": {
+      "input_sha256": "9c32b864c54d9bdc397984804275aefe7f4af25800a525fe0ee23984d316d47d",
+      "size": [
+        80,
+        24
+      ],
+      "kind": "recording-resize-checkpoint",
+      "recording": "yew-resize.rec",
+      "resize_index": 2,
+      "original_input_sha256": "e5452a0c4eb7f7a5f18b01c4700a3519868e4f6c4ab35fbd906393e14e7b1170",
+      "target_size": [
+        60,
+        20
+      ],
+      "screen_sha256": "95c1a52ffa28686745055898225b9b32d5eb1d0574e685c08bd80faed8f23ea0",
+      "classification": "measured",
+      "files": {
+        "recording-yew-resize-resize-2/A.json": "7d6870dd89bd9c166396a02904436fea77ab52c2710c6cfe37841e0e6fdb6d40",
+        "recording-yew-resize-resize-2/S.json": "b176af2441848b730399feb9f5a3da3297f9f471f66cccb7c8ab5a8179f9d97f",
+        "recording-yew-resize-resize-2/A.print": "78ec4ea434f925fb996b3f5665865acfa0129d3daf541fcf1681e5d8b7e67c38",
+        "recording-yew-resize-resize-2/S.print": "2d0da8c29a43e55410a065a2818251290d5607c2f4b28bd543f87b3d9adf8dca",
+        "recording-yew-resize-resize-2/continuation.json": "8d49dd9832c2deaa766ea7911f220e804ea094b8a2ac3c2583d9367731b3a0b8",
+        "recording-yew-resize-resize-2/got.screen": "95c1a52ffa28686745055898225b9b32d5eb1d0574e685c08bd80faed8f23ea0",
+        "recording-yew-resize-resize-2.rec": "9c32b864c54d9bdc397984804275aefe7f4af25800a525fe0ee23984d316d47d"
+      },
+      "input_path": "recording-yew-resize-resize-2.rec"
+    }
+  },
+  "errors": [],
+  "capture_head": "58b03bd",
+  "capture_manifest_sha256": "fb5de6c03c39fc31478365fcbd71bf934530eb5afde27cd59ee9ac6e0dbd1db0"
+}
