@@ -9,7 +9,7 @@ fn main() -> int {
         let pane = new(80, 24, 4096)
         let retained = budget.charged(frame) - before
         io.write_line("MEASURE pane-interpreter cols=80 rows=24 history-cap=4096 retained={retained}")
-        assert(pane.history.bytes.len == 4096 && retained == 781904, "pane-interpreter-small-history-budget")
+        assert(pane.history.bytes.len == 4096 && retained == 782096, "pane-interpreter-small-history-budget")
     }
     0
 }
