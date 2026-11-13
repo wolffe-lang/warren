@@ -71,6 +71,16 @@ step lupin-pure "$LUPIN" run src/pure_test.lu
 step answer-build "$WOLF" build --deny-warnings src/vt_answers_test.lu -o "$root/target/native/vt-answers"
 step version-answer-native python3 -I tests/vt/version_answer.py "$root/target/native/vt-answers"
 step version-answer-lupin python3 -I tests/vt/version_answer.py "$LUPIN" run src/vt_answers_test.lu
+# Framing/capacity rows live beside the pure members to exercise private
+# storage policy. The native default ring and smaller interpreter ledger
+# are deliberately separate entries; the interpreter cap is not increased.
+for entry in capacity_rows history_rows history_capacity_rows; do
+  step "vt-$entry-build" "$WOLF" build --deny-warnings "src/vt/$entry.lu" -o "$root/target/native/vt-$entry"
+  step "vt-$entry-native" "$root/target/native/vt-$entry"
+done
+for entry in capacity_rows history_rows history_ledger_rows; do
+  step "vt-$entry-lupin" "$LUPIN" run "src/vt/$entry.lu"
+done
 [ "$mode" = linux ] || exit 0
 # The oracle rows. No step here skips: without the pinned binaries it is red.
 oracle_identity() {

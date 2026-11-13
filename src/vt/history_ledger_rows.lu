@@ -15,7 +15,7 @@ fn main() -> int {
         assert(history.bytes.len == 1048576)
         assert(large_charge - small_charge == 16 * (1048576 - 4096), "history-ledger-byte-formula")
         let overhead = small_charge - 16 * 4096
-        assert(overhead >= 0 && overhead <= 8192)
+        assert(overhead == 176, "history-ledger-fixed-overhead")
         let stable = budget.charged(frame)
         var id = 0
         while id < 1024 { assert(history_reserve(mut history, id, 0, 0) >= 0); id += 1 }

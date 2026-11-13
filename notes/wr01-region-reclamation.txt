@@ -26,6 +26,25 @@ The approved VT design consequently reuses backing storage. A resize within
 capacity must not allocate; growth is explicit and charged, and abandoned
 arena buffers are never claimed freed. The budget is expressed at peak
 backing capacity, bounded by the protocol's 262,144-cell area limit, plus the
-fixed-cap encoded history ring and the two-screen storage term at capacity.
+fixed-cap encoded history ring and screen/workspace storage at capacity.
 A repeated grow/shrink/grow row must show that retained charge stops rising
 once capacity has been reached, natively and under the interpreter's cap.
+
+The framed ring's default-capacity witness is native-only. Its 8,388,608
+encoded bytes retain 8,388,656 arena bytes: one byte per encoded byte plus
+48 bytes of overhead. This is the public native ring bound, not a bound for
+an entire pane and not yet evidence of screen-history integration.
+
+The same default witness is RED under lupin's unchanged 32 MiB region cap:
+the copied-out List alone would charge 134,217,760 ledger bytes, or 16 per
+encoded byte plus its 32-byte header, before the constructor can finish.
+This is an interpreter-ledger property, not 128 MiB of encoded history and
+not a native leak. That default interpreter row is not called green.
+
+Instead, src/vt/history_ledger_rows.lu uses 4,096-byte and 1,048,576-byte
+configured rings under the same 32 MiB cap. Complete constructor charges are
+16*N + 176 on this pin: the larger retains 16,777,392 ledger bytes. The row
+asserts both the 16-byte slope and 176-byte fixed term, and 1,024 appends add
+zero charge. src/vt/history_capacity_rows.lu independently asserts the exact
+native default bound. A ledger or representation change must move its row,
+not be hidden by raising the interpreter cap. No issue is filed here.
