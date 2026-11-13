@@ -123,7 +123,7 @@ step version-answer-lupin python3 -I tests/vt/version_answer.py "$LUPIN" run src
 # Framing/capacity rows live beside the pure members to exercise private
 # storage policy. The native default ring and smaller interpreter ledger
 # are deliberately separate entries; the interpreter cap is not increased.
-for entry in vt_grid_test vt_unicode_test vt_ops_test vt_screen_state_test vt_graphics_test vt_events_test vt_dump_test vt_width_test vt_history_test vt_resize_test vt_interaction_test vt_resource_test vt_scalar_test; do
+for entry in vt_grid_test vt_unicode_test vt_annotation_test vt_ops_test vt_screen_state_test vt_graphics_test vt_events_test vt_dump_test vt_width_test vt_history_test vt_resize_test vt_interaction_test vt_resource_test vt_scalar_test; do
   step "$entry-lupin" "$LUPIN" run "src/$entry.lu"
 done
 for entry in cell_capacity_rows copy_rows capacity_rows history_rows history_codec_rows history_fragment_rows line_coordinate_rows history_deque_rows history_prefix_rows reflow_rows resize_properties_rows history_capacity_rows pane_capacity_rows; do

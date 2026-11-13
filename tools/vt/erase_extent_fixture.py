@@ -127,6 +127,8 @@ class Trace:
                 self.blank(row, i, preserve=True)
 
     def print(self, cp):
+        if 0xFFF9 <= cp <= 0xFFFB:
+            return
         size = width(cp)
         if size == 0:
             if cp == 0x200D or (self.col == 1 and not self.pending):
