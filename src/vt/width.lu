@@ -7,30 +7,32 @@
 pub fn width_version() -> str { "15.1.0" }
 
 /// Natural width: Mn/Me and default-ignorable Cf are zero; EAW W/F
-/// or Emoji_Presentation are two (zero wins); otherwise one. This
-/// does not execute controls, join emoji, or validate scalar input.
+/// or Emoji_Presentation are two (zero wins); otherwise one.
+/// The stated 350 C-library exception scalars override that base rule;
+/// see tests/vt/width-exceptions.json for ranges, counts and reasons.
+/// This does not execute controls, join emoji, or validate scalar input.
 /// Parser validation precedes it; out-of-range integers return one.
 pub fn scalar_width(cp: int) -> int {
     if cp < 128 || cp > 1114111 { return 1 }
-    if cp < 43232 {
+    if cp < 43335 {
         if cp < 5906 {
-            if cp < 2881 {
-                if cp < 2362 {
-                    if cp < 1767 {
-                        if cp < 1479 {
-                            if cp < 1425 {
-                                if cp < 768 {
-                                    if cp < 173 {
+            if cp < 2893 {
+                if cp < 2364 {
+                    if cp < 1770 {
+                        if cp < 1552 {
+                            if cp < 1471 {
+                                if cp < 1155 {
+                                    if cp < 768 {
                                         return 1
-                                    } else if cp > 173 {
+                                    } else if cp > 879 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 879 {
-                                    if cp < 1155 {
+                                } else if cp > 1161 {
+                                    if cp < 1425 {
                                         return 1
-                                    } else if cp > 1161 {
+                                    } else if cp > 1469 {
                                         return 1
                                     } else {
                                         return 0
@@ -38,19 +40,19 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 1469 {
-                                if cp < 1473 {
-                                    if cp < 1471 {
+                            } else if cp > 1471 {
+                                if cp < 1476 {
+                                    if cp < 1473 {
                                         return 1
-                                    } else if cp > 1471 {
+                                    } else if cp > 1474 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 1474 {
-                                    if cp < 1476 {
+                                } else if cp > 1477 {
+                                    if cp < 1479 {
                                         return 1
-                                    } else if cp > 1477 {
+                                    } else if cp > 1479 {
                                         return 1
                                     } else {
                                         return 0
@@ -61,20 +63,20 @@ pub fn scalar_width(cp: int) -> int {
                             } else {
                                 return 0
                             }
-                        } else if cp > 1479 {
-                            if cp < 1648 {
-                                if cp < 1564 {
-                                    if cp < 1552 {
+                        } else if cp > 1562 {
+                            if cp < 1750 {
+                                if cp < 1611 {
+                                    if cp < 1564 {
                                         return 1
-                                    } else if cp > 1562 {
+                                    } else if cp > 1564 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 1564 {
-                                    if cp < 1611 {
+                                } else if cp > 1631 {
+                                    if cp < 1648 {
                                         return 1
-                                    } else if cp > 1631 {
+                                    } else if cp > 1648 {
                                         return 1
                                     } else {
                                         return 0
@@ -82,16 +84,16 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 1648 {
-                                if cp < 1759 {
-                                    if cp < 1750 {
+                            } else if cp > 1756 {
+                                if cp < 1767 {
+                                    if cp < 1759 {
                                         return 1
-                                    } else if cp > 1756 {
+                                    } else if cp > 1764 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 1764 {
+                                } else if cp > 1768 {
                                     return 1
                                 } else {
                                     return 0
@@ -102,21 +104,21 @@ pub fn scalar_width(cp: int) -> int {
                         } else {
                             return 0
                         }
-                    } else if cp > 1768 {
-                        if cp < 2075 {
-                            if cp < 1958 {
-                                if cp < 1809 {
-                                    if cp < 1770 {
+                    } else if cp > 1773 {
+                        if cp < 2085 {
+                            if cp < 2027 {
+                                if cp < 1840 {
+                                    if cp < 1809 {
                                         return 1
-                                    } else if cp > 1773 {
+                                    } else if cp > 1809 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 1809 {
-                                    if cp < 1840 {
+                                } else if cp > 1866 {
+                                    if cp < 1958 {
                                         return 1
-                                    } else if cp > 1866 {
+                                    } else if cp > 1968 {
                                         return 1
                                     } else {
                                         return 0
@@ -124,19 +126,19 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 1968 {
-                                if cp < 2045 {
-                                    if cp < 2027 {
+                            } else if cp > 2035 {
+                                if cp < 2070 {
+                                    if cp < 2045 {
                                         return 1
-                                    } else if cp > 2035 {
+                                    } else if cp > 2045 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 2045 {
-                                    if cp < 2070 {
+                                } else if cp > 2073 {
+                                    if cp < 2075 {
                                         return 1
-                                    } else if cp > 2073 {
+                                    } else if cp > 2083 {
                                         return 1
                                     } else {
                                         return 0
@@ -147,20 +149,20 @@ pub fn scalar_width(cp: int) -> int {
                             } else {
                                 return 0
                             }
-                        } else if cp > 2083 {
-                            if cp < 2200 {
-                                if cp < 2089 {
-                                    if cp < 2085 {
+                        } else if cp > 2087 {
+                            if cp < 2250 {
+                                if cp < 2137 {
+                                    if cp < 2089 {
                                         return 1
-                                    } else if cp > 2087 {
+                                    } else if cp > 2093 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 2093 {
-                                    if cp < 2137 {
+                                } else if cp > 2139 {
+                                    if cp < 2200 {
                                         return 1
-                                    } else if cp > 2139 {
+                                    } else if cp > 2207 {
                                         return 1
                                     } else {
                                         return 0
@@ -168,16 +170,16 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 2207 {
-                                if cp < 2275 {
-                                    if cp < 2250 {
+                            } else if cp > 2273 {
+                                if cp < 2362 {
+                                    if cp < 2275 {
                                         return 1
-                                    } else if cp > 2273 {
+                                    } else if cp > 2306 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 2306 {
+                                } else if cp > 2362 {
                                     return 1
                                 } else {
                                     return 0
@@ -191,22 +193,22 @@ pub fn scalar_width(cp: int) -> int {
                     } else {
                         return 0
                     }
-                } else if cp > 2362 {
-                    if cp < 2631 {
-                        if cp < 2497 {
-                            if cp < 2385 {
-                                if cp < 2369 {
-                                    if cp < 2364 {
+                } else if cp > 2364 {
+                    if cp < 2635 {
+                        if cp < 2509 {
+                            if cp < 2402 {
+                                if cp < 2381 {
+                                    if cp < 2369 {
                                         return 1
-                                    } else if cp > 2364 {
+                                    } else if cp > 2376 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 2376 {
-                                    if cp < 2381 {
+                                } else if cp > 2381 {
+                                    if cp < 2385 {
                                         return 1
-                                    } else if cp > 2381 {
+                                    } else if cp > 2391 {
                                         return 1
                                     } else {
                                         return 0
@@ -214,19 +216,19 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 2391 {
-                                if cp < 2433 {
-                                    if cp < 2402 {
+                            } else if cp > 2403 {
+                                if cp < 2492 {
+                                    if cp < 2433 {
                                         return 1
-                                    } else if cp > 2403 {
+                                    } else if cp > 2433 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 2433 {
-                                    if cp < 2492 {
+                                } else if cp > 2492 {
+                                    if cp < 2497 {
                                         return 1
-                                    } else if cp > 2492 {
+                                    } else if cp > 2500 {
                                         return 1
                                     } else {
                                         return 0
@@ -237,20 +239,20 @@ pub fn scalar_width(cp: int) -> int {
                             } else {
                                 return 0
                             }
-                        } else if cp > 2500 {
-                            if cp < 2561 {
-                                if cp < 2530 {
-                                    if cp < 2509 {
+                        } else if cp > 2509 {
+                            if cp < 2620 {
+                                if cp < 2558 {
+                                    if cp < 2530 {
                                         return 1
-                                    } else if cp > 2509 {
+                                    } else if cp > 2531 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 2531 {
-                                    if cp < 2558 {
+                                } else if cp > 2558 {
+                                    if cp < 2561 {
                                         return 1
-                                    } else if cp > 2558 {
+                                    } else if cp > 2562 {
                                         return 1
                                     } else {
                                         return 0
@@ -258,16 +260,16 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 2562 {
-                                if cp < 2625 {
-                                    if cp < 2620 {
+                            } else if cp > 2620 {
+                                if cp < 2631 {
+                                    if cp < 2625 {
                                         return 1
-                                    } else if cp > 2620 {
+                                    } else if cp > 2626 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 2626 {
+                                } else if cp > 2632 {
                                     return 1
                                 } else {
                                     return 0
@@ -278,21 +280,21 @@ pub fn scalar_width(cp: int) -> int {
                         } else {
                             return 0
                         }
-                    } else if cp > 2632 {
-                        if cp < 2759 {
-                            if cp < 2677 {
-                                if cp < 2641 {
-                                    if cp < 2635 {
+                    } else if cp > 2637 {
+                        if cp < 2765 {
+                            if cp < 2689 {
+                                if cp < 2672 {
+                                    if cp < 2641 {
                                         return 1
-                                    } else if cp > 2637 {
+                                    } else if cp > 2641 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 2641 {
-                                    if cp < 2672 {
+                                } else if cp > 2673 {
+                                    if cp < 2677 {
                                         return 1
-                                    } else if cp > 2673 {
+                                    } else if cp > 2677 {
                                         return 1
                                     } else {
                                         return 0
@@ -300,19 +302,19 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 2677 {
-                                if cp < 2748 {
-                                    if cp < 2689 {
+                            } else if cp > 2690 {
+                                if cp < 2753 {
+                                    if cp < 2748 {
                                         return 1
-                                    } else if cp > 2690 {
+                                    } else if cp > 2748 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 2748 {
-                                    if cp < 2753 {
+                                } else if cp > 2757 {
+                                    if cp < 2759 {
                                         return 1
-                                    } else if cp > 2757 {
+                                    } else if cp > 2760 {
                                         return 1
                                     } else {
                                         return 0
@@ -323,20 +325,20 @@ pub fn scalar_width(cp: int) -> int {
                             } else {
                                 return 0
                             }
-                        } else if cp > 2760 {
-                            if cp < 2817 {
-                                if cp < 2786 {
-                                    if cp < 2765 {
+                        } else if cp > 2765 {
+                            if cp < 2876 {
+                                if cp < 2810 {
+                                    if cp < 2786 {
                                         return 1
-                                    } else if cp > 2765 {
+                                    } else if cp > 2787 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 2787 {
-                                    if cp < 2810 {
+                                } else if cp > 2815 {
+                                    if cp < 2817 {
                                         return 1
-                                    } else if cp > 2815 {
+                                    } else if cp > 2817 {
                                         return 1
                                     } else {
                                         return 0
@@ -344,16 +346,16 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 2817 {
-                                if cp < 2879 {
-                                    if cp < 2876 {
+                            } else if cp > 2876 {
+                                if cp < 2881 {
+                                    if cp < 2879 {
                                         return 1
-                                    } else if cp > 2876 {
+                                    } else if cp > 2879 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 2879 {
+                                } else if cp > 2884 {
                                     return 1
                                 } else {
                                     return 0
@@ -370,23 +372,23 @@ pub fn scalar_width(cp: int) -> int {
                 } else {
                     return 0
                 }
-            } else if cp > 2884 {
-                if cp < 3633 {
-                    if cp < 3201 {
-                        if cp < 3076 {
-                            if cp < 2946 {
-                                if cp < 2901 {
-                                    if cp < 2893 {
+            } else if cp > 2893 {
+                if cp < 3636 {
+                    if cp < 3260 {
+                        if cp < 3132 {
+                            if cp < 3008 {
+                                if cp < 2914 {
+                                    if cp < 2901 {
                                         return 1
-                                    } else if cp > 2893 {
+                                    } else if cp > 2902 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 2902 {
-                                    if cp < 2914 {
+                                } else if cp > 2915 {
+                                    if cp < 2946 {
                                         return 1
-                                    } else if cp > 2915 {
+                                    } else if cp > 2946 {
                                         return 1
                                     } else {
                                         return 0
@@ -394,19 +396,19 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 2946 {
-                                if cp < 3021 {
-                                    if cp < 3008 {
+                            } else if cp > 3008 {
+                                if cp < 3072 {
+                                    if cp < 3021 {
                                         return 1
-                                    } else if cp > 3008 {
+                                    } else if cp > 3021 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 3021 {
-                                    if cp < 3072 {
+                                } else if cp > 3072 {
+                                    if cp < 3076 {
                                         return 1
-                                    } else if cp > 3072 {
+                                    } else if cp > 3076 {
                                         return 1
                                     } else {
                                         return 0
@@ -417,20 +419,20 @@ pub fn scalar_width(cp: int) -> int {
                             } else {
                                 return 0
                             }
-                        } else if cp > 3076 {
-                            if cp < 3146 {
-                                if cp < 3134 {
-                                    if cp < 3132 {
+                        } else if cp > 3132 {
+                            if cp < 3157 {
+                                if cp < 3142 {
+                                    if cp < 3134 {
                                         return 1
-                                    } else if cp > 3132 {
+                                    } else if cp > 3136 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 3136 {
-                                    if cp < 3142 {
+                                } else if cp > 3144 {
+                                    if cp < 3146 {
                                         return 1
-                                    } else if cp > 3144 {
+                                    } else if cp > 3149 {
                                         return 1
                                     } else {
                                         return 0
@@ -438,16 +440,16 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 3149 {
-                                if cp < 3170 {
-                                    if cp < 3157 {
+                            } else if cp > 3158 {
+                                if cp < 3201 {
+                                    if cp < 3170 {
                                         return 1
-                                    } else if cp > 3158 {
+                                    } else if cp > 3171 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 3171 {
+                                } else if cp > 3201 {
                                     return 1
                                 } else {
                                     return 0
@@ -458,21 +460,21 @@ pub fn scalar_width(cp: int) -> int {
                         } else {
                             return 0
                         }
-                    } else if cp > 3201 {
-                        if cp < 3393 {
-                            if cp < 3276 {
-                                if cp < 3263 {
-                                    if cp < 3260 {
+                    } else if cp > 3260 {
+                        if cp < 3405 {
+                            if cp < 3298 {
+                                if cp < 3270 {
+                                    if cp < 3263 {
                                         return 1
-                                    } else if cp > 3260 {
+                                    } else if cp > 3263 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 3263 {
-                                    if cp < 3270 {
+                                } else if cp > 3270 {
+                                    if cp < 3276 {
                                         return 1
-                                    } else if cp > 3270 {
+                                    } else if cp > 3277 {
                                         return 1
                                     } else {
                                         return 0
@@ -480,19 +482,19 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 3277 {
-                                if cp < 3328 {
-                                    if cp < 3298 {
+                            } else if cp > 3299 {
+                                if cp < 3387 {
+                                    if cp < 3328 {
                                         return 1
-                                    } else if cp > 3299 {
+                                    } else if cp > 3329 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 3329 {
-                                    if cp < 3387 {
+                                } else if cp > 3388 {
+                                    if cp < 3393 {
                                         return 1
-                                    } else if cp > 3388 {
+                                    } else if cp > 3396 {
                                         return 1
                                     } else {
                                         return 0
@@ -503,20 +505,20 @@ pub fn scalar_width(cp: int) -> int {
                             } else {
                                 return 0
                             }
-                        } else if cp > 3396 {
-                            if cp < 3530 {
-                                if cp < 3426 {
-                                    if cp < 3405 {
+                        } else if cp > 3405 {
+                            if cp < 3538 {
+                                if cp < 3457 {
+                                    if cp < 3426 {
                                         return 1
-                                    } else if cp > 3405 {
+                                    } else if cp > 3427 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 3427 {
-                                    if cp < 3457 {
+                                } else if cp > 3457 {
+                                    if cp < 3530 {
                                         return 1
-                                    } else if cp > 3457 {
+                                    } else if cp > 3530 {
                                         return 1
                                     } else {
                                         return 0
@@ -524,16 +526,16 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 3530 {
-                                if cp < 3542 {
-                                    if cp < 3538 {
+                            } else if cp > 3540 {
+                                if cp < 3633 {
+                                    if cp < 3542 {
                                         return 1
-                                    } else if cp > 3540 {
+                                    } else if cp > 3542 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 3542 {
+                                } else if cp > 3633 {
                                     return 1
                                 } else {
                                     return 0
@@ -547,22 +549,22 @@ pub fn scalar_width(cp: int) -> int {
                     } else {
                         return 0
                     }
-                } else if cp > 3633 {
-                    if cp < 4038 {
-                        if cp < 3895 {
-                            if cp < 3764 {
-                                if cp < 3655 {
-                                    if cp < 3636 {
+                } else if cp > 3642 {
+                    if cp < 4141 {
+                        if cp < 3897 {
+                            if cp < 3784 {
+                                if cp < 3761 {
+                                    if cp < 3655 {
                                         return 1
-                                    } else if cp > 3642 {
+                                    } else if cp > 3662 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 3662 {
-                                    if cp < 3761 {
+                                } else if cp > 3761 {
+                                    if cp < 3764 {
                                         return 1
-                                    } else if cp > 3761 {
+                                    } else if cp > 3772 {
                                         return 1
                                     } else {
                                         return 0
@@ -570,19 +572,19 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 3772 {
-                                if cp < 3864 {
-                                    if cp < 3784 {
+                            } else if cp > 3790 {
+                                if cp < 3893 {
+                                    if cp < 3864 {
                                         return 1
-                                    } else if cp > 3790 {
+                                    } else if cp > 3865 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 3865 {
-                                    if cp < 3893 {
+                                } else if cp > 3893 {
+                                    if cp < 3895 {
                                         return 1
-                                    } else if cp > 3893 {
+                                    } else if cp > 3895 {
                                         return 1
                                     } else {
                                         return 0
@@ -593,20 +595,20 @@ pub fn scalar_width(cp: int) -> int {
                             } else {
                                 return 0
                             }
-                        } else if cp > 3895 {
-                            if cp < 3974 {
-                                if cp < 3953 {
-                                    if cp < 3897 {
+                        } else if cp > 3897 {
+                            if cp < 3981 {
+                                if cp < 3968 {
+                                    if cp < 3953 {
                                         return 1
-                                    } else if cp > 3897 {
+                                    } else if cp > 3966 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 3966 {
-                                    if cp < 3968 {
+                                } else if cp > 3972 {
+                                    if cp < 3974 {
                                         return 1
-                                    } else if cp > 3972 {
+                                    } else if cp > 3975 {
                                         return 1
                                     } else {
                                         return 0
@@ -614,16 +616,16 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 3975 {
-                                if cp < 3993 {
-                                    if cp < 3981 {
+                            } else if cp > 3991 {
+                                if cp < 4038 {
+                                    if cp < 3993 {
                                         return 1
-                                    } else if cp > 3991 {
+                                    } else if cp > 4028 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 4028 {
+                                } else if cp > 4038 {
                                     return 1
                                 } else {
                                     return 0
@@ -634,21 +636,21 @@ pub fn scalar_width(cp: int) -> int {
                         } else {
                             return 0
                         }
-                    } else if cp > 4038 {
-                        if cp < 4209 {
-                            if cp < 4157 {
-                                if cp < 4146 {
-                                    if cp < 4141 {
+                    } else if cp > 4144 {
+                        if cp < 4226 {
+                            if cp < 4184 {
+                                if cp < 4153 {
+                                    if cp < 4146 {
                                         return 1
-                                    } else if cp > 4144 {
+                                    } else if cp > 4151 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 4151 {
-                                    if cp < 4153 {
+                                } else if cp > 4154 {
+                                    if cp < 4157 {
                                         return 1
-                                    } else if cp > 4154 {
+                                    } else if cp > 4158 {
                                         return 1
                                     } else {
                                         return 0
@@ -656,16 +658,16 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 4158 {
-                                if cp < 4190 {
-                                    if cp < 4184 {
+                            } else if cp > 4185 {
+                                if cp < 4209 {
+                                    if cp < 4190 {
                                         return 1
-                                    } else if cp > 4185 {
+                                    } else if cp > 4192 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 4192 {
+                                } else if cp > 4212 {
                                     return 1
                                 } else {
                                     return 0
@@ -673,20 +675,20 @@ pub fn scalar_width(cp: int) -> int {
                             } else {
                                 return 0
                             }
-                        } else if cp > 4212 {
-                            if cp < 4253 {
-                                if cp < 4229 {
-                                    if cp < 4226 {
+                        } else if cp > 4226 {
+                            if cp < 4352 {
+                                if cp < 4237 {
+                                    if cp < 4229 {
                                         return 1
-                                    } else if cp > 4226 {
+                                    } else if cp > 4230 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 4230 {
-                                    if cp < 4237 {
+                                } else if cp > 4237 {
+                                    if cp < 4253 {
                                         return 1
-                                    } else if cp > 4237 {
+                                    } else if cp > 4253 {
                                         return 1
                                     } else {
                                         return 0
@@ -694,14 +696,14 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 4253 {
+                            } else if cp > 4447 {
                                 if cp < 4957 {
-                                    if cp < 4352 {
+                                    if cp < 4448 {
                                         return 1
-                                    } else if cp > 4447 {
+                                    } else if cp > 4607 {
                                         return 1
                                     } else {
-                                        return 2
+                                        return 0
                                     }
                                 } else if cp > 4959 {
                                     return 1
@@ -709,7 +711,7 @@ pub fn scalar_width(cp: int) -> int {
                                     return 0
                                 }
                             } else {
-                                return 0
+                                return 2
                             }
                         } else {
                             return 0
@@ -724,7 +726,7 @@ pub fn scalar_width(cp: int) -> int {
                 return 0
             }
         } else if cp > 5908 {
-            if cp < 9725 {
+            if cp < 9748 {
                 if cp < 6978 {
                     if cp < 6457 {
                         if cp < 6109 {
@@ -989,7 +991,7 @@ pub fn scalar_width(cp: int) -> int {
                             return 0
                         }
                     } else if cp > 7405 {
-                        if cp < 8294 {
+                        if cp < 8400 {
                             if cp < 8203 {
                                 if cp < 7416 {
                                     if cp < 7412 {
@@ -1020,27 +1022,33 @@ pub fn scalar_width(cp: int) -> int {
                                         return 0
                                     }
                                 } else if cp > 8292 {
-                                    return 1
+                                    if cp < 8294 {
+                                        return 1
+                                    } else if cp > 8303 {
+                                        return 1
+                                    } else {
+                                        return 0
+                                    }
                                 } else {
                                     return 0
                                 }
                             } else {
                                 return 0
                             }
-                        } else if cp > 8303 {
-                            if cp < 9193 {
-                                if cp < 8986 {
-                                    if cp < 8400 {
+                        } else if cp > 8432 {
+                            if cp < 9200 {
+                                if cp < 9001 {
+                                    if cp < 8986 {
                                         return 1
-                                    } else if cp > 8432 {
+                                    } else if cp > 8987 {
                                         return 1
                                     } else {
-                                        return 0
+                                        return 2
                                     }
-                                } else if cp > 8987 {
-                                    if cp < 9001 {
+                                } else if cp > 9002 {
+                                    if cp < 9193 {
                                         return 1
-                                    } else if cp > 9002 {
+                                    } else if cp > 9196 {
                                         return 1
                                     } else {
                                         return 2
@@ -1048,16 +1056,16 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 2
                                 }
-                            } else if cp > 9196 {
-                                if cp < 9203 {
-                                    if cp < 9200 {
+                            } else if cp > 9200 {
+                                if cp < 9725 {
+                                    if cp < 9203 {
                                         return 1
-                                    } else if cp > 9200 {
+                                    } else if cp > 9203 {
                                         return 1
                                     } else {
                                         return 2
                                     }
-                                } else if cp > 9203 {
+                                } else if cp > 9726 {
                                     return 1
                                 } else {
                                     return 2
@@ -1074,23 +1082,23 @@ pub fn scalar_width(cp: int) -> int {
                 } else {
                     return 0
                 }
-            } else if cp > 9726 {
-                if cp < 11647 {
-                    if cp < 9981 {
-                        if cp < 9924 {
-                            if cp < 9875 {
-                                if cp < 9800 {
-                                    if cp < 9748 {
+            } else if cp > 9749 {
+                if cp < 11744 {
+                    if cp < 9989 {
+                        if cp < 9934 {
+                            if cp < 9889 {
+                                if cp < 9855 {
+                                    if cp < 9800 {
                                         return 1
-                                    } else if cp > 9749 {
+                                    } else if cp > 9811 {
                                         return 1
                                     } else {
                                         return 2
                                     }
-                                } else if cp > 9811 {
-                                    if cp < 9855 {
+                                } else if cp > 9855 {
+                                    if cp < 9875 {
                                         return 1
-                                    } else if cp > 9855 {
+                                    } else if cp > 9875 {
                                         return 1
                                     } else {
                                         return 2
@@ -1098,19 +1106,19 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 2
                                 }
-                            } else if cp > 9875 {
-                                if cp < 9898 {
-                                    if cp < 9889 {
+                            } else if cp > 9889 {
+                                if cp < 9917 {
+                                    if cp < 9898 {
                                         return 1
-                                    } else if cp > 9889 {
+                                    } else if cp > 9899 {
                                         return 1
                                     } else {
                                         return 2
                                     }
-                                } else if cp > 9899 {
-                                    if cp < 9917 {
+                                } else if cp > 9918 {
+                                    if cp < 9924 {
                                         return 1
-                                    } else if cp > 9918 {
+                                    } else if cp > 9925 {
                                         return 1
                                     } else {
                                         return 2
@@ -1121,20 +1129,20 @@ pub fn scalar_width(cp: int) -> int {
                             } else {
                                 return 2
                             }
-                        } else if cp > 9925 {
-                            if cp < 9970 {
-                                if cp < 9940 {
-                                    if cp < 9934 {
+                        } else if cp > 9934 {
+                            if cp < 9973 {
+                                if cp < 9962 {
+                                    if cp < 9940 {
                                         return 1
-                                    } else if cp > 9934 {
+                                    } else if cp > 9940 {
                                         return 1
                                     } else {
                                         return 2
                                     }
-                                } else if cp > 9940 {
-                                    if cp < 9962 {
+                                } else if cp > 9962 {
+                                    if cp < 9970 {
                                         return 1
-                                    } else if cp > 9962 {
+                                    } else if cp > 9971 {
                                         return 1
                                     } else {
                                         return 2
@@ -1142,16 +1150,16 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 2
                                 }
-                            } else if cp > 9971 {
-                                if cp < 9978 {
-                                    if cp < 9973 {
+                            } else if cp > 9973 {
+                                if cp < 9981 {
+                                    if cp < 9978 {
                                         return 1
-                                    } else if cp > 9973 {
+                                    } else if cp > 9978 {
                                         return 1
                                     } else {
                                         return 2
                                     }
-                                } else if cp > 9978 {
+                                } else if cp > 9981 {
                                     return 1
                                 } else {
                                     return 2
@@ -1162,21 +1170,21 @@ pub fn scalar_width(cp: int) -> int {
                         } else {
                             return 2
                         }
-                    } else if cp > 9981 {
-                        if cp < 10133 {
-                            if cp < 10060 {
-                                if cp < 9994 {
-                                    if cp < 9989 {
+                    } else if cp > 9989 {
+                        if cp < 10160 {
+                            if cp < 10062 {
+                                if cp < 10024 {
+                                    if cp < 9994 {
                                         return 1
-                                    } else if cp > 9989 {
+                                    } else if cp > 9995 {
                                         return 1
                                     } else {
                                         return 2
                                     }
-                                } else if cp > 9995 {
-                                    if cp < 10024 {
+                                } else if cp > 10024 {
+                                    if cp < 10060 {
                                         return 1
-                                    } else if cp > 10024 {
+                                    } else if cp > 10060 {
                                         return 1
                                     } else {
                                         return 2
@@ -1184,19 +1192,19 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 2
                                 }
-                            } else if cp > 10060 {
-                                if cp < 10067 {
-                                    if cp < 10062 {
+                            } else if cp > 10062 {
+                                if cp < 10071 {
+                                    if cp < 10067 {
                                         return 1
-                                    } else if cp > 10062 {
+                                    } else if cp > 10069 {
                                         return 1
                                     } else {
                                         return 2
                                     }
-                                } else if cp > 10069 {
-                                    if cp < 10071 {
+                                } else if cp > 10071 {
+                                    if cp < 10133 {
                                         return 1
-                                    } else if cp > 10071 {
+                                    } else if cp > 10135 {
                                         return 1
                                     } else {
                                         return 2
@@ -1207,20 +1215,20 @@ pub fn scalar_width(cp: int) -> int {
                             } else {
                                 return 2
                             }
-                        } else if cp > 10135 {
-                            if cp < 11088 {
-                                if cp < 10175 {
-                                    if cp < 10160 {
+                        } else if cp > 10160 {
+                            if cp < 11093 {
+                                if cp < 11035 {
+                                    if cp < 10175 {
                                         return 1
-                                    } else if cp > 10160 {
+                                    } else if cp > 10175 {
                                         return 1
                                     } else {
                                         return 2
                                     }
-                                } else if cp > 10175 {
-                                    if cp < 11035 {
+                                } else if cp > 11036 {
+                                    if cp < 11088 {
                                         return 1
-                                    } else if cp > 11036 {
+                                    } else if cp > 11088 {
                                         return 1
                                     } else {
                                         return 2
@@ -1228,16 +1236,16 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 2
                                 }
-                            } else if cp > 11088 {
-                                if cp < 11503 {
-                                    if cp < 11093 {
+                            } else if cp > 11093 {
+                                if cp < 11647 {
+                                    if cp < 11503 {
                                         return 1
-                                    } else if cp > 11093 {
+                                    } else if cp > 11505 {
                                         return 1
                                     } else {
-                                        return 2
+                                        return 0
                                     }
-                                } else if cp > 11505 {
+                                } else if cp > 11647 {
                                     return 1
                                 } else {
                                     return 0
@@ -1251,22 +1259,22 @@ pub fn scalar_width(cp: int) -> int {
                     } else {
                         return 2
                     }
-                } else if cp > 11647 {
-                    if cp < 12832 {
-                        if cp < 12353 {
-                            if cp < 12032 {
-                                if cp < 11904 {
-                                    if cp < 11744 {
+                } else if cp > 11775 {
+                    if cp < 42128 {
+                        if cp < 12441 {
+                            if cp < 12272 {
+                                if cp < 11931 {
+                                    if cp < 11904 {
                                         return 1
-                                    } else if cp > 11775 {
+                                    } else if cp > 11929 {
                                         return 1
                                     } else {
-                                        return 0
+                                        return 2
                                     }
-                                } else if cp > 11929 {
-                                    if cp < 11931 {
+                                } else if cp > 12019 {
+                                    if cp < 12032 {
                                         return 1
-                                    } else if cp > 12019 {
+                                    } else if cp > 12245 {
                                         return 1
                                     } else {
                                         return 2
@@ -1274,43 +1282,43 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 2
                                 }
-                            } else if cp > 12245 {
-                                if cp < 12330 {
-                                    if cp < 12272 {
+                            } else if cp > 12329 {
+                                if cp < 12334 {
+                                    if cp < 12330 {
                                         return 1
-                                    } else if cp > 12329 {
+                                    } else if cp > 12333 {
                                         return 1
                                     } else {
-                                        return 2
+                                        return 0
                                     }
-                                } else if cp > 12333 {
-                                    if cp < 12334 {
+                                } else if cp > 12350 {
+                                    if cp < 12353 {
                                         return 1
-                                    } else if cp > 12350 {
+                                    } else if cp > 12438 {
                                         return 1
                                     } else {
                                         return 2
                                     }
                                 } else {
-                                    return 0
+                                    return 2
                                 }
                             } else {
                                 return 2
                             }
-                        } else if cp > 12438 {
-                            if cp < 12593 {
-                                if cp < 12443 {
-                                    if cp < 12441 {
+                        } else if cp > 12442 {
+                            if cp < 12688 {
+                                if cp < 12549 {
+                                    if cp < 12443 {
                                         return 1
-                                    } else if cp > 12442 {
+                                    } else if cp > 12543 {
                                         return 1
                                     } else {
-                                        return 0
+                                        return 2
                                     }
-                                } else if cp > 12543 {
-                                    if cp < 12549 {
+                                } else if cp > 12591 {
+                                    if cp < 12593 {
                                         return 1
-                                    } else if cp > 12591 {
+                                    } else if cp > 12686 {
                                         return 1
                                     } else {
                                         return 2
@@ -1318,16 +1326,16 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 2
                                 }
-                            } else if cp > 12686 {
-                                if cp < 12783 {
-                                    if cp < 12688 {
+                            } else if cp > 12771 {
+                                if cp < 12832 {
+                                    if cp < 12783 {
                                         return 1
-                                    } else if cp > 12771 {
+                                    } else if cp > 12830 {
                                         return 1
                                     } else {
                                         return 2
                                     }
-                                } else if cp > 12830 {
+                                } else if cp > 42124 {
                                     return 1
                                 } else {
                                     return 2
@@ -1336,49 +1344,31 @@ pub fn scalar_width(cp: int) -> int {
                                 return 2
                             }
                         } else {
-                            return 2
+                            return 0
                         }
-                    } else if cp > 12871 {
-                        if cp < 42736 {
-                            if cp < 42607 {
-                                if cp < 19968 {
-                                    if cp < 12880 {
+                    } else if cp > 42182 {
+                        if cp < 43019 {
+                            if cp < 42736 {
+                                if cp < 42612 {
+                                    if cp < 42607 {
                                         return 1
-                                    } else if cp > 19903 {
-                                        return 1
-                                    } else {
-                                        return 2
-                                    }
-                                } else if cp > 42124 {
-                                    if cp < 42128 {
-                                        return 1
-                                    } else if cp > 42182 {
-                                        return 1
-                                    } else {
-                                        return 2
-                                    }
-                                } else {
-                                    return 2
-                                }
-                            } else if cp > 42610 {
-                                if cp < 42654 {
-                                    if cp < 42612 {
-                                        return 1
-                                    } else if cp > 42621 {
+                                    } else if cp > 42610 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 42655 {
-                                    return 1
+                                } else if cp > 42621 {
+                                    if cp < 42654 {
+                                        return 1
+                                    } else if cp > 42655 {
+                                        return 1
+                                    } else {
+                                        return 0
+                                    }
                                 } else {
                                     return 0
                                 }
-                            } else {
-                                return 0
-                            }
-                        } else if cp > 42737 {
-                            if cp < 43045 {
+                            } else if cp > 42737 {
                                 if cp < 43014 {
                                     if cp < 43010 {
                                         return 1
@@ -1388,9 +1378,27 @@ pub fn scalar_width(cp: int) -> int {
                                         return 0
                                     }
                                 } else if cp > 43014 {
-                                    if cp < 43019 {
+                                    return 1
+                                } else {
+                                    return 0
+                                }
+                            } else {
+                                return 0
+                            }
+                        } else if cp > 43019 {
+                            if cp < 43232 {
+                                if cp < 43052 {
+                                    if cp < 43045 {
                                         return 1
-                                    } else if cp > 43019 {
+                                    } else if cp > 43046 {
+                                        return 1
+                                    } else {
+                                        return 0
+                                    }
+                                } else if cp > 43052 {
+                                    if cp < 43204 {
+                                        return 1
+                                    } else if cp > 43205 {
                                         return 1
                                     } else {
                                         return 0
@@ -1398,16 +1406,16 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 43046 {
-                                if cp < 43204 {
-                                    if cp < 43052 {
+                            } else if cp > 43249 {
+                                if cp < 43302 {
+                                    if cp < 43263 {
                                         return 1
-                                    } else if cp > 43052 {
+                                    } else if cp > 43263 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 43205 {
+                                } else if cp > 43309 {
                                     return 1
                                 } else {
                                     return 0
@@ -1430,45 +1438,25 @@ pub fn scalar_width(cp: int) -> int {
         } else {
             return 0
         }
-    } else if cp > 43249 {
+    } else if cp > 43345 {
         if cp < 72760 {
             if cp < 69888 {
-                if cp < 65040 {
-                    if cp < 43644 {
-                        if cp < 43452 {
-                            if cp < 43360 {
-                                if cp < 43302 {
-                                    if cp < 43263 {
+                if cp < 65056 {
+                    if cp < 43703 {
+                        if cp < 43569 {
+                            if cp < 43446 {
+                                if cp < 43392 {
+                                    if cp < 43360 {
                                         return 1
-                                    } else if cp > 43263 {
-                                        return 1
-                                    } else {
-                                        return 0
-                                    }
-                                } else if cp > 43309 {
-                                    if cp < 43335 {
-                                        return 1
-                                    } else if cp > 43345 {
+                                    } else if cp > 43388 {
                                         return 1
                                     } else {
-                                        return 0
+                                        return 2
                                     }
-                                } else {
-                                    return 0
-                                }
-                            } else if cp > 43388 {
-                                if cp < 43443 {
-                                    if cp < 43392 {
+                                } else if cp > 43394 {
+                                    if cp < 43443 {
                                         return 1
-                                    } else if cp > 43394 {
-                                        return 1
-                                    } else {
-                                        return 0
-                                    }
-                                } else if cp > 43443 {
-                                    if cp < 43446 {
-                                        return 1
-                                    } else if cp > 43449 {
+                                    } else if cp > 43443 {
                                         return 1
                                     } else {
                                         return 0
@@ -1476,53 +1464,51 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else {
-                                return 2
-                            }
-                        } else if cp > 43453 {
-                            if cp < 43573 {
-                                if cp < 43561 {
-                                    if cp < 43493 {
+                            } else if cp > 43449 {
+                                if cp < 43493 {
+                                    if cp < 43452 {
                                         return 1
-                                    } else if cp > 43493 {
+                                    } else if cp > 43453 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 43566 {
-                                    if cp < 43569 {
+                                } else if cp > 43493 {
+                                    if cp < 43561 {
                                         return 1
-                                    } else if cp > 43570 {
-                                        return 1
-                                    } else {
-                                        return 0
-                                    }
-                                } else {
-                                    return 0
-                                }
-                            } else if cp > 43574 {
-                                if cp < 43596 {
-                                    if cp < 43587 {
-                                        return 1
-                                    } else if cp > 43587 {
+                                    } else if cp > 43566 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 43596 {
-                                    return 1
                                 } else {
                                     return 0
                                 }
                             } else {
                                 return 0
                             }
-                        } else {
-                            return 0
-                        }
-                    } else if cp > 43644 {
-                        if cp < 44005 {
-                            if cp < 43710 {
+                        } else if cp > 43570 {
+                            if cp < 43644 {
+                                if cp < 43587 {
+                                    if cp < 43573 {
+                                        return 1
+                                    } else if cp > 43574 {
+                                        return 1
+                                    } else {
+                                        return 0
+                                    }
+                                } else if cp > 43587 {
+                                    if cp < 43596 {
+                                        return 1
+                                    } else if cp > 43596 {
+                                        return 1
+                                    } else {
+                                        return 0
+                                    }
+                                } else {
+                                    return 0
+                                }
+                            } else if cp > 43644 {
                                 if cp < 43698 {
                                     if cp < 43696 {
                                         return 1
@@ -1532,9 +1518,31 @@ pub fn scalar_width(cp: int) -> int {
                                         return 0
                                     }
                                 } else if cp > 43700 {
-                                    if cp < 43703 {
+                                    return 1
+                                } else {
+                                    return 0
+                                }
+                            } else {
+                                return 0
+                            }
+                        } else {
+                            return 0
+                        }
+                    } else if cp > 43704 {
+                        if cp < 44032 {
+                            if cp < 43766 {
+                                if cp < 43713 {
+                                    if cp < 43710 {
                                         return 1
-                                    } else if cp > 43704 {
+                                    } else if cp > 43711 {
+                                        return 1
+                                    } else {
+                                        return 0
+                                    }
+                                } else if cp > 43713 {
+                                    if cp < 43756 {
+                                        return 1
+                                    } else if cp > 43757 {
                                         return 1
                                     } else {
                                         return 0
@@ -1542,19 +1550,19 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 43711 {
-                                if cp < 43756 {
-                                    if cp < 43713 {
+                            } else if cp > 43766 {
+                                if cp < 44008 {
+                                    if cp < 44005 {
                                         return 1
-                                    } else if cp > 43713 {
+                                    } else if cp > 44005 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 43757 {
-                                    if cp < 43766 {
+                                } else if cp > 44008 {
+                                    if cp < 44013 {
                                         return 1
-                                    } else if cp > 43766 {
+                                    } else if cp > 44013 {
                                         return 1
                                     } else {
                                         return 0
@@ -1565,20 +1573,20 @@ pub fn scalar_width(cp: int) -> int {
                             } else {
                                 return 0
                             }
-                        } else if cp > 44005 {
-                            if cp < 63744 {
-                                if cp < 44013 {
-                                    if cp < 44008 {
+                        } else if cp > 55203 {
+                            if cp < 64286 {
+                                if cp < 55243 {
+                                    if cp < 55216 {
                                         return 1
-                                    } else if cp > 44008 {
+                                    } else if cp > 55238 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 44013 {
-                                    if cp < 44032 {
+                                } else if cp > 55291 {
+                                    if cp < 63744 {
                                         return 1
-                                    } else if cp > 55203 {
+                                    } else if cp > 64255 {
                                         return 1
                                     } else {
                                         return 2
@@ -1586,45 +1594,45 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 0
                                 }
-                            } else if cp > 64255 {
-                                if cp < 65024 {
-                                    if cp < 64286 {
+                            } else if cp > 64286 {
+                                if cp < 65040 {
+                                    if cp < 65024 {
                                         return 1
-                                    } else if cp > 64286 {
+                                    } else if cp > 65039 {
                                         return 1
                                     } else {
                                         return 0
                                     }
-                                } else if cp > 65039 {
+                                } else if cp > 65049 {
                                     return 1
                                 } else {
-                                    return 0
+                                    return 2
                                 }
                             } else {
-                                return 2
+                                return 0
                             }
                         } else {
-                            return 0
+                            return 2
                         }
                     } else {
                         return 0
                     }
-                } else if cp > 65049 {
+                } else if cp > 65071 {
                     if cp < 68159 {
                         if cp < 66045 {
-                            if cp < 65128 {
-                                if cp < 65072 {
-                                    if cp < 65056 {
+                            if cp < 65279 {
+                                if cp < 65108 {
+                                    if cp < 65072 {
                                         return 1
-                                    } else if cp > 65071 {
+                                    } else if cp > 65106 {
                                         return 1
                                     } else {
-                                        return 0
+                                        return 2
                                     }
-                                } else if cp > 65106 {
-                                    if cp < 65108 {
+                                } else if cp > 65126 {
+                                    if cp < 65128 {
                                         return 1
-                                    } else if cp > 65126 {
+                                    } else if cp > 65131 {
                                         return 1
                                     } else {
                                         return 2
@@ -1632,28 +1640,28 @@ pub fn scalar_width(cp: int) -> int {
                                 } else {
                                     return 2
                                 }
-                            } else if cp > 65131 {
-                                if cp < 65281 {
-                                    if cp < 65279 {
+                            } else if cp > 65279 {
+                                if cp < 65504 {
+                                    if cp < 65281 {
                                         return 1
-                                    } else if cp > 65279 {
-                                        return 1
-                                    } else {
-                                        return 0
-                                    }
-                                } else if cp > 65376 {
-                                    if cp < 65504 {
-                                        return 1
-                                    } else if cp > 65510 {
+                                    } else if cp > 65376 {
                                         return 1
                                     } else {
                                         return 2
+                                    }
+                                } else if cp > 65510 {
+                                    if cp < 65529 {
+                                        return 1
+                                    } else if cp > 65531 {
+                                        return 1
+                                    } else {
+                                        return 0
                                     }
                                 } else {
                                     return 2
                                 }
                             } else {
-                                return 2
+                                return 0
                             }
                         } else if cp > 66045 {
                             if cp < 68101 {
@@ -1786,7 +1794,7 @@ pub fn scalar_width(cp: int) -> int {
                         return 0
                     }
                 } else {
-                    return 2
+                    return 0
                 }
             } else if cp > 69890 {
                 if cp < 71103 {
@@ -2232,7 +2240,7 @@ pub fn scalar_width(cp: int) -> int {
                         }
                     } else if cp > 73473 {
                         if cp < 94031 {
-                            if cp < 78912 {
+                            if cp < 78896 {
                                 if cp < 73536 {
                                     if cp < 73526 {
                                         return 1
@@ -2540,7 +2548,7 @@ pub fn scalar_width(cp: int) -> int {
                                 return 0
                             }
                         } else if cp > 126980 {
-                            if cp < 127462 {
+                            if cp < 127488 {
                                 if cp < 127374 {
                                     if cp < 127183 {
                                         return 1

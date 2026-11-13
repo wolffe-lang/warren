@@ -23,13 +23,8 @@
       "sha256": "d7aef489c8fe4c14f09ea5695200277c6b93ac82ac60845cdd2161b0d6835cc1"
     }
   ],
-  "algorithm": "Mn/Me and default-ignorable Cf are zero; EAW W/F or Emoji_Presentation are two; zero wins; otherwise one",
+  "algorithm": "Mn/Me and default-ignorable Cf zero; EAW W/F or Emoji_Presentation two; zero wins; otherwise one; then the stated 350 measured C-library exceptions override the base table",
   "ranges": [
-    [
-      173,
-      173,
-      0
-    ],
     [
       768,
       879,
@@ -611,6 +606,11 @@
       2
     ],
     [
+      4448,
+      4607,
+      0
+    ],
+    [
       4957,
       4959,
       0
@@ -1137,16 +1137,6 @@
     ],
     [
       12832,
-      12871,
-      2
-    ],
-    [
-      12880,
-      19903,
-      2
-    ],
-    [
-      19968,
       42124,
       2
     ],
@@ -1341,6 +1331,16 @@
       2
     ],
     [
+      55216,
+      55238,
+      0
+    ],
+    [
+      55243,
+      55291,
+      0
+    ],
+    [
       63744,
       64255,
       2
@@ -1394,6 +1394,11 @@
       65504,
       65510,
       2
+    ],
+    [
+      65529,
+      65531,
+      0
     ],
     [
       66045,
@@ -1896,7 +1901,7 @@
       0
     ],
     [
-      78912,
+      78896,
       78912,
       0
     ],
@@ -2156,7 +2161,7 @@
       2
     ],
     [
-      127462,
+      127488,
       127490,
       2
     ],
@@ -2391,5 +2396,6 @@
       0
     ]
   ],
-  "generated_sha256": "0e8c9f099fb766c82408fa3a418b0f138119275745b6ae5cbf28645460ea0afb"
+  "exceptions_sha256": "d947010b04d305a811cd7608ed7571c3d88a026101a8767fb1ed896ca8da5fca",
+  "generated_sha256": "31a450ba2c0aecc5680dbdc5e7142ac57bea8073bca4b5521d2ed1429d1baf27"
 }

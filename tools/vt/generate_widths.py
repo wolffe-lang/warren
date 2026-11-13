@@ -75,6 +75,20 @@ def make_ranges(inputs):
                 if cats[cp] == 2:
                     widths[cp] = 0
     widths[0x200B:0x2010] = b'\0' * 5
+    policy = json.loads((ROOT / 'tests/vt/width-exceptions.json').read_text())
+    assert policy['schema'] == 1 and policy['unicode'] == '15.1.0' and policy['total'] == 350
+    seen = set()
+    for group in policy['groups']:
+        count = 0
+        assert group['reason'] and group['width'] in (0, 1, 2)
+        for low, high in group['ranges']:
+            for cp in range(int(low, 16), int(high, 16) + 1):
+                assert cp not in seen and widths[cp] == group['unicode_width']
+                widths[cp] = group['width']
+                seen.add(cp)
+                count += 1
+        assert count == group['count']
+    assert len(seen) == 350
     ranges = []
     at = 0
     while at < LIMIT:
@@ -109,8 +123,10 @@ def render(version, ranges):
              '/// The pinned normative width-data version; locale independent.',
              'pub fn width_version() -> str { "%s" }' % version, '',
              '/// Natural width: Mn/Me and default-ignorable Cf are zero; EAW W/F',
-             '/// or Emoji_Presentation are two (zero wins); otherwise one. This',
-             '/// does not execute controls, join emoji, or validate scalar input.',
+             '/// or Emoji_Presentation are two (zero wins); otherwise one.',
+             '/// The stated 350 C-library exception scalars override that base rule;',
+             '/// see tests/vt/width-exceptions.json for ranges, counts and reasons.',
+             '/// This does not execute controls, join emoji, or validate scalar input.',
              '/// Parser validation precedes it; out-of-range integers return one.',
              'pub fn scalar_width(cp: int) -> int {',
              '    if cp < 128 || cp > 1114111 { return 1 }']
@@ -139,6 +155,7 @@ def main():
     code = render(pin['version'], ranges)
     metadata = {'schema': 1, 'version': pin['version'], 'sources': pin['sources'],
                 'algorithm': pin['algorithm'], 'ranges': ranges,
+                'exceptions_sha256': digest((ROOT / 'tests/vt/width-exceptions.json').read_bytes()),
                 'generated_sha256': digest(code.encode())}
     encoded = json.dumps(metadata, indent=2) + '\n'
     for path, text in [(ROOT / 'src/vt/width.lu', code),
