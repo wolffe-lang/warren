@@ -18,7 +18,7 @@ import tty
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / 'tools/vt'))
-from check_width_policy import expected_differences
+from check_width_policy import exception_scalars
 from width_sweep import positions
 PAIRS = {'US': (0x1F1FA, 0x1F1F8), 'GB': (0x1F1EC, 0x1F1E7)}
 
@@ -71,7 +71,7 @@ def main():
     vector = args.native_vector.read_bytes()
     import runpy
     assert vector == runpy.run_path(str(ROOT / 'tests/vt/width_vector_rows.py'))['expected_vector']()
-    entries = expected_differences()
+    entries = exception_scalars()
     assert len(entries) == 350
     rows = []
     for entry in entries:
