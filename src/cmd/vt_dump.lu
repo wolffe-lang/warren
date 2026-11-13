@@ -212,6 +212,8 @@ pub fn vt_dump(args: List[str]) -> int {
     }
     var input = new_dump_input(take file)
     let result = if options.replay { dump_recording(mut input, options) } else { dump_raw(mut input, options) }
-    fs.close(take input.file) else { io.write_err_line("warren: cannot close input"); return 1 }
+    if options.file != "-" {
+        fs.close(take input.file) else { io.write_err_line("warren: cannot close input"); return 1 }
+    }
     result
 }
