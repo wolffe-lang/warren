@@ -73,6 +73,7 @@ step width-exception-rows python3 -I tests/vt/width_exception_rows.py
 step current-width-measurements python3 -I tools/vt/check_width_columns.py
 step report-fixture-rows python3 -I tests/vt/report_fixture_rows.py
 step report-bound-rows python3 -I tests/vt/report_bound_rows.py
+step erase-extent-source-rows python3 -I tests/vt/erase_extent_rows.py
 step corpus-chunking-rows python3 -I tests/vt/chunking_rows.py
 step checked-verdict-rows python3 -I tests/vt/checked_verdict_rows.py
 step observer-deadline-rows python3 -I tests/vt/observer_rows.py
