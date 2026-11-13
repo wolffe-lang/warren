@@ -1,0 +1,37 @@
+//! member: false
+//! Interlinear annotation controls are consumed without occupying a cell/mark.
+use vt
+
+fn test_annotation_controls_are_not_stored() {
+    let controls: List[str] = ["\u{fff9}", "\u{fffa}", "\u{fffb}"]
+    for control in controls {
+        var text = vt.new(12, 4, 0)
+        vt.feed(mut text, "a".bytes())
+        vt.feed(mut text, control.bytes())
+        assert(text.cursor_row == 1 && text.cursor_col == 2 && text.primary.extents[0] == 1)
+        assert(text.primary.cells[0].base == 97 && text.primary.cells[0].mark1 == 0 &&
+            text.primary.cells[0].mark2 == 0, "annotation-control-not-a-mark")
+        var blank = vt.new(12, 4, 0)
+        vt.feed(mut blank, "\u{1b}[1;5H".bytes())
+        vt.feed(mut blank, control.bytes())
+        assert(blank.cursor_col == 5 && blank.primary.extents[0] == 0, "annotation-control-does-not-write-blank")
+        var index = 0
+        while index < 48 {
+            assert(blank.primary.cells[index].mark1 == 0 && !blank.primary.cells[index].written)
+            index += 1
+        }
+        var slots = vt.new(12, 4, 0)
+        vt.feed(mut slots, "a\u{301}".bytes())
+        vt.feed(mut slots, control.bytes())
+        vt.feed(mut slots, "\u{302}".bytes())
+        assert(slots.primary.cells[0].mark1 == 0x301 && slots.primary.cells[0].mark2 == 0x302,
+            "annotation-control-does-not-consume-mark-slot")
+        var pending = vt.new(2, 2, 0)
+        vt.feed(mut pending, "\u{1b}[2GZ".bytes())
+        vt.feed(mut pending, control.bytes())
+        assert(pending.pending_wrap && pending.cursor_col == 2 && pending.primary.cells[1].mark1 == 0,
+            "annotation-control-preserves-pending-wrap")
+    }
+}
+
+fn main() -> int { test_annotation_controls_are_not_stored(); 0 }

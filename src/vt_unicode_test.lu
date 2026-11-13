@@ -119,9 +119,9 @@ fn test_zero_width_exception_attachment() {
         jamo.primary.cells[0].mark1 == 0x1160 && jamo.primary.cells[0].mark2 == 0x11A8,
         "zero-width-jamo-attach-to-base")
     var format = vt.new(12, 4, 0)
-    vt.feed(mut format, "a\u{fff9}\u{13430}".bytes())
-    assert(format.cursor_col == 2 && format.primary.cells[0].mark1 == 0xFFF9 &&
-        format.primary.cells[0].mark2 == 0x13430, "zero-width-format-attach-to-base")
+    vt.feed(mut format, "a\u{13430}\u{13431}".bytes())
+    assert(format.cursor_col == 2 && format.primary.cells[0].mark1 == 0x13430 &&
+        format.primary.cells[0].mark2 == 0x13431, "zero-width-format-attach-to-base")
     var blank = vt.new(12, 4, 0)
     vt.feed(mut blank, "\u{1b}[1;5H\u{1161}".bytes())
     assert(blank.primary.cells[3].written && blank.primary.extents[0] == 4 &&
