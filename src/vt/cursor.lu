@@ -51,6 +51,8 @@ fn erase_row(mut screen: Screen, cols: int, row: int, first: int, last: int, bac
     if last == cols {
         if screen.extents[row - 1] >= first { screen.extents[row - 1] = first - 1 - (if starts_in_tail { 1 } else { 0 }) }
         screen.wrapped[row - 1] = false
+    } else if screen.extents[row - 1] < last {
+        screen.extents[row - 1] = last
     }
 }
 
