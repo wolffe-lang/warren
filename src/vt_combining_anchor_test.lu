@@ -82,6 +82,11 @@ fn test_anchor_preserving_operations_and_rendition() {
 }
 
 fn test_anchor_survives_resize_as_logical_cell() {
+    var height = vt.new(12, 4, 4096)
+    vt.feed(mut height, "abcd".bytes())
+    assert(vt.resize(mut height, 12, 8) == "")
+    vt.feed(mut height, "\t\u{301}".bytes())
+    assert(marked(height, 1, 4), "combine-anchor-height-only-snapshot-path")
     var pane = vt.new(12, 4, 4096)
     vt.feed(mut pane, "abcdefghijklmnop".bytes())
     assert(vt.resize(mut pane, 3, 8) == "" && vt.resize(mut pane, 6, 8) == "")
