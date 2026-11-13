@@ -1,0 +1,59 @@
+//! member: false
+//! Tab and explicit scrolling operations, including one-row regions.
+use vt
+use std.mem.budget
+
+fn test_tabs() {
+    var pane = vt.new(30, 3, 0)
+    vt.feed(mut pane, "\u{1b}[2IX\u{1b}[2ZY".bytes())
+    assert(pane.primary.cells[16].base == 88 && pane.primary.cells[16].width == 1, "ops-cht")
+    assert(pane.primary.cells[8].base == 89 && pane.cursor_col == 10, "ops-cbt")
+    vt.feed(mut pane, "\u{1b}[3g\u{1b}[1;5H\u{1b}H\r\tZ".bytes())
+    assert(pane.primary.cells[4].base == 90 && !pane.default_tabs, "ops-hts")
+    assert(pane.tabs[4] && !pane.tabs[8])
+    vt.feed(mut pane, "\u{1b}[1;5H\u{1b}[g\r\tQ".bytes())
+    assert(pane.primary.cells[29].base == 81 && !pane.tabs[4], "ops-tbc")
+    vt.feed(mut pane, "\u{1b}[999ZI".bytes())
+    assert(pane.primary.cells[0].base == 73 && pane.cursor_col == 2)
+    var pending = vt.new(4, 2, 0)
+    vt.feed(mut pending, "abcd\u{1b}HZ".bytes())
+    assert(pending.primary.cells[4].base == 90 && pending.tabs[3])
+}
+
+fn test_index_and_reverse_index() {
+    var pane = vt.new(5, 3, 0)
+    vt.feed(mut pane, "a\u{1b}DZ\u{1b}EQ".bytes())
+    assert(pane.primary.cells[6].base == 90 && pane.primary.cells[10].base == 81, "ops-ind-nel")
+    vt.feed(mut pane, "\u{1b}[1;2H\u{1b}MX".bytes())
+    assert(pane.primary.cells[1].base == 88 && pane.primary.cells[5].base == 97, "ops-ri")
+    assert(pane.primary.cells[11].base == 90 && pane.cursor_row == 1 && pane.cursor_col == 3)
+    var region = vt.new(4, 4, 0)
+    vt.feed(mut region, "1\r\n2\r\n3\r\n4\u{1b}[2;3r\u{1b}[2;1H\u{1b}M".bytes())
+    assert(region.primary.cells[0].base == 49 && region.primary.cells[4].base == 32)
+    assert(region.primary.cells[8].base == 50 && region.primary.cells[12].base == 52)
+    vt.feed(mut region, "\u{1b}[4;4H\u{1b}D".bytes())
+    assert(region.cursor_row == 4 && region.cursor_col == 4)
+    var one = vt.new(2, 1, 0)
+    vt.feed(mut one, "ab\u{1b}MZ".bytes())
+    assert(one.primary.cells[0].base == 32 && one.primary.cells[1].base == 90)
+    assert(one.pending_wrap && one.cursor_row == 1)
+}
+
+fn test_scroll_operations() {
+    region frame(cap: 1048576) {
+        var pane = vt.new(4, 4, 0)
+        vt.feed(mut pane, "1\r\n2\r\n3\r\n4\u{1b}[2;4r\u{1b}[3;3H\u{1b}[44m".bytes())
+        let data = "\u{1b}[S\u{1b}[T".bytes()
+        let stable = budget.charged(frame)
+        vt.feed(mut pane, data)
+        assert(pane.primary.cells[0].base == 49 && pane.primary.cells[4].base == 32, "ops-su-sd")
+        assert(pane.primary.cells[8].base == 51 && pane.primary.cells[12].base == 52)
+        assert(pane.primary.cells[4].background == 4 && pane.primary.extents[1] == 0)
+        assert(pane.cursor_row == 3 && pane.cursor_col == 3)
+        var i = 0
+        while i < 256 { vt.feed(mut pane, data); i += 1 }
+        assert(budget.charged(frame) == stable, "ops-scroll-allocation")
+    }
+}
+
+fn main() -> int { test_tabs(); test_index_and_reverse_index(); test_scroll_operations(); 0 }
