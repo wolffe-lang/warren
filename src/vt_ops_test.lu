@@ -1,5 +1,5 @@
 //! member: false
-//! Tab and explicit scrolling operations, including one-row regions.
+//! Tab and explicit scrolling operations, including one-row boundeds.
 use vt
 use std.mem.budget
 
@@ -27,12 +27,12 @@ fn test_index_and_reverse_index() {
     vt.feed(mut pane, "\u{1b}[1;2H\u{1b}MX".bytes())
     assert(pane.primary.cells[1].base == 88 && pane.primary.cells[5].base == 97, "ops-ri")
     assert(pane.primary.cells[11].base == 90 && pane.cursor_row == 1 && pane.cursor_col == 3)
-    var region = vt.new(4, 4, 0)
-    vt.feed(mut region, "1\r\n2\r\n3\r\n4\u{1b}[2;3r\u{1b}[2;1H\u{1b}M".bytes())
-    assert(region.primary.cells[0].base == 49 && region.primary.cells[4].base == 32)
-    assert(region.primary.cells[8].base == 50 && region.primary.cells[12].base == 52)
-    vt.feed(mut region, "\u{1b}[4;4H\u{1b}D".bytes())
-    assert(region.cursor_row == 4 && region.cursor_col == 4)
+    var bounded = vt.new(4, 4, 0)
+    vt.feed(mut bounded, "1\r\n2\r\n3\r\n4\u{1b}[2;3r\u{1b}[2;1H\u{1b}M".bytes())
+    assert(bounded.primary.cells[0].base == 49 && bounded.primary.cells[4].base == 32)
+    assert(bounded.primary.cells[8].base == 50 && bounded.primary.cells[12].base == 52)
+    vt.feed(mut bounded, "\u{1b}[4;4H\u{1b}D".bytes())
+    assert(bounded.cursor_row == 4 && bounded.cursor_col == 4)
     var one = vt.new(2, 1, 0)
     vt.feed(mut one, "ab\u{1b}MZ".bytes())
     assert(one.primary.cells[0].base == 32 && one.primary.cells[1].base == 90)
