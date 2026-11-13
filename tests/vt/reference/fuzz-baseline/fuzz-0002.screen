@@ -1,0 +1,128 @@
+warren-screen 1
+size 80 24
+cursor 1 25 shape=3 visible=1 pending-wrap=0
+region 17 24
+tabs 9,17,25,33,41,49,57,65,73
+title 6775757374
+mode alternate-screen-1047 0
+mode alternate-screen-1049 0
+mode alternate-screen-47 0
+mode alternate-scroll 0
+mode application-cursor-keys 0
+mode application-keypad 0
+mode autowrap 1
+mode bracketed-paste 0
+mode cursor-blink 1
+mode cursor-visible 1
+mode focus-events 1
+mode insert 1
+mode left-right-margins 0
+mode mouse-any-motion 0
+mode mouse-button-motion 0
+mode mouse-press-release 0
+mode mouse-sgr 1
+mode mouse-urxvt 0
+mode mouse-utf8 0
+mode newline 0
+mode origin 0
+mode reverse-wrap 0
+mode send-receive 1
+mode synchronized-output ?
+row 1 extent=80
+1 2 U+D55C italic,invisible,fg=idx:95
+2 0 - italic,invisible,fg=idx:95
+3 2 U+D55C italic,invisible,fg=idx:95
+4 0 - italic,invisible,fg=idx:95
+5 2 U+3042 italic,invisible,fg=idx:95
+6 0 - italic,invisible,fg=idx:95
+7 2 U+3042 italic,invisible,fg=idx:95
+8 0 - italic,invisible,fg=idx:95
+9 2 U+3042 italic,invisible,fg=idx:95
+10 0 - italic,invisible,fg=idx:95
+11 1 U+007A italic,invisible,fg=idx:95
+12 1 U+003A italic,invisible,fg=idx:95
+13 1 U+005E italic,invisible,fg=idx:95
+14 1 U+0041 italic,invisible,fg=idx:95
+15 1 U+0050 italic,invisible,fg=idx:95
+16 1 U+002E italic,invisible,fg=idx:95
+17 1 U+0021 italic,invisible,fg=idx:95
+18 1 U+0031 italic,invisible,fg=idx:95
+19 1 U+0052 italic,invisible,fg=idx:95
+20 1 U+005A italic,invisible,fg=idx:95
+21 1 U+0039 italic,invisible,fg=idx:95
+22 1 U+006E italic,invisible,fg=idx:95
+23 1 U+0059 italic,invisible,fg=idx:95
+24 1 U+002B italic,invisible,fg=idx:95
+25 1 U+003E invisible,fg=idx:0
+26 1 U+0046 invisible,fg=idx:0
+27 1 U+0032 invisible,fg=idx:0
+28 1 U+0046 invisible,fg=idx:0
+29 1 U+0037 invisible,fg=idx:0
+30 1 U+0055 invisible,fg=idx:0
+31 1 U+0043 invisible,fg=idx:0
+32 1 U+0074 invisible,fg=idx:0
+33 1 U+0063 invisible,fg=idx:0
+34 1 U+0046 invisible,fg=idx:0
+35 1 U+002F invisible,fg=idx:0
+36 1 U+0043 invisible,fg=idx:0
+37 1 U+0023 invisible,fg=idx:0
+38 1 U+0076 invisible,fg=idx:0
+39 1 U+003B invisible,fg=idx:0
+40 1 U+007B invisible,fg=idx:0
+41 1 U+006F invisible,fg=idx:0
+42 1 U+005C invisible,fg=idx:0
+43 1 U+0020 fg=idx:0
+44-80 1 U+0020 fg=idx:3
+row 2 extent=5
+1 1 U+003E italic,invisible,fg=idx:0
+2 1 U+0065 italic,invisible,fg=idx:0
+3 1 U+0025 italic,invisible,fg=idx:0
+4 1 U+003F italic,invisible,fg=idx:0
+5 1 U+0075 italic,invisible,fg=idx:0
+6-80 1 U+0020 fg=idx:3
+row 3 extent=9
+1-8 1 U+0020 fg=idx:3
+9 1 U+0068+U+0308 invisible,fg=idx:0
+10-80 1 U+0020 fg=idx:3
+row 4 extent=0
+1-80 1 U+0020 fg=idx:3
+row 5 extent=0
+1-80 1 U+0020 fg=idx:3
+row 6 extent=0
+1-80 1 U+0020 fg=idx:3
+row 7 extent=0
+1-80 1 U+0020 fg=idx:3
+row 8 extent=0
+1-80 1 U+0020 fg=idx:3
+row 9 extent=0
+1-80 1 U+0020 fg=idx:3
+row 10 extent=0
+1-80 1 U+0020 fg=idx:3
+row 11 extent=0
+1-80 1 U+0020 fg=idx:3
+row 12 extent=0
+1-80 1 U+0020 fg=idx:3
+row 13 extent=0
+1-80 1 U+0020 fg=idx:3
+row 14 extent=0
+1-80 1 U+0020 fg=idx:3
+row 15 extent=0
+1-80 1 U+0020 fg=idx:3
+row 16 extent=0
+1-80 1 U+0020 fg=idx:3
+row 17 extent=0
+1-80 1 U+0020 fg=idx:3
+row 18 extent=0
+1-80 1 U+0020 fg=idx:3
+row 19 extent=0
+1-80 1 U+0020 fg=idx:3
+row 20 extent=0
+1-80 1 U+0020 fg=idx:3
+row 21 extent=0
+1-80 1 U+0020 fg=idx:3
+row 22 extent=0
+1-80 1 U+0020 fg=idx:3
+row 23 extent=0
+1-80 1 U+0020 fg=idx:3
+row 24 extent=0
+1-80 1 U+0020 fg=idx:3

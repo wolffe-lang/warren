@@ -1,0 +1,91 @@
+warren-screen 1
+size 80 24
+cursor 3 14 shape=3 visible=1 pending-wrap=0
+region 19 24
+tabs 9,17,25,33,41,47,49,57,65,73
+title 6466
+mode alternate-screen-1047 1
+mode alternate-screen-1049 1
+mode alternate-screen-47 1
+mode alternate-scroll 0
+mode application-cursor-keys 0
+mode application-keypad 1
+mode autowrap 1
+mode bracketed-paste 0
+mode cursor-blink 1
+mode cursor-visible 1
+mode focus-events 0
+mode insert 1
+mode left-right-margins 0
+mode mouse-any-motion 0
+mode mouse-button-motion 0
+mode mouse-press-release 0
+mode mouse-sgr 0
+mode mouse-urxvt 0
+mode mouse-utf8 0
+mode newline 0
+mode origin 0
+mode reverse-wrap 0
+mode send-receive 1
+mode synchronized-output ?
+row 1 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 2 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 3 extent=13
+1 1 U+003E strike,fg=idx:242,bg=idx:156
+2 1 U+004C strike,fg=idx:242,bg=idx:156
+3 1 U+004D strike,fg=idx:242,bg=idx:156
+4 1 U+0068 strike,fg=idx:242,bg=idx:156
+5 1 U+0067 strike,fg=idx:242,bg=idx:156
+6 1 U+006B strike,fg=idx:242,bg=idx:156
+7 2 U+4E2D strike,fg=idx:242,bg=idx:156
+8 0 - strike,fg=idx:242,bg=idx:156
+9 2 U+4E2D strike,fg=idx:242,bg=idx:156
+10 0 - strike,fg=idx:242,bg=idx:156
+11 2 U+4E2D strike,fg=idx:242,bg=idx:156
+12 0 - strike,fg=idx:242,bg=idx:156
+13 1 U+006C+U+0308 strike,fg=idx:242,bg=idx:156
+14-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 4 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 5 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 6 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 7 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 8 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 9 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 10 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 11 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 12 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 13 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 14 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 15 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 16 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 17 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 18 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 19 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 20 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 21 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 22 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 23 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13
+row 24 extent=0
+1-80 1 U+0020 fg=rgb:74:39:79,bg=idx:13

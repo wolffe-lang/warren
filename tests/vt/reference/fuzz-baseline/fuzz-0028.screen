@@ -1,0 +1,258 @@
+warren-screen 1
+size 80 24
+cursor 1 45 shape=4 visible=0 pending-wrap=0
+region 19 24
+tabs -
+title 7a747163676d6d72
+mode alternate-screen-1047 0
+mode alternate-screen-1049 0
+mode alternate-screen-47 0
+mode alternate-scroll 0
+mode application-cursor-keys 1
+mode application-keypad 0
+mode autowrap 1
+mode bracketed-paste 0
+mode cursor-blink 0
+mode cursor-visible 0
+mode focus-events 1
+mode insert 1
+mode left-right-margins 0
+mode mouse-any-motion 0
+mode mouse-button-motion 0
+mode mouse-press-release 0
+mode mouse-sgr 0
+mode mouse-urxvt 0
+mode mouse-utf8 0
+mode newline 0
+mode origin 0
+mode reverse-wrap 0
+mode send-receive 1
+mode synchronized-output ?
+row 1 extent=46
+1 1 U+0069 blink,bg=rgb:188:104:196
+2 1 U+0063 blink,bg=rgb:188:104:196
+3 1 U+004C blink,bg=rgb:188:104:196
+4 1 U+006C blink,bg=rgb:188:104:196
+5 1 U+0063 italic,blink,bg=rgb:188:104:196
+6 1 U+006D italic,blink,bg=rgb:188:104:196
+7 1 U+0031 italic,blink,bg=rgb:188:104:196
+8 1 U+007D italic,blink,bg=rgb:188:104:196
+9 1 U+0051 italic,blink,bg=rgb:188:104:196
+10 1 U+0025 italic,blink,bg=rgb:188:104:196
+11 1 U+0046 italic,blink,bg=rgb:188:104:196
+12 1 U+005A italic,blink,bg=rgb:188:104:196
+13 1 U+0036 italic,blink,bg=rgb:188:104:196
+14 1 U+002A italic,blink,bg=rgb:188:104:196
+15 1 U+003F italic,blink,bg=rgb:188:104:196
+16 1 U+007B italic,blink,bg=rgb:188:104:196
+17 1 U+0052 italic,blink,bg=rgb:188:104:196
+18 1 U+0076 italic,blink,bg=rgb:188:104:196
+19 1 U+0031 italic,blink,bg=rgb:188:104:196
+20 1 U+0042 italic,blink,bg=rgb:188:104:196
+21 1 U+0043 italic,blink,bg=rgb:188:104:196
+22 1 U+002B italic,blink,bg=rgb:188:104:196
+23 1 U+006F italic,blink,bg=rgb:188:104:196
+24 1 U+0040 italic,blink,bg=rgb:188:104:196
+25 1 U+0021 italic,blink,bg=rgb:188:104:196
+26 1 U+0020 italic,blink,bg=rgb:188:104:196
+27 1 U+003E italic,blink,bg=rgb:188:104:196
+28 1 U+0031 italic,blink,bg=rgb:188:104:196
+29 1 U+005F italic,blink,bg=rgb:188:104:196
+30 1 U+0074 italic,blink,bg=rgb:188:104:196
+31 1 U+0024 italic,blink,bg=rgb:188:104:196
+32 1 U+0067 italic,blink,bg=rgb:188:104:196
+33 1 U+0074 italic,blink,bg=rgb:188:104:196
+34 1 U+0059 italic,blink,bg=rgb:188:104:196
+35 1 U+005A italic,blink,bg=rgb:188:104:196
+36 1 U+0020 italic,blink,bg=rgb:188:104:196
+37 1 U+004F italic,blink,bg=rgb:188:104:196
+38 1 U+0025 italic,blink,bg=rgb:188:104:196
+39 1 U+007E italic,blink,bg=rgb:188:104:196
+40 1 U+0069 italic,blink,bg=rgb:188:104:196
+41 1 U+004F italic,blink,bg=rgb:188:104:196
+42 1 U+0069 italic,blink,bg=rgb:188:104:196
+43 1 U+004A italic,blink,bg=rgb:188:104:196
+44 1 U+0063 italic,blink,bg=rgb:188:104:196
+45 1 U+003C italic,blink,bg=rgb:188:104:196
+46 1 U+0020 bg=rgb:188:104:196
+47-80 1 U+0020 fg=rgb:36:178:252,bg=idx:37
+row 2 extent=20
+1 1 U+0052 blink,fg=rgb:36:178:252,bg=idx:37
+2 1 U+0027 blink,fg=rgb:36:178:252,bg=idx:37
+3 1 U+006E blink,fg=rgb:36:178:252,bg=idx:37
+4 1 U+0043 blink,fg=rgb:36:178:252,bg=idx:37
+5 1 U+005C blink,fg=rgb:36:178:252,bg=idx:37
+6 1 U+0032 blink,fg=rgb:36:178:252,bg=idx:37
+7 1 U+0027 blink,fg=rgb:36:178:252,bg=idx:37
+8 1 U+0055 blink,fg=rgb:36:178:252,bg=idx:37
+9 1 U+0042 blink,bg=idx:37
+10 1 U+0043 blink,bg=idx:37
+11 1 U+005A blink,bg=idx:37
+12 1 U+0073 blink,bg=idx:37
+13 1 U+002F blink,bg=idx:37
+14 1 U+007B blink,bg=idx:37
+15 1 U+0029 blink,bg=idx:37
+16 1 U+006C blink,bg=idx:37
+17 1 U+0052 blink,bg=idx:37
+18 1 U+0034 blink,bg=idx:37
+19 1 U+0029 blink,bg=idx:37
+20 1 U+0022 blink,bg=idx:37
+21-80 1 U+0020 fg=rgb:36:178:252,bg=idx:37
+row 3 extent=0
+1-80 1 U+0020 fg=rgb:36:178:252,bg=idx:37
+row 4 extent=0
+1-80 1 U+0020 fg=rgb:36:178:252,bg=idx:37
+row 5 extent=0
+1-80 1 U+0020 fg=rgb:36:178:252,bg=idx:37
+row 6 extent=0
+1-80 1 U+0020 fg=rgb:36:178:252,bg=idx:37
+row 7 extent=0
+1-80 1 U+0020 fg=rgb:36:178:252,bg=idx:37
+row 8 extent=0
+1-80 1 U+0020 fg=rgb:36:178:252,bg=idx:37
+row 9 extent=0
+1-80 1 U+0020 fg=rgb:36:178:252,bg=idx:37
+row 10 extent=0
+1-80 1 U+0020 fg=rgb:36:178:252,bg=idx:37
+row 11 extent=59
+1-59 1 U+0020 fg=rgb:36:178:252,bg=idx:37
+60-80 1 U+0020 fg=idx:116,bg=idx:5
+row 12 extent=0
+1-80 1 U+0020 fg=idx:116,bg=idx:5
+row 13 extent=0
+1-80 1 U+0020 fg=idx:116,bg=idx:5
+row 14 extent=0
+1-80 1 U+0020 fg=idx:116,bg=idx:5
+row 15 extent=0
+1-80 1 U+0020 fg=idx:116,bg=idx:5
+row 16 extent=0
+1-80 1 U+0020 fg=idx:116,bg=idx:5
+row 17 extent=0
+1-80 1 U+0020 fg=idx:116,bg=idx:5
+row 18 extent=0
+1-80 1 U+0020 fg=idx:116,bg=idx:5
+row 19 extent=0
+1-80 1 U+0020 fg=idx:116,bg=idx:5
+row 20 extent=0
+1-80 1 U+0020 fg=idx:116,bg=idx:5
+row 21 extent=0
+1-80 1 U+0020 fg=idx:116,bg=idx:5
+row 22 extent=80
+1 1 U+005B blink,fg=rgb:115:175:224
+2 1 U+006F blink,fg=rgb:115:175:224
+3 1 U+003E blink,fg=rgb:115:175:224
+4 1 U+003C blink,fg=rgb:115:175:224
+5 1 U+0037 blink,fg=rgb:115:175:224
+6 1 U+0035 blink,fg=rgb:115:175:224
+7 1 U+002D blink,fg=rgb:115:175:224
+8 1 U+003B blink,fg=rgb:115:175:224
+9 1 U+006A blink,fg=rgb:115:175:224
+10 1 U+002D blink,fg=rgb:115:175:224
+11 1 U+0022 blink,fg=rgb:115:175:224
+12 1 U+0062 blink,fg=rgb:115:175:224
+13 1 U+0047 blink,fg=rgb:115:175:224
+14 1 U+0029 blink,fg=rgb:115:175:224
+15 1 U+0064 blink,fg=rgb:115:175:224
+16 1 U+0047 blink,fg=rgb:115:175:224
+17 1 U+004B blink,fg=rgb:115:175:224
+18 1 U+005B blink,fg=rgb:115:175:224
+19 1 U+0060 blink,fg=rgb:115:175:224
+20 1 U+0028 blink,fg=rgb:115:175:224
+21 1 U+0072 blink,fg=rgb:115:175:224
+22 1 U+0067 blink,fg=rgb:115:175:224
+23 1 U+004E blink,fg=rgb:115:175:224
+24 1 U+0043 blink,fg=rgb:115:175:224
+25 1 U+0050 blink,fg=rgb:115:175:224
+26 1 U+0027 blink,fg=rgb:115:175:224
+27 1 U+007E blink,fg=rgb:115:175:224
+28 1 U+0032 blink,fg=rgb:115:175:224
+29 1 U+0068 blink,fg=rgb:115:175:224
+30 1 U+0042 blink,fg=rgb:115:175:224
+31 1 U+005B blink,fg=rgb:115:175:224
+32 1 U+0050 blink,fg=rgb:115:175:224
+33 1 U+0064 blink,fg=rgb:115:175:224
+34 1 U+0048 blink,fg=rgb:115:175:224
+35 1 U+0031 blink,fg=rgb:115:175:224
+36 1 U+002F blink,fg=rgb:115:175:224
+37 1 U+0043 blink,fg=rgb:115:175:224
+38 1 U+0066 blink,fg=rgb:115:175:224
+39 1 U+0031 blink,fg=rgb:115:175:224
+40 1 U+0055 blink,fg=rgb:115:175:224
+41 1 U+0033 blink,fg=rgb:115:175:224
+42 1 U+0038 blink,fg=rgb:115:175:224
+43 1 U+0049 blink,fg=rgb:115:175:224
+44 1 U+0044 blink,fg=rgb:115:175:224
+45 1 U+003A blink,fg=rgb:115:175:224
+46 1 U+005B blink,fg=rgb:115:175:224
+47 1 U+0070 blink,fg=rgb:115:175:224
+48 1 U+005B blink,fg=rgb:115:175:224
+49 1 U+002F blink,fg=rgb:115:175:224
+50 1 U+004C blink,fg=rgb:115:175:224
+51 1 U+0069 blink,fg=rgb:115:175:224
+52 1 U+0074 blink,fg=rgb:115:175:224
+53 1 U+0069 blink,fg=rgb:115:175:224
+54 1 U+004B blink,fg=rgb:115:175:224
+55 1 U+006A blink,fg=rgb:115:175:224
+56 1 U+007B blink,fg=rgb:115:175:224
+57 1 U+0034 blink,fg=rgb:115:175:224
+58 1 U+002D blink,fg=rgb:115:175:224
+59 1 U+006C blink,fg=rgb:115:175:224
+60 1 U+0070 blink,fg=rgb:115:175:224
+61 1 U+0053 blink,fg=rgb:115:175:224
+62 1 U+0064 blink,fg=rgb:115:175:224
+63 1 U+0047 blink,fg=rgb:115:175:224
+64 1 U+002F blink,fg=rgb:115:175:224
+65 1 U+0034 blink,fg=rgb:115:175:224
+66 1 U+0040 blink,fg=rgb:115:175:224
+67 1 U+004D blink,fg=rgb:115:175:224
+68 1 U+0062 blink,fg=rgb:115:175:224
+69 1 U+003A blink,fg=rgb:115:175:224
+70 1 U+004D blink,fg=rgb:115:175:224
+71 1 U+004B blink,fg=rgb:115:175:224
+72 1 U+0038 blink,fg=rgb:115:175:224
+73 1 U+0065 blink,fg=rgb:115:175:224
+74 1 U+007C blink,fg=rgb:115:175:224
+75 1 U+0024 blink,fg=rgb:115:175:224
+76 1 U+0055 blink,fg=idx:181
+77 1 U+0048 blink,fg=idx:181
+78 1 U+0042 blink,fg=idx:181
+79 1 U+004D blink,fg=idx:181
+80 1 U+006E blink,fg=idx:181
+row 23 extent=80
+1 1 U+006C blink,fg=idx:181
+2 1 U+0045 blink,fg=idx:181
+3 1 U+002E blink,fg=idx:181
+4 1 U+006C blink,fg=idx:181
+5 1 U+0034 blink,fg=idx:181
+6 1 U+007B blink,fg=idx:181
+7 1 U+0075 blink,fg=idx:181
+8 1 U+004B blink,fg=idx:181
+9 1 U+0074 blink,fg=idx:181
+10 1 U+005F blink,fg=idx:181
+11 1 U+0026 blink,fg=idx:181
+12 1 U+006A blink,fg=idx:181
+13 1 U+0045 blink,fg=idx:181
+14 1 U+004A blink,fg=idx:181
+15-79 1 U+0020 fg=idx:181
+80 1 U+006E blink,fg=rgb:36:178:252,bg=idx:37
+row 24 extent=20
+1 1 U+004C blink,fg=rgb:36:178:252,bg=idx:37
+2 1 U+0058 blink,fg=rgb:36:178:252,bg=idx:37
+3 1 U+0079 blink,fg=rgb:36:178:252,bg=idx:37
+4 1 U+006C blink,fg=rgb:36:178:252,bg=idx:37
+5 1 U+0063 blink,fg=rgb:36:178:252,bg=idx:37
+6 1 U+0074 blink,fg=rgb:36:178:252,bg=idx:37
+7 1 U+0056 blink,fg=rgb:36:178:252,bg=idx:37
+8 1 U+0053 blink,fg=rgb:36:178:252,bg=idx:37
+9 1 U+0035 blink,fg=rgb:36:178:252,bg=idx:37
+10 1 U+006F blink,fg=rgb:36:178:252,bg=idx:37
+11 1 U+0027 blink,fg=rgb:36:178:252,bg=idx:37
+12 1 U+0048 blink,fg=rgb:36:178:252,bg=idx:37
+13 1 U+0055 blink,fg=rgb:36:178:252,bg=idx:37
+14 1 U+003B blink,fg=rgb:36:178:252,bg=idx:37
+15 1 U+004E blink,fg=rgb:36:178:252,bg=idx:37
+16 1 U+0076 blink,fg=rgb:36:178:252,bg=idx:37
+17-18 1 U+0074 blink,fg=rgb:36:178:252,bg=idx:37
+19 1 U+0038 blink,fg=rgb:36:178:252,bg=idx:37
+20 1 U+006D+U+0301 blink,fg=rgb:36:178:252,bg=idx:37
+21-80 1 U+0020 fg=rgb:36:178:252,bg=idx:37

@@ -1,0 +1,290 @@
+warren-screen 1
+size 80 24
+cursor 11 1 shape=1 visible=0 pending-wrap=0
+region 11 24
+tabs 9,17,25,33,41,49,57,65,73
+title 7867
+mode alternate-screen-1047 1
+mode alternate-screen-1049 1
+mode alternate-screen-47 1
+mode alternate-scroll 0
+mode application-cursor-keys 0
+mode application-keypad 1
+mode autowrap 1
+mode bracketed-paste 1
+mode cursor-blink 1
+mode cursor-visible 0
+mode focus-events 0
+mode insert 0
+mode left-right-margins 0
+mode mouse-any-motion 0
+mode mouse-button-motion 0
+mode mouse-press-release 0
+mode mouse-sgr 0
+mode mouse-urxvt 0
+mode mouse-utf8 0
+mode newline 0
+mode origin 1
+mode reverse-wrap 0
+mode send-receive 1
+mode synchronized-output ?
+row 1 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:8
+row 2 extent=3
+1 1 U+004C italic,blink,inverse,fg=idx:44,bg=idx:12
+2 1 U+0028 italic,blink,inverse,fg=idx:44,bg=idx:12
+3 1 U+0064 italic,blink,inverse,fg=idx:44,bg=idx:12
+4-80 1 U+0020 fg=idx:44,bg=idx:8
+row 3 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:8
+row 4 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:8
+row 5 extent=80
+1 2 U+D55C italic,underline,invisible,fg=idx:44,bg=idx:8
+2 0 - italic,underline,invisible,fg=idx:44,bg=idx:8
+3 2 U+D55C italic,underline,invisible,fg=idx:44,bg=idx:8
+4 0 - italic,underline,invisible,fg=idx:44,bg=idx:8
+5 1 U+0032 italic,underline,invisible,fg=idx:44,bg=idx:8
+6 1 U+0068 italic,underline,invisible,fg=idx:44,bg=idx:8
+7 1 U+0028 italic,underline,invisible,fg=idx:44,bg=idx:8
+8 1 U+0078 italic,underline,invisible,fg=idx:44,bg=idx:8
+9 1 U+0051 italic,underline,invisible,fg=idx:44,bg=idx:8
+10 1 U+006F italic,underline,invisible,fg=idx:44,bg=idx:8
+11 1 U+006D italic,underline,invisible,fg=idx:44,bg=idx:8
+12 1 U+0024 italic,underline,invisible,fg=idx:44,bg=idx:8
+13 1 U+002E italic,underline,invisible,fg=idx:44,bg=idx:8
+14 1 U+0053 italic,underline,invisible,fg=idx:44,bg=idx:8
+15 1 U+005B italic,underline,invisible,fg=idx:44,bg=idx:8
+16 1 U+0034 italic,underline,invisible,fg=idx:44,bg=idx:8
+17 1 U+004F italic,underline,invisible,fg=idx:44,bg=idx:8
+18 1 U+0027 italic,underline,invisible,fg=idx:44,bg=idx:8
+19 1 U+0079+U+0308 italic,underline,invisible,fg=idx:44,bg=idx:8
+20 1 U+0036 italic,underline,invisible,fg=idx:44,bg=idx:8
+21 1 U+0025 italic,underline,invisible,fg=idx:44,bg=idx:8
+22 1 U+0056 italic,underline,invisible,fg=idx:44,bg=idx:8
+23 1 U+003F italic,underline,invisible,fg=idx:44,bg=idx:8
+24 1 U+0059 italic,underline,invisible,fg=idx:44,bg=idx:8
+25 1 U+0041 italic,underline,invisible,fg=idx:44,bg=idx:8
+26 1 U+005E italic,underline,invisible,fg=idx:44,bg=idx:8
+27 1 U+0048 italic,underline,invisible,fg=idx:44,bg=idx:8
+28 1 U+003C italic,underline,invisible,fg=idx:44,bg=idx:8
+29-30 1 U+0046 italic,underline,invisible,fg=idx:44,bg=idx:8
+31 1 U+0022 italic,underline,invisible,fg=idx:44,bg=idx:8
+32 1 U+006C italic,underline,invisible,fg=idx:44,bg=idx:8
+33 1 U+006E italic,underline,invisible,fg=idx:44,bg=idx:8
+34 1 U+0076 italic,underline,invisible,fg=idx:44,bg=idx:8
+35 1 U+006E italic,underline,invisible,fg=idx:44,bg=idx:8
+36 1 U+005B italic,underline,invisible,fg=idx:44,bg=idx:8
+37 1 U+007C italic,underline,invisible,fg=idx:44,bg=idx:8
+38 1 U+0027 italic,underline,invisible,fg=idx:44,bg=idx:8
+39 1 U+007D italic,underline,invisible,fg=idx:44,bg=idx:8
+40 1 U+006C italic,underline,invisible,fg=idx:44,bg=idx:8
+41 1 U+002C italic,underline,invisible,fg=idx:44,bg=idx:8
+42 1 U+0064 italic,underline,invisible,fg=idx:44,bg=idx:8
+43 1 U+0048 italic,underline,invisible,fg=idx:44,bg=idx:8
+44 1 U+005C italic,underline,invisible,fg=idx:44,bg=idx:8
+45 1 U+004A italic,underline,invisible,fg=idx:44,bg=idx:8
+46 1 U+0035 italic,underline,invisible,fg=idx:44,bg=idx:8
+47 1 U+0033 italic,underline,invisible,fg=idx:44,bg=idx:8
+48 1 U+0060 italic,underline,invisible,fg=idx:44,bg=idx:8
+49 1 U+0042 italic,underline,invisible,fg=idx:44,bg=idx:8
+50 1 U+0044 italic,underline,invisible,fg=idx:44,bg=idx:8
+51 1 U+004F italic,underline,invisible,fg=idx:44,bg=idx:8
+52 1 U+0049 italic,underline,invisible,fg=idx:44,bg=idx:8
+53 1 U+0029 italic,underline,invisible,fg=idx:44,bg=idx:8
+54 1 U+0048 italic,underline,invisible,fg=idx:44,bg=idx:8
+55 1 U+005B italic,underline,invisible,fg=idx:44,bg=idx:8
+56 1 U+003F italic,underline,invisible,fg=idx:44,bg=idx:8
+57 1 U+007C italic,underline,invisible,fg=idx:44,bg=idx:8
+58 1 U+007D italic,underline,invisible,fg=idx:44,bg=idx:8
+59 1 U+005C italic,underline,invisible,fg=idx:44,bg=idx:8
+60 1 U+0071 italic,underline,invisible,fg=idx:44,bg=idx:8
+61 1 U+0061 italic,underline,invisible,fg=idx:44,bg=idx:8
+62 1 U+0078 italic,underline,invisible,fg=idx:44,bg=idx:8
+63 1 U+0044 italic,underline,invisible,fg=idx:44,bg=idx:8
+64 1 U+0029 italic,underline,invisible,fg=idx:44,bg=idx:8
+65 1 U+0069 italic,underline,invisible,fg=idx:44,bg=idx:8
+66 1 U+0033 italic,underline,invisible,fg=idx:44,bg=idx:8
+67-80 1 U+0020 fg=idx:44,bg=idx:8
+row 6 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:8
+row 7 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:8
+row 8 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:8
+row 9 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:8
+row 10 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:8
+row 11 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:12
+row 12 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:8
+row 13 extent=65
+1 1 U+0062 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+2 1 U+004A italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+3 1 U+004C italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+4 1 U+0070 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+5 1 U+006C italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+6 1 U+0021 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+7 1 U+0031 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+8 1 U+0022 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+9 1 U+0076 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+10 1 U+0060 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+11 1 U+003D italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+12 1 U+0026 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+13 1 U+0061 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+14 1 U+007A italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+15 1 U+0028 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+16 1 U+002B italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+17 1 U+005C italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+18 1 U+0061 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+19 1 U+0067 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+20 1 U+007B italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+21 1 U+003D italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+22 1 U+0038 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+23 1 U+0031 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+24 1 U+003B italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+25 1 U+0067 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+26 1 U+007D italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+27 1 U+005F italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+28 1 U+002C italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+29 1 U+004D italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+30 1 U+0032 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+31 1 U+003F italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+32 1 U+0076 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+33 1 U+003C italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+34 1 U+0022 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+35 1 U+0049 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+36 1 U+0067 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+37 1 U+002B italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+38 1 U+0020 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+39 1 U+0023 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+40 1 U+0045 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+41 1 U+0067 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+42 1 U+0039 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+43 1 U+006B italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+44 1 U+0050 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+45 1 U+007D italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+46 1 U+004D italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+47 1 U+0073 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+48 1 U+0070 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+49 1 U+0054 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+50 1 U+0039 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+51 1 U+003E italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+52 1 U+0042 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+53 1 U+0052 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+54 1 U+0033 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+55 1 U+003E italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+56 1 U+002A italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+57 1 U+006E italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+58 1 U+004D italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+59 1 U+0030 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+60 1 U+0020 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+61 1 U+0051 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+62 1 U+0035 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+63 1 U+0051 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+64 1 U+0076 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+65 1 U+0027 italic,underline,inverse,invisible,fg=idx:44,bg=idx:8
+66-80 1 U+0020 fg=idx:44,bg=idx:8
+row 14 extent=17
+1 1 U+0036 italic,inverse,invisible,fg=idx:44,bg=idx:14
+2 1 U+004B italic,inverse,invisible,fg=idx:44,bg=idx:14
+3 1 U+0024 italic,inverse,invisible,fg=idx:44,bg=idx:14
+4 1 U+0069 italic,inverse,invisible,fg=idx:44,bg=idx:14
+5 1 U+0066 italic,inverse,invisible,fg=idx:44,bg=idx:14
+6 1 U+0039 italic,inverse,invisible,fg=idx:44,bg=idx:14
+7 1 U+0045 italic,inverse,invisible,fg=idx:44,bg=idx:14
+8 1 U+004D italic,inverse,invisible,fg=idx:44,bg=idx:14
+9 1 U+006C italic,inverse,invisible,fg=idx:44,bg=idx:14
+10 1 U+003B italic,inverse,invisible,fg=idx:44,bg=idx:14
+11 1 U+0078 italic,inverse,invisible,fg=idx:44,bg=idx:14
+12 1 U+005F italic,inverse,invisible,fg=idx:44,bg=idx:14
+13 1 U+0069 italic,inverse,invisible,fg=idx:44,bg=idx:14
+14 1 U+0034 italic,inverse,invisible,fg=idx:44,bg=idx:14
+15 1 U+002F italic,inverse,invisible,fg=idx:44,bg=idx:14
+16 1 U+0057 italic,inverse,invisible,fg=idx:44,bg=idx:14
+17 1 U+0037 italic,inverse,invisible,fg=idx:44,bg=idx:14
+18-80 1 U+0020 fg=idx:44,bg=idx:8
+row 15 extent=78
+1-17 1 U+0020 fg=idx:44,bg=idx:8
+18 1 U+0046 italic,blink,inverse,fg=idx:44,bg=idx:12
+19 1 U+007E italic,blink,inverse,fg=idx:44,bg=idx:12
+20 1 U+003C italic,blink,inverse,fg=idx:44,bg=idx:12
+21 1 U+0066 italic,blink,inverse,fg=idx:44,bg=idx:12
+22 1 U+0062 italic,blink,inverse,fg=idx:44,bg=idx:12
+23 1 U+0066 italic,blink,inverse,fg=idx:44,bg=idx:12
+24 1 U+0038 italic,blink,inverse,fg=idx:44,bg=idx:12
+25 1 U+002B italic,blink,inverse,fg=idx:44,bg=idx:12
+26 1 U+002C italic,blink,inverse,fg=idx:44,bg=idx:12
+27 1 U+0073 italic,blink,inverse,fg=idx:44,bg=idx:12
+28 1 U+0060 italic,blink,inverse,fg=idx:44,bg=idx:12
+29 1 U+0051 italic,blink,inverse,fg=idx:44,bg=idx:12
+30 1 U+003E italic,blink,inverse,fg=idx:44,bg=idx:12
+31 1 U+0061 italic,blink,inverse,fg=idx:44,bg=idx:12
+32 1 U+0035 italic,blink,inverse,fg=idx:44,bg=idx:12
+33 1 U+003F italic,blink,inverse,fg=idx:44,bg=idx:12
+34 1 U+0058 italic,blink,inverse,fg=idx:44,bg=idx:12
+35 1 U+0079 italic,blink,inverse,fg=idx:44,bg=idx:12
+36 1 U+0043 italic,blink,inverse,fg=idx:44,bg=idx:12
+37 1 U+003B italic,blink,inverse,fg=idx:44,bg=idx:12
+38 1 U+0064 italic,blink,inverse,fg=idx:44,bg=idx:12
+39 1 U+0060 italic,blink,inverse,fg=idx:44,bg=idx:12
+40 1 U+0036 italic,blink,inverse,fg=idx:44,bg=idx:12
+41 1 U+007B italic,blink,inverse,fg=idx:44,bg=idx:12
+42 1 U+005A italic,blink,inverse,fg=idx:44,bg=idx:12
+43 1 U+0055 italic,blink,inverse,fg=idx:44,bg=idx:12
+44 1 U+007B italic,blink,inverse,fg=idx:44,bg=idx:12
+45 1 U+0075 italic,blink,inverse,fg=idx:44,bg=idx:12
+46 1 U+0025 italic,blink,inverse,fg=idx:44,bg=idx:12
+47 1 U+0039 italic,blink,inverse,fg=idx:44,bg=idx:12
+48 1 U+0027 italic,blink,inverse,fg=idx:44,bg=idx:12
+49 1 U+0054 italic,blink,inverse,fg=idx:44,bg=idx:12
+50 1 U+0035 italic,blink,inverse,fg=idx:44,bg=idx:12
+51 1 U+0040 italic,blink,inverse,fg=idx:44,bg=idx:12
+52 1 U+002C italic,blink,inverse,fg=idx:44,bg=idx:12
+53 1 U+0025 italic,blink,inverse,fg=idx:44,bg=idx:12
+54 1 U+002F italic,blink,inverse,fg=idx:44,bg=idx:12
+55 1 U+002B italic,blink,inverse,fg=idx:44,bg=idx:12
+56 1 U+0063 italic,blink,inverse,fg=idx:44,bg=idx:12
+57 1 U+002C italic,blink,inverse,fg=idx:44,bg=idx:12
+58 1 U+004D italic,blink,inverse,fg=idx:44,bg=idx:12
+59 1 U+002B italic,blink,inverse,fg=idx:44,bg=idx:12
+60 1 U+003A italic,blink,inverse,fg=idx:44,bg=idx:12
+61 1 U+0059 italic,blink,inverse,fg=idx:44,bg=idx:12
+62 1 U+0040 italic,blink,inverse,fg=idx:44,bg=idx:12
+63 1 U+0063 italic,blink,inverse,fg=idx:44,bg=idx:12
+64 1 U+006C italic,blink,inverse,fg=idx:44,bg=idx:12
+65 1 U+0048 italic,blink,inverse,fg=idx:44,bg=idx:12
+66 1 U+0072 italic,blink,inverse,fg=idx:44,bg=idx:12
+67 1 U+004C italic,blink,inverse,fg=idx:44,bg=idx:12
+68 1 U+007A italic,blink,inverse,fg=idx:44,bg=idx:12
+69 1 U+0025 italic,blink,inverse,fg=idx:44,bg=idx:12
+70 1 U+006C italic,blink,inverse,fg=idx:44,bg=idx:12
+71 1 U+007E italic,blink,inverse,fg=idx:44,bg=idx:12
+72 1 U+0030 italic,blink,inverse,fg=idx:44,bg=idx:12
+73 1 U+0023 italic,blink,inverse,fg=idx:44,bg=idx:12
+74 1 U+0029 italic,blink,inverse,fg=idx:44,bg=idx:12
+75 1 U+002E italic,blink,inverse,fg=idx:44,bg=idx:12
+76 1 U+0028 italic,blink,inverse,fg=idx:44,bg=idx:12
+77 1 U+0075 italic,blink,inverse,fg=idx:44,bg=idx:12
+78 1 U+0030 italic,blink,inverse,fg=idx:44,bg=idx:12
+79-80 1 U+0020 fg=idx:44,bg=idx:12
+row 16 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:12
+row 17 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:12
+row 18 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:12
+row 19 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:12
+row 20 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:12
+row 21 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:12
+row 22 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:12
+row 23 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:12
+row 24 extent=0
+1-80 1 U+0020 fg=idx:44,bg=idx:12

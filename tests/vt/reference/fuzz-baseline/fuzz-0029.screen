@@ -1,0 +1,200 @@
+warren-screen 1
+size 80 24
+cursor 12 17 shape=3 visible=1 pending-wrap=0
+region 12 24
+tabs 9,17,25,33,41,49,57,65,73
+title 62656f716771
+mode alternate-screen-1047 1
+mode alternate-screen-1049 1
+mode alternate-screen-47 1
+mode alternate-scroll 0
+mode application-cursor-keys 0
+mode application-keypad 1
+mode autowrap 1
+mode bracketed-paste 1
+mode cursor-blink 1
+mode cursor-visible 1
+mode focus-events 0
+mode insert 0
+mode left-right-margins 0
+mode mouse-any-motion 0
+mode mouse-button-motion 0
+mode mouse-press-release 0
+mode mouse-sgr 0
+mode mouse-urxvt 0
+mode mouse-utf8 0
+mode newline 0
+mode origin 1
+mode reverse-wrap 0
+mode send-receive 1
+mode synchronized-output ?
+row 1 extent=0
+1-80 1 U+0020 fg=idx:86,bg=rgb:204:7:91
+row 2 extent=0
+1-80 1 U+0020 fg=idx:86,bg=rgb:204:7:91
+row 3 extent=0
+1-80 1 U+0020 fg=idx:86,bg=rgb:204:7:91
+row 4 extent=0
+1-80 1 U+0020 fg=idx:86,bg=rgb:204:7:91
+row 5 extent=0
+1-80 1 U+0020 fg=idx:86,bg=rgb:204:7:91
+row 6 extent=0
+1-80 1 U+0020 fg=idx:86,bg=rgb:204:7:91
+row 7 extent=26
+1 1 U+0031 bold,underline,inverse,fg=idx:86
+2 1 U+007B bold,underline,inverse,fg=idx:86
+3 1 U+002A bold,underline,inverse,fg=idx:86
+4 1 U+002F bold,underline,inverse,fg=idx:86
+5 1 U+0076 bold,underline,inverse,fg=idx:86
+6 1 U+0042 bold,underline,inverse,fg=idx:86
+7 1 U+0023 bold,underline,inverse,fg=idx:86
+8 1 U+0064 bold,underline,inverse,fg=idx:86
+9 1 U+0069 bold,underline,inverse,fg=idx:86
+10 1 U+005A bold,underline,inverse,fg=idx:86
+11 1 U+004B bold,underline,inverse,fg=idx:86
+12 1 U+0067 bold,underline,inverse,fg=idx:86
+13 1 U+0065 bold,underline,inverse,fg=idx:86
+14 1 U+0037 bold,underline,inverse,fg=idx:86
+15 1 U+0042 bold,underline,inverse,fg=idx:86
+16 1 U+0054 bold,underline,inverse,fg=idx:86
+17 1 U+0035 bold,underline,inverse,fg=idx:86
+18 1 U+003E bold,underline,inverse,fg=idx:86
+19 1 U+002E bold,underline,inverse,fg=idx:86
+20 1 U+0021 bold,underline,inverse,fg=idx:86
+21 1 U+004C bold,underline,inverse,fg=idx:86
+22 1 U+005D bold,underline,inverse,fg=idx:86
+23 1 U+002A bold,underline,inverse,fg=idx:86
+24 1 U+0071 bold,underline,inverse,fg=idx:86
+25 1 U+007A bold,underline,inverse,fg=idx:86
+26 1 U+0073 bold,underline,inverse,fg=idx:86
+27-80 1 U+0020 fg=idx:86,bg=rgb:204:7:91
+row 8 extent=67
+1 1 U+0033 bold,underline,inverse,fg=idx:86
+2 1 U+0058 bold,underline,inverse,fg=idx:86
+3 1 U+005B bold,underline,inverse,fg=idx:86
+4 1 U+0067 bold,underline,inverse,fg=idx:86
+5 1 U+005B bold,underline,inverse,fg=idx:86
+6 1 U+0033 bold,underline,inverse,fg=idx:86
+7 1 U+002D bold,underline,inverse,fg=idx:86
+8 1 U+0060 bold,underline,inverse,fg=idx:86
+9 1 U+0033 bold,underline,inverse,fg=idx:86
+10 1 U+0070 bold,underline,inverse,fg=idx:86
+11 1 U+0025 bold,underline,inverse,fg=idx:86
+12 1 U+0044 bold,underline,inverse,fg=idx:86
+13 1 U+007A bold,underline,inverse,fg=idx:86
+14 1 U+0061 bold,underline,inverse,fg=idx:86
+15 1 U+007D bold,underline,inverse,fg=idx:86
+16 1 U+0073 bold,underline,inverse,fg=idx:86
+17 1 U+0046 bold,underline,inverse,fg=idx:86
+18 1 U+0036 bold,underline,inverse,fg=idx:86
+19 1 U+0020 bold,underline,inverse,fg=idx:86
+20 1 U+0024 bold,underline,inverse,fg=idx:86
+21 1 U+007C bold,underline,inverse,fg=idx:86
+22 1 U+0072 bold,underline,inverse,fg=idx:86
+23 1 U+0058 bold,underline,inverse,fg=idx:86
+24 1 U+0033 bold,underline,inverse,fg=idx:86
+25 1 U+0069 bold,underline,inverse,fg=idx:86
+26 1 U+0031 bold,underline,inverse,fg=idx:86
+27 1 U+0038 bold,underline,inverse,fg=idx:86
+28 1 U+0062 bold,underline,inverse,fg=idx:86
+29 1 U+003C bold,underline,inverse,fg=idx:86
+30 1 U+0043 bold,underline,inverse,fg=idx:86
+31 1 U+0055 bold,underline,inverse,fg=idx:86
+32 1 U+0060 bold,underline,inverse,fg=idx:86
+33 1 U+0069 bold,underline,inverse,fg=idx:86
+34 1 U+003C bold,underline,inverse,fg=idx:86
+35 1 U+0040 bold,underline,inverse,fg=idx:86
+36 1 U+007C bold,underline,inverse,fg=idx:86
+37 1 U+0072 bold,underline,inverse,fg=idx:86
+38 1 U+0046 bold,underline,inverse,fg=idx:86
+39 1 U+005A bold,underline,inverse,fg=idx:86
+40 1 U+0076 bold,underline,inverse,fg=idx:86
+41 1 U+004C bold,underline,inverse,fg=idx:86
+42 1 U+006C bold,underline,inverse,fg=idx:86
+43 1 U+004D bold,underline,inverse,fg=idx:86
+44 1 U+002B bold,underline,inverse,fg=idx:86
+45 1 U+0049 bold,underline,inverse,fg=idx:86
+46 1 U+0033 bold,underline,inverse,fg=idx:86
+47 1 U+0079 bold,underline,inverse,fg=idx:86
+48 1 U+006D bold,underline,inverse,fg=idx:86
+49 1 U+005C bold,underline,inverse,fg=idx:86
+50 1 U+0063 bold,underline,inverse,fg=idx:86
+51-67 1 U+0020 fg=idx:86
+68-80 1 U+0020 fg=idx:86,bg=rgb:204:7:91
+row 9 extent=0
+1-80 1 U+0020 fg=idx:86,bg=rgb:204:7:91
+row 10 extent=0
+1-80 1 U+0020 fg=idx:86,bg=rgb:204:7:91
+row 11 extent=0
+1-80 1 U+0020 fg=idx:86,bg=rgb:204:7:91
+row 12 extent=16
+1-11 1 U+0020 fg=idx:86,bg=rgb:204:7:91
+12 2 U+4E2D bold,underline,inverse,fg=idx:86
+13 0 - bold,underline,inverse,fg=idx:86
+14 1 U+005A bold,underline,inverse,fg=idx:86
+15 1 U+0079 bold,underline,inverse,fg=idx:86
+16 1 U+007D bold,underline,inverse,fg=idx:86
+17-80 1 U+0020 fg=idx:86,bg=rgb:204:7:91
+row 13 extent=0
+1-80 1 U+0020 fg=idx:86,bg=rgb:204:7:91
+row 14 extent=23
+1 1 U+0060 bold,underline,inverse,fg=idx:86
+2 1 U+0052 bold,underline,inverse,fg=idx:86
+3 1 U+0025 bold,underline,inverse,fg=idx:86
+4 1 U+0065 bold,underline,inverse,fg=idx:86
+5 1 U+002F bold,underline,inverse,fg=idx:86
+6 1 U+0049 bold,underline,inverse,fg=idx:86
+7 1 U+002B bold,underline,inverse,fg=idx:86
+8 1 U+0034 bold,underline,inverse,fg=idx:86
+9 1 U+0061 bold,underline,inverse,fg=idx:86
+10 1 U+0072 bold,underline,inverse,fg=idx:86
+11 1 U+0063 bold,underline,inverse,fg=idx:86
+12 1 U+0022 bold,underline,inverse,fg=idx:86
+13 1 U+0070 bold,underline,inverse,fg=idx:86
+14 1 U+0029 bold,underline,inverse,fg=idx:86
+15 1 U+0058 bold,underline,inverse,fg=idx:86
+16 1 U+0071 bold,underline,inverse,fg=idx:86
+17 1 U+0034 bold,underline,inverse,fg=idx:86
+18 1 U+003A bold,underline,inverse,fg=idx:86
+19 1 U+0037 bold,underline,inverse,fg=idx:86
+20 1 U+0030 bold,underline,inverse,fg=idx:86
+21 1 U+0056 bold,underline,inverse,fg=idx:86
+22 1 U+0032 bold,underline,inverse,fg=idx:86
+23 1 U+0049 bold,underline,inverse,fg=idx:86
+24-80 1 U+0020 fg=idx:86,bg=rgb:204:7:91
+row 15 extent=0
+1-80 1 U+0020 fg=idx:86
+row 16 extent=0
+1-80 1 U+0020 fg=idx:86
+row 17 extent=0
+1-80 1 U+0020 fg=idx:86
+row 18 extent=76
+1-61 1 U+0020 fg=idx:86
+62 1 U+003E bold,underline,inverse,fg=idx:86
+63 1 U+0058 bold,underline,inverse,fg=idx:86
+64 1 U+0047 bold,underline,inverse,fg=idx:86
+65 1 U+0063 bold,underline,inverse,fg=idx:86
+66 1 U+0040 bold,underline,inverse,fg=idx:86
+67 1 U+002D bold,underline,inverse,fg=idx:86
+68 1 U+0077 bold,underline,inverse,fg=idx:86
+69 1 U+006A bold,underline,inverse,fg=idx:86
+70 1 U+0059 bold,underline,inverse,fg=idx:86
+71 1 U+003D bold,underline,inverse,fg=idx:86
+72 1 U+0066 bold,underline,inverse,fg=idx:86
+73 1 U+007C bold,underline,inverse,fg=idx:86
+74 1 U+004C bold,underline,inverse,fg=idx:86
+75 1 U+005D bold,underline,inverse,fg=idx:86
+76 1 U+0065 bold,underline,inverse,fg=idx:86
+77-80 1 U+0020 fg=idx:86
+row 19 extent=0
+1-80 1 U+0020 fg=idx:86
+row 20 extent=0
+1-80 1 U+0020 fg=idx:86
+row 21 extent=0
+1-80 1 U+0020 fg=idx:86
+row 22 extent=0
+1-80 1 U+0020 fg=idx:86
+row 23 extent=0
+1-80 1 U+0020 fg=idx:86
+row 24 extent=0
+1-80 1 U+0020 fg=idx:86

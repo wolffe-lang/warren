@@ -1,0 +1,263 @@
+warren-screen 1
+size 80 24
+cursor 15 1 shape=1 visible=1 pending-wrap=0
+region 8 24
+tabs -
+title 6f787163
+mode alternate-screen-1047 0
+mode alternate-screen-1049 0
+mode alternate-screen-47 0
+mode alternate-scroll 0
+mode application-cursor-keys 0
+mode application-keypad 1
+mode autowrap 1
+mode bracketed-paste 0
+mode cursor-blink 1
+mode cursor-visible 1
+mode focus-events 0
+mode insert 1
+mode left-right-margins 0
+mode mouse-any-motion 1
+mode mouse-button-motion 0
+mode mouse-press-release 0
+mode mouse-sgr 0
+mode mouse-urxvt 0
+mode mouse-utf8 0
+mode newline 0
+mode origin 0
+mode reverse-wrap 0
+mode send-receive 1
+mode synchronized-output ?
+row 1 extent=80
+1-43 1 U+0020 fg=idx:10
+44 1 U+0055 bold,italic,fg=idx:2
+45 1 U+0072 bold,italic,fg=idx:2
+46 1 U+004E bold,italic,fg=idx:2
+47 1 U+002A bold,italic,fg=idx:2
+48 1 U+005A bold,italic,fg=idx:2
+49 1 U+003E bold,italic,fg=idx:2
+50 1 U+0062 bold,italic,fg=idx:2
+51 1 U+002B bold,italic,fg=idx:2
+52 1 U+005E bold,italic,fg=idx:2,bg=rgb:53:93:237
+53 1 U+0074 bold,italic,fg=idx:2,bg=rgb:53:93:237
+54 1 U+005D bold,italic,fg=idx:2,bg=rgb:53:93:237
+55 1 U+0053 bold,italic,fg=idx:2,bg=rgb:53:93:237
+56 1 U+006A bold,italic,fg=idx:2,bg=rgb:53:93:237
+57 1 U+003A bold,italic,fg=idx:2,bg=rgb:53:93:237
+58 1 U+0038 bold,italic,fg=idx:2,bg=rgb:53:93:237
+59 1 U+0033 bold,italic,fg=idx:2,bg=rgb:53:93:237
+60 1 U+0074 bold,italic,fg=idx:2,bg=rgb:53:93:237
+61 1 U+0056 bold,italic,fg=idx:2,bg=rgb:53:93:237
+62 1 U+0076 fg=idx:8
+63 1 U+005C fg=idx:8
+64 1 U+0055 fg=idx:8
+65 1 U+0052 fg=idx:8
+66 1 U+004A fg=idx:8
+67 1 U+0024 fg=idx:8
+68 1 U+007B fg=idx:8
+69 1 U+0033 fg=idx:8
+70 1 U+004F fg=idx:8
+71 1 U+0073 fg=idx:8
+72 1 U+0037 fg=idx:8
+73 1 U+0066 fg=idx:8
+74 1 U+0063 fg=idx:8
+75 1 U+002D fg=idx:8
+76 1 U+003A fg=idx:8
+77 1 U+002D dim,fg=idx:8
+78 1 U+005B dim,fg=idx:8
+79 1 U+0078 dim,fg=idx:8
+80 1 U+007D dim,fg=idx:8
+row 2 extent=6
+1 1 U+0071 dim,fg=idx:8
+2 1 U+0025 dim,fg=idx:8
+3 1 U+0059 dim,fg=idx:8
+4 1 U+0077 dim,fg=idx:8
+5 1 U+007E dim,fg=idx:8
+6 1 U+0052 dim,fg=idx:8
+7-80 1 U+0020 fg=idx:8
+row 3 extent=22
+1 1 U+003B dim,fg=idx:8
+2 1 U+0029 dim,fg=idx:8
+3 1 U+0079 dim,fg=idx:8
+4 1 U+007D dim,fg=idx:8
+5 1 U+0074 dim,fg=idx:8
+6 1 U+004B dim,fg=idx:8
+7 1 U+0034 dim,fg=idx:8
+8 1 U+0020 dim,fg=idx:8
+9 1 U+0049 dim,fg=idx:8
+10 1 U+0054 dim,fg=idx:8
+11 1 U+0030 dim,fg=idx:8
+12 1 U+0043 dim,fg=idx:8
+13 1 U+006C dim,fg=idx:8
+14 1 U+004B dim,fg=idx:8
+15 1 U+0035 dim,fg=idx:8
+16 1 U+003A dim,fg=idx:8
+17 1 U+0025 dim,fg=idx:8
+18 1 U+0076 dim,fg=idx:8
+19 1 U+004A dim,fg=idx:8
+20 1 U+0034 dim,fg=idx:8
+21 1 U+0074 dim,fg=idx:8
+22 1 U+0049 dim,fg=idx:8
+23-80 1 U+0020 fg=idx:8
+row 4 extent=0
+1-80 1 U+0020 fg=idx:8
+row 5 extent=0
+1-80 1 U+0020 fg=idx:8
+row 6 extent=0
+1-80 1 U+0020 fg=idx:8
+row 7 extent=0
+1-80 1 U+0020 fg=idx:8
+row 8 extent=0
+1-80 1 U+0020 fg=idx:8
+row 9 extent=0
+1-80 1 U+0020 fg=idx:8
+row 10 extent=0
+1-80 1 U+0020 fg=idx:8
+row 11 extent=0
+1-80 1 U+0020 fg=idx:8
+row 12 extent=0
+1-80 1 U+0020 fg=rgb:190:108:143,bg=rgb:245:44:143
+row 13 extent=39
+1 1 U+007D bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+2 1 U+0075 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+3 1 U+007E bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+4 1 U+002E bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+5 1 U+0069 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+6 1 U+007C bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+7 1 U+0043 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+8 1 U+0028 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+9 1 U+0053 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+10 1 U+003E bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+11 1 U+0067 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+12 1 U+0035 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+13 1 U+0044 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+14 1 U+0076 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+15 1 U+0048 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+16 1 U+002D bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+17 1 U+0068 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+18 1 U+0054 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+19 1 U+0062 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+20 1 U+0063 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+21 1 U+004D bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+22 1 U+0030 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+23 1 U+007D bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+24 1 U+0061 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+25 1 U+0075 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+26 1 U+006D bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+27 1 U+0042 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+28 1 U+0048 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+29 1 U+0037 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+30 1 U+007B bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+31 1 U+002D bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+32 1 U+005B bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+33 1 U+006E bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+34 1 U+0072 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+35 1 U+005C bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+36 1 U+0073 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+37 1 U+004F bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+38 1 U+003F bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+39 1 U+0061+U+20D7 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+40-80 1 U+0020 fg=rgb:190:108:143,bg=rgb:245:44:143
+row 14 extent=80
+1-39 1 U+0020 fg=rgb:190:108:143,bg=rgb:245:44:143
+40-41 1 U+0046 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+42 1 U+002B bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+43 1 U+004E bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+44 1 U+0049 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+45 1 U+003D bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+46 1 U+0026 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+47 1 U+0023 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+48 1 U+0043 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+49 1 U+0047 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+50 1 U+003C bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+51 1 U+007D bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+52 1 U+0033 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+53 1 U+0053 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+54 1 U+004C bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+55 1 U+0038 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+56 1 U+0043 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+57-58 1 U+0042 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+59 1 U+0033 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+60 1 U+0069 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+61 1 U+0046 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+62 1 U+006C bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+63 1 U+0056 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+64 1 U+005F bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+65 1 U+0045 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+66 1 U+0041 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+67 1 U+0049 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+68 1 U+0076 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+69 1 U+0069 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+70 1 U+0074 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+71 1 U+0053 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+72 1 U+007B bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+73 1 U+0053 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+74 1 U+0031 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+75 1 U+0059 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+76 1 U+006E bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+77 1 U+0024 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+78 1 U+0032 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+79 1 U+006E bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+80 1 U+0073 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+row 15 extent=9
+1 1 U+0065 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+2 1 U+0059 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+3 1 U+006C bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+4 1 U+0069 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+5 1 U+0024 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+6 1 U+0060 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+7 1 U+002B bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+8 1 U+005D bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+9-80 1 U+0020 fg=rgb:190:108:143,bg=rgb:245:44:143
+row 16 extent=0
+1-80 1 U+0020 fg=rgb:190:108:143,bg=rgb:245:44:143
+row 17 extent=0
+1-80 1 U+0020 fg=rgb:190:108:143,bg=rgb:245:44:143
+row 18 extent=0
+1-80 1 U+0020 fg=rgb:190:108:143,bg=rgb:245:44:143
+row 19 extent=0
+1-80 1 U+0020 fg=rgb:190:108:143,bg=rgb:245:44:143
+row 20 extent=0
+1-80 1 U+0020 fg=rgb:190:108:143,bg=rgb:245:44:143
+row 21 extent=0
+1-80 1 U+0020 fg=rgb:190:108:143,bg=rgb:245:44:143
+row 22 extent=0
+1-80 1 U+0020 fg=rgb:190:108:143,bg=rgb:245:44:143
+row 23 extent=80
+1-63 1 U+0020 fg=rgb:190:108:143,bg=rgb:245:44:143
+64 1 U+006D bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+65 1 U+004A bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+66 1 U+002E bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+67 1 U+005D bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+68 1 U+0053 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+69 1 U+0068 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+70 1 U+0059 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+71 1 U+007C bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+72 1 U+0022 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+73 1 U+007B bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+74 1 U+0075 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+75 1 U+0061 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+76 1 U+002C bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+77 1 U+005E bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+78 1 U+0029 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+79 1 U+0028 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+80 1 U+003E bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+row 24 extent=54
+1 1 U+007B bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+2 1 U+006D bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+3 1 U+005D bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+4 1 U+002A bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+5 1 U+0077 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+6 1 U+006E bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+7-44 1 U+0020 fg=rgb:190:108:143,bg=rgb:245:44:143
+45 2 U+3042 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+46 0 - bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+47 2 U+3042 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+48 0 - bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+49 2 U+6587 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+50 0 - bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+51 2 U+6587 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+52 0 - bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+53 2 U+6587 bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+54 0 - bold,dim,italic,inverse,invisible,fg=rgb:190:108:143,bg=rgb:245:44:143
+55-80 1 U+0020 fg=rgb:190:108:143,bg=rgb:245:44:143

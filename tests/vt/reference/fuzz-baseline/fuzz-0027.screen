@@ -1,0 +1,347 @@
+warren-screen 1
+size 80 24
+cursor 1 24 shape=4 visible=1 pending-wrap=0
+region 21 24
+tabs -
+title 79767369746a736f
+mode alternate-screen-1047 1
+mode alternate-screen-1049 1
+mode alternate-screen-47 1
+mode alternate-scroll 0
+mode application-cursor-keys 0
+mode application-keypad 0
+mode autowrap 1
+mode bracketed-paste 1
+mode cursor-blink 0
+mode cursor-visible 1
+mode focus-events 0
+mode insert 1
+mode left-right-margins 0
+mode mouse-any-motion 0
+mode mouse-button-motion 0
+mode mouse-press-release 0
+mode mouse-sgr 0
+mode mouse-urxvt 0
+mode mouse-utf8 0
+mode newline 0
+mode origin 0
+mode reverse-wrap 0
+mode send-receive 1
+mode synchronized-output ?
+row 1 extent=23
+1 1 U+004D dim,invisible,strike,fg=idx:6,bg=idx:53
+2 1 U+002E dim,invisible,strike,fg=idx:6,bg=idx:53
+3 1 U+0055 dim,invisible,strike,fg=idx:6,bg=idx:53
+4 1 U+006A dim,invisible,strike,fg=idx:6,bg=idx:53
+5 1 U+0038 dim,invisible,strike,fg=idx:6,bg=idx:53
+6 1 U+002E dim,invisible,strike,fg=idx:6,bg=idx:53
+7 1 U+0064 dim,invisible,strike,fg=idx:6,bg=idx:53
+8 1 U+0045 dim,invisible,strike,fg=idx:6,bg=idx:53
+9 1 U+0063 dim,invisible,strike,fg=idx:6,bg=idx:53
+10 1 U+0035 dim,invisible,strike,fg=idx:6,bg=idx:53
+11 1 U+0075 dim,invisible,strike,fg=idx:6,bg=idx:53
+12 1 U+0029 dim,invisible,strike,fg=idx:6,bg=idx:53
+13 1 U+004F dim,invisible,strike,fg=idx:6,bg=idx:53
+14 1 U+0028 dim,invisible,strike,fg=idx:6,bg=idx:53
+15 1 U+0054 dim,invisible,strike,fg=idx:6,bg=idx:53
+16 1 U+002B dim,invisible,strike,fg=idx:6,bg=idx:53
+17 1 U+003F dim,invisible,strike,fg=idx:6,bg=idx:53
+18 1 U+0061 dim,invisible,strike,fg=idx:6,bg=idx:53
+19 1 U+0070 dim,invisible,strike,fg=idx:6,bg=idx:53
+20 1 U+0061 dim,invisible,strike,fg=idx:6,bg=idx:53
+21 1 U+004B dim,invisible,strike,fg=idx:6,bg=idx:53
+22 1 U+006E dim,invisible,strike,fg=idx:6,bg=idx:53
+23 1 U+0056 dim,invisible,strike,fg=idx:6,bg=idx:53
+24-80 1 U+0020 bg=idx:11
+row 2 extent=80
+1 1 U+0042 blink,inverse,invisible,strike,fg=idx:33,bg=rgb:58:180:241
+2 1 U+003F blink,inverse,invisible,strike,fg=idx:33,bg=rgb:58:180:241
+3 1 U+0056 blink,inverse,invisible,strike,fg=idx:33,bg=rgb:58:180:241
+4 1 U+004D blink,inverse,invisible,strike,fg=idx:33,bg=rgb:58:180:241
+5 1 U+0035 blink,inverse,invisible,strike,fg=idx:33,bg=rgb:58:180:241
+6 1 U+0076 blink,inverse,invisible,strike,fg=idx:33,bg=rgb:58:180:241
+7 1 U+003E blink,inverse,invisible,strike,fg=idx:33,bg=rgb:58:180:241
+8 1 U+0032 blink,inverse,invisible,strike,fg=idx:33,bg=rgb:58:180:241
+9 1 U+0021 blink,inverse,invisible,strike,fg=idx:33,bg=rgb:58:180:241
+10 1 U+0028 blink,inverse,invisible,strike,fg=idx:33,bg=rgb:58:180:241
+11 1 U+0030 blink,inverse,invisible,strike,fg=idx:33,bg=rgb:58:180:241
+12 1 U+004E blink,inverse,invisible,strike,fg=idx:33,bg=rgb:58:180:241
+13 1 U+0029 dim,blink,inverse,invisible,strike,fg=idx:41,bg=rgb:58:180:241
+14 1 U+0069 dim,blink,inverse,invisible,strike,fg=idx:41,bg=rgb:58:180:241
+15 1 U+0061 dim,blink,inverse,invisible,strike,fg=idx:41,bg=rgb:58:180:241
+16 1 U+005C dim,blink,inverse,invisible,strike,fg=idx:41,bg=rgb:58:180:241
+17 1 U+005A dim,blink,inverse,invisible,strike,fg=idx:41,bg=rgb:58:180:241
+18 1 U+0036 dim,blink,inverse,invisible,bg=idx:12
+19 1 U+005C dim,blink,inverse,invisible,bg=idx:12
+20 1 U+004D dim,blink,inverse,invisible,bg=idx:12
+21 1 U+005C dim,blink,inverse,invisible,bg=idx:12
+22 1 U+007B dim,blink,inverse,invisible,bg=idx:12
+23 1 U+0059 blink,inverse,invisible,bg=idx:12
+24 1 U+0047 blink,inverse,invisible,bg=idx:12
+25 1 U+0071 blink,inverse,invisible,bg=idx:12
+26 1 U+0028 blink,inverse,invisible,bg=idx:12
+27 1 U+0064 blink,inverse,invisible,bg=idx:12
+28 1 U+0075 blink,inverse,invisible,bg=idx:12
+29 1 U+0027 blink,inverse,invisible,bg=idx:12
+30 1 U+002B blink,inverse,invisible,bg=idx:12
+31 1 U+005E blink,inverse,invisible,bg=idx:12
+32 1 U+005B blink,inverse,invisible,bg=idx:12
+33 1 U+002D blink,inverse,invisible,bg=idx:12
+34 1 U+002C blink,inverse,invisible,bg=idx:12
+35 1 U+0069+U+0301 blink,inverse,invisible,bg=idx:12
+36 1 U+0037 blink,inverse,invisible,bg=idx:12
+37 1 U+0049 blink,inverse,invisible,bg=idx:12
+38 1 U+0034 blink,inverse,invisible,bg=idx:12
+39 1 U+0020 blink,inverse,invisible,bg=idx:12
+40 1 U+0031 blink,inverse,invisible,bg=idx:12
+41 1 U+0034 blink,inverse,invisible,bg=idx:12
+42 1 U+006B blink,inverse,invisible,bg=idx:12
+43 1 U+0020 blink,inverse,invisible,bg=idx:12
+44 1 U+005E blink,inverse,invisible,bg=idx:12
+45 1 U+0048 blink,inverse,invisible,bg=idx:12
+46 1 U+0058 blink,inverse,invisible,bg=idx:12
+47 1 U+007E blink,inverse,invisible,bg=idx:12
+48 1 U+0042 blink,inverse,invisible,bg=idx:12
+49 1 U+0035 blink,inverse,invisible,bg=idx:12
+50 1 U+0072 blink,inverse,invisible,bg=idx:12
+51 1 U+006A blink,inverse,invisible,bg=idx:12
+52 1 U+005D blink,inverse,invisible,bg=idx:12
+53 1 U+0061 blink,inverse,invisible,bg=idx:12
+54 1 U+003A blink,inverse,invisible,bg=idx:12
+55 1 U+006E blink,inverse,invisible,bg=idx:12
+56 1 U+002E blink,inverse,invisible,bg=idx:12
+57 1 U+0046 blink,inverse,invisible,bg=idx:12
+58 1 U+006F blink,inverse,invisible,bg=idx:12
+59 1 U+0029 blink,inverse,invisible,bg=idx:12
+60 1 U+0064 blink,inverse,invisible,bg=idx:12
+61 1 U+005A blink,inverse,invisible,bg=idx:12
+62 1 U+0025 blink,inverse,invisible,bg=idx:12
+63 1 U+002F blink,inverse,invisible,bg=idx:12
+64 1 U+0031 blink,inverse,invisible,bg=idx:12
+65 1 U+0025 blink,inverse,invisible,bg=idx:12
+66 1 U+0048 blink,inverse,invisible,bg=idx:12
+67 1 U+0028 blink,inverse,invisible,bg=idx:12
+68 1 U+0025 blink,inverse,invisible,bg=idx:12
+69 1 U+0065 blink,inverse,invisible,bg=idx:12
+70-71 1 U+006C blink,inverse,invisible,bg=idx:12
+72 1 U+006D blink,inverse,invisible,bg=idx:12
+73 1 U+0023 blink,inverse,invisible,bg=idx:12
+74 1 U+004A blink,inverse,invisible,bg=idx:12
+75 1 U+0060 blink,inverse,invisible,bg=idx:12
+76 1 U+0046 blink,inverse,invisible,bg=idx:12
+77 1 U+0058 blink,inverse,invisible,bg=idx:12
+78 1 U+0050 blink,inverse,invisible,bg=idx:12
+79 1 U+0053 blink,inverse,invisible,bg=idx:12
+80 1 U+0041 blink,inverse,invisible,bg=idx:12
+row 3 extent=0
+1-80 1 U+0020 fg=idx:41,bg=rgb:58:180:241
+row 4 extent=0
+1-80 1 U+0020 bg=idx:11
+row 5 extent=0
+1-80 1 U+0020 bg=idx:11
+row 6 extent=0
+1-80 1 U+0020 bg=idx:11
+row 7 extent=0
+1-80 1 U+0020 bg=idx:11
+row 8 extent=0
+1-80 1 U+0020 bg=idx:11
+row 9 extent=0
+1-80 1 U+0020 bg=idx:11
+row 10 extent=0
+1-80 1 U+0020 bg=idx:11
+row 11 extent=0
+1-80 1 U+0020 bg=idx:11
+row 12 extent=0
+1-80 1 U+0020 bg=idx:11
+row 13 extent=0
+1-80 1 U+0020 bg=idx:11
+row 14 extent=0
+1-80 1 U+0020 bg=idx:11
+row 15 extent=35
+1-34 1 U+0020 bg=idx:11
+35 1 U+0040 blink,inverse,invisible,bg=rgb:135:61:149
+36-80 1 U+0020 bg=idx:11
+row 16 extent=0
+1-80 1 U+0020 bg=idx:11
+row 17 extent=0
+1-80 1 U+0020 bg=idx:11
+row 18 extent=49
+1-34 1 U+0020 bg=idx:11
+35 1 U+003B blink,inverse,invisible,strike,fg=idx:15,bg=rgb:58:180:241
+36 1 U+0031 blink,inverse,invisible,strike,fg=idx:15,bg=rgb:58:180:241
+37 1 U+0048 blink,inverse,invisible,strike,fg=idx:15,bg=rgb:58:180:241
+38 1 U+005B blink,inverse,invisible,strike,fg=idx:15,bg=rgb:58:180:241
+39 1 U+0056 blink,inverse,invisible,strike,fg=idx:15,bg=rgb:58:180:241
+40 1 U+0045 blink,inverse,invisible,strike,fg=idx:15,bg=rgb:58:180:241
+41 1 U+0051 blink,inverse,invisible,strike,fg=idx:15,bg=rgb:58:180:241
+42 1 U+0037 blink,inverse,invisible,strike,fg=idx:15,bg=rgb:58:180:241
+43 1 U+0067 blink,inverse,invisible,strike,fg=idx:15,bg=rgb:58:180:241
+44 1 U+004D blink,inverse,invisible,strike,fg=idx:15,bg=rgb:58:180:241
+45 1 U+0022 blink,inverse,invisible,strike,fg=idx:15,bg=rgb:58:180:241
+46 1 U+0074 blink,inverse,invisible,strike,fg=idx:15,bg=rgb:58:180:241
+47 1 U+003A blink,inverse,invisible,strike,fg=idx:15,bg=rgb:58:180:241
+48 1 U+0050 blink,inverse,invisible,strike,fg=idx:15,bg=rgb:58:180:241
+49 1 U+0032 blink,inverse,invisible,strike,fg=idx:15,bg=rgb:58:180:241
+50-80 1 U+0020 bg=idx:11
+row 19 extent=26
+1 1 U+0037 blink,inverse,invisible,bg=idx:12
+2 1 U+004A blink,inverse,invisible,bg=idx:12
+3 1 U+007D blink,inverse,invisible,bg=idx:12
+4 1 U+0029 blink,inverse,invisible,bg=idx:12
+5 1 U+005D blink,inverse,invisible,bg=idx:12
+6 1 U+005E blink,inverse,invisible,bg=idx:12
+7 1 U+007D blink,inverse,invisible,bg=idx:12
+8 1 U+005C blink,inverse,invisible,bg=idx:12
+9 1 U+0071 blink,inverse,invisible,bg=idx:12
+10 1 U+004F blink,inverse,invisible,bg=idx:12
+11 1 U+0051 blink,inverse,invisible,bg=idx:12
+12 1 U+003C blink,inverse,invisible,bg=idx:12
+13 1 U+0040 blink,inverse,invisible,bg=idx:12
+14 1 U+0078 blink,inverse,invisible,bg=idx:12
+15 1 U+0070 blink,inverse,invisible,bg=idx:12
+16 1 U+003A blink,inverse,invisible,bg=idx:12
+17 1 U+0030 blink,inverse,invisible,bg=idx:12
+18 1 U+004D blink,inverse,invisible,bg=idx:12
+19 1 U+0047 blink,inverse,invisible,bg=idx:12
+20 1 U+006F blink,inverse,invisible,bg=idx:12
+21 2 U+6587 blink,inverse,invisible,bg=idx:12
+22 0 - blink,inverse,invisible,bg=idx:12
+23 2 U+6587 blink,inverse,invisible,bg=idx:12
+24 0 - blink,inverse,invisible,bg=idx:12
+25 2 U+6587 blink,inverse,invisible,bg=idx:12
+26 0 - blink,inverse,invisible,bg=idx:12
+27-80 1 U+0020 bg=idx:11
+row 20 extent=0
+1-80 1 U+0020 bg=idx:11
+row 21 extent=0
+1-80 1 U+0020 bg=idx:11
+row 22 extent=47
+1 1 U+0025 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+2 1 U+0024 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+3 1 U+0041 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+4 1 U+002E blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+5 1 U+006B blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+6 1 U+0049 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+7 1 U+003B blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+8 1 U+002E blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+9 1 U+0053 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+10 1 U+0077 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+11 1 U+005E blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+12 1 U+0048 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+13 1 U+003E blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+14 1 U+0068 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+15 1 U+0032 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+16 1 U+0028 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+17 1 U+0035 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+18 1 U+0045 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+19 1 U+0037 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+20 1 U+0032 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+21 1 U+0034 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+22 1 U+002D blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+23 1 U+005A blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+24 1 U+0041 blink,inverse,invisible,strike,fg=idx:14,bg=idx:47
+25 2 U+6587 blink,inverse,invisible,bg=idx:12
+26 0 - blink,inverse,invisible,bg=idx:12
+27 1 U+0068+U+20D7 blink,inverse,invisible,bg=idx:12
+28 1 U+0026 blink,inverse,invisible,fg=rgb:77:85:12,bg=idx:12
+29 1 U+005B blink,inverse,invisible,fg=rgb:77:85:12,bg=idx:12
+30 1 U+0030 blink,inverse,invisible,fg=rgb:77:85:12,bg=idx:12
+31 1 U+0076 blink,inverse,invisible,fg=rgb:77:85:12,bg=idx:12
+32 1 U+0033 blink,inverse,invisible,fg=rgb:77:85:12,bg=idx:12
+33-34 1 U+0055 blink,inverse,invisible,bg=idx:12
+35 1 U+007D blink,inverse,invisible,bg=idx:12
+36 1 U+0024 blink,inverse,invisible,bg=idx:12
+37 1 U+005C blink,inverse,invisible,bg=idx:12
+38 1 U+0057 blink,inverse,invisible,bg=idx:12
+39 1 U+0073 blink,inverse,invisible,bg=idx:12
+40 1 U+0022 blink,inverse,invisible,bg=idx:12
+41 1 U+0064 blink,inverse,invisible,bg=idx:12
+42 1 U+0020 blink,inverse,invisible,bg=idx:12
+43 1 U+005C blink,inverse,invisible,bg=idx:12
+44 1 U+0035 blink,inverse,invisible,bg=idx:12
+45 1 U+0054 blink,inverse,invisible,bg=idx:12
+46 1 U+0025 blink,inverse,invisible,bg=idx:12
+47 1 U+0034 blink,inverse,invisible,bg=idx:12
+48-80 1 U+0020 bg=idx:11
+row 23 extent=0
+1-80 1 U+0020 bg=idx:11
+row 24 extent=80
+1 1 U+005A blink,inverse,invisible,bg=idx:12
+2 1 U+005F blink,inverse,invisible,bg=idx:12
+3 1 U+007D blink,inverse,invisible,bg=idx:12
+4 1 U+003E blink,inverse,invisible,bg=idx:12
+5 1 U+0031 blink,inverse,invisible,bg=idx:12
+6 1 U+0060 blink,inverse,invisible,bg=idx:12
+7 1 U+0046 blink,inverse,invisible,bg=idx:12
+8 1 U+0035 blink,inverse,invisible,bg=idx:12
+9 1 U+0078 blink,inverse,invisible,bg=idx:12
+10 1 U+0026 blink,inverse,invisible,bg=idx:12
+11 1 U+006E blink,inverse,invisible,bg=idx:12
+12 1 U+002A blink,inverse,invisible,bg=idx:12
+13 1 U+0039 blink,inverse,invisible,bg=idx:12
+14 1 U+006C blink,inverse,invisible,bg=idx:12
+15 1 U+0041 blink,inverse,invisible,bg=idx:12
+16 1 U+0048 blink,inverse,invisible,bg=idx:12
+17 1 U+0045 blink,inverse,invisible,bg=idx:12
+18 1 U+004F blink,inverse,invisible,bg=idx:12
+19 1 U+0026 blink,inverse,invisible,bg=idx:12
+20 1 U+0044 blink,inverse,invisible,bg=idx:12
+21 1 U+0055 blink,inverse,invisible,bg=idx:12
+22 1 U+0021 blink,inverse,invisible,bg=idx:12
+23 1 U+003B blink,inverse,invisible,bg=idx:12
+24 1 U+0026 blink,inverse,invisible,bg=idx:12
+25 1 U+003C blink,inverse,invisible,bg=idx:12
+26 1 U+0050 blink,inverse,invisible,bg=idx:12
+27 1 U+0063 blink,inverse,invisible,bg=idx:12
+28 1 U+0045 blink,inverse,invisible,bg=idx:12
+29 1 U+0027 blink,inverse,invisible,bg=idx:12
+30 1 U+0022 blink,inverse,invisible,bg=idx:12
+31 1 U+003F blink,inverse,invisible,bg=idx:12
+32 1 U+003C blink,inverse,invisible,bg=idx:12
+33 1 U+0032 blink,inverse,invisible,bg=idx:12
+34 1 U+0070 blink,inverse,invisible,bg=idx:12
+35 1 U+0026 blink,inverse,invisible,bg=idx:12
+36 1 U+004E blink,inverse,invisible,bg=idx:12
+37 1 U+0055 blink,inverse,invisible,bg=idx:12
+38 1 U+003A blink,inverse,invisible,bg=idx:12
+39 1 U+002E blink,inverse,invisible,bg=idx:12
+40 1 U+003A blink,inverse,invisible,bg=idx:12
+41 1 U+0055 blink,inverse,invisible,bg=idx:12
+42 1 U+0073 blink,inverse,invisible,bg=idx:12
+43 1 U+005A blink,inverse,invisible,bg=idx:12
+44 1 U+0020 blink,inverse,invisible,bg=rgb:135:61:149
+45 1 U+0024 blink,inverse,invisible,bg=rgb:135:61:149
+46 1 U+0048 blink,inverse,invisible,bg=rgb:135:61:149
+47 1 U+0040 blink,inverse,invisible,bg=rgb:135:61:149
+48 1 U+0023 blink,inverse,invisible,bg=rgb:135:61:149
+49 1 U+0030 blink,inverse,invisible,bg=rgb:135:61:149
+50 1 U+0079 blink,inverse,invisible,bg=rgb:135:61:149
+51 1 U+0055 blink,inverse,invisible,bg=rgb:135:61:149
+52 1 U+0062 blink,inverse,invisible,bg=rgb:135:61:149
+53 1 U+0053 blink,inverse,invisible,bg=rgb:135:61:149
+54 1 U+0069 blink,inverse,invisible,bg=rgb:135:61:149
+55 1 U+0057 blink,inverse,invisible,bg=rgb:135:61:149
+56 1 U+0075 blink,inverse,invisible,bg=rgb:135:61:149
+57 1 U+006E blink,inverse,invisible,bg=rgb:135:61:149
+58 1 U+0027 blink,inverse,invisible,bg=rgb:135:61:149
+59 1 U+0040 blink,inverse,invisible,bg=idx:12
+60 1 U+002C blink,inverse,invisible,bg=idx:12
+61 1 U+0047 blink,inverse,invisible,bg=idx:12
+62 1 U+0068 blink,inverse,invisible,bg=idx:12
+63 1 U+0025 blink,inverse,invisible,bg=idx:12
+64 1 U+0078 blink,inverse,invisible,bg=idx:12
+65 1 U+0024 blink,inverse,invisible,bg=idx:12
+66 1 U+004B blink,inverse,invisible,bg=idx:12
+67 1 U+0043 blink,inverse,invisible,bg=idx:12
+68 1 U+0064 blink,inverse,invisible,bg=idx:12
+69 1 U+0077 blink,inverse,invisible,bg=idx:12
+70-71 1 U+0024 blink,inverse,invisible,bg=idx:12
+72 1 U+005B blink,inverse,invisible,bg=idx:12
+73 1 U+007B blink,inverse,invisible,bg=idx:12
+74 1 U+006B blink,inverse,invisible,bg=idx:12
+75 1 U+0060 blink,inverse,invisible,bg=idx:12
+76 1 U+0078+U+0301 blink,inverse,invisible,bg=idx:12
+77 1 U+0066 blink,inverse,invisible,bg=idx:12
+78 1 U+0043 blink,inverse,invisible,bg=idx:12
+79 1 U+003F blink,inverse,invisible,bg=idx:12
+80 1 U+0064 blink,inverse,invisible,bg=idx:12

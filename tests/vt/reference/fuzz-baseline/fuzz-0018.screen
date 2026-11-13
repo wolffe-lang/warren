@@ -1,0 +1,216 @@
+warren-screen 1
+size 80 24
+cursor 1 1 shape=6 visible=1 pending-wrap=0
+region 6 22
+tabs -
+title 77766b6e64636472
+mode alternate-screen-1047 1
+mode alternate-screen-1049 1
+mode alternate-screen-47 1
+mode alternate-scroll 0
+mode application-cursor-keys 1
+mode application-keypad 0
+mode autowrap 1
+mode bracketed-paste 1
+mode cursor-blink 0
+mode cursor-visible 1
+mode focus-events 1
+mode insert 1
+mode left-right-margins 0
+mode mouse-any-motion 0
+mode mouse-button-motion 0
+mode mouse-press-release 0
+mode mouse-sgr 0
+mode mouse-urxvt 0
+mode mouse-utf8 0
+mode newline 0
+mode origin 0
+mode reverse-wrap 0
+mode send-receive 1
+mode synchronized-output ?
+row 1 extent=80
+1 1 U+0033 blink,strike
+2 1 U+0075 blink,strike
+3 1 U+0073 blink,strike
+4 1 U+0070 blink,strike
+5 2 U+D55C blink,strike
+6 0 - blink,strike
+7 2 U+D55C blink,strike
+8 0 - blink,strike
+9-75 1 U+0020 -
+76 1 U+0036 -
+77 1 U+005E -
+78 1 U+0036 -
+79 1 U+007B -
+80 1 U+0024 -
+row 2 extent=8
+1 1 U+0033 -
+2 1 U+0067 -
+3 1 U+0047 -
+4 1 U+0042 -
+5 1 U+002A -
+6 1 U+0043 -
+7 1 U+0029 -
+8 1 U+0023 -
+9-80 1 U+0020 -
+row 3 extent=62
+1-15 1 U+0020 -
+16 1 U+003E -
+17 1 U+004D -
+18 1 U+0074 -
+19 1 U+003A -
+20 1 U+007B -
+21 1 U+006D -
+22 1 U+0070 -
+23 1 U+0066 -
+24 1 U+0028 -
+25 1 U+0064 -
+26 1 U+003A -
+27 1 U+0044 -
+28 1 U+005F -
+29 1 U+006E -
+30 1 U+006B -
+31 1 U+004E -
+32 1 U+0037 -
+33 1 U+0063 -
+34 1 U+007B -
+35 1 U+0036 -
+36 1 U+005F -
+37 1 U+003E -
+38 1 U+004C -
+39 1 U+0038 -
+40 1 U+0055 -
+41 1 U+004F -
+42 1 U+006A -
+43 1 U+0079 -
+44 1 U+003B -
+45 1 U+0022 -
+46 1 U+0063 -
+47 1 U+0023 -
+48 1 U+004E -
+49 1 U+0074 -
+50 1 U+004B -
+51 1 U+0021 -
+52 1 U+003F -
+53 1 U+0074 -
+54 1 U+0020 -
+55 1 U+0029 -
+56 1 U+0024 -
+57 1 U+0060 -
+58 1 U+007E -
+59 1 U+0038 -
+60 1 U+0043 -
+61 1 U+0021 -
+62 1 U+0031 -
+63-80 1 U+0020 -
+row 4 extent=0
+1-80 1 U+0020 -
+row 5 extent=0
+1-80 1 U+0020 -
+row 6 extent=72
+1-70 1 U+0020 -
+71 2 U+3042 blink,strike
+72 0 - blink,strike
+73-80 1 U+0020 -
+row 7 extent=9
+1 1 U+0037 dim,italic,fg=idx:15,bg=idx:3
+2 1 U+007E dim,italic,fg=idx:15,bg=idx:3
+3 1 U+002F dim,italic,fg=idx:15,bg=idx:3
+4 1 U+0055 dim,italic,fg=idx:15,bg=idx:3
+5 1 U+004D dim,italic,fg=idx:15,bg=idx:3
+6 2 U+FF21 dim,italic,fg=idx:15,bg=idx:3
+7 0 - dim,italic,fg=idx:15,bg=idx:3
+8 2 U+FF21 dim,italic,fg=idx:15,bg=idx:3
+9 0 - dim,italic,fg=idx:15,bg=idx:3
+10-80 1 U+0020 fg=idx:15,bg=idx:3
+row 8 extent=58
+1-2 1 U+0020 -
+3 1 U+0030 dim,fg=rgb:83:132:186,bg=idx:0
+4 1 U+002C dim,fg=rgb:83:132:186,bg=idx:0
+5 1 U+0054 dim,fg=rgb:83:132:186,bg=idx:0
+6 1 U+0079 dim,fg=rgb:83:132:186,bg=idx:0
+7 1 U+006B dim,fg=rgb:83:132:186,bg=idx:0
+8 1 U+0033 dim,fg=rgb:83:132:186,bg=idx:0
+9 1 U+0056 dim,fg=rgb:83:132:186,bg=idx:0
+10 1 U+003F dim,fg=rgb:83:132:186,bg=idx:0
+11 1 U+0030 dim,fg=rgb:83:132:186,bg=idx:0
+12 1 U+0027 dim,fg=rgb:83:132:186,bg=idx:0
+13 1 U+006A dim,fg=rgb:83:132:186,bg=idx:0
+14 1 U+005E dim,fg=rgb:83:132:186,bg=idx:0
+15 1 U+0060 dim,fg=rgb:83:132:186,bg=idx:0
+16 1 U+0053 dim,fg=rgb:83:132:186,bg=idx:0
+17 1 U+0040 dim,fg=rgb:83:132:186,bg=idx:0
+18 1 U+0055 dim,fg=rgb:83:132:186,bg=idx:0
+19 1 U+003B dim,fg=rgb:83:132:186,bg=idx:0
+20 1 U+0022 dim,fg=rgb:83:132:186,bg=idx:0
+21 1 U+0021 dim,fg=rgb:83:132:186,bg=idx:0
+22 1 U+007D dim,fg=rgb:83:132:186,bg=idx:0
+23 1 U+0052 dim,fg=rgb:83:132:186,bg=idx:0
+24 1 U+0051 dim,fg=rgb:83:132:186,bg=idx:0
+25 1 U+0059 dim,fg=rgb:83:132:186,bg=idx:0
+26 1 U+002E dim,fg=rgb:83:132:186,bg=idx:0
+27 1 U+007B dim,fg=rgb:83:132:186,bg=idx:0
+28 1 U+0034 dim,fg=rgb:83:132:186,bg=idx:0
+29 1 U+0050 dim,fg=rgb:83:132:186,bg=idx:0
+30 1 U+0068 dim,fg=rgb:83:132:186,bg=idx:0
+31 1 U+002C dim,fg=rgb:83:132:186,bg=idx:0
+32 1 U+004D dim,fg=rgb:83:132:186,bg=idx:0
+33 2 U+FF21 dim,italic,fg=idx:15,bg=idx:3
+34 0 - dim,italic,fg=idx:15,bg=idx:3
+35 2 U+FF21 dim,italic,fg=idx:15,bg=idx:3
+36 0 - dim,italic,fg=idx:15,bg=idx:3
+37 2 U+FF21 dim,italic,fg=idx:15,bg=idx:3
+38 0 - dim,italic,fg=idx:15,bg=idx:3
+39 1 U+0026 dim,italic,fg=idx:15,bg=idx:3
+40 1 U+003E dim,italic,fg=idx:15,bg=idx:3
+41 1 U+0034 dim,italic,fg=idx:15,bg=idx:3
+42 1 U+0053 dim,italic,fg=idx:15,bg=idx:3
+43 1 U+0043 dim,italic,fg=idx:15,bg=idx:3
+44 1 U+0023 dim,italic,fg=idx:15,bg=idx:3
+45 1 U+0071 dim,italic,fg=idx:15,bg=idx:3
+46 1 U+006B dim,italic,fg=idx:15,bg=idx:3
+47 1 U+0071 dim,italic,fg=idx:15,bg=idx:3
+48 1 U+0069 dim,italic,fg=idx:15,bg=idx:3
+49 1 U+0033 dim,italic,fg=idx:15,bg=idx:3
+50 1 U+0047 dim,italic,fg=idx:15,bg=idx:3
+51 1 U+0066 dim,italic,fg=idx:15,bg=idx:3
+52 1 U+002C dim,italic,fg=idx:15,bg=idx:3
+53 1 U+0051 dim,italic,fg=idx:15,bg=idx:3
+54 1 U+0058 dim,italic,fg=idx:15,bg=idx:3
+55 1 U+0072 dim,italic,fg=idx:15,bg=idx:3
+56 1 U+0038 dim,italic,fg=idx:15,bg=idx:3
+57 1 U+0062 dim,italic,fg=idx:15,bg=idx:3
+58 1 U+0061 dim,italic,fg=idx:15,bg=idx:3
+59-80 1 U+0020 fg=idx:15,bg=idx:3
+row 9 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3
+row 10 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3
+row 11 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3
+row 12 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3
+row 13 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3
+row 14 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3
+row 15 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3
+row 16 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3
+row 17 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3
+row 18 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3
+row 19 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3
+row 20 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3
+row 21 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3
+row 22 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3
+row 23 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3
+row 24 extent=0
+1-80 1 U+0020 fg=idx:15,bg=idx:3

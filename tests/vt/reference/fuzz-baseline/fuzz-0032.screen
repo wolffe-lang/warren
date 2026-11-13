@@ -1,0 +1,108 @@
+warren-screen 1
+size 80 24
+cursor 24 18 shape=4 visible=1 pending-wrap=0
+region 18 24
+tabs -
+title 667371656974766c
+mode alternate-screen-1047 1
+mode alternate-screen-1049 1
+mode alternate-screen-47 1
+mode alternate-scroll 0
+mode application-cursor-keys 1
+mode application-keypad 0
+mode autowrap 0
+mode bracketed-paste 0
+mode cursor-blink 0
+mode cursor-visible 1
+mode focus-events 0
+mode insert 0
+mode left-right-margins 0
+mode mouse-any-motion 0
+mode mouse-button-motion 1
+mode mouse-press-release 0
+mode mouse-sgr 1
+mode mouse-urxvt 0
+mode mouse-utf8 0
+mode newline 0
+mode origin 1
+mode reverse-wrap 0
+mode send-receive 1
+mode synchronized-output ?
+row 1 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 2 extent=8
+1 1 U+006C invisible,strike,fg=rgb:44:234:77,bg=idx:1
+2 1 U+007A invisible,strike,fg=rgb:44:234:77,bg=idx:1
+3 1 U+0067 invisible,strike,fg=rgb:44:234:77,bg=idx:1
+4 1 U+004E invisible,strike,fg=rgb:44:234:77,bg=idx:1
+5 1 U+0021 invisible,strike,fg=rgb:44:234:77,bg=idx:1
+6 1 U+0026 invisible,strike,fg=rgb:44:234:77,bg=idx:1
+7 1 U+0035 invisible,strike,fg=rgb:44:234:77,bg=idx:1
+8 1 U+002E invisible,strike,fg=rgb:44:234:77,bg=idx:1
+9-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 3 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 4 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 5 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 6 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 7 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 8 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 9 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 10 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 11 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 12 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 13 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 14 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 15 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 16 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 17 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 18 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 19 extent=26
+1-6 1 U+0020 fg=rgb:212:223:50,bg=rgb:196:1:252
+7 1 U+0078 blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+8 1 U+005D blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+9 1 U+002B blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+10 1 U+0031 blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+11 1 U+0049 blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+12 1 U+007D blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+13 1 U+005E blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+14 1 U+004A blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+15 1 U+0057 blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+16 1 U+0066 blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+17 1 U+0050 blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+18 1 U+005F blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+19 1 U+0036 blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+20 1 U+007D blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+21 1 U+0074 blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+22 1 U+0033 blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+23 1 U+0037 blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+24 1 U+004B blink,inverse,invisible,strike,fg=rgb:215:102:40,bg=rgb:196:1:252
+25 2 U+3042 underline,blink,inverse,invisible,strike,bg=rgb:196:1:252
+26 0 - underline,blink,inverse,invisible,strike,bg=rgb:196:1:252
+27-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 20 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 21 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 22 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 23 extent=0
+1-80 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+row 24 extent=80
+1-79 1 U+0020 fg=rgb:44:234:77,bg=idx:1
+80 1 U+005C underline,blink,inverse,invisible,strike,bg=rgb:196:1:252

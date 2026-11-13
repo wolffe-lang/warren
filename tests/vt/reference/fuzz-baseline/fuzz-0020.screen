@@ -1,0 +1,125 @@
+warren-screen 1
+size 80 24
+cursor 4 22 shape=1 visible=0 pending-wrap=0
+region 23 24
+tabs 9,17,33,41,49,57,65,73
+title 6f626a
+mode alternate-screen-1047 0
+mode alternate-screen-1049 0
+mode alternate-screen-47 0
+mode alternate-scroll 0
+mode application-cursor-keys 0
+mode application-keypad 1
+mode autowrap 1
+mode bracketed-paste 0
+mode cursor-blink 1
+mode cursor-visible 0
+mode focus-events 0
+mode insert 0
+mode left-right-margins 0
+mode mouse-any-motion 0
+mode mouse-button-motion 0
+mode mouse-press-release 1
+mode mouse-sgr 1
+mode mouse-urxvt 0
+mode mouse-utf8 0
+mode newline 0
+mode origin 0
+mode reverse-wrap 0
+mode send-receive 1
+mode synchronized-output ?
+row 1 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 2 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 3 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 4 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 5 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 6 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 7 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 8 extent=36
+1-26 1 U+0020 bg=rgb:120:132:164
+27 1 U+006F strike
+28 1 U+0034 strike
+29 1 U+0047 strike
+30-31 1 U+0068 strike
+32 1 U+004B strike
+33 1 U+0025 strike
+34 1 U+0050 strike
+35 1 U+0069 strike
+36 1 U+0058 strike
+37-80 1 U+0020 bg=rgb:120:132:164
+row 9 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 10 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 11 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 12 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 13 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 14 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 15 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 16 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 17 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 18 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 19 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 20 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 21 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 22 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 23 extent=0
+1-80 1 U+0020 bg=rgb:120:132:164
+row 24 extent=80
+1-11 1 U+0020 bg=rgb:120:132:164
+12-13 1 U+0053 strike
+14 1 U+002B strike
+15 1 U+0060 strike
+16 1 U+0063 strike
+17 1 U+0048 strike
+18 1 U+0039 strike
+19 1 U+0077 strike
+20 1 U+004B strike
+21 1 U+0052 strike
+22 1 U+0078 strike
+23 1 U+004A strike
+24 1 U+0042 strike
+25 1 U+0040 strike
+26 1 U+0042 strike
+27-50 1 U+0020 bg=rgb:120:132:164
+51-59 1 U+0020 bg=idx:10
+60 1 U+0042 strike,bg=rgb:120:132:164
+61 1 U+0039 strike,bg=rgb:120:132:164
+62 1 U+007B strike,bg=rgb:120:132:164
+63 1 U+005E strike,bg=rgb:120:132:164
+64 1 U+0039 strike,bg=rgb:120:132:164
+65 1 U+003B strike,bg=rgb:120:132:164
+66 1 U+0076 strike,bg=rgb:120:132:164
+67 1 U+0068 strike,bg=rgb:120:132:164
+68 1 U+006E strike,bg=rgb:120:132:164
+69 1 U+0042 strike,bg=rgb:120:132:164
+70 1 U+0055 strike,bg=rgb:120:132:164
+71 1 U+0075 strike,bg=rgb:120:132:164
+72 1 U+0060 strike,bg=rgb:120:132:164
+73 1 U+007D strike,bg=rgb:120:132:164
+74 1 U+0074 strike,bg=rgb:120:132:164
+75 1 U+0026 strike,bg=rgb:120:132:164
+76 1 U+0079 strike,bg=rgb:120:132:164
+77 1 U+0039 strike,bg=rgb:120:132:164
+78 1 U+0026 strike,bg=rgb:120:132:164
+79 1 U+0061 strike,bg=rgb:120:132:164
+80 1 U+005B strike,bg=rgb:120:132:164
