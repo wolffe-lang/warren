@@ -1,0 +1,36 @@
+//! member: true
+//! Reusable scalar reflow state; record and screen boundaries stay separate.
+
+/// A logical address and its mapped position in the complete reflow window.
+pub struct ReflowAnchor { id: int, offset: int, row: int, col: int, found: bool }
+
+/// Persistent counting/rendering scratch. Rows here are window-relative,
+/// before selecting a visible suffix; anchors keep their logical targets.
+pub struct ReflowState {
+    row: int, col: int, line_id: int, offset: int, started: bool,
+    last_row: int, last_col: int, painting: bool, paint_col: int,
+    cursor: ReflowAnchor, saved: ReflowAnchor, bottom: ReflowAnchor,
+}
+
+fn new_reflow_anchor() -> ReflowAnchor {
+    ReflowAnchor { id: 0 - 1, offset: 0, row: 0, col: 1, found: false }
+}
+
+fn new_reflow_state() -> ReflowState {
+    ReflowState { row: 0, col: 1, line_id: 0 - 1, offset: 0, started: false,
+        last_row: 0, last_col: 0, painting: false, paint_col: 1,
+        cursor: new_reflow_anchor(), saved: new_reflow_anchor(), bottom: new_reflow_anchor() }
+}
+
+fn reflow_start(mut state: ReflowState) {
+    state.row = 0
+}
+
+fn reflow_record(mut state: ReflowState, source: History, at: int,
+        mut reader: HistoryReader, mut output: Screen, cols: int,
+        first: int, last: int, emit: bool) {
+    assert(source.records > 0 && at >= 0 && cols > 0 && first >= 1 && last >= first)
+    if emit { output.extents[0] = output.extents[0] }
+    reader.value = 0
+    state.row = 0
+}

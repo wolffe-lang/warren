@@ -1,0 +1,67 @@
+//! member: false
+//! Scalar reflow counts, viewport clipping, natural widths, marks and paint.
+use std.mem.budget
+
+fn test_reflow_counts_and_visible_suffix() {
+    var pane = new(6, 2, 0)
+    feed(mut pane, "ab中\u{301}cdE".bytes())
+    var source = new_history(256)
+    assert(history_encode_line(mut source, pane.primary, 6, 1, 2, 0, 0))
+    var state = new_reflow_state()
+    state.cursor.id = 0
+    state.cursor.offset = 4
+    state.saved.id = 0
+    state.saved.offset = 3
+    state.bottom.id = 0
+    state.bottom.offset = 6
+    var reader = new_history_reader()
+    var output = new_screen(3, 2)
+    output.cells[0].base = 88
+    reflow_start(mut state)
+    reflow_record(mut state, source, source.head, mut reader, mut output, 3, 2, 3, false)
+    assert(state.row == 3 && state.offset == 7, "reflow-count-wide-gap")
+    assert(output.cells[0].base == 88, "reflow-count-does-not-paint")
+    assert(state.cursor.found && state.cursor.row == 2 && state.cursor.col == 3)
+    assert(state.saved.found && state.saved.row == 2 && state.saved.col == 2)
+    assert(state.bottom.found && state.bottom.row == 3 && state.bottom.col == 2)
+    reflow_start(mut state)
+    reflow_record(mut state, source, source.head, mut reader, mut output, 3, 2, 3, true)
+    assert(output.cells[0].base == 20013 && output.cells[0].width == 2 && output.cells[0].mark1 == 769)
+    assert(output.cells[1].width == 0 && output.cells[2].base == 99)
+    assert(output.cells[3].base == 100 && output.cells[4].base == 69)
+    assert(output.extents[0] == 3 && output.extents[1] == 2 && output.wrapped[0])
+    assert(output.line_ids[0] == 0 && output.line_offsets[0] == 2 && output.line_offsets[1] == 5)
+    var one = new_screen(1, 8)
+    reflow_start(mut state)
+    reflow_record(mut state, source, source.head, mut reader, mut one, 1, 1, 8, true)
+    assert(state.row == 6 && state.saved.row == 3 && state.saved.col == 1, "reflow-one-column-natural-address")
+    assert(one.cells[2].base == 20013 && one.cells[2].width == 1 && one.cells[2].mark1 == 769)
+    assert(one.line_offsets[2] == 2 && one.line_offsets[3] == 4)
+}
+
+fn test_reflow_paint_and_allocation() {
+    region frame(cap: 1048576) {
+        var pane = new(4, 1, 0)
+        feed(mut pane, "A\u{1b}[44m\u{1b}[K".bytes())
+        var source = new_history(256)
+        assert(history_encode_line(mut source, pane.primary, 4, 1, 1, 8, 0))
+        var state = new_reflow_state()
+        state.cursor.id = 8
+        state.cursor.offset = 1
+        var reader = new_history_reader()
+        var output = new_screen(2, 2)
+        let stable = budget.charged(frame)
+        var turn = 0
+        while turn < 128 {
+            reflow_start(mut state)
+            reflow_record(mut state, source, source.head, mut reader, mut output, 2, 1, 2, true)
+            assert(state.row == 1 && state.offset == 1, "reflow-paint-is-not-content")
+            assert(state.cursor.found && state.cursor.row == 1 && state.cursor.col == 2)
+            assert(output.extents[0] == 1 && output.cells[1].background == 4 && !output.wrapped[0])
+            turn += 1
+        }
+        assert(budget.charged(frame) == stable, "reflow-scalar-pass-allocation")
+    }
+}
+
+fn main() -> int { test_reflow_counts_and_visible_suffix(); test_reflow_paint_and_allocation(); 0 }
