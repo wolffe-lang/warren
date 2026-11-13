@@ -25,4 +25,42 @@ fn test_mouse_reset_is_one_tracking_mode() {
     }
 }
 
-fn main() -> int { test_cursor_toward_region(); test_mouse_reset_is_one_tracking_mode(); 0 }
+fn test_partial_erase_extends_written_extent() {
+    var ech = vt.new(12, 4, 0)
+    vt.feed(mut ech, "ab\u{1b}[5G\u{1b}[X".bytes())
+    assert(ech.primary.extents[0] == 5, "partial-ech-marks-blank-through-endpoint")
+    var left = vt.new(12, 4, 0)
+    vt.feed(mut left, "\u{1b}[5G\u{1b}[1K".bytes())
+    assert(left.primary.extents[0] == 5, "partial-el-left-marks-blank-through-endpoint")
+}
+
+fn test_inserted_blank_extends_written_extent() {
+    var pane = vt.new(12, 4, 0)
+    vt.feed(mut pane, "\u{1b}[5G\u{1b}[@".bytes())
+    assert(pane.primary.extents[0] == 5, "ich-past-old-extent-marks-inserted-blank")
+}
+
+fn test_1049_reset_keeps_alternate_content() {
+    var pane = vt.new(12, 4, 0)
+    vt.feed(mut pane, "\u{1b}[?1049hX\u{1b}[?1049l\u{1b}[?47h".bytes())
+    assert(pane.alternate.cells[0].base == 88 && pane.alternate.extents[0] == 1,
+        "1049-reset-does-not-clear-shared-alternate")
+}
+
+fn test_1049_clear_cancels_active_pending_wrap() {
+    var pane = vt.new(4, 2, 0)
+    vt.feed(mut pane, "abcd\u{1b}[?1049h".bytes())
+    assert(pane.cursor_col == 4 && !pane.pending_wrap, "1049-clear-cancels-active-pending-wrap")
+    vt.feed(mut pane, "\u{1b}[?1049l".bytes())
+    assert(pane.pending_wrap, "1049-restore-keeps-saved-primary-pending-wrap")
+}
+
+fn main() -> int {
+    test_cursor_toward_region()
+    test_mouse_reset_is_one_tracking_mode()
+    test_partial_erase_extends_written_extent()
+    test_inserted_blank_extends_written_extent()
+    test_1049_reset_keeps_alternate_content()
+    test_1049_clear_cancels_active_pending_wrap()
+    0
+}
