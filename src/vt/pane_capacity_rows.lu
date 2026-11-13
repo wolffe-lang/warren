@@ -11,8 +11,36 @@ fn main() -> int {
         assert(pane.history.bytes.len == 8388608 && pane.history.used == 0)
         assert(pane.primary.cells.len == 1920 && pane.alternate.cells.len == 1920)
         assert(pane.primary.line_ids[0] == 0 && pane.primary.line_ids[23] == 23)
-        assert(retained >= 8388656 && retained <= 9437184, "pane-native-default-history-budget")
+        assert(retained == 8656640, "pane-native-default-history-budget")
         io.write_line("MEASURE pane-default cols=80 rows=24 history-cap=8388608 retained={retained}")
+    }
+    region small(cap: 1048576) {
+        let before = budget.charged(small)
+        let pane = new(80, 24, 0)
+        let retained = budget.charged(small) - before
+        assert(pane.history.bytes.len == 0 && retained == 268032, "pane-native-no-history-budget")
+        io.write_line("MEASURE pane-default cols=80 rows=24 history-cap=0 retained={retained}")
+    }
+    region small_history(cap: 1048576) {
+        let before = budget.charged(small_history)
+        let pane = new(80, 24, 4096)
+        let retained = budget.charged(small_history) - before
+        assert(pane.history.bytes.len == 4096 && retained == 272128, "pane-native-small-history-budget")
+        io.write_line("MEASURE pane-default cols=80 rows=24 history-cap=4096 retained={retained}")
+    }
+    region large(cap: 8388608) {
+        let before = budget.charged(large)
+        let pane = new(320, 90, 0)
+        let retained = budget.charged(large) - before
+        assert(pane.primary.cells.len == 28800 && retained == 3713264, "pane-native-large-no-history-budget")
+        io.write_line("MEASURE pane-default cols=320 rows=90 history-cap=0 retained={retained}")
+    }
+    region large_history(cap: 16777216) {
+        let before = budget.charged(large_history)
+        let pane = new(320, 90, 8388608)
+        let retained = budget.charged(large_history) - before
+        assert(pane.history.bytes.len == 8388608 && retained == 12101872, "pane-native-large-default-history-budget")
+        io.write_line("MEASURE pane-default cols=320 rows=90 history-cap=8388608 retained={retained}")
     }
     0
 }
