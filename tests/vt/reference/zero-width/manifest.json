@@ -1,0 +1,430 @@
+{
+  "schema": 1,
+  "terminal_process_budget": 56,
+  "cases": {
+    "zero-1160-ascii": {
+      "input_sha256": "3f097c6e09bfc4ed91ce6ccdc842f7195ec93e32ba4ce2b8c89c0595ed032c49",
+      "scalar": "U+1160",
+      "context": "ascii",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "print and checksums disagree: U+0061 U+1160 against FF9F FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0",
+      "files": {
+        "zero-1160-ascii.in": "3f097c6e09bfc4ed91ce6ccdc842f7195ec93e32ba4ce2b8c89c0595ed032c49",
+        "zero-1160-ascii/A.json": "13dc5479499af5778192696c21794bc9391dd5cbce837d0faf958066a300192f",
+        "zero-1160-ascii/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-1160-ascii/A.print": "f656b32722bc562b0721d2bf25f70a70c58e67c538aceb4f7c28008c5f018e3a",
+        "zero-1160-ascii/S.print": "16af14c3f8bc2549f8c618eb761b3d2c5486aa1e6d7dcf970f76dcdf27f488ae",
+        "zero-1160-ascii/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-1160-wide": {
+      "input_sha256": "ec1c8a45897227e8f7351520fe296961a66f7594af648fb986370e1d0ff8e58b",
+      "scalar": "U+1160",
+      "context": "wide",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "print and checksums disagree: U+4E2D U+1160 against B1D3 0000 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0",
+      "files": {
+        "zero-1160-wide.in": "ec1c8a45897227e8f7351520fe296961a66f7594af648fb986370e1d0ff8e58b",
+        "zero-1160-wide/A.json": "5c7e2ccabaa4de8424784bae33a2f30e6a545eaa6799e28d6179f6f550dcba32",
+        "zero-1160-wide/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-1160-wide/A.print": "28b32477d794abafbb29ab8b0b85869e0970db55a33e7a99d9666d1c705bee06",
+        "zero-1160-wide/S.print": "d45a02d22d7f155869f8a1b7718601f8aa2358d47212ea7a56fa94da1756e3ec",
+        "zero-1160-wide/continuation.json": "6c29676b93acdef7bbc79fee256140c98014ada190baa2722d1f109341d018f7"
+      }
+    },
+    "zero-1160-unwritten": {
+      "input_sha256": "2f872b19f32fc1176f3af674e68cfcaceeb4479d249bcfcdb50feb10796f959f",
+      "scalar": "U+1160",
+      "context": "unwritten",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "row 1: pass S lost its separator before column 1",
+      "files": {
+        "zero-1160-unwritten.in": "2f872b19f32fc1176f3af674e68cfcaceeb4479d249bcfcdb50feb10796f959f",
+        "zero-1160-unwritten/A.json": "69ae13205c0d9ad7c26ceebeb2baf361ac1cba08958e76ac943d3cf95014365d",
+        "zero-1160-unwritten/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-1160-unwritten/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "zero-1160-unwritten/S.print": "f7d89dbeef22ffbfbfca8cd9abffcf9586f683a03f305241295fe6ee84e92fe9",
+        "zero-1160-unwritten/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-1160-first": {
+      "input_sha256": "ef95bf8746b4d425c1debe1bedb75d728f23d498d17e3641a151994eada0b74b",
+      "scalar": "U+1160",
+      "context": "first",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "row 1: pass S lost its separator before column 1",
+      "files": {
+        "zero-1160-first.in": "ef95bf8746b4d425c1debe1bedb75d728f23d498d17e3641a151994eada0b74b",
+        "zero-1160-first/A.json": "515ecc541b5d005ac2681bb0673b0f1bf97a045ad06fdd7c7e436cf01f16e365",
+        "zero-1160-first/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-1160-first/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "zero-1160-first/S.print": "394ccbb828c67d03f73e20dce2726e24e4637acb50976af3344896518221cd2e",
+        "zero-1160-first/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-1161-ascii": {
+      "input_sha256": "c8b0152c912e998ce590cb6bfa5d64bce2ae064a32d97997aacb810b79e1792c",
+      "scalar": "U+1161",
+      "context": "ascii",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "print and checksums disagree: U+0061 U+1161 against FF9F FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0",
+      "files": {
+        "zero-1161-ascii.in": "c8b0152c912e998ce590cb6bfa5d64bce2ae064a32d97997aacb810b79e1792c",
+        "zero-1161-ascii/A.json": "13dc5479499af5778192696c21794bc9391dd5cbce837d0faf958066a300192f",
+        "zero-1161-ascii/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-1161-ascii/A.print": "81828a4870efda4ae8bbd30f09fc8137281951b8091f75ef0208441e41062b5d",
+        "zero-1161-ascii/S.print": "c66095f830366839f631c0a86fc085f0aee4c887274f14f64ade71ef643868c9",
+        "zero-1161-ascii/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-1161-wide": {
+      "input_sha256": "adfd9520520f43f18cceb2b0369ecda2170fa5373886ea11a85ef2997fc993a5",
+      "scalar": "U+1161",
+      "context": "wide",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "print and checksums disagree: U+4E2D U+1161 against B1D3 0000 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0",
+      "files": {
+        "zero-1161-wide.in": "adfd9520520f43f18cceb2b0369ecda2170fa5373886ea11a85ef2997fc993a5",
+        "zero-1161-wide/A.json": "5c7e2ccabaa4de8424784bae33a2f30e6a545eaa6799e28d6179f6f550dcba32",
+        "zero-1161-wide/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-1161-wide/A.print": "7aa6bc476daa74d1e5e4127a6cfb71fbd03441b9d01c4c9b8cb43f137a5a974c",
+        "zero-1161-wide/S.print": "8da66ddc497f43e8b47b02938d1b984bca76b6c733f395260ffaed56c5c15567",
+        "zero-1161-wide/continuation.json": "6c29676b93acdef7bbc79fee256140c98014ada190baa2722d1f109341d018f7"
+      }
+    },
+    "zero-1161-unwritten": {
+      "input_sha256": "4290a8a5869b225f86088c202aa941ebc110531f5bd28defe8bf806ce3f8daaf",
+      "scalar": "U+1161",
+      "context": "unwritten",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "row 1: pass S lost its separator before column 1",
+      "files": {
+        "zero-1161-unwritten.in": "4290a8a5869b225f86088c202aa941ebc110531f5bd28defe8bf806ce3f8daaf",
+        "zero-1161-unwritten/A.json": "69ae13205c0d9ad7c26ceebeb2baf361ac1cba08958e76ac943d3cf95014365d",
+        "zero-1161-unwritten/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-1161-unwritten/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "zero-1161-unwritten/S.print": "502e0dddcf04664551140d92778ae054e4df2c3184c4c27c9b2b35602b0d1910",
+        "zero-1161-unwritten/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-1161-first": {
+      "input_sha256": "20bf4f11b3342af38e812a22c21141ff73cb59b7e93339c21e14c937cb944a63",
+      "scalar": "U+1161",
+      "context": "first",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "row 1: pass S lost its separator before column 1",
+      "files": {
+        "zero-1161-first.in": "20bf4f11b3342af38e812a22c21141ff73cb59b7e93339c21e14c937cb944a63",
+        "zero-1161-first/A.json": "515ecc541b5d005ac2681bb0673b0f1bf97a045ad06fdd7c7e436cf01f16e365",
+        "zero-1161-first/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-1161-first/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "zero-1161-first/S.print": "9b10446f9fe0eb7693b8682a1a72e3a1f999f4c90f18d43fec0eb88be1054ee7",
+        "zero-1161-first/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-11A8-ascii": {
+      "input_sha256": "2f3278b4190f55e0fcb0fdb97bb97f50312779534639a4ce308deb4d152cb41c",
+      "scalar": "U+11A8",
+      "context": "ascii",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "print and checksums disagree: U+0061 U+11A8 against FF9F FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0",
+      "files": {
+        "zero-11A8-ascii.in": "2f3278b4190f55e0fcb0fdb97bb97f50312779534639a4ce308deb4d152cb41c",
+        "zero-11A8-ascii/A.json": "13dc5479499af5778192696c21794bc9391dd5cbce837d0faf958066a300192f",
+        "zero-11A8-ascii/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-11A8-ascii/A.print": "e2607e413ffe3d290722f47add7a3ee9fa5bfa6632fa2fa8a7651ea4ee672e4e",
+        "zero-11A8-ascii/S.print": "309869136dd6a915bc144fca9b440296d8114268321f7cd40ccb43d16318a2a2",
+        "zero-11A8-ascii/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-11A8-wide": {
+      "input_sha256": "911804a99689a7a183e31c74996e72c284cedd3e436be3fe92b540769aec6b69",
+      "scalar": "U+11A8",
+      "context": "wide",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "print and checksums disagree: U+4E2D U+11A8 against B1D3 0000 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0",
+      "files": {
+        "zero-11A8-wide.in": "911804a99689a7a183e31c74996e72c284cedd3e436be3fe92b540769aec6b69",
+        "zero-11A8-wide/A.json": "5c7e2ccabaa4de8424784bae33a2f30e6a545eaa6799e28d6179f6f550dcba32",
+        "zero-11A8-wide/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-11A8-wide/A.print": "bdd08a211a1c2c57bb234834eb721fa21cc355cf4eb15033ee02db10d722ead6",
+        "zero-11A8-wide/S.print": "f9c0bd4560e04fd26fa9176e811651f8fa91140d279e7d2db18beceae8a7b786",
+        "zero-11A8-wide/continuation.json": "6c29676b93acdef7bbc79fee256140c98014ada190baa2722d1f109341d018f7"
+      }
+    },
+    "zero-11A8-unwritten": {
+      "input_sha256": "27b5bb5c8ea5667778930499138ec9a5e66aea71dd2c9099ab16fc2992475219",
+      "scalar": "U+11A8",
+      "context": "unwritten",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "row 1: pass S lost its separator before column 1",
+      "files": {
+        "zero-11A8-unwritten.in": "27b5bb5c8ea5667778930499138ec9a5e66aea71dd2c9099ab16fc2992475219",
+        "zero-11A8-unwritten/A.json": "69ae13205c0d9ad7c26ceebeb2baf361ac1cba08958e76ac943d3cf95014365d",
+        "zero-11A8-unwritten/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-11A8-unwritten/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "zero-11A8-unwritten/S.print": "2daa7999609c90105c2bfc1eab3120a82ec5d27381cbff4fe810e5435918e570",
+        "zero-11A8-unwritten/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-11A8-first": {
+      "input_sha256": "2d1d1fb5268e795541cfa4c1c3b5b1862b3a7c518fbbb5907b99a2ab4dfc768b",
+      "scalar": "U+11A8",
+      "context": "first",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "row 1: pass S lost its separator before column 1",
+      "files": {
+        "zero-11A8-first.in": "2d1d1fb5268e795541cfa4c1c3b5b1862b3a7c518fbbb5907b99a2ab4dfc768b",
+        "zero-11A8-first/A.json": "515ecc541b5d005ac2681bb0673b0f1bf97a045ad06fdd7c7e436cf01f16e365",
+        "zero-11A8-first/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-11A8-first/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "zero-11A8-first/S.print": "2f06258886e7eaa4770652b8db4d7f4a516dd5c7b43e370062c2f9e29621d3f6",
+        "zero-11A8-first/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-D7B0-ascii": {
+      "input_sha256": "d32a90f911f27dbc8cc0d9238efdd51d861ffe23554672ac9dc206f18966563f",
+      "scalar": "U+D7B0",
+      "context": "ascii",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "print and checksums disagree: U+0061 U+D7B0 against FF9F FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0",
+      "files": {
+        "zero-D7B0-ascii.in": "d32a90f911f27dbc8cc0d9238efdd51d861ffe23554672ac9dc206f18966563f",
+        "zero-D7B0-ascii/A.json": "13dc5479499af5778192696c21794bc9391dd5cbce837d0faf958066a300192f",
+        "zero-D7B0-ascii/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-D7B0-ascii/A.print": "254b22df07d5ac08caca1bd55d58de6272f79087db8ca6d42461486092980000",
+        "zero-D7B0-ascii/S.print": "c5161982d8152562f0bbaec728acb121ce41d73b36f31608c30e5b382e3350e9",
+        "zero-D7B0-ascii/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-D7B0-wide": {
+      "input_sha256": "c4e186193cd739bb43d941b7a936237dbcec41f4fb40ec0d0e93636b0ce2aab1",
+      "scalar": "U+D7B0",
+      "context": "wide",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "print and checksums disagree: U+4E2D U+D7B0 against B1D3 0000 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0",
+      "files": {
+        "zero-D7B0-wide.in": "c4e186193cd739bb43d941b7a936237dbcec41f4fb40ec0d0e93636b0ce2aab1",
+        "zero-D7B0-wide/A.json": "5c7e2ccabaa4de8424784bae33a2f30e6a545eaa6799e28d6179f6f550dcba32",
+        "zero-D7B0-wide/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-D7B0-wide/A.print": "59e413426361ecca0f8995285334a27a6850885498295097462bd631517bb6af",
+        "zero-D7B0-wide/S.print": "6120f33d74f1518a56643794b258c8869b37ad795d652367a058b1cf7dc17a7d",
+        "zero-D7B0-wide/continuation.json": "6c29676b93acdef7bbc79fee256140c98014ada190baa2722d1f109341d018f7"
+      }
+    },
+    "zero-D7B0-unwritten": {
+      "input_sha256": "33ba03eded02d0fcead9fb8f5d9f3fb8187e35f1f6a07f9c1f31c20a6a3ab521",
+      "scalar": "U+D7B0",
+      "context": "unwritten",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "row 1: pass S lost its separator before column 1",
+      "files": {
+        "zero-D7B0-unwritten.in": "33ba03eded02d0fcead9fb8f5d9f3fb8187e35f1f6a07f9c1f31c20a6a3ab521",
+        "zero-D7B0-unwritten/A.json": "69ae13205c0d9ad7c26ceebeb2baf361ac1cba08958e76ac943d3cf95014365d",
+        "zero-D7B0-unwritten/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-D7B0-unwritten/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "zero-D7B0-unwritten/S.print": "e6106946e56c0572cb119b3c9621af8513b35586f4a9a6b37db02cc065fb79fb",
+        "zero-D7B0-unwritten/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-D7B0-first": {
+      "input_sha256": "4487da951f9d811a86e68d753d43b7543d05ca7e84c6580b87ef980d023f32e2",
+      "scalar": "U+D7B0",
+      "context": "first",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "row 1: pass S lost its separator before column 1",
+      "files": {
+        "zero-D7B0-first.in": "4487da951f9d811a86e68d753d43b7543d05ca7e84c6580b87ef980d023f32e2",
+        "zero-D7B0-first/A.json": "515ecc541b5d005ac2681bb0673b0f1bf97a045ad06fdd7c7e436cf01f16e365",
+        "zero-D7B0-first/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-D7B0-first/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "zero-D7B0-first/S.print": "90566a32e9870085802375d4060aaf44b39ef2080b2edfb4e5a95eb31d6f550c",
+        "zero-D7B0-first/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-D7CB-ascii": {
+      "input_sha256": "2f81eafb59cd79819b7dd6fd4e9521cb3de9f021b42b9885f2231f6508133dec",
+      "scalar": "U+D7CB",
+      "context": "ascii",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "print and checksums disagree: U+0061 U+D7CB against FF9F FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0",
+      "files": {
+        "zero-D7CB-ascii.in": "2f81eafb59cd79819b7dd6fd4e9521cb3de9f021b42b9885f2231f6508133dec",
+        "zero-D7CB-ascii/A.json": "13dc5479499af5778192696c21794bc9391dd5cbce837d0faf958066a300192f",
+        "zero-D7CB-ascii/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-D7CB-ascii/A.print": "762fe661f7d42b4a6a2b2fc955bca0ebae896de375cb793b12d0607a778309cd",
+        "zero-D7CB-ascii/S.print": "9a3f76808e70206cbabf02b99611b7e6e053570794336e826b4653e64e549550",
+        "zero-D7CB-ascii/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-D7CB-wide": {
+      "input_sha256": "7ccdc8f1fab769a12d573b327fd2e1ce436d78d6f828b2764e84ae9eab452bb1",
+      "scalar": "U+D7CB",
+      "context": "wide",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "print and checksums disagree: U+4E2D U+D7CB against B1D3 0000 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0",
+      "files": {
+        "zero-D7CB-wide.in": "7ccdc8f1fab769a12d573b327fd2e1ce436d78d6f828b2764e84ae9eab452bb1",
+        "zero-D7CB-wide/A.json": "5c7e2ccabaa4de8424784bae33a2f30e6a545eaa6799e28d6179f6f550dcba32",
+        "zero-D7CB-wide/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-D7CB-wide/A.print": "4c8c17ba63e9b62e640f8fc383ec0ef38f7e766b1ffc25c8a0ef9866bec01c0f",
+        "zero-D7CB-wide/S.print": "c524fd1cbbbb8f364632f809d3097c2bf40d02ad5d724991fda8fae354418055",
+        "zero-D7CB-wide/continuation.json": "6c29676b93acdef7bbc79fee256140c98014ada190baa2722d1f109341d018f7"
+      }
+    },
+    "zero-D7CB-unwritten": {
+      "input_sha256": "195f7da87ce3899735adea2cc0d530e457912e60c39a85e69b336d9203782ac0",
+      "scalar": "U+D7CB",
+      "context": "unwritten",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "row 1: pass S lost its separator before column 1",
+      "files": {
+        "zero-D7CB-unwritten.in": "195f7da87ce3899735adea2cc0d530e457912e60c39a85e69b336d9203782ac0",
+        "zero-D7CB-unwritten/A.json": "69ae13205c0d9ad7c26ceebeb2baf361ac1cba08958e76ac943d3cf95014365d",
+        "zero-D7CB-unwritten/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-D7CB-unwritten/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "zero-D7CB-unwritten/S.print": "738544a27467d68055ea9f62df74c1b96dda4a7352dcfb3bdfc309ae71108154",
+        "zero-D7CB-unwritten/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-D7CB-first": {
+      "input_sha256": "ee3f2c5ade6863bd4d067c3440f5ce0f5f070870e451a38fb115543ff3c11eff",
+      "scalar": "U+D7CB",
+      "context": "first",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "row 1: pass S lost its separator before column 1",
+      "files": {
+        "zero-D7CB-first.in": "ee3f2c5ade6863bd4d067c3440f5ce0f5f070870e451a38fb115543ff3c11eff",
+        "zero-D7CB-first/A.json": "515ecc541b5d005ac2681bb0673b0f1bf97a045ad06fdd7c7e436cf01f16e365",
+        "zero-D7CB-first/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-D7CB-first/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "zero-D7CB-first/S.print": "7d3da9061f6c09cf7bdea70b264d54d7d4bf5b88f187fa668b2f86d781ef20ee",
+        "zero-D7CB-first/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-FFF9-ascii": {
+      "input_sha256": "32301b174b53c671296c84bed16b24f750ca9e7b006aae54b20b38efe5c44f9d",
+      "scalar": "U+FFF9",
+      "context": "ascii",
+      "classification": "complete-reference-frame",
+      "files": {
+        "zero-FFF9-ascii.in": "32301b174b53c671296c84bed16b24f750ca9e7b006aae54b20b38efe5c44f9d",
+        "zero-FFF9-ascii/A.json": "13dc5479499af5778192696c21794bc9391dd5cbce837d0faf958066a300192f",
+        "zero-FFF9-ascii/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-FFF9-ascii/A.print": "47b62e52cfe434dd26d10c68b228848c04628b5f407451286e6cec31b1a2540c",
+        "zero-FFF9-ascii/S.print": "a60288fe3507322debc1f5fa77a7d48fdb269e89352291d8e116007809fa69f6",
+        "zero-FFF9-ascii/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "zero-FFF9-ascii/got.screen": "cb7d2decd320b26c9406a5159d7e2f6e6fb52dfc0d24d19bc6e123abb734f394"
+      }
+    },
+    "zero-FFF9-wide": {
+      "input_sha256": "0cc8d1d7abe3c98df8f8265a2660221f25db82ef85e7a34eb0d00e5e88ad8433",
+      "scalar": "U+FFF9",
+      "context": "wide",
+      "classification": "complete-reference-frame",
+      "files": {
+        "zero-FFF9-wide.in": "0cc8d1d7abe3c98df8f8265a2660221f25db82ef85e7a34eb0d00e5e88ad8433",
+        "zero-FFF9-wide/A.json": "5c7e2ccabaa4de8424784bae33a2f30e6a545eaa6799e28d6179f6f550dcba32",
+        "zero-FFF9-wide/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-FFF9-wide/A.print": "87b33ca85c7dedd8816968d7a885f9f6fce7106ee9b18d9c3a3f42f028877e62",
+        "zero-FFF9-wide/S.print": "dbfd6bfeb5118f8f7aee53faddd914dc28e8da30b53a4402227725bf4a14df4b",
+        "zero-FFF9-wide/continuation.json": "6c29676b93acdef7bbc79fee256140c98014ada190baa2722d1f109341d018f7",
+        "zero-FFF9-wide/got.screen": "231235c32476bfd879dff5c94fe1bb1a9dc0ed91659ce88860244a3b4d20ec02"
+      }
+    },
+    "zero-FFF9-unwritten": {
+      "input_sha256": "3328ce0c546941725c99cb6e11ae40a444f5771e69fed6858b04a4ba03f7d493",
+      "scalar": "U+FFF9",
+      "context": "unwritten",
+      "classification": "complete-reference-frame",
+      "files": {
+        "zero-FFF9-unwritten.in": "3328ce0c546941725c99cb6e11ae40a444f5771e69fed6858b04a4ba03f7d493",
+        "zero-FFF9-unwritten/A.json": "69ae13205c0d9ad7c26ceebeb2baf361ac1cba08958e76ac943d3cf95014365d",
+        "zero-FFF9-unwritten/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-FFF9-unwritten/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "zero-FFF9-unwritten/S.print": "454dab81f5654e2c2c955fe9f5cfd4644115fce28b7ee7335d9fa0d5f783e71a",
+        "zero-FFF9-unwritten/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "zero-FFF9-unwritten/got.screen": "98cc7dad03807d25603daa55f5dbb67393fbc1f4f5adcab200b7cd6ba2c9bfec"
+      }
+    },
+    "zero-FFF9-first": {
+      "input_sha256": "366e8d78f91d94cb9895dcd0b2f1e89c3f789d28712a5e969cb30c7a8469bad0",
+      "scalar": "U+FFF9",
+      "context": "first",
+      "classification": "complete-reference-frame",
+      "files": {
+        "zero-FFF9-first.in": "366e8d78f91d94cb9895dcd0b2f1e89c3f789d28712a5e969cb30c7a8469bad0",
+        "zero-FFF9-first/A.json": "515ecc541b5d005ac2681bb0673b0f1bf97a045ad06fdd7c7e436cf01f16e365",
+        "zero-FFF9-first/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-FFF9-first/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "zero-FFF9-first/S.print": "454dab81f5654e2c2c955fe9f5cfd4644115fce28b7ee7335d9fa0d5f783e71a",
+        "zero-FFF9-first/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "zero-FFF9-first/got.screen": "295571a04cb8e7900e63298be82f4ed33d70b6f22bb13332222d52dc48b20524"
+      }
+    },
+    "zero-13430-ascii": {
+      "input_sha256": "0b23a188e1fe342c4fa7193109c8401635e9e00f4f374c879862b1ef281d6d11",
+      "scalar": "U+13430",
+      "context": "ascii",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "print and checksums disagree: U+0061 U+13430 against FF9F FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0",
+      "files": {
+        "zero-13430-ascii.in": "0b23a188e1fe342c4fa7193109c8401635e9e00f4f374c879862b1ef281d6d11",
+        "zero-13430-ascii/A.json": "13dc5479499af5778192696c21794bc9391dd5cbce837d0faf958066a300192f",
+        "zero-13430-ascii/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-13430-ascii/A.print": "d41c41e60a9962b6c901cebadf6a6482ab88d9e7b29817fab1ad8c1eb5098bd3",
+        "zero-13430-ascii/S.print": "5d8c5d71704b1815ee4fff3c2bf633600ea5d1f9e5710b6edd5ac194661e297f",
+        "zero-13430-ascii/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-13430-wide": {
+      "input_sha256": "2330b1a770959e97e163d740c02e642e68936b99461504bdfec669827b36aebf",
+      "scalar": "U+13430",
+      "context": "wide",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "print and checksums disagree: U+4E2D U+13430 against B1D3 0000 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0 FFE0",
+      "files": {
+        "zero-13430-wide.in": "2330b1a770959e97e163d740c02e642e68936b99461504bdfec669827b36aebf",
+        "zero-13430-wide/A.json": "5c7e2ccabaa4de8424784bae33a2f30e6a545eaa6799e28d6179f6f550dcba32",
+        "zero-13430-wide/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-13430-wide/A.print": "d609c7c1e09ec5b639dbf998d099d857e4e50490111248d857162c1b6aa0d1ca",
+        "zero-13430-wide/S.print": "93d5f2fdeaf006675fe3fddf74ebe2f0a9c6d4661bc82098199a30989f93cf55",
+        "zero-13430-wide/continuation.json": "6c29676b93acdef7bbc79fee256140c98014ada190baa2722d1f109341d018f7"
+      }
+    },
+    "zero-13430-unwritten": {
+      "input_sha256": "2ea87e00b9f5673c25dd4bbf212a670eeb63cb58cdb5abdc716283c998cfdef2",
+      "scalar": "U+13430",
+      "context": "unwritten",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "row 1: pass S lost its separator before column 1",
+      "files": {
+        "zero-13430-unwritten.in": "2ea87e00b9f5673c25dd4bbf212a670eeb63cb58cdb5abdc716283c998cfdef2",
+        "zero-13430-unwritten/A.json": "69ae13205c0d9ad7c26ceebeb2baf361ac1cba08958e76ac943d3cf95014365d",
+        "zero-13430-unwritten/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-13430-unwritten/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "zero-13430-unwritten/S.print": "5639ecbdf5acc2457932dbd80b4a0d08228b5ac4301ce74f3fb4cceac44837fa",
+        "zero-13430-unwritten/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "zero-13430-first": {
+      "input_sha256": "fedc0524cb780f61e9bc70607870216e8265164284af7f433e418404d39dc8fa",
+      "scalar": "U+13430",
+      "context": "first",
+      "classification": "raw-reference-report-or-layout-failure",
+      "validator_error": "row 1: pass S lost its separator before column 1",
+      "files": {
+        "zero-13430-first.in": "fedc0524cb780f61e9bc70607870216e8265164284af7f433e418404d39dc8fa",
+        "zero-13430-first/A.json": "515ecc541b5d005ac2681bb0673b0f1bf97a045ad06fdd7c7e436cf01f16e365",
+        "zero-13430-first/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "zero-13430-first/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "zero-13430-first/S.print": "18800d71698b2e24bbecde07610d0f916038735ab273306b55c87bdfbe992614",
+        "zero-13430-first/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    }
+  },
+  "errors": [],
+  "capture_head": "c70c46ce8f675afb2d55ab86eaa27fa5545e056b",
+  "pins_sha256": "8d6d781805e6840a6a6becb059453cfa166fb7d53424fd4a89289ad827b7e992",
+  "capture_manifest_sha256": "00dd70df2f90e61de893c470b3821e8e96b69730e833e1b963402e9a8a931fd7"
+}
