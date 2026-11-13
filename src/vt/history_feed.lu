@@ -1,0 +1,97 @@
+//! member: true
+//! Primary logical row addresses and append-only, bounded history fragments.
+
+fn prime_primary_coordinate(mut pane: Vt, row: int) {
+    pane.line_coordinate.id = pane.primary.line_ids[row - 1]
+    pane.line_coordinate.offset = pane.primary.line_offsets[row - 1]
+    pane.line_coordinate.next_id = if pane.primary.overflow_ids[row - 1] >= 0 {
+        pane.primary.overflow_ids[row - 1]
+    } else { pane.primary.next_line_id }
+}
+
+fn commit_primary_coordinate(mut pane: Vt, row: int) {
+    if pane.line_coordinate.id != pane.primary.line_ids[row - 1] {
+        pane.primary.overflow_ids[row - 1] = pane.line_coordinate.id
+    }
+    if pane.primary.next_line_id < pane.line_coordinate.next_id {
+        pane.primary.next_line_id = pane.line_coordinate.next_id
+    }
+}
+
+fn advance_screen_coordinate(mut coordinate: LineCoordinate, screen: Screen, cols: int, row: int) {
+    let cells = history_line_cells(screen, cols, row, row)
+    var first: int = 0
+    while first < cells {
+        let room = 4294967296 - coordinate.offset
+        let limit = if room < 65536 { room } else { 65536 }
+        let end = history_fragment_end(screen, cols, row, row, first, limit)
+        if end == first {
+            assert(room == 1)
+            prepare_line_coordinate(mut coordinate, 2)
+        } else {
+            advance_line_coordinate(mut coordinate, end - first)
+            first = end
+        }
+    }
+}
+
+fn advance_primary_coordinate(mut pane: Vt, row: int) {
+    prime_primary_coordinate(mut pane, row)
+    advance_screen_coordinate(mut pane.line_coordinate, pane.primary, pane.cols, row)
+    commit_primary_coordinate(mut pane, row)
+}
+
+fn assign_row_line(mut screen: Screen, row: int, id: int, offset: int) {
+    if screen.line_ids[row - 1] != id || screen.line_offsets[row - 1] != offset {
+        screen.overflow_ids[row - 1] = 0 - 1
+    }
+    screen.line_ids[row - 1] = id
+    screen.line_offsets[row - 1] = offset
+}
+
+fn fresh_row_line(mut screen: Screen, row: int) {
+    screen.line_ids[row - 1] = screen.next_line_id
+    screen.next_line_id += 1
+    screen.line_offsets[row - 1] = 0
+    screen.overflow_ids[row - 1] = 0 - 1
+}
+
+fn repair_primary_lineage(mut pane: Vt) {
+    if pane.primary.line_ids[0] < 0 { fresh_row_line(mut pane.primary, 1) }
+    var previous_original = pane.primary.line_ids[0]
+    var row = 2
+    while row <= pane.rows {
+        let original = pane.primary.line_ids[row - 1]
+        if pane.primary.wrapped[row - 2] {
+            advance_primary_coordinate(mut pane, row - 1)
+            assign_row_line(mut pane.primary, row, pane.line_coordinate.id, pane.line_coordinate.offset)
+        } else if original < 0 || pane.primary.line_offsets[row - 1] != 0 ||
+                original == previous_original || original == pane.primary.line_ids[row - 2] {
+            fresh_row_line(mut pane.primary, row)
+        }
+        previous_original = original
+        row += 1
+    }
+}
+
+fn retain_primary_row(mut pane: Vt, row: int) {
+    prime_primary_coordinate(mut pane, row)
+    if pane.history.bytes.len == 0 {
+        history_count_evicted(mut pane.history, 1)
+        advance_screen_coordinate(mut pane.line_coordinate, pane.primary, pane.cols, row)
+    } else {
+        history_encode_fragments(mut pane.history, pane.primary, pane.cols, row, row, mut pane.line_coordinate)
+    }
+    commit_primary_coordinate(mut pane, row)
+}
+
+fn scroll_primary_up(mut pane: Vt, top: int, bottom: int, amount: int) {
+    let count = grid_clamp(amount, 1, bottom - top + 1)
+    repair_primary_lineage(mut pane)
+    if top == 1 {
+        var row = top
+        while row < top + count { retain_primary_row(mut pane, row); row += 1 }
+    }
+    shift_lines(mut pane.primary, pane.cols, top, bottom, count, pane.pen.background, false)
+    repair_primary_lineage(mut pane)
+}

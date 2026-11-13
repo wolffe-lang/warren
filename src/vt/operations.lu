@@ -25,7 +25,10 @@ fn tab_backward(mut pane: Vt, count: int) {
 
 fn clear_line_wrap(mut pane: Vt) {
     if pane.active_alternate { pane.alternate.wrapped[pane.cursor_row - 1] = false }
-    else { pane.primary.wrapped[pane.cursor_row - 1] = false }
+    else {
+        pane.primary.wrapped[pane.cursor_row - 1] = false
+        repair_primary_lineage(mut pane)
+    }
 }
 
 fn reverse_index(mut pane: Vt) {
@@ -35,6 +38,7 @@ fn reverse_index(mut pane: Vt) {
             shift_lines(mut pane.alternate, pane.cols, pane.region_top, pane.region_bottom, 1, pane.pen.background, true)
         } else {
             shift_lines(mut pane.primary, pane.cols, pane.region_top, pane.region_bottom, 1, pane.pen.background, true)
+            repair_primary_lineage(mut pane)
         }
     } else if pane.cursor_row > 1 { pane.cursor_row -= 1 }
 }
@@ -82,9 +86,12 @@ fn dispatch_tab_or_scroll(mut pane: Vt, final: int) {
         if pane.active_alternate {
             shift_lines(mut pane.alternate, pane.cols, pane.region_top, pane.region_bottom,
                 amount, pane.pen.background, final == 84)
+        } else if final == 83 {
+            scroll_primary_up(mut pane, pane.region_top, pane.region_bottom, amount)
         } else {
             shift_lines(mut pane.primary, pane.cols, pane.region_top, pane.region_bottom,
-                amount, pane.pen.background, final == 84)
+                amount, pane.pen.background, true)
+            repair_primary_lineage(mut pane)
         }
     }
 }

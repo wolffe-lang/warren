@@ -39,8 +39,8 @@ pub struct Modes {
 }
 
 /// One pane's pure terminal state. Cursor and region coordinates are 1-based;
-/// tab and row arrays are 0-based. History has fixed storage, but incoming
-/// screen removals are not connected to that storage by this seam yet.
+/// tab and row arrays are 0-based. History uses fixed encoded-byte storage;
+/// row addresses survive ordinary fragment boundaries and cursor movement.
 pub struct Vt {
     cols: int, rows: int,
     primary: Screen, alternate: Screen, active_alternate: bool,

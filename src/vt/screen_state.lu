@@ -118,6 +118,10 @@ fn full_reset(mut pane: Vt) {
     soft_reset(mut pane)
     clear_screen(mut pane.primary, pane.cols, pane.rows, 0 - 1)
     clear_screen(mut pane.alternate, pane.cols, pane.rows, 0 - 1)
+    history_clear(mut pane.history)
+    pane.line_coordinate.id = pane.primary.line_ids[0]
+    pane.line_coordinate.offset = 0
+    pane.line_coordinate.next_id = pane.primary.next_line_id
     alternate_state(mut pane, false)
     reset_saved_cursor(mut pane.saved_primary)
     reset_saved_cursor(mut pane.saved_alternate)
@@ -150,5 +154,5 @@ fn full_reset(mut pane: Vt) {
     pane.parser.second_kind = 0
     pane.parser.second_value = 0
     // Window title and undrained external notifications are not screen state.
-    // The history ring, once implemented, is emptied here too.
+    // The primary lifetime ID allocator is not recycled by a terminal reset.
 }

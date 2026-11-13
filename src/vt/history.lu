@@ -3,7 +3,7 @@
 
 /// The retained encoded history ring. Header lengths include every encoded
 /// byte. Head/tail are byte positions; previous lengths support reverse reads.
-/// Screen-line encoding and feed integration are not implemented yet.
+/// Reader and row-address state are kept separately from this framing value.
 pub struct History {
     bytes: List[byte], head: int, tail: int, used: int,
     records: int, newest_length: int, evicted: int,

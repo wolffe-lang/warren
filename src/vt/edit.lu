@@ -47,6 +47,9 @@ fn copy_row(mut screen: Screen, cols: int, to: int, from: int) {
     while col < cols { copy_cell(mut screen, (to - 1) * cols + col, (from - 1) * cols + col); col += 1 }
     screen.extents[to - 1] = screen.extents[from - 1]
     screen.wrapped[to - 1] = screen.wrapped[from - 1]
+    screen.line_ids[to - 1] = screen.line_ids[from - 1]
+    screen.line_offsets[to - 1] = screen.line_offsets[from - 1]
+    screen.overflow_ids[to - 1] = screen.overflow_ids[from - 1]
 }
 
 fn blank_row(mut screen: Screen, cols: int, row: int, background: int) {
@@ -54,6 +57,7 @@ fn blank_row(mut screen: Screen, cols: int, row: int, background: int) {
     while col < cols { blank_cell(mut screen, (row - 1) * cols + col, background); col += 1 }
     screen.extents[row - 1] = 0
     screen.wrapped[row - 1] = false
+    fresh_row_line(mut screen, row)
 }
 
 fn shift_lines(mut screen: Screen, cols: int, row: int, bottom: int,
@@ -92,4 +96,5 @@ fn dispatch_editing(mut pane: Vt, final: int) {
             shift_lines(mut pane.primary, pane.cols, pane.cursor_row, pane.region_bottom, amount, pane.pen.background, final == 76)
         }
     }
+    if !pane.active_alternate { repair_primary_lineage(mut pane) }
 }

@@ -146,12 +146,14 @@ fn dispatch_csi(mut pane: Vt, final: int) {
         if final != 88 && (mode > 2 && !(final == 74 && mode == 3)) { return }
         let amount = grid_param(pane.parser, 0, 1, true)
         pane.pending_wrap = false
+        if final == 74 && mode == 3 { history_clear(mut pane.history); return }
         if pane.active_alternate {
             erase_active_screen(mut pane.alternate, pane.cols, pane.rows, pane.cursor_row,
                 pane.cursor_col, final, mode, amount, pane.pen.background)
         } else {
             erase_active_screen(mut pane.primary, pane.cols, pane.rows, pane.cursor_row,
                 pane.cursor_col, final, mode, amount, pane.pen.background)
+            repair_primary_lineage(mut pane)
         }
     }
 }

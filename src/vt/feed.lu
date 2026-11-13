@@ -22,21 +22,7 @@ fn copy_cell(mut screen: Screen, to: int, from: int) {
 }
 
 fn scroll_up_one(mut screen: Screen, cols: int, top: int, bottom: int, background: int) {
-    var row = top - 1
-    while row < bottom - 1 {
-        var col = 0
-        while col < cols {
-            copy_cell(mut screen, row * cols + col, (row + 1) * cols + col)
-            col += 1
-        }
-        screen.extents[row] = screen.extents[row + 1]
-        screen.wrapped[row] = screen.wrapped[row + 1]
-        row += 1
-    }
-    var col = 0
-    while col < cols { blank_cell(mut screen, (bottom - 1) * cols + col, background); col += 1 }
-    screen.extents[bottom - 1] = 0
-    screen.wrapped[bottom - 1] = false
+    shift_lines(mut screen, cols, top, bottom, 1, background, false)
 }
 
 fn index_line(mut pane: Vt) {
@@ -45,7 +31,7 @@ fn index_line(mut pane: Vt) {
         if pane.active_alternate {
             scroll_up_one(mut pane.alternate, pane.cols, pane.region_top, pane.region_bottom, pane.pen.background)
         } else {
-            scroll_up_one(mut pane.primary, pane.cols, pane.region_top, pane.region_bottom, pane.pen.background)
+            scroll_primary_up(mut pane, pane.region_top, pane.region_bottom, 1)
         }
     } else if pane.cursor_row < pane.rows {
         pane.cursor_row += 1
@@ -102,9 +88,19 @@ fn write_glyph(mut screen: Screen, cols: int, row: int, col: int, cp: int,
 }
 
 fn wrap_line(mut pane: Vt) {
-    if pane.active_alternate { pane.alternate.wrapped[pane.cursor_row - 1] = true }
-    else { pane.primary.wrapped[pane.cursor_row - 1] = true }
-    index_line(mut pane)
+    if pane.active_alternate {
+        pane.alternate.wrapped[pane.cursor_row - 1] = true
+        index_line(mut pane)
+    } else {
+        repair_primary_lineage(mut pane)
+        advance_primary_coordinate(mut pane, pane.cursor_row)
+        let id = pane.line_coordinate.id
+        let offset = pane.line_coordinate.offset
+        pane.primary.wrapped[pane.cursor_row - 1] = true
+        index_line(mut pane)
+        assign_row_line(mut pane.primary, pane.cursor_row, id, offset)
+        repair_primary_lineage(mut pane)
+    }
     pane.cursor_col = 1
 }
 
@@ -130,6 +126,8 @@ fn print_scalar(mut pane: Vt, cp: int) {
         if !pane.modes.autowrap { return }
         wrap_line(mut pane)
     }
+    let written_row = pane.cursor_row
+    let prior_extent = pane.primary.extents[written_row - 1]
     if pane.modes.insert {
         if pane.active_alternate {
             shift_characters(mut pane.alternate, pane.cols, pane.cursor_row, pane.cursor_col, width, pane.pen.background, true)
@@ -143,6 +141,10 @@ fn print_scalar(mut pane: Vt, cp: int) {
     } else {
         write_glyph(mut pane.primary, pane.cols, pane.cursor_row, pane.cursor_col, cp,
             width, pane.pen.flags, pane.pen.foreground, pane.pen.background)
+    }
+    if !pane.active_alternate && pane.primary.wrapped[written_row - 1] &&
+            (pane.cols == 1 || pane.primary.extents[written_row - 1] != prior_extent) {
+        repair_primary_lineage(mut pane)
     }
     pane.last_printed = cp
     pane.last_mark1 = 0
@@ -182,11 +184,11 @@ fn dispatch_grid_token(mut pane: Vt, kind: int, value: int) {
     else if kind == 5 { dispatch_osc(mut pane) }
 }
 
-/// Consume bytes with incremental parsing, width-aware printing, C0 screen
-/// operations, cursor addressing, scroll regions, erasure, SGR, titles,
-/// stored mode state and bounded final-state events. The grid is incomplete:
-/// alternate-screen and other ESC operations, scrollback and answers are
-/// not served by this slice yet.
+/// Consume bytes with incremental parsing, width-aware screen operations,
+/// bounded final-state events and query answers. Primary upward scrolling
+/// retains whole encoded history fragments only for a region starting at
+/// row one; alternate scrolling never enters that history. Feeding mutates
+/// preallocated storage, not an input-sized event or answer log.
 pub fn feed(mut pane: Vt, data: List[byte]) {
     for b in data {
         advance_in_place(mut pane.parser, b)

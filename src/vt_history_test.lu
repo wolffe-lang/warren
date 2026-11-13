@@ -80,6 +80,44 @@ fn test_history_feed_charge() {
     }
 }
 
+fn same_history(a: vt.Vt, b: vt.Vt) {
+    assert(vt.dump(a) == vt.dump(b), "history-chunk-screen")
+    assert(a.primary.next_line_id == b.primary.next_line_id, "history-chunk-id-allocation")
+    var row = 0
+    while row < a.rows {
+        assert(a.primary.line_ids[row] == b.primary.line_ids[row])
+        assert(a.primary.line_offsets[row] == b.primary.line_offsets[row])
+        assert(a.primary.overflow_ids[row] == b.primary.overflow_ids[row])
+        row += 1
+    }
+    assert(a.history.head == b.history.head && a.history.tail == b.history.tail && a.history.used == b.history.used)
+    assert(a.history.records == b.history.records && a.history.evicted == b.history.evicted)
+    var i = 0
+    while i < a.history.bytes.len { assert(a.history.bytes[i] == b.history.bytes[i], "history-chunk-ring"); i += 1 }
+}
+
+fn test_history_chunking() {
+    let data = "abcdefghijkl\u{1b}[2;1H\u{1b}[L\u{1b}[M\u{1b}[2K\u{1b}[3;1H中\r\nZ\u{1b}[S".bytes()
+    var reference = vt.new(4, 3, 4096)
+    vt.feed(mut reference, data)
+    var split = 0
+    while split <= data.len {
+        region turn(cap: 1048576) {
+            var pane = vt.new(4, 3, 4096)
+            vt.feed(mut pane, data[0..split])
+            vt.feed(mut pane, data[split..data.len])
+            same_history(reference, pane)
+        }
+        split += 1
+    }
+    region single(cap: 1048576) {
+        var pane = vt.new(4, 3, 4096)
+        var i = 0
+        while i < data.len { vt.feed(mut pane, data[i..i + 1]); i += 1 }
+        same_history(reference, pane)
+    }
+}
+
 fn main() -> int {
     test_primary_history_append()
     test_wrap_addresses()
@@ -87,5 +125,6 @@ fn main() -> int {
     test_edits_repair_logical_breaks()
     test_clear_and_lifetime_ids()
     test_history_feed_charge()
+    test_history_chunking()
     0
 }
