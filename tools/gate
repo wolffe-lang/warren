@@ -58,6 +58,7 @@ step frozen-checkpoints python3 -I tools/vt/check_checkpoints.py
 step inverse-reference python3 -I tools/vt/check_inverse.py
 step d9-reference python3 -I tools/vt/check_d9.py
 step combining-reference python3 -I tools/vt/check_combining.py
+step combine-anchor-reference python3 -I tools/vt/check_combine_anchor.py
 step zero-width-reference python3 -I tools/vt/check_zero_width.py
 step annotation-reference python3 -I tools/vt/check_annotations.py
 step erase-extent-reference python3 -I tools/vt/check_erase_extents.py
@@ -109,6 +110,7 @@ step fuzz-baseline-native python3 -I tests/vt/compare_suite.py --suite fuzz-base
 step d9-original-repaired-native python3 -I tests/vt/compare_d9.py "$root/target/native/warren"
 step combining-extent-native python3 -I tests/vt/combining_extent_rows.py "$root/target/native/warren"
 step combining-frames-native python3 -I tests/vt/compare_combining.py "$root/target/native/warren"
+step combine-anchor-frames-native python3 -I tests/vt/compare_combine_anchor.py "$root/target/native/warren"
 step erase-reflow-contract-native python3 -I tests/vt/compare_erase_reflow.py "$root/target/native/warren"
 step annotation-frames-native python3 -I tests/vt/compare_annotations.py "$root/target/native/warren"
 step erase-extent-frames-native python3 -I tests/vt/compare_erase_extents.py "$root/target/native/warren"
@@ -124,6 +126,7 @@ step lupin-pure "$LUPIN" run src/pure_test.lu
 step cli-lupin python3 -I tests/vt/cli_rows.py "$LUPIN" run src/warren.lu
 step cases-lupin python3 -I tests/vt/compare_cases.py "$LUPIN" run src/warren.lu
 step combining-frames-lupin python3 -I tests/vt/compare_combining.py "$LUPIN" run src/warren.lu
+step combine-anchor-frames-lupin python3 -I tests/vt/compare_combine_anchor.py "$LUPIN" run src/warren.lu
 step erase-reflow-contract-lupin python3 -I tests/vt/compare_erase_reflow.py "$LUPIN" run src/warren.lu
 step annotation-frames-lupin python3 -I tests/vt/compare_annotations.py "$LUPIN" run src/warren.lu
 step erase-extent-frames-lupin python3 -I tests/vt/compare_erase_extents.py "$LUPIN" run src/warren.lu

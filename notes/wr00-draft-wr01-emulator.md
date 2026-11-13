@@ -3,8 +3,8 @@
 Current width policy: D11 is withdrawn. The pinned Unicode 15.1.0 base table
 is overridden by the 350 stated exception scalars in `tests/vt/width-exceptions.json`,
 matching measured glibc 2.39 `wcwidth` and the reference. The exhaustive sweep
-requires zero non-control differences. Jamo/format exceptions of width zero
-attach under section 2.3 and D10; regional indicators are width one,
+requires zero non-control differences. Non-annotation jamo/format exceptions
+of width zero attach under section2.3 and D10; regional indicators are width one,
 so a pair advances two.
 
 The reference contract for `src/vt`. It is exact where exactness
@@ -179,22 +179,19 @@ see it broken.
 
 For a code point with width w (section 5):
 
-1. w = 0 (a combining mark): added to the cell on the cursor's left, or to
-   the cell under the cursor when a wrap is pending; with no such cell it is
-   dropped (`combining-first-cell`, `combining-after-wide`,
-   `combining-after-wrap`). A cell keeps 2 marks; later ones are dropped
-   (`combining-many`). U+200D is dropped (`zero-width-joiner`). Interlinear
-   annotation controls U+FFF9–FFFB are also consumed without being stored: no
-   cell, mark slot, extent or cursor change, despite their scalar width0.
-   Twelve complete reference frames in `tests/vt/reference/annotations` and
-   `tests/vt/reference/zero-width` measure all three after ASCII, wide text,
-   an unwritten addressed cell and at the first column.
-   A variation selector is kept as a mark and does not change the width
+1. w =0 (a combining mark): attach to the shared combine anchor when it is
+   set; otherwise use the cursor's own cell. A wide tail resolves to its lead.
+   Existing base and rendition are preserved; an unwritten blank has a space
+   base and becomes written, extending its extent through the target's width
+   (D10). First and last columns are valid targets. The cursor never advances.
+   A cell keeps2 marks; later ones are dropped (`combining-many`). U+200D is
+   dropped (`zero-width-joiner`). Interlinear annotation controls U+FFF9–FFFB
+   are consumed without being stored: no cell, mark slot, extent or cursor
+   change, despite scalar width0. Twelve complete reference frames in
+   `tests/vt/reference/annotations` and `tests/vt/reference/zero-width` cover
+   ASCII, wide text, an unwritten addressed cell and the first column.
+   A variation selector is kept as a mark and does not change width
    (`emoji-vs16`).
-   If its target was an unwritten blank, the mark makes that cell written and
-   extends the extent through the target's width, so G6 and R1 hold (D10).
-   No-left-cell drops, wide-tail attachment and pending-wrap targeting remain
-   as above; the reference's inconsistent blank-cell reports are retained.
 2. If `pending_wrap` and autowrap: mark the row `wrapped`, move to column 1
    of the next row (scrolling the region if on its bottom row), clear the flag.
 3. Except for G2a at one column, if w = 2 and col = cols: with autowrap,
@@ -204,9 +201,26 @@ For a code point with width w (section 5):
 4. In insert mode, shift the row right by w from the cursor first; cells
    pushed past the last column are lost (`insert-mode`, `wide-insert-mode`).
 5. Write the cell or pair with the pen's rendition, through the charset
-   mapping of section 3.6; fix any pair this breaks (G2); extend the extent.
+   mapping of section3.6; fix any pair this breaks (G2); extend the extent.
+   Set the combine anchor to this graphic's lead cell.
 6. Advance by w. If that would pass the last column, stay on it and set
    `pending_wrap`.
+
+The combine anchor is cursor state shared across the two screens, not another
+cell or a foreground/background attribute. HT, SGR, DECSC, mode47 and SU/SD
+preserve its physical position; subsequent marks leave it unchanged.
+CUP/HVP, CHA/HPA/VPA/HPR/VPR, CUU/CUD/CUF/CUB/CNL/CPL (even clamped or
+unchanged), BS/CR/LF/IND/NEL, erases, accepted
+character/line edits, DECRC, a mode1047 clear, mode1049 and RIS clear it. A normal graphic
+sets it again. Primary resize maps its logical cell with reflow, including the
+unchanged-width snapshot path; active-alternate resize clips its coordinate.
+Same-size and refused requests do not alter it. Raw A/S, before/after cursor
+reports and113 complete comparison frames are bound under
+`tests/vt/reference/combine-anchor`; the one conflicting RI observation is
+retained separately by the same gate. The narrowly identified
+RI→HT→mark reference interaction is outside the comparison subset while its
+conflicting reports are unresolved; the fuzz record counts that exclusion and
+still runs native chunking and resize-property checks on those streams.
 
 ### 2.4 What clears a pending wrap (measured, one stream each: `wrap-*`)
 
@@ -299,7 +313,7 @@ The list, with the document's section for each, is in the prediction
 | D7 | `SGR 53` (overline) ignored, mode 2026 unknown | 53 consumed without effect; 2026 stored and reported | yew sets 2026 around every frame |
 | D8 | DEL inside an OSC title becomes `?` (`tests/vt/parser-reference/osc-del.in`, title `613f62`) | DEL is silently dropped, yielding title `6162` | titles are display text; dropping the control is cleaner than adding a visible question mark |
 | D9 | a pre-restore background reappears after saved-pen restore followed by 7/27; an RGB integer can become invalid palette 15540094 | keep the restored colour value and set form; 7/27 change only inverse | post-restore inverse colour-cache defect; paired raw fixtures are in `tests/vt/reference/inverse` and `tests/vt/reference/d9` |
-| D10 | a combining mark on an unwritten blank is visible in the full-cell print beyond extent 0; a complete canonical frame is inconsistent | the target cell is written and extends the extent; resize keeps it, with the existing no-left-cell drop rule at column1 | G6 and R1; six named report failures, two strict written-base controls |
+| D10 | a mark on an unwritten cell appears in the full-cell print beyond the ordinary print's extent0 | keep that measured placement and mark the cell written, extending the extent; resize retains it | only the extent report is inconsistent; first-column marks are retained |
 | D11 | withdrawn; scalar widths now agree outside control characters | Unicode 15.1.0 plus the explicit exception classes in `tests/vt/width-exceptions.json` | the exhaustive sweep accepts zero non-control differences |
 | D12 | origin-mode CPR wraps a negative relative row after restoring an absolute cursor above the current region; a one-above-top row reports zero | keep the measured absolute placement but report relative CPR row 1 above the region | exact-trigger reference-report inconsistency; DECCIR remains the absolute witness |
 | D13 | legacy SGR30 with bold promotes the stored black foreground to index8 | store index0 plus bold, exactly as indexed38;5;0 | painter brightening does not change stored colour; 31–37, indexed0 and explicit90 remain strict controls |

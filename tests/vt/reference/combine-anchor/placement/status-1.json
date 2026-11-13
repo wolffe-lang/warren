@@ -1,0 +1,62 @@
+{
+  "place-0301-pending-first-column": {
+    "before": {
+      "cpr_hex": "1b5b313b3152",
+      "deccir_hex": "1b50312475313b313b313b403b403b483b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3152",
+      "deccir_hex": "1b50312475313b313b313b403b403b483b303b323b403b424242421b5c"
+    }
+  },
+  "place-0301-clear-first-column": {
+    "before": {
+      "cpr_hex": "1b5b313b3152",
+      "deccir_hex": "1b50312475313b313b313b403b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3152",
+      "deccir_hex": "1b50312475313b313b313b403b403b403b303b323b403b424242421b5c"
+    }
+  },
+  "place-1161-pending-first-column": {
+    "before": {
+      "cpr_hex": "1b5b313b3152",
+      "deccir_hex": "1b50312475313b313b313b403b403b483b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3152",
+      "deccir_hex": "1b50312475313b313b313b403b403b483b303b323b403b424242421b5c"
+    }
+  },
+  "place-1161-clear-first-column": {
+    "before": {
+      "cpr_hex": "1b5b313b3152",
+      "deccir_hex": "1b50312475313b313b313b403b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3152",
+      "deccir_hex": "1b50312475313b313b313b403b403b403b303b323b403b424242421b5c"
+    }
+  },
+  "place-13430-pending-first-column": {
+    "before": {
+      "cpr_hex": "1b5b313b3152",
+      "deccir_hex": "1b50312475313b313b313b403b403b483b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3152",
+      "deccir_hex": "1b50312475313b313b313b403b403b483b303b323b403b424242421b5c"
+    }
+  },
+  "place-13430-clear-first-column": {
+    "before": {
+      "cpr_hex": "1b5b313b3152",
+      "deccir_hex": "1b50312475313b313b313b403b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3152",
+      "deccir_hex": "1b50312475313b313b313b403b403b403b303b323b403b424242421b5c"
+    }
+  }
+}

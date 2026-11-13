@@ -1,0 +1,142 @@
+{
+  "bs-then-ht": {
+    "before": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    }
+  },
+  "cub0-then-ht": {
+    "before": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    }
+  },
+  "cub1-then-ht": {
+    "before": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    }
+  },
+  "su-then-ht": {
+    "before": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    }
+  },
+  "sd-then-ht": {
+    "before": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    }
+  },
+  "ind-then-ht": {
+    "before": {
+      "cpr_hex": "1b5b323b3952",
+      "deccir_hex": "1b50312475323b393b313b403b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b323b3952",
+      "deccir_hex": "1b50312475323b393b313b403b403b403b303b323b403b424242421b5c"
+    }
+  },
+  "nel-then-ht": {
+    "before": {
+      "cpr_hex": "1b5b323b3952",
+      "deccir_hex": "1b50312475323b393b313b403b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b323b3952",
+      "deccir_hex": "1b50312475323b393b313b403b403b403b303b323b403b424242421b5c"
+    }
+  },
+  "ri-then-ht": {
+    "before": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    }
+  },
+  "ich-then-ht": {
+    "before": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    }
+  },
+  "dch-then-ht": {
+    "before": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3952",
+      "deccir_hex": "1b50312475313b393b313b403b403b403b303b323b403b424242421b5c"
+    }
+  },
+  "alt1047-roundtrip": {
+    "before": {
+      "cpr_hex": "1b5b313b3552",
+      "deccir_hex": "1b50312475313b353b313b403b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3552",
+      "deccir_hex": "1b50312475313b353b313b403b403b403b303b323b403b424242421b5c"
+    }
+  },
+  "cup-new-style": {
+    "before": {
+      "cpr_hex": "1b5b313b3552",
+      "deccir_hex": "1b50312475313b353b313b413b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3552",
+      "deccir_hex": "1b50312475313b353b313b413b403b403b303b323b403b424242421b5c"
+    }
+  },
+  "cr-new-style": {
+    "before": {
+      "cpr_hex": "1b5b313b3152",
+      "deccir_hex": "1b50312475313b313b313b413b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b313b3152",
+      "deccir_hex": "1b50312475313b313b313b413b403b403b303b323b403b424242421b5c"
+    }
+  },
+  "resize-wrapped-anchor": {
+    "before": {
+      "cpr_hex": "1b5b323b3552",
+      "deccir_hex": "1b50312475323b353b313b403b403b403b303b323b403b424242421b5c"
+    },
+    "after": {
+      "cpr_hex": "1b5b323b3552",
+      "deccir_hex": "1b50312475323b353b313b403b403b403b303b323b403b424242421b5c"
+    }
+  }
+}
