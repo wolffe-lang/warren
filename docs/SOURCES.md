@@ -5,6 +5,28 @@ consulted, with a digest where the document is a file, and what it was used
 for. The lists of what may and may not be read are in the README. The
 reference programs were run as binaries and never opened as implementations.
 
+## Consulted for width generation (2026-11-13 UTC)
+
+- Unicode 15.1.0 `UnicodeData.txt`, `EastAsianWidth.txt`,
+  `DerivedCoreProperties.txt` and `emoji-data.txt`, fetched as normative data
+  from unicode.org. Exact URLs and SHA-256 pins are in
+  `tests/vt/unicode-sources.json`; each local input digest was checked twice.
+  The generator uses Mn/Me, default-ignorable Cf, W/F and Emoji_Presentation,
+  with zero width taking precedence. It imports no code from input folders.
+- Unicode's 15.1 ReadMe identifies the final 2023-08-28 data;
+  SHA-256 `0d2da782ead4e85630d510f50808355e8c3355e670841d257dd1e6fbd40db9fa`.
+  Unicode License V3 is included as `LICENSE-UNICODE`, SHA-256
+  `e7a93b009565cfce55919a381437ac4db883e9da2126fa28b91d12732bc53d96`.
+- The pinned image's public libc `wcwidth`/`iswprint` ABI, called as a black
+  box in `C.UTF-8`: glibc 2.39 accepts the 15.1 sample U+2FFC but rejects the
+  16.0 sample U+1C89. This identity probe supports the pin; it is not the
+  complete assigned-scalar xterm sweep, which remains pending.
+- The pinned wolf language specification's memory-model and types documents
+  and public region conformance examples, for retained arena charges and
+  affine region ownership. The replacement-storage witness does not infer
+  per-buffer reclamation from list replacement; the adopted draft instead
+  budgets peak capacities and retained growth buffers explicitly.
+
 ## Consulted for the incremental parser (2026-11-12)
 
 - The adopted emulator contract in `notes/wr00-draft-wr01-emulator.md`, its

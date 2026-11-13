@@ -1,7 +1,8 @@
 # Grid slice directive
 
-This local follow-on starts from parser head `d966f49`. It is kept separate
-from the parser-only review while that head's Linux record is running.
+This follow-on preserves the initial grid work begun from parser head
+`d966f49` and now runs on `wr01-grid` from merged parser trunk `2bb72fab`.
+It is not a claim that the remaining W1 gates have passed.
 
 ## Prediction before code
 
@@ -27,3 +28,26 @@ The initial seven-integer cell is 56 bytes of native scalar payload before
 container overhead. At 80×24 the two screens should therefore be near 220 KiB,
 not including parser state or history; the implementation's ledger, not this
 arithmetic, supplies the measurement.
+
+## Continuation order
+
+The constructor, ASCII/C0, cursor/erase, rendition, narrow editing, bounded
+final-state events and deterministic dump have native/interpreter rows.
+The generated Unicode 15.1 decision tree and initial Unicode printing/pair
+repairs now have positive native/interpreter rows after committed red rows.
+The assigned-scalar xterm sweep is still pending: neither the normative
+properties nor three locale identity samples stand in for it.
+
+Next, complete the remaining operation/mode/answer dispatch with red-first
+rows, then integrate fixed-byte history and capacity-reusing resize/reflow.
+The adopted draft records the peak-capacity allocation model, off-viewport
+cursor projection/commit rule, and 24-byte history header. Its property rows
+must be implemented before claiming those policies work. Preserve content
+and rendition in the one-column wide exception and restore natural width
+on widening; no resize implementation exists yet.
+
+One standalone read-only host preflight has passed. Prepare the complete
+host take before acquiring a pool slot; no heavy work is assigned to the
+other pool host. The first grid review leaves this exact Done-when row open:
+
+> PAX corpus leg: not run, no boot fixture in this repository yet

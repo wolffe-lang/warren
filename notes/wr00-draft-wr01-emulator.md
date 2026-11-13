@@ -15,7 +15,8 @@ beyond the stated caps. One value, `Vt`, is one pane's terminal.
 ```
 new(cols, rows, scrollback_cap_bytes) -> Vt
 feed(vt, bytes)                 total; never fails
-resize(vt, cols, rows)          total for cols, rows >= 1
+resize(vt, cols, rows)          total for positive sizes up to 262144 cells;
+                               larger rectangles refused as vt-size-area
 take_answers(vt) -> bytes       what the terminal says back (DA, DSR, CPR, DECRPM)
 take_events(vt) -> [Event]      title changed, bell, clipboard write, mode changed
 dump(vt) -> text                the screen dump, format 1 (docs/SCREEN-DUMP.md)
@@ -308,7 +309,13 @@ followed by the primary screen's lines.
   under the cap. Nothing is cut at the right edge.
 - **R2 the cursor keeps its place.** The cursor stays on the same cell of
   the same line, or, when it sat past the content, the same distance past it,
-  clamped to the new width.
+  clamped to the new width. If that logical cell lies outside the visible
+  suffix chosen by R5, project the displayed cursor to the nearest visible
+  cell, retaining the original logical anchor across resize-only sequences.
+  The next nonempty feed commits the projected position. For example, after
+  shrinking 24 rows to 1, regrowing without feed restores the original cursor
+  if no text was evicted; feeding a byte before regrowing instead commits the
+  visible position. Eviction must never resurrect an abandoned anchor.
 - **R3 path independence.** For any sizes a and b, resizing to a and then to
   b gives the same text, the same cursor place and the same rows on screen as
   resizing straight to b, provided no line left scrollback on the way.
@@ -357,9 +364,13 @@ draws every code point in one cell) is the renderer's problem, not the grid's.
   primary screen is stored unwrapped: its content, once, whatever width it
   was wrapped at. Reflowing history on a resize is therefore free; only the
   rows on screen are rebuilt. A view of history wraps lines on demand.
-- **Encoding.** A line is a header (8 bytes: length, flags), its text as
-  UTF-8, and one 12-byte record per run of equal rendition. Trailing blanks
-  past the extent are not stored unless they carry a background.
+- **Encoding.** A line has a 24-byte little-endian header, in order: total
+  encoded length u32, previous-record length u32, stable line ID u64,
+  logical start-cell offset u32, and flags u32 (unused bits must be zero).
+  Its text is UTF-8, with one 12-byte record per run of equal rendition.
+  Trailing blanks past the extent are not stored unless they carry a
+  background. Previous lengths permit reverse traversal across ring wrap
+  without an unbounded per-line index.
 - **The cap** counts exactly those bytes. Default 8 MiB a pane. When a new
   line would pass it, whole lines leave from the oldest end until it fits.
 - **S1** stored bytes <= cap, always.
@@ -376,9 +387,17 @@ draws every code point in one cell) is the renderer's problem, not the grid's.
 Costs to hold, as rows with numbers taken on one machine and compared only
 with that machine: appending a line is O(its length); eviction is O(1)
 amortised; a resize is O(rows on screen + the lines they hold), independent
-of history; memory after any stream is at most the cap plus two screens. A
-plain 80-column line of shell output is about 70 bytes, so the default holds
-on the order of a hundred thousand lines.
+of history. The allocation budget counts the fixed-capacity encoded history
+ring, peak screen/workspace capacities and all retained arena growth buffers;
+replaced arena buffers are not claimed freed. Backing capacity is reused on
+shrink and on regrowth within the previous peak, with no further charge.
+Growth is bounded by the protocol's 262144-cell area ceiling. Tests repeat
+small→large→small→large under native and interpreter region caps and require
+charge to plateau after capacity is reached. A plain 80-byte, one-rendition
+line costs 116 bytes including its header and run, so 8 MiB holds roughly
+72,000 such lines; this is an estimate, not a line-count promise. Encoding
+rows require reverse traversal across ring wrap, exactly one record evicted
+at the cap boundary, and a stable ID surviving reflow.
 
 ## 7. Rows
 
