@@ -91,7 +91,30 @@ fn test_history_materializes_logical_spaces_written() {
         pane.primary.cells[2].base == 32 && pane.primary.cells[2].written, "history-logical-spaces-are-written")
 }
 
+fn test_combining_marks_make_unwritten_cells_content() {
+    var pane = vt.new(12, 2, 4096)
+    vt.feed(mut pane, "\u{1b}[1;5H\u{301}".bytes())
+    assert(pane.primary.cells[3].mark1 == 769)
+    assert(pane.primary.cells[3].written && pane.primary.extents[0] == 4,
+        "combining-unwritten-primary-is-content")
+    assert(vt.resize(mut pane, 6, 4) == "")
+    assert(pane.primary.cells[3].mark1 == 769 && pane.primary.cells[3].written,
+        "combining-unwritten-primary-survives-resize")
+    vt.feed(mut pane, "\u{1b}[?47h\u{1b}[1;5H\u{301}".bytes())
+    assert(pane.alternate.cells[3].written && pane.alternate.extents[0] == 4,
+        "combining-unwritten-alternate-is-content")
+    var erased = vt.new(12, 2, 0)
+    vt.feed(mut erased, "abcd\u{1b}[1;4H\u{1b}[2K\u{301}".bytes())
+    assert(erased.primary.cells[2].written && erased.primary.extents[0] == 3,
+        "combining-erased-cell-is-content")
+    var first = vt.new(12, 2, 0)
+    vt.feed(mut first, "\u{1b}[1;0H\u{301}".bytes())
+    assert(first.primary.extents[0] == 0 && !first.primary.cells[0].written && first.primary.cells[0].mark1 == 0,
+        "combining-without-left-cell-still-dropped")
+}
+
 fn main() -> int {
+    test_combining_marks_make_unwritten_cells_content()
     test_cursor_toward_region()
     test_mouse_reset_is_one_tracking_mode()
     test_partial_erase_extends_written_extent()
