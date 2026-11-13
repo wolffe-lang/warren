@@ -6,14 +6,15 @@ use std.io
 fn cell_payload_row() {
     region frame(cap: 65536) {
         let first = budget.charged(frame)
-        let one = new_screen(1, 1)
+        let one = new_screen(2, 1)
         let one_charge = budget.charged(frame) - first
         let second = budget.charged(frame)
-        let two = new_screen(2, 1)
+        let two = new_screen(4, 1)
         let two_charge = budget.charged(frame) - second
-        assert(one.cells.len == 1 && two.cells.len == 2)
-        let payload = two_charge - one_charge
-        io.write_line("MEASURE native-cell-payload bytes={payload} screen-one={one_charge} screen-two={two_charge}")
+        assert(one.cells.len == 2 && two.cells.len == 4)
+        // Even cell counts cancel arena alignment, not just row/header terms.
+        let payload = (two_charge - one_charge) / 2
+        io.write_line("MEASURE native-cell-payload bytes={payload} screen-two={one_charge} screen-four={two_charge}")
         assert(payload == 64, "cell-native-payload-64-bytes")
     }
 }
