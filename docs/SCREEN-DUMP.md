@@ -129,7 +129,7 @@ Every place where a dump is not compared as written, by name.
 | N2 precompose-off | the reference runs with `precompose: false` | a base and a combining mark stay two code points, as sent |
 | N3 absolute-cursor | the cursor is absolute | CPR is relative under origin mode; DECCIR is not |
 | N4 replacement | the reference's cell for a malformed byte is reported as `U+FFFD` | print screen writes it as `#`; its checksum (zero) tells it from a real `#` |
-| N5 widths-as-run | widths are whatever the reference decides, from its C library's tables | recorded, not asserted; W1 pins a Unicode version against it |
+| N5 widths-as-run | reference widths come from its pinned C library's tables | warren's Unicode 15.1 table has five explicit exception classes agreeing with those measurements; the exhaustive sweep permits zero non-control differences |
 
 ## What the mechanism cannot show
 

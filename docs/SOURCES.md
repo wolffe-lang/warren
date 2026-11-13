@@ -52,7 +52,8 @@ instead prepares an ignored version member from the single manifest field.
   from unicode.org. Exact URLs and SHA-256 pins are in
   `tests/vt/unicode-sources.json`; each local input digest was checked twice.
   The generator uses Mn/Me, default-ignorable Cf, W/F and Emoji_Presentation,
-  with zero width taking precedence. It imports no code from input folders.
+  with zero width taking precedence, then applies the five stated exception
+  classes in `tests/vt/width-exceptions.json`. It imports no code from input folders.
 - Unicode's 15.1 ReadMe identifies the final 2023-08-28 data;
   SHA-256 `0d2da782ead4e85630d510f50808355e8c3355e670841d257dd1e6fbd40db9fa`.
   Unicode License V3 is included as `LICENSE-UNICODE`, SHA-256
@@ -60,11 +61,19 @@ instead prepares an ignored version member from the single manifest field.
 - The pinned image's public libc `wcwidth`/`iswprint` ABI, called as a black
   box in `C.UTF-8`: glibc 2.39 accepts the 15.1 sample U+2FFC but rejects the
   16.0 sample U+1C89. This identity probe supports the pin; it is not the
-  complete assigned-scalar sweep. That development sweep has since measured
-  all 287346 assigned scalars and named exactly 350 differences under D11.
-  Black-box glibc `wcwidth` calls for exactly those 350 agree with the reference;
-  `wcswidth` and reference CPR both measure the US/GB indicator pairs as two
-  cells, while actual warren input advances four. No libc source was opened.
+  complete assigned-scalar sweep. The replacement-table development sweep
+  measured all 287346 assigned scalars: 65 controls and zero non-control
+  differences. The 350 explicit width exceptions agree with black-box glibc
+  `wcwidth` and reference CPR. Actual warren input, `wcswidth` and reference
+  CPR all measure the US/GB indicator pairs as two cells. No libc source was
+  opened. The earlier 350-difference result remains historical evidence only.
+- Twenty-eight two-pass zero-width cell captures measure seven representative
+  scalars after ASCII, after a wide base, on an unwritten addressed cell and
+  at the first column. Jamo and U+13430 are printed attached to existing bases;
+  U+FFF9 is omitted in all four contexts. Twelve full-cell prints retain a
+  mark on an unwritten cell while the ordinary print reports zero extent;
+  the strict validator still rejects those inconsistent reports. Raw bytes,
+  checksums and both print passes are in `tests/vt/reference/zero-width`.
 - wolf-std commit `77cf3210a82c93dc05ded987c249bb69e79b0a89`, documented
   `std.str` header (through line 210) and `std.fmt` header (through line 45):
   no display-width family exists at this pin; padding counts bytes, not terminal
