@@ -1,0 +1,80 @@
+//! member: false
+//! Saved-cursor, alternate-screen and soft-reset contract rows.
+use vt
+use std.mem.budget
+
+fn test_saved_cursor() {
+    var pane = vt.new(8, 4, 0)
+    vt.feed(mut pane, "\u{1b}[1;31m\u{1b}[3;5H\u{1b}7\u{1b}[0m\u{1b}[1;1H\u{1b}8Z".bytes())
+    assert(pane.cursor_row == 3 && pane.cursor_col == 6, "state-decsc-position")
+    assert(pane.primary.cells[20].base == 90 && pane.primary.cells[20].flags == 1 && pane.primary.cells[20].foreground == 1)
+    var fresh = vt.new(8, 4, 0)
+    vt.feed(mut fresh, "\u{1b}[3;5H\u{1b}[1m\u{1b}8Z".bytes())
+    assert(fresh.primary.cells[0].base == 90 && fresh.primary.cells[0].flags == 0)
+    var origin = vt.new(8, 4, 0)
+    vt.feed(mut origin, "\u{1b}[2;4r\u{1b}[?6h\u{1b}[2;3H\u{1b}7\u{1b}[?6l\u{1b}8Z".bytes())
+    assert(origin.modes.origin && origin.cursor_row == 3 && origin.cursor_col == 4)
+    var pending = vt.new(4, 2, 0)
+    vt.feed(mut pending, "abcd\u{1b}7\r\u{1b}8Z".bytes())
+    assert(pending.primary.cells[4].base == 90 && pending.primary.wrapped[0])
+    var ansi = vt.new(8, 4, 0)
+    vt.feed(mut ansi, "\u{1b}[3;5H\u{1b}[s\r\u{1b}[uZ".bytes())
+    assert(ansi.primary.cells[20].base == 90)
+}
+
+fn test_alternate() {
+    var pane = vt.new(8, 4, 0)
+    vt.feed(mut pane, "ab\u{1b}[?1049h\u{1b}[3;5Hx\u{1b}[?1049lZ".bytes())
+    assert(!pane.active_alternate && pane.cursor_row == 1 && pane.cursor_col == 4, "state-alt-restore")
+    assert(pane.primary.cells[0].base == 97 && pane.primary.cells[2].base == 90)
+    var twice = vt.new(8, 4, 0)
+    vt.feed(mut twice, "ab\u{1b}[?1049hx\u{1b}[?1049hy".bytes())
+    assert(twice.active_alternate && twice.alternate.extents[0] == 4 && twice.alternate.cells[3].base == 121)
+    assert(twice.alternate.cells[2].base == 32 && twice.primary.extents[0] == 2)
+    vt.feed(mut twice, "\u{1b}[?1049lZ".bytes())
+    assert(twice.primary.cells[2].base == 90 && twice.cursor_col == 4)
+    var keep = vt.new(8, 4, 0)
+    vt.feed(mut keep, "\u{1b}[?47halt\u{1b}[?47l\u{1b}[?47h".bytes())
+    assert(keep.alternate.cells[0].base == 97 && keep.alternate.cells[2].base == 116)
+    vt.feed(mut keep, "\u{1b}[?1047l\u{1b}[?47h".bytes())
+    assert(keep.alternate.extents[0] == 0 && keep.alternate.cells[0].base == 32)
+    var shared = vt.new(8, 4, 0)
+    vt.feed(mut shared, "\u{1b}[2;4r\u{1b}[1;31;44m\u{1b}[?1049hX".bytes())
+    assert(shared.region_top == 2 && shared.region_bottom == 4)
+    assert(shared.alternate.cells[0].flags == 1 && shared.alternate.cells[0].foreground == 1)
+    assert(shared.alternate.cells[1].flags == 0 && shared.alternate.cells[1].background == 4)
+    var action = vt.new(8, 4, 0)
+    vt.feed(mut action, "\u{1b}[3;5H\u{1b}[?1048h\r\u{1b}[?1048lZ".bytes())
+    assert(action.primary.cells[20].base == 90 && !action.active_alternate)
+}
+
+fn test_soft_reset_and_allocation() {
+    region frame(cap: 1048576) {
+        var pane = vt.new(8, 4, 0)
+        vt.feed(mut pane, "ab\u{1b}[1;31m\u{1b}[2;4r\u{1b}[?6h\u{1b}[?25l\u{1b}[4h\u{1b}[!pZ".bytes())
+        assert(pane.region_top == 1 && pane.region_bottom == 4, "state-soft-reset")
+        assert(!pane.modes.origin && !pane.modes.insert && pane.modes.cursor_visible)
+        assert(pane.primary.cells[0].base == 97 && pane.primary.cells[8].base == 90 && pane.primary.cells[8].flags == 0)
+        let data = "\u{1b}7\u{1b}[?1049h\u{1b}[?1049l\u{1b}8\u{1b}[!p".bytes()
+        let stable = budget.charged(frame)
+        var i = 0
+        while i < 256 { vt.feed(mut pane, data); i += 1 }
+        assert(budget.charged(frame) == stable, "state-control-allocation")
+    }
+}
+
+fn test_full_reset_keeps_window_title() {
+    var pane = vt.new(8, 4, 0)
+    vt.feed(mut pane, "\u{1b}]2;window title\u{7}ab\u{1b}[1;31m\u{1b}[2;4r\u{1b}[?6h\u{1b}[?25l\u{1b}[?2004h\u{1b}[3g\u{1b}7\u{1b}[5n\u{1b}[?1049hX\u{1b}cZ".bytes())
+    assert(!pane.active_alternate && pane.cursor_row == 1 && pane.cursor_col == 2, "state-full-reset")
+    assert(pane.primary.cells[0].base == 90 && pane.primary.cells[0].flags == 0)
+    assert(pane.primary.extents[0] == 1 && pane.alternate.extents[0] == 0)
+    assert(pane.region_top == 1 && pane.region_bottom == 4 && pane.default_tabs)
+    assert(!pane.modes.origin && pane.modes.cursor_visible && pane.mode_values[14] == 0)
+    assert(pane.answer_length == 0 && pane.parser.state == 0)
+    assert(pane.title_length == 12 && pane.title_storage[0] == 119 as byte && pane.title_storage[11] == 101 as byte, "state-ris-keeps-title")
+    vt.feed(mut pane, "\u{1b}8Q".bytes())
+    assert(pane.primary.cells[0].base == 81, "state-ris-clears-saved-cursor")
+}
+
+fn main() -> int { test_saved_cursor(); test_alternate(); test_soft_reset_and_allocation(); test_full_reset_keeps_window_title(); 0 }
