@@ -17,10 +17,10 @@ from reference_inputs import inputs, fixture_input
 from expectations import expected
 
 
-def observe(command, data, timeout, label):
+def observe(command, data, timeout, label, interval=30):
     """Keep a finite observer deadline visible; never change interpreter caps."""
-    if not math.isfinite(timeout) or timeout <= 0:
-        raise ValueError('observer deadline must be finite and positive')
+    if not math.isfinite(timeout) or timeout <= 0 or not math.isfinite(interval) or interval <= 0:
+        raise ValueError('observer deadline and interval must be finite and positive')
     started = time.monotonic()
     deadline = started + timeout
     process = subprocess.Popen(command, cwd=ROOT, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -29,7 +29,7 @@ def observe(command, data, timeout, label):
         while True:
             remaining = deadline - time.monotonic()
             try:
-                output, errors = process.communicate(input=data if first else None, timeout=max(0.001, min(30, remaining)))
+                output, errors = process.communicate(input=data if first else None, timeout=max(0.001, min(interval, remaining)))
                 return subprocess.CompletedProcess(command, process.returncode, output, errors)
             except subprocess.TimeoutExpired:
                 first = False
