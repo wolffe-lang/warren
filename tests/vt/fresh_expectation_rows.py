@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[2]
 for part in ('tools/oracle', 'tests/vt', 'tools/vt'):
     sys.path.insert(0, str(ROOT / part))
 from expectations import blank, text_row
-from fresh_expectations import background_pair, legacy_pair
+from fresh_expectations import background_pair, d9_triggers, legacy_pair
 from report_expectations import recompose_no_bold
 C = b'\x1b['
 
@@ -32,6 +32,12 @@ def main():
     cursor['cursor']['col'] = 3
     refuses(lambda: background_pair(source, original, cursor))
     refuses(lambda: background_pair(b'X', original, repaired))
+    for foreground_setter in (b'31', b'91', b'38;5;9', b'38;2;1;2;3', b'39'):
+        body = b'\x1b7' + C + b'48;5;181m\x1b8' + C + foreground_setter + b'm' + C + b'27mX'
+        assert len(d9_triggers(body)) == 1, 'measured separate FG setter does not repair the BG cache'
+    for background_setter in (b'42', b'102', b'48;5;9', b'48;2;1;2;3', b'49', b'0'):
+        body = b'\x1b7' + C + b'48;5;181m\x1b8' + C + background_setter + b'm' + C + b'27mX'
+        assert not d9_triggers(body), 'background setter/reset must disarm the stale BG trigger'
     black = blank(12, 4)
     text_row(black, 0, [88], 'bold,fg=idx:8')
     indexed = copy.deepcopy(black)
