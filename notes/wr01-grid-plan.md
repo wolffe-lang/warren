@@ -64,6 +64,31 @@ missing newer record. Screen-line encoding, stable IDs through reflow and
 history feed integration remain separate rows; a ring-only pass proves none
 of those. The first implementation uses no unbounded line index.
 
+## Line-encoding continuation
+
+After framing, encode screen content directly into a reserved ring record in
+two bounded passes: count exact bytes/runs, reserve/evict whole records, then
+write. No temporary per-line List or growing index is needed. Continuation
+cells are not text; base plus at most two marks is UTF-8. A 12-byte run is
+three LE u32 words: text-byte count, foreground/control, background/control.
+The low 26 bits of each colour word encode default=0, palette=1+index, or
+RGB=(1<<25)+RGB24. Foreground bits 26..31 hold rendition bits 0..5;
+background bits 26..28 hold rendition bits 6..8, with bits 29..31 naming a
+run kind (ordinary content=0, unwritten background paint=1; others unused).
+Unused bits are zero. This keeps all nine flags and the original colour
+form without allocating a style dictionary.
+
+Keep background paint past the extent separate from logical content. Its
+positions must be reconstructible, including default-colour gaps before a
+nondefault background; paint never creates additional logical text or rows.
+A reusable scalar reader walks run headers/UTF-8 and exposes scalar fields,
+not newly allocated records. Its storage is separate from the ring so that
+adding reader fields cannot silently change the measured ring overhead.
+Rows must cover round-trip colours/flags/base/two marks, content versus
+paint, exact encoded byte counts, and flat repeated encode/read charge.
+This is still groundwork: feed/history integration, 65536-cell splitting,
+stable-ID assignment and the path-independent reflow source remain pending.
+
 One standalone read-only host preflight has passed. Prepare the complete
 host take before acquiring a pool slot; no heavy work is assigned to the
 other pool host. The first grid review leaves this exact Done-when row open:

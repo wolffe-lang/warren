@@ -1,0 +1,71 @@
+//! member: false
+//! Run encoding: exact bytes, Unicode/rendition round trip, paint and budgets.
+use std.mem.budget
+
+fn test_history_line_roundtrip() {
+    var pane = new(8, 2, 0)
+    feed(mut pane, "é中\u{301}\u{20d7}\u{1b}[1;2;3;21;5;7;8;9;38;2;1;2;3;48;5;196mZ\u{1b}[44m\u{1b}[K".bytes())
+    var history = new_history(256)
+    assert(history_encode_line(mut history, pane.primary, 8, 1, 1, 91, 17))
+    assert(history.used == 75 && history_get_word(history, history.head, 0, 4) == 75, "history-exact-run-byte-count")
+    assert(history_get_word(history, history.head, 8, 8) == 91 && history_get_word(history, history.head, 16, 4) == 17)
+    let expected: List[int] = [233, 20013, 769, 8407, 90, 32, 32, 32, 32]
+    var reader = new_history_reader()
+    history_reader_start(mut reader, history, history.head)
+    var i = 0
+    while history_reader_next(mut reader, history) {
+        assert(i < expected.len && reader.value == expected[i], "history-unicode-roundtrip")
+        if i < 4 { assert(reader.kind == 0 && reader.flags == 0 && reader.foreground == 0 - 1 && reader.background == 0 - 1) }
+        else if i == 4 { assert(reader.kind == 0 && reader.flags == 503 && reader.foreground == 16843267 && reader.background == 196, "history-rendition-roundtrip") }
+        else { assert(reader.kind == 1 && reader.flags == 0 && reader.foreground == 0 - 1 && reader.background == 4, "history-paint-not-content") }
+        i += 1
+    }
+    assert(i == expected.len)
+}
+
+fn test_history_unwrapped_runs_and_paint_gaps() {
+    var pane = new(8, 2, 0)
+    feed(mut pane, "abcdefghXYZ".bytes())
+    var history = new_history(256)
+    assert(history_encode_line(mut history, pane.primary, 8, 1, 2, 0, 0))
+    assert(history.used == 47, "history-runs-merge-across-wrap")
+    var paint = new(8, 1, 0)
+    feed(mut paint, "A\u{1b}[1;7H\u{1b}[42m\u{1b}[X".bytes())
+    assert(paint.primary.extents[0] == 1)
+    assert(history_encode_line(mut history, paint.primary, 8, 1, 1, 1, 0))
+    let at = (history.tail - history.newest_length + 256) % 256
+    assert(history.newest_length == 67)
+    var reader = new_history_reader()
+    history_reader_start(mut reader, history, at)
+    var i = 0
+    while history_reader_next(mut reader, history) {
+        if i == 0 { assert(reader.value == 65 && reader.kind == 0) }
+        else if i < 6 { assert(reader.value == 32 && reader.kind == 1 && reader.background == 0 - 1) }
+        else { assert(i == 6 && reader.kind == 1 && reader.background == 2) }
+        i += 1
+    }
+    assert(i == 7, "history-paint-default-gap")
+}
+
+fn test_history_codec_allocation() {
+    region frame(cap: 1048576) {
+        var pane = new(8, 2, 0)
+        feed(mut pane, "é中\u{301}\u{20d7}\u{1b}[31mZ".bytes())
+        var history = new_history(128)
+        var reader = new_history_reader()
+        let stable = budget.charged(frame)
+        var turn = 0
+        while turn < 1024 {
+            assert(history_encode_line(mut history, pane.primary, 8, 1, 1, turn, 0))
+            let at = (history.tail - history.newest_length + 128) % 128
+            history_reader_start(mut reader, history, at)
+            var count = 0
+            while history_reader_next(mut reader, history) { count += 1 }
+            assert(count == 5)
+            turn += 1
+        }
+        assert(budget.charged(frame) == stable, "history-codec-feed-allocation")
+    }
+}
+
+fn main() -> int { test_history_line_roundtrip(); test_history_unwrapped_runs_and_paint_gaps(); test_history_codec_allocation(); 0 }
