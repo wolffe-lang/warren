@@ -109,10 +109,10 @@ fn set_grid_mode(mut pane: Vt, private_mode: bool, code: int, enabled: bool) {
         pane.modes.autowrap = enabled
     } else if code == 25 {
         pane.modes.cursor_visible = enabled
-    } else if index >= 8 && index <= 10 && enabled {
+    } else if index >= 8 && index <= 10 {
         var other = 8
         while other <= 10 {
-            if other != index { change_mode_value(mut pane, other, 0) }
+            if !enabled || other != index { change_mode_value(mut pane, other, 0) }
             other += 1
         }
     }
