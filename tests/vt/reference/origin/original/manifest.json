@@ -1,0 +1,145 @@
+{
+  "schema": 1,
+  "complete_dump_count": 8,
+  "pins_sha256": "8d6d781805e6840a6a6becb059453cfa166fb7d53424fd4a89289ad827b7e992",
+  "cases": {
+    "dec-above-new-region": {
+      "input_sha256": "cb9f9977640ea8e8edd8c93646f85daca7f42aa91daf927c564a3fe8bd0520a2",
+      "size": [
+        12,
+        8
+      ],
+      "kind": "saved-row-discriminator",
+      "error": "CPR '\\x1b[65534;4R' and DECCIR '\\x1bP1$u2;4;1;@;@;A;0;2;@;BBBB\\x1b\\\\' disagree on the cursor",
+      "files": {
+        "dec-above-new-region.in": "cb9f9977640ea8e8edd8c93646f85daca7f42aa91daf927c564a3fe8bd0520a2",
+        "dec-above-new-region/A.json": "5a8f305b08a1dda82bde088da1b5b1a2b3f34c79d9da53b0841f31eccd8a83ff",
+        "dec-above-new-region/A.print": "42cd2680b07442bd694c06fe66d636396038c8df925be53cd5d5071957a4582d"
+      }
+    },
+    "dec-below-new-region": {
+      "input_sha256": "c198163af18e775a0dbd52620a144a4e502a1ba4962d0fdc250ca8ea049dde10",
+      "size": [
+        12,
+        8
+      ],
+      "kind": "saved-row-discriminator",
+      "screen_sha256": "d1cc01da9c7eac6f4db46b7729411b7400273fa246925ff55f0d71985bfb36a8",
+      "files": {
+        "dec-below-new-region.in": "c198163af18e775a0dbd52620a144a4e502a1ba4962d0fdc250ca8ea049dde10",
+        "dec-below-new-region/A.json": "7b58226ebbec845042cf7046bc895037c68d6e420f5b8b484f85a2e0791c8d3e",
+        "dec-below-new-region/A.print": "e066409c2541f91bbba9e43dfabdefc5afeb8160867d58eb29296b4712dbf942",
+        "dec-below-new-region/S.json": "fd6a54f4a0794c1a12bddefc718020ba31f63c7e26c4affddc5867c78435bd3e",
+        "dec-below-new-region/S.print": "622683cece180572f8894feff0c9c6d1efbfe85f817dc28720c6632bec909059",
+        "dec-below-new-region/continuation.json": "e0af4f4b011b185c68cff16ce759752c7c787cdde1333c8bc4a0883ba296fe8c",
+        "dec-below-new-region/got.screen": "d1cc01da9c7eac6f4db46b7729411b7400273fa246925ff55f0d71985bfb36a8"
+      }
+    },
+    "1048-above-new-region": {
+      "input_sha256": "b6cc481bdb7ccb901529d1d03875206d108071ae6fd83af07e8364b940851ec8",
+      "size": [
+        12,
+        8
+      ],
+      "kind": "saved-row-discriminator",
+      "error": "CPR '\\x1b[65534;4R' and DECCIR '\\x1bP1$u2;4;1;@;@;A;0;2;@;BBBB\\x1b\\\\' disagree on the cursor",
+      "files": {
+        "1048-above-new-region.in": "b6cc481bdb7ccb901529d1d03875206d108071ae6fd83af07e8364b940851ec8",
+        "1048-above-new-region/A.json": "5a8f305b08a1dda82bde088da1b5b1a2b3f34c79d9da53b0841f31eccd8a83ff",
+        "1048-above-new-region/A.print": "42cd2680b07442bd694c06fe66d636396038c8df925be53cd5d5071957a4582d"
+      }
+    },
+    "1049-above-new-region": {
+      "input_sha256": "ef9594996d41b1a46af523b15f9ded7d4d3ca7d76fc98535f68726ff37f76a02",
+      "size": [
+        12,
+        8
+      ],
+      "kind": "saved-row-discriminator",
+      "error": "CPR '\\x1b[65534;4R' and DECCIR '\\x1bP1$u2;4;1;@;@;A;0;2;@;BBBB\\x1b\\\\' disagree on the cursor",
+      "files": {
+        "1049-above-new-region.in": "ef9594996d41b1a46af523b15f9ded7d4d3ca7d76fc98535f68726ff37f76a02",
+        "1049-above-new-region/A.json": "5a8f305b08a1dda82bde088da1b5b1a2b3f34c79d9da53b0841f31eccd8a83ff",
+        "1049-above-new-region/A.print": "42cd2680b07442bd694c06fe66d636396038c8df925be53cd5d5071957a4582d"
+      }
+    },
+    "dec-inside-new-region-control": {
+      "input_sha256": "825ecae40a78452071e60ccee5d19b8e9a33fe6c79f2444867a79118e87fb935",
+      "size": [
+        12,
+        8
+      ],
+      "kind": "saved-row-discriminator",
+      "screen_sha256": "4db74881a679e72ced7c9d5ca8cbb3a6029c9d32bd548940ef00d5a56a1fa523",
+      "files": {
+        "dec-inside-new-region-control.in": "825ecae40a78452071e60ccee5d19b8e9a33fe6c79f2444867a79118e87fb935",
+        "dec-inside-new-region-control/A.json": "cdf3f34d33d90a114e09e89e543264f0b04167a91048112f8c2923f8cc6130fc",
+        "dec-inside-new-region-control/A.print": "b1e580336baf7b893d29936ae8df3e2a96373a32b2f5706015760093a32a63f1",
+        "dec-inside-new-region-control/S.json": "fd6a54f4a0794c1a12bddefc718020ba31f63c7e26c4affddc5867c78435bd3e",
+        "dec-inside-new-region-control/S.print": "4742130c70a741969ad522762763f9c078fe165e8b5fd9045a68c4d03d405dd3",
+        "dec-inside-new-region-control/continuation.json": "e0af4f4b011b185c68cff16ce759752c7c787cdde1333c8bc4a0883ba296fe8c",
+        "dec-inside-new-region-control/got.screen": "4db74881a679e72ced7c9d5ca8cbb3a6029c9d32bd548940ef00d5a56a1fa523"
+      }
+    },
+    "dec-origin-off-control": {
+      "input_sha256": "fb14dfa24fd2d0af3a5f6ccb9872758676d8706cf486266025f2886cb0b5175a",
+      "size": [
+        12,
+        8
+      ],
+      "kind": "saved-row-discriminator",
+      "screen_sha256": "d07fd88f259f2f6032c48a965a2a227e48c7948458fe855b75ab2dd0e9b5e148",
+      "files": {
+        "dec-origin-off-control.in": "fb14dfa24fd2d0af3a5f6ccb9872758676d8706cf486266025f2886cb0b5175a",
+        "dec-origin-off-control/A.json": "5cffd5c378e2dd4d7f620b0d0c5f4e6ee164c717e85fbed694e38007a122eed5",
+        "dec-origin-off-control/A.print": "42cd2680b07442bd694c06fe66d636396038c8df925be53cd5d5071957a4582d",
+        "dec-origin-off-control/S.json": "fd6a54f4a0794c1a12bddefc718020ba31f63c7e26c4affddc5867c78435bd3e",
+        "dec-origin-off-control/S.print": "d4613781b0e78eb79f74671ca1506a86e74e2f6ae269b223a4a72b0120e25f52",
+        "dec-origin-off-control/continuation.json": "e0af4f4b011b185c68cff16ce759752c7c787cdde1333c8bc4a0883ba296fe8c",
+        "dec-origin-off-control/got.screen": "d07fd88f259f2f6032c48a965a2a227e48c7948458fe855b75ab2dd0e9b5e148"
+      }
+    },
+    "fresh-0190-before-fragment": {
+      "input_sha256": "b476206718e4c7aa1ef01eaac0542cdcd2ef74f0c9467e0481c2a7f39a53234e",
+      "size": [
+        80,
+        24
+      ],
+      "kind": "fresh-prefix-cursor-diagnostic",
+      "prefix_bytes": 2906,
+      "original_sha256": "c32809f32574f396527bb5faf5a4453c0600c7716da7539ed31342b15b78baf2",
+      "error": "CPR '\\x1b[65523;34R' and DECCIR '\\x1bP1$u3;34;1;C;@;A;0;2;@;BBBB\\x1b\\\\' disagree on the cursor",
+      "files": {
+        "fresh-0190-before-fragment.in": "b476206718e4c7aa1ef01eaac0542cdcd2ef74f0c9467e0481c2a7f39a53234e",
+        "fresh-0190-before-fragment/A.json": "470ffc1e1e05d3d970de6a6266c04d496741e3172527f25c8d012e6beca7adc8",
+        "fresh-0190-before-fragment/A.print": "6fa6e997fbd2cdce935a9dd8e8ef4a5f5085ba0c4d9ff190a2f109c7ab043b4d"
+      }
+    },
+    "fresh-0191-before-fragment": {
+      "input_sha256": "19b5c65e9f28e4201d1ce772d5bb54e317acdd7daca3f98ec8c85241f666cee8",
+      "size": [
+        80,
+        24
+      ],
+      "kind": "fresh-prefix-cursor-diagnostic",
+      "prefix_bytes": 3877,
+      "original_sha256": "f0061f6736a10f33b340659d2cf59945490a87f41ced521927da93aaee2bc883",
+      "error": "CPR '\\x1b[65527;43R' and DECCIR '\\x1bP1$u12;43;1;@;@;A;0;2;@;BBBB\\x1b\\\\' disagree on the cursor",
+      "files": {
+        "fresh-0191-before-fragment.in": "19b5c65e9f28e4201d1ce772d5bb54e317acdd7daca3f98ec8c85241f666cee8",
+        "fresh-0191-before-fragment/A.json": "43d5dee88b347772da38ae0c2c623d516389f477fbaeef3cfaffc0ab4579898a",
+        "fresh-0191-before-fragment/A.print": "faa18a38d96008711f280ffedc14d162c0810852bd5a7c99b9b07250e0b03c01"
+      }
+    }
+  },
+  "errors": [
+    "dec-above-new-region",
+    "1048-above-new-region",
+    "1049-above-new-region",
+    "fresh-0190-before-fragment",
+    "fresh-0191-before-fragment"
+  ],
+  "capture_head": "2a90eb931d98267c2dea42c47c61fd67249dd45f",
+  "capture_manifest_sha256": "af27a6d2080d8d2b0affdcd516a5943aac3e957519b7d58082fb9dc68ff6132f",
+  "actual_terminal_passes": 11
+}
