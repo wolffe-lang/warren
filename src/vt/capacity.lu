@@ -1,12 +1,49 @@
 //! member: true
-//! Capacity seam; private allocation policy is exercised independently of resize.
+//! Retained backing capacities. Logical geometry is independent of list lengths.
 
-fn valid_vt_size(cols: int, rows: int) -> bool { cols >= 1 && rows >= 1 }
+fn valid_vt_size(cols: int, rows: int) -> bool {
+    // Division precedes multiplication so hostile dimensions cannot overflow.
+    cols >= 1 && rows >= 1 && cols <= 262144 / rows
+}
+
+fn grown_capacity(current: int, needed: int) -> int {
+    assert(needed >= 1 && needed <= 262144, "vt-size-area")
+    var capacity = if current < 1 { 1 } else { current }
+    while capacity < needed {
+        if capacity > 131072 { capacity = 262144 }
+        else { capacity *= 2 }
+    }
+    capacity
+}
 
 fn ensure_screen_capacity(mut screen: Screen, cells: int, rows: int) {
-    if rows > 0 { screen.extents[0] = grid_clamp(screen.extents[0], 0, cells) }
+    assert(cells >= 1 && cells <= 262144 && rows >= 1 && rows <= 262144, "vt-size-area")
+    if cells > screen.cells.len {
+        let capacity = grown_capacity(screen.cells.len, cells)
+        (mut screen.cells).reserve(capacity)
+        while screen.cells.len < capacity {
+            (mut screen.cells).push(Cell { base: 32, mark1: 0, mark2: 0, width: 1,
+                flags: 0, foreground: 0 - 1, background: 0 - 1 })
+        }
+    }
+    if rows > screen.extents.len {
+        let capacity = grown_capacity(screen.extents.len, rows)
+        (mut screen.extents).reserve(capacity)
+        (mut screen.wrapped).reserve(capacity)
+        while screen.extents.len < capacity {
+            (mut screen.extents).push(0)
+            (mut screen.wrapped).push(false)
+        }
+    }
 }
 
 fn ensure_tab_capacity(mut pane: Vt, cols: int) {
-    if cols > 0 { pane.tabs[0] = pane.tabs[0] }
+    assert(cols >= 1 && cols <= 262144, "vt-size-area")
+    if cols <= pane.tabs.len { return }
+    let capacity = grown_capacity(pane.tabs.len, cols)
+    (mut pane.tabs).reserve(capacity)
+    while pane.tabs.len < capacity {
+        let col = pane.tabs.len
+        (mut pane.tabs).push(pane.default_tabs && col > 0 && col % 8 == 0)
+    }
 }

@@ -10,7 +10,8 @@ pub struct Cell {
     flags: int, foreground: int, background: int,
 }
 
-/// One rectangular screen, stored flat; row metadata is indexed from zero.
+/// One rectangular logical screen, stored flat. Backing arrays may retain a
+/// larger capacity; only cols*rows cells and rows metadata entries are active.
 pub struct Screen {
     cells: List[Cell],
     extents: List[int],
@@ -78,9 +79,10 @@ fn default_tabs(cols: int) -> List[bool] {
 }
 
 /// Construct a pane with positive dimensions and a nonnegative history cap.
-/// Invalid constructor arguments are caller contract violations and assert.
+/// Invalid constructor arguments assert; area above 262144 is vt-size-area.
 pub fn new(cols: int, rows: int, scrollback_cap_bytes: int) -> Vt {
     assert(cols >= 1 && rows >= 1 && scrollback_cap_bytes >= 0)
+    assert(valid_vt_size(cols, rows), "vt-size-area")
     Vt {
         cols: cols, rows: rows, primary: new_screen(cols, rows), alternate: new_screen(cols, rows),
         active_alternate: false, cursor_row: 1, cursor_col: 1, cursor_shape: 2, pending_wrap: false,
