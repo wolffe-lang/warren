@@ -46,9 +46,11 @@ class Trace:
     def __init__(self, cols, rows):
         self.cols, self.rows = cols, rows
         self.events = []
+        self.reference_exclusions = []
         self.reset()
 
     def reset(self):
+        self.ri_offset = self.ri_tab_offset = -1
         self.screens = [[Row(self.cols) for _ in range(self.rows)] for _ in range(2)]
         self.alternate = 0
         self.row = self.col = 1
@@ -63,10 +65,14 @@ class Trace:
     def screen(self):
         return self.screens[self.alternate]
 
+    def clear_mark_uncertainty(self):
+        self.ri_offset = self.ri_tab_offset = -1
+
     def save(self):
         self.saved[self.alternate] = (self.row, self.col, self.background, self.origin, self.pending)
 
     def restore(self):
+        self.clear_mark_uncertainty()
         self.row, self.col, self.background, self.origin, self.pending = self.saved[self.alternate]
         self.row = min(max(1, self.row), self.bottom if self.origin else self.rows)
         self.col = min(max(1, self.col), self.cols)
@@ -79,6 +85,7 @@ class Trace:
         self.screen[first - 1:last] = part[count:] + blanks if up else blanks + part[:-count]
 
     def linefeed(self, eligible=True):
+        self.clear_mark_uncertainty()
         self.pending = False
         if self.row == self.bottom:
             self.scroll(self.top, self.bottom, 1, True, eligible)
@@ -87,7 +94,8 @@ class Trace:
         if self.newline:
             self.col = 1
 
-    def reverse(self):
+    def reverse(self, offset=0):
+        self.ri_offset, self.ri_tab_offset = offset, -1
         self.pending = False
         if self.row == self.top:
             self.scroll(self.top, self.bottom, 1, False, True)
@@ -126,11 +134,15 @@ class Trace:
             elif cell.width == 0 and (i == 0 or row.cells[i - 1].width != 2):
                 self.blank(row, i, preserve=True)
 
-    def print(self, cp):
+    def print(self, cp, offset=0):
         if 0xFFF9 <= cp <= 0xFFFB:
             return
         size = width(cp)
         if size == 0:
+            if cp != 0x200D and self.ri_offset >= 0 and self.ri_tab_offset >= 0:
+                self.reference_exclusions.append({'name': 'RI-HT-combining-open',
+                    'ri_offset': self.ri_offset, 'ht_offset': self.ri_tab_offset,
+                    'mark_offset': offset, 'scalar': 'U+%04X' % cp})
             if cp == 0x200D or (self.col == 1 and not self.pending):
                 return
             row = self.screen[self.row - 1]
@@ -139,6 +151,7 @@ class Trace:
                 index -= 1
             row.cells[index].contract = row.cells[index].reference = True
             return
+        self.clear_mark_uncertainty()
         if self.pending and self.autowrap:
             self.col = 1
             self.linefeed()
@@ -204,6 +217,7 @@ class Trace:
             active = final == 'h'
             for mode in parts:
                 if mode == 6:
+                    self.clear_mark_uncertainty()
                     self.origin = active
                     self.row, self.col, self.pending = (self.top if active else 1), 1, False
                 elif mode == 7:
@@ -211,6 +225,7 @@ class Trace:
                 elif mode == 1048:
                     self.save() if active else self.restore()
                 elif mode == 1049:
+                    self.clear_mark_uncertainty()
                     if active:
                         self.save()
                         self.alternate = 1
@@ -221,6 +236,8 @@ class Trace:
                         self.restore()
                 elif mode in (47, 1047):
                     if mode == 1047 and not active:
+                        if self.alternate:
+                            self.clear_mark_uncertainty()
                         self.screens[1] = [Row(self.cols, self.background) for _ in range(self.rows)]
                     self.alternate = int(active)
                 elif mode not in (1, 12, 25, 45, 66, 69, 1000, 1002, 1003, 1004, 1006, 1007, 1015, 2004, 2026):
@@ -236,12 +253,14 @@ class Trace:
             else:
                 raise ValueError('unowned ANSI mode')
         elif final in ('H', 'f', 'd'):
+            self.clear_mark_uncertainty()
             self.row = min(max((self.top if self.origin else 1) + value - 1, self.top if self.origin else 1),
                            self.bottom if self.origin else self.rows)
             if final != 'd':
                 self.col = min(self.cols, (parts[1] or 1) if len(parts) > 1 else 1)
             self.pending = False
         elif final in 'ABEF':
+            self.clear_mark_uncertainty()
             amount = value if final in 'BE' else -value
             low = self.top if amount < 0 and self.row >= self.top else 1
             high = self.bottom if amount > 0 and self.row <= self.bottom else self.rows
@@ -250,14 +269,17 @@ class Trace:
                 self.col = 1
             self.pending = False
         elif final in 'CDG`':
+            self.clear_mark_uncertainty()
             self.col = min(self.cols, max(1, value if final in 'G`' else self.col + (value if final == 'C' else -value)))
             self.pending = False
         elif final == 'r':
             bottom = min(self.rows, (parts[1] or self.rows) if len(parts) > 1 else self.rows)
             if value < bottom:
+                self.clear_mark_uncertainty()
                 self.top, self.bottom = value, bottom
                 self.row, self.col, self.pending = (value if self.origin else 1), 1, False
         elif final in ('X', 'K', 'J'):
+            self.clear_mark_uncertainty()
             self.pending = False
             mode = parts[0]
             if final == 'X':
@@ -272,10 +294,12 @@ class Trace:
                         last = self.col if mode == 1 and row == self.row else self.cols
                         self.erase(row, first, last, final, offset)
         elif final in ('@', 'P'):
+            self.clear_mark_uncertainty()
             self.pending = False
             self.shift(value, final == '@')
         elif final in ('L', 'M'):
             if self.top <= self.row <= self.bottom:
+                self.clear_mark_uncertainty()
                 self.pending, self.col = False, 1
                 self.scroll(self.row, self.bottom, value, final == 'M', False)
         elif final in ('S', 'T'):
@@ -336,7 +360,7 @@ def trace(data, cols=80, rows=24):
                     state.col = 1
                 state.linefeed(code == 69)
             elif code == 77:
-                state.reverse()
+                state.reverse(start)
             elif code == 72:
                 state.tabs.add(state.col)
             elif code == 99:
@@ -346,16 +370,20 @@ def trace(data, cols=80, rows=24):
         elif code in (10, 11, 12):
             state.linefeed()
         elif code == 13:
+            state.clear_mark_uncertainty()
             state.col, state.pending = 1, False
         elif code == 8:
+            state.clear_mark_uncertainty()
             state.col, state.pending = max(1, state.col - 1), False
         elif code == 9:
+            if state.ri_offset >= 0:
+                state.ri_tab_offset = start
             state.col = min((stop for stop in state.tabs if stop > state.col), default=cols)
         elif code < 32 or code == 127:
             continue
         else:
             length = 1 if code < 128 else 2 if code < 224 else 3 if code < 240 else 4
-            state.print(ord(data[start:start + length].decode('utf-8')))
+            state.print(ord(data[start:start + length].decode('utf-8')), start)
             at = start + length
     changed = []
     for index, row in enumerate(state.screen):
@@ -363,6 +391,7 @@ def trace(data, cols=80, rows=24):
         if reference != contract:
             changed.append({'row': index + 1, 'reference_extent': reference, 'contract_extent': contract})
     return {'schema': 1, 'events': state.events, 'rows': changed,
+            'reference_exclusions': state.reference_exclusions,
             'cursor': [state.row, state.col], 'active_alternate': bool(state.alternate)}
 
 
