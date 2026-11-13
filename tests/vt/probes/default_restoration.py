@@ -2,7 +2,8 @@
 """Finite named-red diagnostics: default-colour restore and sparse cell repair.
 
 The base set has twenty dumps/status observations (sixty terminal processes);
-the refinement has fourteen (forty-two processes). No set exceeds 24 dumps.
+the foreground refinement has fourteen (forty-two processes), and the
+inverse refinement has twelve (thirty-six). No set exceeds 24 dumps.
 The reference is only run as a pinned binary.
 """
 import argparse
@@ -84,6 +85,25 @@ def refinement_cases():
     return {name: (HEAD + body, 12, 4) for name, body in bodies.items()}
 
 
+def inverse_cases():
+    bodies = {
+        'inactive-default-reset-then-inverse': H + L + BG + L + C + b'7mX',
+        'inactive-default-reset-then-uninverse': H + L + BG + L + C + b'27mX',
+        'dec-default-restore-then-inverse': E + b'7' + BG + E + b'8' + C + b'7mX',
+        'dec-default-restore-then-uninverse': E + b'7' + BG + E + b'8' + C + b'27mX',
+        'dec-palette-rgb-restore-then-uninverse': C + b'40m' + E + b'7' + C + b'48;' + RGB + E + b'8' + C + b'27mX',
+        'dec-palette-rgb-restore-then-inverse': C + b'40m' + E + b'7' + C + b'48;' + RGB + E + b'8' + C + b'7mX',
+        'repeat-alt-reset-then-uninverse': H + BG + H + L + L + C + b'27mX',
+        'saved-fg-repeat-alt-then-uninverse': C + b'97m' + H + BG + H + L + C + b'36;9m' + L + C + b'27mX',
+        'unsaved-explicit-default-then-inverse': BG + C + b'49m' + C + b'7mX',
+        'restored-explicit-default-then-inverse': H + L + BG + L + C + b'49m' + C + b'7mX',
+        'inactive-default-reset-then-bold': H + L + BG + L + C + b'1mX',
+        'inactive-default-reset-then-underline': H + L + BG + L + C + b'4mX',
+    }
+    assert len(bodies) == 12
+    return {name: (HEAD + body, 12, 4) for name, body in bodies.items()}
+
+
 def pen_inner(source, out):
     old = termios.tcgetattr(0)
     try:
@@ -124,12 +144,15 @@ def main():
     parser.add_argument('--out', type=Path)
     parser.add_argument('--list', action='store_true')
     parser.add_argument('--refine', action='store_true', help='fourteen extended-foreground restore discriminators')
+    parser.add_argument('--inverse', action='store_true', help='twelve inverse/uninverse restore discriminators')
     parser.add_argument('--pen-inner', type=Path, help=argparse.SUPPRESS)
     parser.add_argument('--pen-out', type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.pen_inner:
         return pen_inner(args.pen_inner, args.pen_out)
-    selected = refinement_cases() if args.refine else cases()
+    if args.refine and args.inverse:
+        parser.error('choose one finite diagnostic set')
+    selected = inverse_cases() if args.inverse else refinement_cases() if args.refine else cases()
     count = len(selected)
     assert count <= 24
     print('BUNDLE complete-dumps=%d pen-status-observations=%d terminal-passes=%d hard-cap=24' %
@@ -141,7 +164,7 @@ def main():
     if not args.out:
         parser.error('--out required unless --list')
     args.out.mkdir(parents=True, exist_ok=False)
-    manifest = {'schema': 1, 'complete_dump_count': count, 'pen_status_count': count, 'refinement': args.refine,
+    manifest = {'schema': 1, 'complete_dump_count': count, 'pen_status_count': count, 'refinement': args.refine, 'inverse': args.inverse,
                 'pins_sha256': hashlib.sha256((ROOT / 'warren-oracle.toml').read_bytes()).hexdigest(),
                 'cases': {}, 'errors': []}
     with oracle.Display() as display:
