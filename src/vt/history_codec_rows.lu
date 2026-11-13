@@ -68,4 +68,30 @@ fn test_history_codec_allocation() {
     }
 }
 
-fn main() -> int { test_history_line_roundtrip(); test_history_unwrapped_runs_and_paint_gaps(); test_history_codec_allocation(); 0 }
+fn test_history_colour_matrix_and_four_byte_scalars() {
+    var pane = new(1, 1, 0)
+    feed(mut pane, "\u{1f600}\u{e0100}".bytes())
+    var history = new_history(128)
+    var reader = new_history_reader()
+    let colours: List[int] = [0 - 1, 0, 255, 16777216, 33554431]
+    let flags: List[int] = [0, 1, 2, 4, 8, 16, 32, 64, 128, 256]
+    for flag in flags {
+        for foreground in colours {
+            for background in colours {
+                pane.primary.cells[0].flags = flag
+                pane.primary.cells[0].foreground = foreground
+                pane.primary.cells[0].background = background
+                assert(history_encode_line(mut history, pane.primary, 1, 1, 1, 0, 0))
+                assert(history.newest_length == 44)
+                let at = (history.tail - history.newest_length + 128) % 128
+                history_reader_start(mut reader, history, at)
+                assert(history_reader_next(mut reader, history) && reader.value == 0x1f600)
+                assert(reader.flags == flag && reader.foreground == foreground && reader.background == background, "history-colour-flag-matrix")
+                assert(history_reader_next(mut reader, history) && reader.value == 0xe0100)
+                assert(!history_reader_next(mut reader, history))
+            }
+        }
+    }
+}
+
+fn main() -> int { test_history_line_roundtrip(); test_history_unwrapped_runs_and_paint_gaps(); test_history_codec_allocation(); test_history_colour_matrix_and_four_byte_scalars(); 0 }
