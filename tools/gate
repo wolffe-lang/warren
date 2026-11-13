@@ -59,6 +59,7 @@ step inverse-reference python3 -I tools/vt/check_inverse.py
 step d9-reference python3 -I tools/vt/check_d9.py
 step combining-reference python3 -I tools/vt/check_combining.py
 step zero-width-reference python3 -I tools/vt/check_zero_width.py
+step annotation-reference python3 -I tools/vt/check_annotations.py
 step d9-background-fixture python3 -I tests/vt/background_fixture_rows.py
 step d9-bounds python3 -I tests/vt/d9_bound_rows.py
 step origin-fixture-rows python3 -I tests/vt/origin_fixture_rows.py
@@ -105,6 +106,7 @@ step d9-original-repaired-native python3 -I tests/vt/compare_d9.py "$root/target
 step combining-extent-native python3 -I tests/vt/combining_extent_rows.py "$root/target/native/warren"
 step combining-frames-native python3 -I tests/vt/compare_combining.py "$root/target/native/warren"
 step erase-reflow-contract-native python3 -I tests/vt/compare_erase_reflow.py "$root/target/native/warren"
+step annotation-frames-native python3 -I tests/vt/compare_annotations.py "$root/target/native/warren"
 step focused-probes-native python3 -I tests/vt/compare_probes.py "$root/target/native/warren"
 step checkpoints-native python3 -I tests/vt/compare_checkpoints.py "$root/target/native/warren"
 step corpus-chunking-native python3 -I tests/vt/chunking_suite.py "$root/target/native/warren"
@@ -118,6 +120,7 @@ step cli-lupin python3 -I tests/vt/cli_rows.py "$LUPIN" run src/warren.lu
 step cases-lupin python3 -I tests/vt/compare_cases.py "$LUPIN" run src/warren.lu
 step combining-frames-lupin python3 -I tests/vt/compare_combining.py "$LUPIN" run src/warren.lu
 step erase-reflow-contract-lupin python3 -I tests/vt/compare_erase_reflow.py "$LUPIN" run src/warren.lu
+step annotation-frames-lupin python3 -I tests/vt/compare_annotations.py "$LUPIN" run src/warren.lu
 step census-lupin python3 -I tests/vt/compare_suite.py --suite census "$LUPIN" run src/warren.lu
 step answer-build "$WOLF" build --deny-warnings src/vt_answers_test.lu -o "$root/target/native/vt-answers"
 step version-answer-native python3 -I tests/vt/version_answer.py "$root/target/native/vt-answers"

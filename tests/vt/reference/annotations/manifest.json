@@ -1,0 +1,130 @@
+{
+  "schema": 1,
+  "cases": {
+    "annotation-FFFA-ascii": {
+      "scalar": "U+FFFA",
+      "context": "ascii",
+      "input_sha256": "6f838a7e662e8b6a35be3e4e477aba67708daa233743fb99d30e3a2b43e4d971",
+      "classification": "complete-reference-frame",
+      "files": {
+        "annotation-FFFA-ascii.in": "6f838a7e662e8b6a35be3e4e477aba67708daa233743fb99d30e3a2b43e4d971",
+        "annotation-FFFA-ascii/A.json": "13dc5479499af5778192696c21794bc9391dd5cbce837d0faf958066a300192f",
+        "annotation-FFFA-ascii/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "annotation-FFFA-ascii/A.print": "47b62e52cfe434dd26d10c68b228848c04628b5f407451286e6cec31b1a2540c",
+        "annotation-FFFA-ascii/S.print": "a60288fe3507322debc1f5fa77a7d48fdb269e89352291d8e116007809fa69f6",
+        "annotation-FFFA-ascii/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "annotation-FFFA-ascii/got.screen": "cb7d2decd320b26c9406a5159d7e2f6e6fb52dfc0d24d19bc6e123abb734f394"
+      }
+    },
+    "annotation-FFFA-wide": {
+      "scalar": "U+FFFA",
+      "context": "wide",
+      "input_sha256": "4cf41964a8cd83c0e5ba6da02ecf3933b37e760a49bc346b2fb6ee9d811d8e3e",
+      "classification": "complete-reference-frame",
+      "files": {
+        "annotation-FFFA-wide.in": "4cf41964a8cd83c0e5ba6da02ecf3933b37e760a49bc346b2fb6ee9d811d8e3e",
+        "annotation-FFFA-wide/A.json": "5c7e2ccabaa4de8424784bae33a2f30e6a545eaa6799e28d6179f6f550dcba32",
+        "annotation-FFFA-wide/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "annotation-FFFA-wide/A.print": "87b33ca85c7dedd8816968d7a885f9f6fce7106ee9b18d9c3a3f42f028877e62",
+        "annotation-FFFA-wide/S.print": "dbfd6bfeb5118f8f7aee53faddd914dc28e8da30b53a4402227725bf4a14df4b",
+        "annotation-FFFA-wide/continuation.json": "6c29676b93acdef7bbc79fee256140c98014ada190baa2722d1f109341d018f7",
+        "annotation-FFFA-wide/got.screen": "231235c32476bfd879dff5c94fe1bb1a9dc0ed91659ce88860244a3b4d20ec02"
+      }
+    },
+    "annotation-FFFA-unwritten": {
+      "scalar": "U+FFFA",
+      "context": "unwritten",
+      "input_sha256": "59523b068580c48bbfc27b6b17708acb07d59f5ae73b40c6a88fed3231ec5879",
+      "classification": "complete-reference-frame",
+      "files": {
+        "annotation-FFFA-unwritten.in": "59523b068580c48bbfc27b6b17708acb07d59f5ae73b40c6a88fed3231ec5879",
+        "annotation-FFFA-unwritten/A.json": "69ae13205c0d9ad7c26ceebeb2baf361ac1cba08958e76ac943d3cf95014365d",
+        "annotation-FFFA-unwritten/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "annotation-FFFA-unwritten/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "annotation-FFFA-unwritten/S.print": "454dab81f5654e2c2c955fe9f5cfd4644115fce28b7ee7335d9fa0d5f783e71a",
+        "annotation-FFFA-unwritten/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "annotation-FFFA-unwritten/got.screen": "98cc7dad03807d25603daa55f5dbb67393fbc1f4f5adcab200b7cd6ba2c9bfec"
+      }
+    },
+    "annotation-FFFA-first": {
+      "scalar": "U+FFFA",
+      "context": "first",
+      "input_sha256": "49a4c31dd79ccf785c1995782efc854bdae7caad4ad584cb9e8d7a743a9109df",
+      "classification": "complete-reference-frame",
+      "files": {
+        "annotation-FFFA-first.in": "49a4c31dd79ccf785c1995782efc854bdae7caad4ad584cb9e8d7a743a9109df",
+        "annotation-FFFA-first/A.json": "515ecc541b5d005ac2681bb0673b0f1bf97a045ad06fdd7c7e436cf01f16e365",
+        "annotation-FFFA-first/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "annotation-FFFA-first/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "annotation-FFFA-first/S.print": "454dab81f5654e2c2c955fe9f5cfd4644115fce28b7ee7335d9fa0d5f783e71a",
+        "annotation-FFFA-first/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "annotation-FFFA-first/got.screen": "295571a04cb8e7900e63298be82f4ed33d70b6f22bb13332222d52dc48b20524"
+      }
+    },
+    "annotation-FFFB-ascii": {
+      "scalar": "U+FFFB",
+      "context": "ascii",
+      "input_sha256": "74384fd176303dcbdfef49886a0edf843022150fc9b33e28997abb6c5ecf2ec2",
+      "classification": "complete-reference-frame",
+      "files": {
+        "annotation-FFFB-ascii.in": "74384fd176303dcbdfef49886a0edf843022150fc9b33e28997abb6c5ecf2ec2",
+        "annotation-FFFB-ascii/A.json": "13dc5479499af5778192696c21794bc9391dd5cbce837d0faf958066a300192f",
+        "annotation-FFFB-ascii/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "annotation-FFFB-ascii/A.print": "47b62e52cfe434dd26d10c68b228848c04628b5f407451286e6cec31b1a2540c",
+        "annotation-FFFB-ascii/S.print": "a60288fe3507322debc1f5fa77a7d48fdb269e89352291d8e116007809fa69f6",
+        "annotation-FFFB-ascii/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "annotation-FFFB-ascii/got.screen": "cb7d2decd320b26c9406a5159d7e2f6e6fb52dfc0d24d19bc6e123abb734f394"
+      }
+    },
+    "annotation-FFFB-wide": {
+      "scalar": "U+FFFB",
+      "context": "wide",
+      "input_sha256": "436ed3dd29dabc63e16d6aad6c826935dde82acca3bac81282d52eab08d34462",
+      "classification": "complete-reference-frame",
+      "files": {
+        "annotation-FFFB-wide.in": "436ed3dd29dabc63e16d6aad6c826935dde82acca3bac81282d52eab08d34462",
+        "annotation-FFFB-wide/A.json": "5c7e2ccabaa4de8424784bae33a2f30e6a545eaa6799e28d6179f6f550dcba32",
+        "annotation-FFFB-wide/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "annotation-FFFB-wide/A.print": "87b33ca85c7dedd8816968d7a885f9f6fce7106ee9b18d9c3a3f42f028877e62",
+        "annotation-FFFB-wide/S.print": "dbfd6bfeb5118f8f7aee53faddd914dc28e8da30b53a4402227725bf4a14df4b",
+        "annotation-FFFB-wide/continuation.json": "6c29676b93acdef7bbc79fee256140c98014ada190baa2722d1f109341d018f7",
+        "annotation-FFFB-wide/got.screen": "231235c32476bfd879dff5c94fe1bb1a9dc0ed91659ce88860244a3b4d20ec02"
+      }
+    },
+    "annotation-FFFB-unwritten": {
+      "scalar": "U+FFFB",
+      "context": "unwritten",
+      "input_sha256": "8bab99fb1123b07c2e8ff885a6fcdd12888b2a29f9ee9f0725f7286f5ba9b7ed",
+      "classification": "complete-reference-frame",
+      "files": {
+        "annotation-FFFB-unwritten.in": "8bab99fb1123b07c2e8ff885a6fcdd12888b2a29f9ee9f0725f7286f5ba9b7ed",
+        "annotation-FFFB-unwritten/A.json": "69ae13205c0d9ad7c26ceebeb2baf361ac1cba08958e76ac943d3cf95014365d",
+        "annotation-FFFB-unwritten/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "annotation-FFFB-unwritten/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "annotation-FFFB-unwritten/S.print": "454dab81f5654e2c2c955fe9f5cfd4644115fce28b7ee7335d9fa0d5f783e71a",
+        "annotation-FFFB-unwritten/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "annotation-FFFB-unwritten/got.screen": "98cc7dad03807d25603daa55f5dbb67393fbc1f4f5adcab200b7cd6ba2c9bfec"
+      }
+    },
+    "annotation-FFFB-first": {
+      "scalar": "U+FFFB",
+      "context": "first",
+      "input_sha256": "3a4fadfba7eeeba1e23bfbf7366f312ad3f679e035f2ae0f603c5cd4ff840538",
+      "classification": "complete-reference-frame",
+      "files": {
+        "annotation-FFFB-first.in": "3a4fadfba7eeeba1e23bfbf7366f312ad3f679e035f2ae0f603c5cd4ff840538",
+        "annotation-FFFB-first/A.json": "515ecc541b5d005ac2681bb0673b0f1bf97a045ad06fdd7c7e436cf01f16e365",
+        "annotation-FFFB-first/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "annotation-FFFB-first/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "annotation-FFFB-first/S.print": "454dab81f5654e2c2c955fe9f5cfd4644115fce28b7ee7335d9fa0d5f783e71a",
+        "annotation-FFFB-first/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "annotation-FFFB-first/got.screen": "295571a04cb8e7900e63298be82f4ed33d70b6f22bb13332222d52dc48b20524"
+      }
+    }
+  },
+  "terminal_process_budget": 16,
+  "errors": [],
+  "capture_head": "efcb5fab96c2af4b64a6a559c5cdb1234fa78020",
+  "pins_sha256": "8d6d781805e6840a6a6becb059453cfa166fb7d53424fd4a89289ad827b7e992",
+  "capture_manifest_sha256": "72c3f1b5efe8c6761e9e465a8a37d776e8126918a53868b3d9ec8bc122adcc93"
+}

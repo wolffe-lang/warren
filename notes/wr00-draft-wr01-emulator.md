@@ -183,8 +183,14 @@ For a code point with width w (section 5):
    the cell under the cursor when a wrap is pending; with no such cell it is
    dropped (`combining-first-cell`, `combining-after-wide`,
    `combining-after-wrap`). A cell keeps 2 marks; later ones are dropped
-   (`combining-many`). U+200D is dropped (`zero-width-joiner`). A variation
-   selector is kept as a mark and does not change the width (`emoji-vs16`).
+   (`combining-many`). U+200D is dropped (`zero-width-joiner`). Interlinear
+   annotation controls U+FFF9–FFFB are also consumed without being stored: no
+   cell, mark slot, extent or cursor change, despite their scalar width0.
+   Twelve complete reference frames in `tests/vt/reference/annotations` and
+   `tests/vt/reference/zero-width` measure all three after ASCII, wide text,
+   an unwritten addressed cell and at the first column.
+   A variation selector is kept as a mark and does not change the width
+   (`emoji-vs16`).
    If its target was an unwritten blank, the mark makes that cell written and
    extends the extent through the target's width, so G6 and R1 hold (D10).
    No-left-cell drops, wide-tail attachment and pending-wrap targeting remain
