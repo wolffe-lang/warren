@@ -38,6 +38,23 @@ fn test_private_capacity() {
         pane.default_tabs = false
         ensure_tab_capacity(mut pane, 128)
         assert(!pane.tabs[72], "capacity-custom-tabs-no-new-stops")
+        region growth_turn(cap: 65536) {
+            ensure_screen_capacity(mut pane.primary, 256, 64)
+            ensure_tab_capacity(mut pane, 256)
+        }
+        let turn_stable = budget.charged(frame)
+        i = 0
+        while i < 16 {
+            region reuse_turn(cap: 65536) {
+                ensure_screen_capacity(mut pane.primary, 8, 2)
+                ensure_screen_capacity(mut pane.primary, 256, 64)
+                ensure_tab_capacity(mut pane, 256)
+            }
+            i += 1
+        }
+        assert(budget.charged(frame) == turn_stable, "capacity-outer-owner-turn-plateau")
+        assert(pane.primary.cells[4].base == 20013 && pane.primary.cells[5].width == 0)
+        assert(pane.primary.line_ids.len == 64 && !pane.tabs[200])
     }
 }
 
