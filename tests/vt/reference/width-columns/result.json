@@ -1,0 +1,2496 @@
+{
+  "schema": 1,
+  "std_commit": "77cf3210a82c93dc05ded987c249bb69e79b0a89",
+  "std_function": null,
+  "std_status": "unavailable at this pin",
+  "locale": "C.UTF-8",
+  "libc_version": "2.39",
+  "native_vector_sha256": "7626d66cbe6c2b0468613c4330ab5f8bf9b90908587c4930b9fa064b033d4cc1",
+  "native_warren_sha256": "e48b223b6eab8ae38592a2b8a22e5b06e108593301b53ef3df05d85f528c9417",
+  "native_warren_head": "49284477654fdf30095298f8b8d511e282307b3a",
+  "oracle_pins_sha256": "8d6d781805e6840a6a6becb059453cfa166fb7d53424fd4a89289ad827b7e992",
+  "scalars": [
+    {
+      "scalar": "U+00AD",
+      "warren": 0,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1160",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1161",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1162",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1163",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1164",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1165",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1166",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1167",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1168",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1169",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+116A",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+116B",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+116C",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+116D",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+116E",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+116F",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1170",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1171",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1172",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1173",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1174",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1175",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1176",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1177",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1178",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1179",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+117A",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+117B",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+117C",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+117D",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+117E",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+117F",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1180",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1181",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1182",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1183",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1184",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1185",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1186",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1187",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1188",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1189",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+118A",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+118B",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+118C",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+118D",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+118E",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+118F",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1190",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1191",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1192",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1193",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1194",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1195",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1196",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1197",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1198",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1199",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+119A",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+119B",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+119C",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+119D",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+119E",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+119F",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11A0",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11A1",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11A2",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11A3",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11A4",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11A5",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11A6",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11A7",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11A8",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11A9",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11AA",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11AB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11AC",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11AD",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11AE",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11AF",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11B0",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11B1",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11B2",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11B3",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11B4",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11B5",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11B6",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11B7",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11B8",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11B9",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11BA",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11BB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11BC",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11BD",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11BE",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11BF",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11C0",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11C1",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11C2",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11C3",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11C4",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11C5",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11C6",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11C7",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11C8",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11C9",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11CA",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11CB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11CC",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11CD",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11CE",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11CF",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11D0",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11D1",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11D2",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11D3",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11D4",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11D5",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11D6",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11D7",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11D8",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11D9",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11DA",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11DB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11DC",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11DD",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11DE",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11DF",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11E0",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11E1",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11E2",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11E3",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11E4",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11E5",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11E6",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11E7",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11E8",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11E9",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11EA",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11EB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11EC",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11ED",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11EE",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11EF",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11F0",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11F1",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11F2",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11F3",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11F4",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11F5",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11F6",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11F7",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11F8",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11F9",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11FA",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11FB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11FC",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11FD",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11FE",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+11FF",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+3248",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+3249",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+324A",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+324B",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+324C",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+324D",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+324E",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+324F",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DC0",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DC1",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DC2",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DC3",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DC4",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DC5",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DC6",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DC7",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DC8",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DC9",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DCA",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DCB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DCC",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DCD",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DCE",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DCF",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DD0",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DD1",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DD2",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DD3",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DD4",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DD5",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DD6",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DD7",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DD8",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DD9",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DDA",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DDB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DDC",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DDD",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DDE",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DDF",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DE0",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DE1",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DE2",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DE3",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DE4",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DE5",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DE6",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DE7",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DE8",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DE9",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DEA",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DEB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DEC",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DED",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DEE",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DEF",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DF0",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DF1",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DF2",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DF3",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DF4",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DF5",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DF6",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DF7",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DF8",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DF9",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DFA",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DFB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DFC",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DFD",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DFE",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+4DFF",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 2,
+      "reference": 2
+    },
+    {
+      "scalar": "U+D7B0",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7B1",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7B2",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7B3",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7B4",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7B5",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7B6",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7B7",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7B8",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7B9",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7BA",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7BB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7BC",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7BD",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7BE",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7BF",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7C0",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7C1",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7C2",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7C3",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7C4",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7C5",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7C6",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7CB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7CC",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7CD",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7CE",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7CF",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7D0",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7D1",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7D2",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7D3",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7D4",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7D5",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7D6",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7D7",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7D8",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7D9",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7DA",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7DB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7DC",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7DD",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7DE",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7DF",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7E0",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7E1",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7E2",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7E3",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7E4",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7E5",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7E6",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7E7",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7E8",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7E9",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7EA",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7EB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7EC",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7ED",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7EE",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7EF",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7F0",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7F1",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7F2",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7F3",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7F4",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7F5",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7F6",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7F7",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7F8",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7F9",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7FA",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+D7FB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+FFF9",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+FFFA",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+FFFB",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+13430",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+13431",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+13432",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+13433",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+13434",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+13435",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+13436",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+13437",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+13438",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+13439",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1343A",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1343B",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1343C",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1343D",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1343E",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1343F",
+      "warren": 1,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 0,
+      "reference": 0
+    },
+    {
+      "scalar": "U+1F1E6",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1E7",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1E8",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1E9",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1EA",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1EB",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1EC",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1ED",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1EE",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1EF",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1F0",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1F1",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1F2",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1F3",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1F4",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1F5",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1F6",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1F7",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1F8",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1F9",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1FA",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1FB",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1FC",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1FD",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1FE",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    },
+    {
+      "scalar": "U+1F1FF",
+      "warren": 2,
+      "std": "unavailable at this pin",
+      "libc_wcwidth": 1,
+      "reference": 1
+    }
+  ],
+  "pairs": {
+    "US": {
+      "scalars": [
+        "U+1F1FA",
+        "U+1F1F8"
+      ],
+      "warren_actual_advance": 4,
+      "std": "unavailable at this pin",
+      "libc_wcswidth": 2,
+      "reference": {
+        "reply_hex": "1b5b313b3452",
+        "row": 1,
+        "col": 4,
+        "advance": 2
+      }
+    },
+    "GB": {
+      "scalars": [
+        "U+1F1EC",
+        "U+1F1E7"
+      ],
+      "warren_actual_advance": 4,
+      "std": "unavailable at this pin",
+      "libc_wcswidth": 2,
+      "reference": {
+        "reply_hex": "1b5b313b3452",
+        "row": 1,
+        "col": 4,
+        "advance": 2
+      }
+    }
+  }
+}
