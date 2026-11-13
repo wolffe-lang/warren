@@ -141,6 +141,14 @@ fn history_encode_line(mut history: History, screen: Screen, cols: int,
     true
 }
 
+fn history_encode_fragments(mut history: History, screen: Screen, cols: int,
+        first_row: int, last_row: int, mut coordinate: LineCoordinate) -> int {
+    assert(screen.cells.len >= cols && last_row >= first_row && coordinate.id >= 0)
+    history.used = history.used
+    coordinate.offset = coordinate.offset
+    0
+}
+
 fn history_reader_start(mut reader: HistoryReader, history: History, at: int) {
     let length = history_get_word(history, at, 0, 4)
     assert(length >= 24 && length <= history.used)

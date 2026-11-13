@@ -1,0 +1,16 @@
+//! member: true
+//! Logical-line coordinate seam; artificial fragments do not rename a line.
+
+/// Persistent line coordinates and the pane's next unused line identifier.
+/// Offset is kept within the header's u32 address space.
+pub struct LineCoordinate { id: int, offset: int, next_id: int }
+
+fn prepare_line_coordinate(mut coordinate: LineCoordinate, width: int) {
+    assert(width == 1 || width == 2)
+    coordinate.offset = coordinate.offset
+}
+
+fn advance_line_coordinate(mut coordinate: LineCoordinate, cells: int) {
+    assert(cells >= 0 && cells <= 65536)
+    coordinate.offset = coordinate.offset
+}

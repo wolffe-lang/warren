@@ -1,0 +1,60 @@
+//! member: false
+//! Native-only large-geometry fragment properties; no input past its caps.
+
+fn test_fragment_boundary_and_evicted_prefix() {
+    region frame(cap: 33554432) {
+        var pane = new(65537, 1, 0)
+        feed(mut pane, "a".repeat(65537).bytes())
+        var history = new_history(70000)
+        var coordinate = LineCoordinate { id: 42, offset: 0, next_id: 43 }
+        assert(history_encode_fragments(mut history, pane.primary, 65537, 1, 1, mut coordinate) == 2, "history-65537-fragments")
+        assert(history.records == 2 && history.used == 65609)
+        let next = (history.head + history_get_word(history, history.head, 0, 4)) % 70000
+        assert(history_get_word(history, history.head, 8, 8) == 42 && history_get_word(history, next, 8, 8) == 42, "history-fragment-id-continuity")
+        assert(history_get_word(history, history.head, 16, 4) == 0 && history_get_word(history, next, 16, 4) == 65536)
+        assert(coordinate.id == 42 && coordinate.offset == 65537)
+        var eviction = new_history(65572)
+        coordinate.offset = 0
+        assert(history_encode_fragments(mut eviction, pane.primary, 65537, 1, 1, mut coordinate) == 2)
+        assert(eviction.records == 1 && eviction.evicted == 1 && eviction.used == 37, "history-exact-fragment-eviction")
+        assert(history_get_word(eviction, eviction.head, 16, 4) == 65536)
+        var reader = new_history_reader()
+        history_reader_start(mut reader, eviction, eviction.head)
+        assert(history_reader_next(mut reader, eviction) && reader.value == 97)
+        assert(!history_reader_next(mut reader, eviction), "history-evicted-prefix-not-invented")
+        var wide = new(65537, 1, 0)
+        feed(mut wide, "a".repeat(65535).bytes())
+        feed(mut wide, "中".bytes())
+        var paired = new_history(70000)
+        coordinate.offset = 0
+        assert(history_encode_fragments(mut paired, wide.primary, 65537, 1, 1, mut coordinate) == 2)
+        let wide_at = (paired.tail - paired.newest_length + 70000) % 70000
+        assert(history_get_word(paired, wide_at, 16, 4) == 65535, "history-fragment-keeps-wide-glyph")
+        history_reader_start(mut reader, paired, wide_at)
+        assert(history_reader_next(mut reader, paired) && reader.value == 20013)
+        assert(!history_reader_next(mut reader, paired))
+    }
+}
+
+fn test_maximum_width_fragments() {
+    region frame(cap: 67108864) {
+        var pane = new(262144, 1, 0)
+        feed(mut pane, "a".repeat(262144).bytes())
+        var history = new_history(300000)
+        var coordinate = LineCoordinate { id: 99, offset: 0, next_id: 100 }
+        assert(history_encode_fragments(mut history, pane.primary, 262144, 1, 1, mut coordinate) == 4, "history-262144-column-row")
+        assert(history.records == 4 && history.used == 262288 && history.evicted == 0)
+        var at = history.head
+        var fragment = 0
+        while fragment < 4 {
+            assert(history_get_word(history, at, 0, 4) == 65572)
+            assert(history_get_word(history, at, 8, 8) == 99)
+            assert(history_get_word(history, at, 16, 4) == fragment * 65536)
+            at = (at + 65572) % 300000
+            fragment += 1
+        }
+        assert(at == history.tail)
+    }
+}
+
+fn main() -> int { test_fragment_boundary_and_evicted_prefix(); test_maximum_width_fragments(); 0 }

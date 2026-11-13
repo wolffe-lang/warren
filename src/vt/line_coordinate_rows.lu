@@ -1,0 +1,23 @@
+//! member: false
+//! Counter seam crosses the finite coordinate boundary without a huge stream.
+use std.mem.budget
+
+fn main() -> int {
+    region frame(cap: 65536) {
+        var coordinate = LineCoordinate { id: 3, offset: 4294967295, next_id: 7 }
+        let stable = budget.charged(frame)
+        prepare_line_coordinate(mut coordinate, 1)
+        assert(coordinate.id == 3 && coordinate.offset == 4294967295)
+        advance_line_coordinate(mut coordinate, 1)
+        assert(coordinate.id == 7 && coordinate.offset == 0 && coordinate.next_id == 8, "history-coordinate-2pow32-boundary")
+        advance_line_coordinate(mut coordinate, 1)
+        assert(coordinate.id == 7 && coordinate.offset == 1)
+        coordinate.offset = 4294967295
+        prepare_line_coordinate(mut coordinate, 2)
+        assert(coordinate.id == 8 && coordinate.offset == 0 && coordinate.next_id == 9, "history-coordinate-wide-not-split")
+        advance_line_coordinate(mut coordinate, 2)
+        assert(coordinate.offset == 2)
+        assert(budget.charged(frame) == stable, "history-coordinate-allocation")
+    }
+    0
+}

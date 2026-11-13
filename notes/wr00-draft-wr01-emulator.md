@@ -307,7 +307,7 @@ extent is the whole row). The *text* of a pane is its scrollback's lines
 followed by the primary screen's lines.
 
 - **R1 content is kept.** On the primary screen, a resize changes no line's
-  content, except that lines may leave the oldest end of scrollback to stay
+  content, except that whole oldest fragments may leave scrollback to stay
   under the cap. Nothing is cut at the right edge.
 - **R2 the cursor keeps its place.** The cursor stays on the same cell of
   the same line, or, when it sat past the content, the same distance past it,
@@ -320,7 +320,7 @@ followed by the primary screen's lines.
   visible position. Eviction must never resurrect an abandoned anchor.
 - **R3 path independence.** For any sizes a and b, resizing to a and then to
   b gives the same text, the same cursor place and the same rows on screen as
-  resizing straight to b, provided no line left scrollback on the way.
+  resizing straight to b, provided no fragment left scrollback on the way.
 - **R4 wide characters are not split.** A wide character that would start in
   the last column moves whole to the next row; the cell it leaves is outside
   that row's extent, so it is not content and R3 survives it.
@@ -362,11 +362,13 @@ draws every code point in one cell) is the renderer's problem, not the grid's.
 
 ## 6. Scrollback and what it costs
 
-- **Storage is by line, not by row.** A line that leaves the top of the
-  primary screen is stored unwrapped: its content, once, whatever width it
-  was wrapped at. Reflowing history on a resize is therefore free; only the
-  rows on screen are rebuilt. A view of history wraps lines on demand.
-- **Encoding.** A line has a 24-byte little-endian header, in order: total
+- **Storage follows logical lines, not physical rows.** A line leaving the
+  top of the primary screen is encoded unwrapped, whatever width it was
+  wrapped at, in bounded continuation fragments. Each fragment carries the
+  same stable logical-line ID and its starting cell offset. Reflowing history
+  therefore needs no rewrite; only visible rows are rebuilt, and a history
+  view wraps the surviving logical content on demand.
+- **Encoding.** Each fragment has a 24-byte little-endian header, in order: total
   encoded length u32, previous-record length u32, stable line ID u64,
   logical start-cell offset u32, and flags u32 (unused bits must be zero).
   Its text is UTF-8, with one 12-byte record per run of equal rendition.
@@ -374,11 +376,20 @@ draws every code point in one cell) is the renderer's problem, not the grid's.
   background. Previous lengths permit reverse traversal across ring wrap
   without an unbounded per-line index.
 - **The cap** counts exactly those bytes. Default 8 MiB a pane. When a new
-  line would pass it, whole lines leave from the oldest end until it fits.
+  fragment would pass it, whole encoded fragments leave from the oldest end
+  until it fits; an encoded record is never retained in part.
 - **S1** stored bytes <= cap, always.
-- **S2** a line is never stored in part. A line longer than 65536 cells is
-  ended there and continues as a new line, so one endless line cannot hold
-  the cap by itself and no single reflow is unbounded.
+- **S2** one encoded fragment holds at most 65536 logical content cells,
+  without splitting a wide glyph. A longer logical line continues in another
+  fragment with the same line ID and its next cell offset. Whole-fragment
+  eviction may remove only the oldest logical prefix. A reader can therefore
+  meet a first surviving fragment whose offset is nonzero: it shows the
+  surviving suffix from its first cell, without inventing prefix spaces or
+  text, and preserves original offsets for addresses. It never renumbers that
+  suffix to offset zero. This bounds an endless line without an unbounded
+  fragment-ID index. After 2^32 logical cells, a line continues under a fresh
+  logical-line ID at offset zero; input is never refused and old addresses
+  never wrap to the new line.
 - **S3** lines are numbered from 0 for the life of the pane and never
   renumbered: copy mode, search and a saved view address (line number, cell),
   which a resize and an eviction leave meaningful.
@@ -398,8 +409,12 @@ small→large→small→large under native and interpreter region caps and requi
 charge to plateau after capacity is reached. A plain 80-byte, one-rendition
 line costs 116 bytes including its header and run, so 8 MiB holds roughly
 72,000 such lines; this is an estimate, not a line-count promise. Encoding
-rows require reverse traversal across ring wrap, exactly one record evicted
-at the cap boundary, and a stable ID surviving reflow.
+rows require reverse traversal across ring wrap, exactly one fragment evicted
+at the cap boundary, and a stable ID surviving reflow. Additional S2 rows
+encode 65537 cells, split a valid 262144-column physical row, preserve one ID
+across fragments, and start a reader at a line whose prefix was evicted
+without inventing the missing content. A counter seam crosses the 2^32-cell
+boundary without feeding billions of cells.
 
 ## 7. Rows
 
