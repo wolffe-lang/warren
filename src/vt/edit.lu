@@ -28,7 +28,7 @@ fn shift_characters(mut screen: Screen, cols: int, row: int, col: int,
         }
         var at = col
         while at < col + n { blank_cell(mut screen, (row - 1) * cols + at - 1, background); at += 1 }
-        if extent >= col { screen.extents[row - 1] = grid_clamp(extent + n, 0, cols) }
+        screen.extents[row - 1] = grid_clamp((if extent >= col { extent } else { col - 1 }) + n, 0, cols)
     } else {
         var to = col
         while to <= cols - n {
