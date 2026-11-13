@@ -6,11 +6,19 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tests/vt'))
 sys.path.insert(0, str(ROOT / 'tools/corpus'))
-from fresh_fuzz import generated
+from fresh_fuzz import generated, profile_settings
 import fuzz
 
 
 def main():
+    assert profile_settings('pull-request') == (200, 4096)
+    assert profile_settings('nightly') == (5000, 4096)
+    try:
+        profile_settings('unknown')
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('unknown profile accepted')
     cases = generated(200, 4096)
     assert len(cases) == 200 and list(cases)[0] == 'fresh-0001' and list(cases)[-1] == 'fresh-0200'
     for seed, (name, data) in enumerate(cases.items(), 1):
