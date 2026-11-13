@@ -1,0 +1,21 @@
+//! member: false
+//! Native-only per-cell payload witness; all row/header terms cancel.
+use std.mem.budget
+use std.io
+
+fn cell_payload_row() {
+    region frame(cap: 65536) {
+        let first = budget.charged(frame)
+        let one = new_screen(1, 1)
+        let one_charge = budget.charged(frame) - first
+        let second = budget.charged(frame)
+        let two = new_screen(2, 1)
+        let two_charge = budget.charged(frame) - second
+        assert(one.cells.len == 1 && two.cells.len == 2)
+        let payload = two_charge - one_charge
+        io.write_line("MEASURE native-cell-payload bytes={payload} screen-one={one_charge} screen-two={two_charge}")
+        assert(payload == 64, "cell-native-payload-64-bytes")
+    }
+}
+
+fn main() -> int { cell_payload_row(); 0 }

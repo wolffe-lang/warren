@@ -55,6 +55,13 @@ fn test_1049_clear_cancels_active_pending_wrap() {
     assert(pane.pending_wrap, "1049-restore-keeps-saved-primary-pending-wrap")
 }
 
+fn test_sparse_insert_discards_last_written_cell() {
+    var pane = vt.new(12, 2, 0)
+    vt.feed(mut pane, "ab\u{1b}[12GZ\u{1b}[3G\u{1b}[@".bytes())
+    assert(pane.primary.extents[0] == 3, "ich-discards-last-written-cell-over-erased-gap")
+    assert(pane.primary.cells[0].base == 97 && pane.primary.cells[1].base == 98 && pane.primary.cells[2].base == 32)
+}
+
 fn main() -> int {
     test_cursor_toward_region()
     test_mouse_reset_is_one_tracking_mode()
@@ -62,5 +69,6 @@ fn main() -> int {
     test_inserted_blank_extends_written_extent()
     test_1049_reset_keeps_alternate_content()
     test_1049_clear_cancels_active_pending_wrap()
+    test_sparse_insert_discards_last_written_cell()
     0
 }
