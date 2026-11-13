@@ -301,9 +301,13 @@ control agrees at all four measured prefixes. Its final-head rebase/retake is
 still required. The red-first finite G6/R1 row at `5021b75` confirms a defect:
 CUP(1,5) followed by U+0301 on an otherwise blank 12×2 pane stores space+acute
 at column 4 but leaves extent 0 on both primary and alternate. Resizing the
-primary to 6×4 then loses the mark entirely. All three named assertions failed;
-no implementation correction has been made. `combine_cell` writes the mark
-without updating writtenness or extent. This is outside the existing fuzz
+primary to 6×4 then loses the mark entirely. All three named assertions failed.
+Correction `cfe02f2` makes `combine_cell` update writtenness and extent. The
+reference's six internally inconsistent blank-cell captures are now D10;
+independent complete contract frames and two strict reference controls retain
+the validator and failed raw captures. Its full-cell print keeps the acute at
+row1 column5 after the baseline resize, despite A's extent0. A fresh complete
+post-correction gate is still required. This edge is outside the existing fuzz
 pieces, which always introduce a combining mark with a preceding ASCII base.
 
 Before the one prepared Linux take: settle that invariant row, add the fresh

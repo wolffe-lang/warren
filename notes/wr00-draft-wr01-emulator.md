@@ -178,6 +178,10 @@ For a code point with width w (section 5):
    `combining-after-wrap`). A cell keeps 2 marks; later ones are dropped
    (`combining-many`). U+200D is dropped (`zero-width-joiner`). A variation
    selector is kept as a mark and does not change the width (`emoji-vs16`).
+   If its target was an unwritten blank, the mark makes that cell written and
+   extends the extent through the target's width, so G6 and R1 hold (D10).
+   No-left-cell drops, wide-tail attachment and pending-wrap targeting remain
+   as above; the reference's inconsistent blank-cell reports are retained.
 2. If `pending_wrap` and autowrap: mark the row `wrapped`, move to column 1
    of the next row (scrolling the region if on its bottom row), clear the flag.
 3. Except for G2a at one column, if w = 2 and col = cols: with autowrap,
@@ -277,8 +281,9 @@ The list, with the document's section for each, is in the prediction
 | D7 | `SGR 53` (overline) ignored, mode 2026 unknown | 53 consumed without effect; 2026 stored and reported | yew sets 2026 around every frame |
 | D8 | DEL inside an OSC title becomes `?` (`tests/vt/parser-reference/osc-del.in`, title `613f62`) | DEL is silently dropped, yielding title `6162` | titles are display text; dropping the control is cleaner than adding a visible question mark |
 | D9 | a pre-restore background reappears after saved-pen restore followed by 7/27; an RGB integer can become invalid palette 15540094 | keep the restored colour value and set form; 7/27 change only inverse | post-restore inverse colour-cache defect; minimal bytes and both observations in `wr01-the-emulator.md` |
+| D10 | a combining mark on an unwritten blank is visible in the full-cell print beyond extent 0; a complete canonical frame is inconsistent | the target cell is written and extends the extent; resize keeps it, with the existing no-left-cell drop rule at column1 | G6 and R1; six named report failures, two strict written-base controls |
 
-Rows for D1 to D9 compare with written expectations, never with the
+Rows for D1 to D10 compare with written expectations, never with the
 reference, and a corpus stream that exercises one is compared under that
 divergence's name or not at all. D9 is scoped to the first SGR sequence after
 a restore that contains 7 or 27 with no separate colour SGR intervening;

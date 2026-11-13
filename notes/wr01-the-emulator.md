@@ -173,6 +173,39 @@ The report fixture independently measures HTS at column 1, which DECTABSR
 omits. The named limits are `RPT-TABS-COLUMN-ONE` and
 `RPT-BRIGHT-BOLD-COLOUR`, with mutation/refusal rows in `report_form_rows.py`.
 
+## D10: combining mark on an unwritten cell
+
+Exact trigger: a combining mark whose target base is unwritten, including an
+untouched or erased blank and an addressed last-column blank, on either screen.
+At the first column no left-hand cell exists: warren retains its explicit rule
+that drops that mark. Otherwise the target becomes written and the extent
+includes its full width; resize must preserve it. A wide glyph's trailing half
+resolves to its lead, and a pending last-column glyph remains the target.
+
+The eight-case pinned-reference bundle produced six named report failures and
+two strict controls. For blank CUP(1,5) + U+0301, pass A prints no written cells
+(extent 0), but the full-cell print contains space+acute at row1 column5, beyond
+that extent. After resize from 12×2 to 6×4, the full-cell print **keeps the acute
+at row1 column5**, while A still prints only empty rows. This is an observation
+of the reference's full-cell print, not a replacement complete reference frame.
+The strict validator rejects both captures and all four analogous report cases;
+it is unchanged. The raw failed inputs, A/S replies and prints remain under
+`tests/vt/reference/combining`. Wide-tail and pending-last-column controls remain
+strict reference agreements apart from the separately named D7 mode report.
+
+The six expected complete frames are built independently from the printing,
+G6 and R1 contract in `combining_expected.py`; no candidate output is read.
+Non-cell metadata is additionally checked against the raw reference queries.
+`check_combining.py` reproduces each exact strict rejection from frozen evidence,
+checks every evidence hash twice and verifies the two complete strict controls.
+Red-first `5021b75` independently failed primary/alternate extent and lost-mark
+resize rows; `cfe02f2` makes `combine_cell` set writtenness and extend the extent.
+The full post-correction rerun is pending. Its first attempt passed the 188
+frozen native frames and checked rows, then exposed a fixture metadata mistake:
+mode47's shared-screen queries report 47/1047/1049 all set, not independent bits.
+That expectation was corrected from the raw reference A replies, not the native
+frame; the failed take remains recorded.
+
 ## Grid follow-on resource checkpoint
 
 The following are measured constructor region charges at `7450229`, asserted
