@@ -17,7 +17,8 @@ fn line(name: str, milestone: str, pure: bool) -> str {
 }
 
 fn main() -> int {
-    io.write_line("warren 0.0.0: scaffold only")
+    let version = vt.package_version()
+    io.write_line("warren {version}: scaffold only")
     io.write_line(line("vt", vt.milestone(), vt.pure()))
     io.write_line(line("proto", proto.milestone(), proto.pure()))
     io.write_line(line("layout", layout.milestone(), layout.pure()))
