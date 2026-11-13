@@ -1,0 +1,57 @@
+//! member: false
+//! DEC graphics, shift/save/restore, repetition and alignment rows.
+use vt
+use std.mem.budget
+
+fn test_dec_graphics() {
+    var pane = vt.new(40, 2, 0)
+    vt.feed(mut pane, "\u{1b}(0_`abcdefghijklmnopqrstuvwxyz{|}~".bytes())
+    let expected: List[int] = [32, 0x25c6, 0x2592, 0x2409, 0x240c, 0x240d, 0x240a,
+        0xb0, 0xb1, 0x2424, 0x240b, 0x2518, 0x2510, 0x250c, 0x2514, 0x253c,
+        0x23ba, 0x23bb, 0x2500, 0x23bc, 0x23bd, 0x251c, 0x2524, 0x2534,
+        0x252c, 0x2502, 0x2264, 0x2265, 0x3c0, 0x2260, 0xa3, 0xb7]
+    var i = 0
+    while i < expected.len {
+        assert(pane.primary.cells[i].base == expected[i] && pane.primary.cells[i].width == 1, "graphics-mapping")
+        i += 1
+    }
+    var shift = vt.new(8, 2, 0)
+    vt.feed(mut shift, "\u{1b})0q\u{e}q\u{f}q".bytes())
+    assert(shift.primary.cells[0].base == 113 && shift.primary.cells[1].base == 0x2500 && shift.primary.cells[2].base == 113)
+    vt.feed(mut shift, "\u{e}\u{1b}7\u{f}\u{1b})B\u{1b}8q".bytes())
+    assert(shift.primary.cells[3].base == 0x2500, "graphics-save-restore")
+    vt.feed(mut shift, "\u{f}\u{1b}(B\u{1b}(Zq".bytes())
+    assert(shift.primary.cells[4].base == 113, "graphics-unknown-inert")
+}
+
+fn test_repeat_and_alignment() {
+    var pane = vt.new(8, 3, 0)
+    vt.feed(mut pane, "a\u{1b}[5b".bytes())
+    assert(pane.cursor_col == 7 && pane.primary.extents[0] == 6 && pane.primary.cells[5].base == 97, "graphics-repeat")
+    vt.feed(mut pane, "\u{1b}[31m\u{1b}[b".bytes())
+    assert(pane.primary.cells[6].base == 97 && pane.primary.cells[6].foreground == 1)
+    var wide = vt.new(4, 2, 0)
+    vt.feed(mut wide, "中\u{1b}[2b".bytes())
+    assert(wide.primary.cells[0].width == 2 && wide.primary.cells[2].width == 2)
+    assert(wide.primary.cells[4].base == 20013 && wide.primary.cells[5].width == 0)
+    var fresh = vt.new(8, 2, 0)
+    vt.feed(mut fresh, "\u{1b}[99b".bytes())
+    assert(fresh.primary.extents[0] == 0 && fresh.cursor_col == 1)
+    vt.feed(mut fresh, "\u{1b}#8".bytes())
+    var i = 0
+    while i < 16 { assert(fresh.primary.cells[i].base == 69 && fresh.primary.cells[i].width == 1, "graphics-alignment"); i += 1 }
+    assert(fresh.primary.extents[0] == 8 && fresh.primary.extents[1] == 8)
+}
+
+fn test_graphics_allocation() {
+    region frame(cap: 1048576) {
+        var pane = vt.new(8, 2, 0)
+        let data = "\u{1b}(0lqk\u{1b}[2b\u{1b}7\u{1b}(B\u{1b}8\r\n".bytes()
+        let stable = budget.charged(frame)
+        var i = 0
+        while i < 512 { vt.feed(mut pane, data); i += 1 }
+        assert(budget.charged(frame) == stable, "graphics-feed-allocation")
+    }
+}
+
+fn main() -> int { test_dec_graphics(); test_repeat_and_alignment(); test_graphics_allocation(); 0 }
