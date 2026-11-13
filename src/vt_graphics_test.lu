@@ -5,7 +5,7 @@ use std.mem.budget
 
 fn test_dec_graphics() {
     var pane = vt.new(40, 2, 0)
-    vt.feed(mut pane, "\u{1b}(0_`abcdefghijklmnopqrstuvwxyz{|}~".bytes())
+    vt.feed(mut pane, "\u{1b}(0_`abcdefghijklmnopqrstuvwxyz\u{7b}|\u{7d}~".bytes())
     let expected: List[int] = [32, 0x25c6, 0x2592, 0x2409, 0x240c, 0x240d, 0x240a,
         0xb0, 0xb1, 0x2424, 0x240b, 0x2518, 0x2510, 0x250c, 0x2514, 0x253c,
         0x23ba, 0x23bb, 0x2500, 0x23bc, 0x23bd, 0x251c, 0x2524, 0x2534,
