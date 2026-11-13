@@ -5,6 +5,18 @@ consulted, with a digest where the document is a file, and what it was used
 for. The lists of what may and may not be read are in the README. The
 reference programs were run as binaries and never opened as implementations.
 
+## Consulted for query answers (2026-11-13 UTC)
+
+The exact patch-390 control-sequences document listed below was fetched
+again from the same digest-matching binary package, extracting only the
+manual. Its decompressed SHA-256 matched
+`18117bddcde059b8e371722ee3e5998be2404c0614017ea30a8a1b7b1d912de6`.
+The DA1 optional-feature list, DA2 fields, DSR 5/6, DECRQM/DECRPM and
+XTVERSION clauses define the response forms. Warren's identity values are
+fixed in [TERM](TERM.md), not copied from xterm's responses. The pinned
+compiler's build help was checked for metadata injection options; the build
+instead prepares an ignored version member from the single manifest field.
+
 ## Consulted for width generation (2026-11-13 UTC)
 
 - Unicode 15.1.0 `UnicodeData.txt`, `EastAsianWidth.txt`,

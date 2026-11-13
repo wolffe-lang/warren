@@ -5,13 +5,16 @@ for PAX first, and measured on x86-64 Linux and macOS arm64 from the first
 pull request. It takes its ideas from tmux, zellij and herdr, and none of
 their code.
 
-**Status: the map, pure incremental terminal parser and protocol v1 codec.
+**Status: the map, pure terminal core in progress and protocol v1 codec.
 No working multiplexer is implemented yet.** The repository holds the pins,
 tiered CI, a pinned reference emulator with a cell-for-cell harness, a survey,
 recorded corpus, and predictions/drafts for the next milestones.
 `src/vt/parser.lu` decodes split UTF-8 and recognises bounded terminal
 sequences; its native test entry is `src/vt_parser_test.lu`, also runnable
-under lupin. The screen grid, resize, history and `vt-dump` are not implemented.
+under lupin. The initial grid serves Unicode widths/combining marks, wide-pair
+repair, cursor/erase/edit/SGR, tabs/index/scroll operations, bounded events,
+query answers and deterministic dumps. Resize, history, remaining ESC/modes
+and the `vt-dump` command are not implemented; W1 is not complete.
 `src/proto` implements bounded transport framing, message validation/encoding,
 fragment assembly and connection-wide image acknowledgement sequencing;
 [PROTOCOL](docs/PROTOCOL.md) fixes the bytes and [SERVER](docs/SERVER.md) is
@@ -47,7 +50,7 @@ executable scaffold status and exits 1.
 | Milestone | What | State |
 |---|---|---|
 | W0 | the map: pins, CI, the oracle, the survey, the prediction | in progress |
-| W1 | the emulator | parser implemented; screen model remains |
+| W1 | the emulator | parser and initial grid/queries implemented; resize/history and full comparison remain |
 | W2 | one pane; detach and attach | pure protocol codec and server contract; I/O planned |
 | W3 | panes, tabs, the bar, keys | planned |
 | W4 | mouse, scrollback, copy | planned |
@@ -89,6 +92,7 @@ The parser's additional entries can be run after staging the tools:
 
 ```sh
 root=$PWD
+python3 -I tools/vt/generate_version.py # also done by tools/gate before builds
 . tools/toolchain-env.sh
 "$LUPIN" run src/vt_parser_test.lu
 "$LUPIN" run src/vt_hostile_test.lu
@@ -102,8 +106,10 @@ Nineteen extra synthetic reference screens are committed under
 `tests/vt/parser-reference/`. Seventeen drive a **parser projection** of
 printed text and titles: sixteen agree and one uses the named D8 policy
 (DEL is dropped from a title, rather than changed to `?`). The other two
-measure a one-row region. These are not whole-screen comparisons with
-warren; the grid does not exist yet. The finite hostile row uses capped
+measure a one-row region. Those parser projections are not whole-screen
+comparisons. The initial grid has three separate full-dump comparisons under
+`tests/vt/grid_reference.py`, with D7 named; the full grid census and width
+sweep remain pending. The finite hostile row uses capped
 regions, and the measurement entry reports retained region charge and feed
 rate separately from process startup. [The note](notes/wr01-the-emulator.md)
 records the prediction, failed takes and scope boundaries.

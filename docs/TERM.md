@@ -95,6 +95,43 @@ The alternatives, for the record:
 | an entry of warren's own | exact | must be installed everywhere; nothing reads it on PAX |
 | `linux` on PAX | matches the console | holds every program to 16 colours and the console's key forms, for no gain: the pane is not the console |
 
+## Identity and query bytes
+
+The pure emulator answers these queries, with `ESC` = byte 1B and no spaces
+between the bytes shown in backticks:
+
+| Query | Exact answer |
+|---|---|
+| `ESC [ c`, `ESC [ 0 c`, or `ESC Z` | `ESC [ ? 6 2 ; 2 2 c` |
+| `ESC [ > c` or `ESC [ > 0 c` | `ESC [ > 0 ; 1 ; 0 c` |
+| `ESC [ > q` or `ESC [ > 0 q` | `ESC P > \| w a r r e n SPACE VERSION ESC \` |
+
+DA1 uses the VT220-style form and advertises only ANSI colour (feature 22).
+It claims no printer, ReGIS, sixel, selective erase, downloadable keys or
+other optional feature. A feature number may be added only with its
+implementation and a row proving it. DA2 uses VT100 family 0, warren's small
+firmware/protocol revision 1, and cartridge 0; programs keying behaviour on
+a DA2 version number will deliberately see a small one, not xterm's patch
+number. `VERSION` is generated at build preparation from the sole version
+field in `src/wolf.pkg`; it is not a second hand-maintained literal and is
+not read from the filesystem at runtime. A row compares the real answer
+byte-for-byte with that manifest, and a changed-manifest fixture proves
+that build preparation regenerates it.
+
+Other identity parameter values, unknown/private variants (apart from the
+specified `>` queries), and DA3 get no answer. Status reports are
+`ESC [ 0 n` for DSR 5, `ESC [ row ; col R` for DSR 6, and
+`ESC [ ? row ; col R` for DEC DSR 6. Rows are relative to the scroll-region
+top while origin mode is set. DECRQM uses the documented `CSI mode;status$y`
+form, with `?` preserved for DEC queries. Unsupported modes report 0;
+fixed-on/off supported modes report 3/4.
+
+The queue is exactly 4096 bytes. If one complete answer cannot fit, that
+query is dropped whole, without disturbing earlier answers or preventing a
+later smaller answer from fitting. Draining clears it. Query input never
+allocates answer storage; a row fills 4092 bytes, drops an oversized CPR,
+then admits a four-byte status answer exactly at the cap.
+
 ## Also set and unset
 
 `WARREN` (the socket's path) and `WARREN_PANE` (the pane's id) are set.

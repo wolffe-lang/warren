@@ -68,6 +68,9 @@ step build "$WOLF" build --deny-warnings src/warren.lu -o "$root/target/native/w
 step scaffold-run scaffold_run "$root/target/native/warren"
 step wolf-test "$WOLF" test --deny-warnings src
 step lupin-pure "$LUPIN" run src/pure_test.lu
+step answer-build "$WOLF" build --deny-warnings src/vt_answers_test.lu -o "$root/target/native/vt-answers"
+step version-answer-native python3 -I tests/vt/version_answer.py "$root/target/native/vt-answers"
+step version-answer-lupin python3 -I tests/vt/version_answer.py "$LUPIN" run src/vt_answers_test.lu
 [ "$mode" = linux ] || exit 0
 # The oracle rows. No step here skips: without the pinned binaries it is red.
 oracle_identity() {
