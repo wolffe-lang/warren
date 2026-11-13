@@ -88,6 +88,27 @@ without the seed and requires its only difference to be the title, then
 compares the seeded whole screen normally. This is fixture setup, not a
 normalisation that silently ignores a field.
 
+## Focused report limits
+
+The pinned binary measurements in `tests/vt/reference/interactions` retain
+all input bytes, raw A/S replies, print bytes and hashes. Their comparator
+reports these rows as **reference report cannot express this**, not as
+reference agreement; separate written expectations hold warren to its rules.
+
+- **RPT-TABS-COLUMN-ONE:** `CSI 3 g; ESC H` sets a stop at column 1,
+  but DECTABSR returns the same empty list as `CSI 3 g` alone. Column 2
+  is reported normally. Warren retains the column-1 stop.
+- **RPT-BRIGHT-BOLD-COLOUR:** both `CSI 1;91;42 m X` and
+  `CSI 1;38;5;9;42 m X` print `CSI 0;1;31;42 m X`. The report loses
+  the distinction between the stored bright palette form and a dark colour
+  rendered bright through bold. DECSC/DECRC produces the same result.
+  Warren retains palette entry 9, bold and palette background 2.
+
+These are limits of the report, not permission to ignore tab or colour
+fields generally. Direct RGB, RGB save/restore and RGB 1049 restoration
+remain strict comparisons. Minimal ECH, EL and DCH right-edge probes also
+remain strict; they do not explain or excuse other extent differences.
+
 ## Normalisations
 
 Every place where a dump is not compared as written, by name.
