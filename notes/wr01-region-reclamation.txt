@@ -1,0 +1,31 @@
+Region-wide reclamation and the VT capacity model
+
+Pins: wolf 0.2.39, lupin 0.1.61, wolf-std 77cf3210.
+
+The published memory model says a region is reclaimed as a unit; safe code
+has no per-allocation free (mem.region.intra.2). A copy committed into an
+outer container is materialized in that container's owning region
+(mem.region.outer-write). A temporary region around a turn therefore frees
+the turn's work, not the older buffers replaced in long-lived state.
+
+Witness: tests/vt/probes/replacement.lu. It alternates 1,024- and 4,096-byte
+buffers for sixteen turns. Each turn has a temporary region and commits with
+an explicit copy into one long-lived buffer. Native retained arena charge is
+41,728 bytes after the turns, against a final and peak logical size of 4,096.
+Lupin reaches the probe's 256 KiB arena cap before completing: the rejected
+copy would add 16,416 ledger bytes, taking the total to 262,448 (246,032 was
+already charged). These are tier-specific ledger charges, not RSS.
+
+This is a measured consequence of the documented arena strategy, not a
+claim that the implementation promised per-buffer reclamation. No issue is
+filed by this work. The aggregate-owned-region diagnostic is not a working
+alternative and is not presented as an implementation defect: the compiler
+refuses its flow and the interpreter rejects its ownership/open-window use.
+
+The approved VT design consequently reuses backing storage. A resize within
+capacity must not allocate; growth is explicit and charged, and abandoned
+arena buffers are never claimed freed. The budget is expressed at peak
+backing capacity, bounded by the protocol's 262,144-cell area limit, plus the
+fixed-cap encoded history ring and the two-screen storage term at capacity.
+A repeated grow/shrink/grow row must show that retained charge stops rising
+once capacity has been reached, natively and under the interpreter's cap.
