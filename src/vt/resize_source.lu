@@ -53,6 +53,11 @@ fn run_resize_window(mut pane: Vt, cols: int, first: int, last: int, emit: bool)
         pane.resize_state.flow.cursor.row = prefix_rows + pane.resize_state.cursor_row
         pane.resize_state.flow.cursor.col = pane.resize_state.cursor_col
         pane.resize_state.flow.cursor.found = true
+        if pane.resize_state.flow.combine.id >= 0 {
+            pane.resize_state.flow.combine.row = prefix_rows + pane.resize_state.combine_row
+            pane.resize_state.flow.combine.col = pane.resize_state.combine_col
+            pane.resize_state.flow.combine.found = true
+        }
         pane.resize_state.flow.bottom.row = prefix_rows + pane.resize_state.bottom_row
         pane.resize_state.flow.bottom.col = 1
         pane.resize_state.flow.bottom.found = true

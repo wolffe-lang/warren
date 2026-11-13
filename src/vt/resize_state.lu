@@ -7,6 +7,7 @@ pub struct ResizeState {
     active: bool, original_cols: int, original_rows: int,
     original_history_records: int, snapshot_records: int,
     cursor_row: int, cursor_col: int, saved_row: int, saved_col: int,
+    combine_row: int, combine_col: int,
     bottom_row: int, padding: int, first_visible: int, last_visible: int,
     max_columns: int, lost: bool,
     snapshot: Screen, output: Screen, canonical: History,
@@ -18,6 +19,7 @@ fn new_resize_state(cols: int) -> ResizeState {
     ResizeState { active: false, original_cols: 0, original_rows: 0,
         original_history_records: 0, snapshot_records: 0,
         cursor_row: 1, cursor_col: 1, saved_row: 1, saved_col: 1,
+        combine_row: 0, combine_col: 1,
         bottom_row: 1, padding: 0, first_visible: 1, last_visible: 1,
         max_columns: cols, lost: false,
         snapshot: new_screen(1, 1), output: new_screen(1, 1), canonical: new_history(0),
@@ -120,6 +122,8 @@ fn begin_resize_epoch(mut pane: Vt) {
     pane.resize_state.cursor_col = cursor_col
     pane.resize_state.saved_row = pane.saved_primary.row
     pane.resize_state.saved_col = pane.saved_primary.col
+    pane.resize_state.combine_row = pane.combine_row
+    pane.resize_state.combine_col = pane.combine_col
     resize_anchor_from_screen(mut pane.resize_state.flow.cursor, pane.primary, pane.cols, cursor_row, cursor_col)
     if pane.saved_primary.valid {
         resize_anchor_from_screen(mut pane.resize_state.flow.saved, pane.primary, pane.cols,
