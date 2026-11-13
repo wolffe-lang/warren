@@ -50,6 +50,7 @@ def check():
         assert pair['warren_actual_advance'] == pair['libc_wcswidth'] == pair['reference']['advance'] == 2
         assert pair['reference'] == {'reply_hex': '1b5b313b3452', 'row': 1, 'col': 4, 'advance': 2}
         model = blank(12, 4)
+        model['title'] = ''
         model['cursor']['col'] = 4
         model['extents'][0] = 3
         model['rows'][0][:3] = [[1, 'U+0061', '-']] + [[1, 'U+%04X' % cp, '-'] for cp in points]

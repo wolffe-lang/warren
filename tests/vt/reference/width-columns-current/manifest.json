@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "capture_head": "c70c46ce8f675afb2d55ab86eaa27fa5545e056b",
+  "files": {
+    "sweep-result.json": "1e19572a1fa8ef2c416ac8967113d6ed121b32ff0aed9edc59a712f6fdbe5ce8",
+    "result.json": "5d29240b368b3a408b6612a448ba62a328d9e91e63df63cf2b379f6ddee0d44b",
+    "reference-pairs.json": "f8e36ba036084fe55cc9b906f4f207d972b7170c6510f4767c0f2538ee02d186",
+    "US.native.screen": "e450ec384f1a4eca4f8575abc9ecbc2cda82e2f69f549ca50e4d1f2b793c3a9a",
+    "GB.native.screen": "58ec7e360109a49a5d3b5bd686d631500569be869e020b68be1d1341c4c14b39"
+  }
+}

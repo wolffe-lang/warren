@@ -1,0 +1,540 @@
+{
+  "schema": 1,
+  "status": "measured-not-an-agreement-verdict",
+  "unicode": "15.1.0",
+  "assigned_sha256": "83d602e924f9f58ee20cbc7604af50254167670583e34e5531ff81567f268093",
+  "widths_sha256": "5acf8a6627cf8c4fe7ef152c1e60ee516fba49e599d2a2a97aee29ace6f53ab6",
+  "native_vector_sha256": "131bd0d9c2a9f604cf409f87733fafe530b0a97f6e216c4b2f4c12195f65fd9a",
+  "measured_scalars": 287346,
+  "excluded_non_scalars": 2048,
+  "batch_size": 128,
+  "classifications": {
+    "control": 65,
+    "equal": 287281
+  },
+  "controls": [
+    {
+      "scalar": "U+0000",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0001",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0002",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0003",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0004",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0005",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0006",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0007",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0008",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 1,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0009",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 9,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+000A",
+      "category": "Cc",
+      "expected": 1,
+      "row": 2,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+000B",
+      "category": "Cc",
+      "expected": 1,
+      "row": 2,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+000C",
+      "category": "Cc",
+      "expected": 1,
+      "row": 2,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+000D",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 1,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+000E",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+000F",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0010",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0011",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0012",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0013",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0014",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0015",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0016",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0017",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0018",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0019",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+001A",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+001B",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+001C",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+001D",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+001E",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+001F",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+007F",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0080",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0081",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0082",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0083",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0084",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0085",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0086",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0087",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0088",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0089",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+008A",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+008B",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+008C",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+008D",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+008E",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+008F",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0090",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0091",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0092",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0093",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0094",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0095",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0096",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0097",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0098",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+0099",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+009A",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+009B",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+009C",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+009D",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+009E",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    },
+    {
+      "scalar": "U+009F",
+      "category": "Cc",
+      "expected": 1,
+      "row": 1,
+      "col": 2,
+      "classification": "control"
+    }
+  ],
+  "disagreements": [],
+  "measurements.tsv_sha256": "70f192a51184313aed958e4ef069762df14f7a003318b857f0b1ad1c50ec0397",
+  "replies.bin_sha256": "a1fc71f912ae00166f6cec6b514ec51f0793d55b2f6cbe264568e8ebe2f0c6f3"
+}

@@ -69,6 +69,7 @@ step width-sweep-framing python3 -I tests/vt/width_sweep_rows.py
 step width-policy-rows python3 -I tests/vt/width_policy_rows.py
 step oracle-zero-width-clusters python3 -I tests/vt/oracle_zero_width_rows.py
 step width-exception-rows python3 -I tests/vt/width_exception_rows.py
+step current-width-measurements python3 -I tools/vt/check_width_columns.py
 step report-fixture-rows python3 -I tests/vt/report_fixture_rows.py
 step report-bound-rows python3 -I tests/vt/report_bound_rows.py
 step corpus-chunking-rows python3 -I tests/vt/chunking_rows.py
