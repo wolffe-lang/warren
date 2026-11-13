@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "name": "oracle-feeder-window-title",
+  "recordings": {
+    "initial_title_utf8": "python3",
+    "startup_output_hex": "1b5d323b707974686f6e3307"
+  },
+  "reason": "The pinned reference launches the Python feeder as xterm's command, giving its window this startup title. The recording format does not encode that host setup."
+}

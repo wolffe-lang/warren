@@ -223,9 +223,11 @@ lowers the extent to the cursor's left; erasing a whole row sets it to 0.
   last row (`decstbm-past-bottom`). A valid one homes the cursor: to row 1,
   or to the region's top under origin mode (`decstbm-homes`,
   `decstbm-origin-homes`).
-- CUU and CUD stop at the region's edge when they start inside it and at the
-  screen's edge when they start outside (`cuu-stops-at-region`,
-  `cuu-outside-region`, `cud-outside-region`). LF on the last row below a
+- CUU stops at the region's top unless it starts above the region; CUD stops
+  at its bottom unless it starts below. A move from outside toward the region
+  can cross it but stops at the far edge; a move away uses the screen edge
+  (`cuu-stops-at-region`, `cuu-outside-region`, `cud-outside-region`, plus the
+  full fuzz interaction rows). LF on the last row below a
   region does nothing (`lf-below-region`). IL and DL outside the region do
   nothing (`il-outside-region`).
 - Under origin mode, addressing is relative to the region and clamped to it
@@ -294,6 +296,10 @@ send the following, and each is cheap; without them ordinary programs break:
   (focus), 1007, 2026, and ANSI 4 and 20;
 - DECRQM answers for the modes it stores, so a program can ask rather than
   guess.
+
+Modes 1000, 1002 and 1003 select one mouse-tracking mode. Setting one clears
+the other two; resetting any of the three clears that tracking selector,
+without resetting the independent SGR coordinate format or focus mode.
 
 ## 4. Resize
 
@@ -408,13 +414,13 @@ amortised; a resize is O(rows on screen + the retained logical lines they
 hold), independent of unrelated history lines. A logical line includes its
 retained continuation fragments, so an endless visible line can require
 lookback up to the configured history cap. The allocation budget counts the
-fixed-capacity encoded history
-ring, peak screen/workspace capacities and all retained arena growth buffers;
-replaced arena buffers are not claimed freed. The canonical resize deque has
+fixed-capacity encoded history ring, peak screen/workspace capacities and
+all retained arena growth buffers; replaced arena buffers are not claimed
+freed. The canonical resize deque has
 an explicit additional bound of the configured history cap plus 48 bytes per
 peak cell before geometric rounding; it is not treated as free duplication
-of history. Backing capacity is reused on
-shrink and on regrowth within the previous peak, with no further charge.
+of history. Backing capacity is reused on shrink and on regrowth within the
+previous peak, with no further charge.
 Growth is bounded by the protocol's 262144-cell area ceiling. Tests repeat
 small→large→small→large under native and interpreter region caps and require
 charge to plateau after capacity is reached. A plain 80-byte, one-rendition

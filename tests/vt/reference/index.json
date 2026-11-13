@@ -6,6 +6,7 @@
     "ci/packages.txt": "8eaab4f45f24f764fa32d47d571dccb60bb579da433341f1d1f439dd278f7622",
     "ci/oracle-binaries.lock": "c1bf425a70ac9439f374cfe8e62981aebccd5ce8d67d5289fd6b8f83a9d85f78"
   },
+  "fixture_setup_sha256": "6bee4263afe3fc39d429d9d078ca0cc26f9d79906afd05ec60221f638f92333e",
   "suites": {
     "census": {
       "alt-1049-restores-cursor": {

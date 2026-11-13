@@ -75,6 +75,19 @@ from a blank. Because the emulator's replacement for a malformed byte and any
 code point whose low sixteen bits are zero also answer zero, the layout of a
 row is searched for and must be unique.
 
+## Recording fixture setup
+
+The reference starts its Python feeder as the terminal's command, so its
+window initially has title `python3`. Recording files encode program bytes
+and sizes, not that host window setup. `tests/vt/recording_setup.json`
+therefore declares an explicit startup OSC 2 seed for recording comparisons.
+The seed is bound in the reference index and inserted as output after the
+initial size, before any recorded event. Neither the empty-title constructor
+nor the title comparison is changed. A paired row runs each recording
+without the seed and requires its only difference to be the title, then
+compares the seeded whole screen normally. This is fixture setup, not a
+normalisation that silently ignores a field.
+
 ## Normalisations
 
 Every place where a dump is not compared as written, by name.

@@ -215,6 +215,13 @@ command boundary; src/vt remains clock-, environment- and I/O-free. Rows
 cover stdin/file identity, binary bytes, options/refusals, replay output vs
 input/resize, malformed lengths and a multi-chunk stream.
 
+Lane decision for recording comparisons: reproduce the reference feeder's
+external startup window title with the explicit OSC 2 seed declared in
+`tests/vt/recording_setup.json`. Bind setup separately from original captured
+input hashes; do not change the empty constructor or rewrite expected titles.
+Each recording also runs unseeded and must differ in the title alone, making
+the entire effect of the seed visible.
+
 One standalone read-only host preflight has passed. Prepare the complete
 host take before acquiring a pool slot; no heavy work is assigned to the
 other pool host. The first grid review leaves this exact Done-when row open:

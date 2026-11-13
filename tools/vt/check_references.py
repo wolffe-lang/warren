@@ -24,7 +24,8 @@ def digest(data):
 def build_index():
     result = {'schema': 1, 'capture_head': '2bb72fabbab74437e375fb8ee6c20d7b506157a6',
               'pins': {name: digest((ROOT / name).read_bytes()) for name in
-                       ('warren-oracle.toml', 'ci/packages.txt', 'ci/oracle-binaries.lock')}, 'suites': {}}
+                       ('warren-oracle.toml', 'ci/packages.txt', 'ci/oracle-binaries.lock')},
+              'fixture_setup_sha256': digest((ROOT / 'tests/vt/recording_setup.json').read_bytes()), 'suites': {}}
     sources = inputs()
     for suite, manifest in MANIFESTS.items():
         entries = dict(line.split() for line in (ROOT / manifest).read_text().splitlines() if line)
