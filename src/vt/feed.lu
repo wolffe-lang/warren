@@ -68,6 +68,9 @@ fn combine_cell(mut screen: Screen, cols: int, row: int, col: int, pending: bool
     if screen.cells[at].width == 0 { at -= 1 }
     if screen.cells[at].mark1 == 0 { screen.cells[at].mark1 = cp }
     else if screen.cells[at].mark2 == 0 { screen.cells[at].mark2 = cp }
+    screen.cells[at].written = true
+    let end_col = at % cols + screen.cells[at].width
+    if screen.extents[row - 1] < end_col { screen.extents[row - 1] = end_col }
     at
 }
 
