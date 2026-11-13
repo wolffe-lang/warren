@@ -1,0 +1,47 @@
+//! member: false
+//! Prefix slicing preserves marks, whole glyphs, paint and byte accounting.
+use std.mem.budget
+
+fn test_history_prefix() {
+    region frame(cap: 1048576) {
+        var pane = new(8, 1, 0)
+        feed(mut pane, "e\u{301}\u{20d7}中\u{1b}[31mZ\u{1b}[44m\u{1b}[K".bytes())
+        var source = new_history(256)
+        assert(history_encode_line(mut source, pane.primary, 8, 1, 1, 10, 100))
+        assert(source.used == 74)
+        var destination = new_history(256)
+        var reader = new_history_reader()
+        assert(history_copy_prefix(mut destination, source, source.head, 0, mut reader) == 0)
+        assert(destination.records == 0)
+        assert(history_copy_prefix(mut destination, source, source.head, 1, mut reader) == 1, "resize-encoded-prefix")
+        assert(destination.newest_length == 42)
+        assert(history_get_word(destination, destination.head, 8, 8) == 10 && history_get_word(destination, destination.head, 16, 4) == 100)
+        history_reader_start(mut reader, destination, destination.head)
+        assert(history_reader_next(mut reader, destination) && reader.value == 101)
+        assert(history_reader_next(mut reader, destination) && reader.value == 769)
+        assert(history_reader_next(mut reader, destination) && reader.value == 8407)
+        assert(!history_reader_next(mut reader, destination), "resize-prefix-keeps-last-base-marks")
+        assert(history_copy_prefix(mut destination, source, source.head, 2, mut reader) == 1)
+        assert(destination.newest_length == 42, "resize-prefix-never-splits-wide-glyph")
+        assert(history_copy_prefix(mut destination, source, source.head, 3, mut reader) == 1)
+        assert(destination.newest_length == 45, "resize-prefix-excludes-next-run-header")
+        assert(history_copy_prefix(mut destination, source, source.head, 4, mut reader) == 1)
+        assert(destination.newest_length == 74, "resize-prefix-keeps-final-paint")
+        let at = history_newest_at(destination)
+        history_reader_start(mut reader, destination, at)
+        var paint = 0
+        while history_reader_next(mut reader, destination) {
+            if reader.kind == 1 { assert(reader.background == 4 && reader.value == 32); paint += 1 }
+        }
+        assert(paint == 4)
+        let stable = budget.charged(frame)
+        var turn = 0
+        while turn < 128 {
+            assert(history_copy_prefix(mut destination, source, source.head, 3, mut reader) == 1)
+            turn += 1
+        }
+        assert(destination.used <= 256 && budget.charged(frame) == stable, "resize-prefix-copy-allocation")
+    }
+}
+
+fn main() -> int { test_history_prefix(); 0 }

@@ -1,0 +1,16 @@
+//! member: true
+//! Encoded-prefix slice seams for a viewport starting inside a fragment.
+
+fn history_prefix_span(mut reader: HistoryReader, source: History, at: int, cells: int) -> int {
+    assert(source.records > 0 && at >= 0 && cells >= 0)
+    reader.value = 0
+    0
+}
+
+fn history_copy_prefix(mut destination: History, source: History, at: int,
+        cells: int, mut reader: HistoryReader) -> int {
+    assert(source.records > 0 && at >= 0 && cells >= 0)
+    reader.value = 0
+    destination.used = destination.used
+    0
+}
