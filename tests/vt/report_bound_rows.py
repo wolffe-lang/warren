@@ -24,6 +24,10 @@ def main():
         try:recompose_no_bold('fresh-0015',old,changed)
         except (AssertionError,ValueError):pass
         else:raise AssertionError('change outside no-bold field bound accepted')
+    invisible=blank(12,4);text_row(invisible,0,[32],'bold,fg=idx:1')
+    invisible_no_bold=copy.deepcopy(invisible);invisible_no_bold['rows'][0][0][2]='fg=idx:10'
+    _,n1_cells=recompose_no_bold('n1-control',invisible,invisible_no_bold)
+    assert not n1_cells, 'existing N1 makes nondrawing blank foreground unobservable'
     try:recompose_no_bold('fresh-0032',old,no_bold)
     except ValueError:pass
     else:raise AssertionError('unruled opposite-promotion case accepted')
