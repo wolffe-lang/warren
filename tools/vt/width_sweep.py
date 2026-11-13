@@ -171,7 +171,7 @@ def main():
     except (AssertionError, ValueError, KeyError) as error:
         print('FAIL width-policy ' + str(error), flush=True)
         return 1
-    print('PASS width-policy D11 exact350 any-351st-red', flush=True)
+    print('PASS width-policy zero-noncontrol-differences any-first-or-351st-red', flush=True)
     return 0
 
 
