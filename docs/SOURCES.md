@@ -5,6 +5,21 @@ consulted, with a digest where the document is a file, and what it was used
 for. The lists of what may and may not be read are in the README. The
 reference programs were run as binaries and never opened as implementations.
 
+## Consulted for grammar and character editing (2026-11-13 UTC)
+
+**ECMA-48, fifth edition, June 1991**, fetched from
+https://ecma-international.org/wp-content/uploads/ECMA-48_5th_edition_june_1991.pdf,
+SHA-256 `9577ad2514c411584b274ef7a4b3238c80aa93defbb349b18b8c78f78873f450`
+(checked twice). Clauses 5.4, 5.4.1 and 5.4.2 specify CSI byte ranges,
+private parameters, decimal substrings and omitted defaults; 5.6 specifies
+control-string delimiters. The definitions checked directly are 8.3.6 CAN,
+8.3.16 CSI, 8.3.26 DCH, 8.3.38 ECH and 8.3.64 ICH. The editing definitions
+put opened/vacated positions into the erased state and discard shifted
+contents at the boundary. Terminal-profile behavior, including the ICH
+cursor position and application-specific cancellation, follows the pinned
+control-sequences document and measured cases rather than claiming every
+ECMA device mode is implemented. No implementation source was consulted.
+
 ## Consulted for DEC graphics and saved cursors (2026-11-13 UTC)
 
 The DEC **VT100 User Guide**, chapter 3, at
@@ -88,7 +103,7 @@ sweep remain part of the screen-model work.
 | **XTerm Control Sequences** (`ctlseqs.txt`), "updated for XTerm Patch #390 (2024/02/19)" | `/usr/share/doc/xterm/ctlseqs.txt.gz` of Ubuntu's `xterm_390-1ubuntu3_amd64.deb` (sha256 `3541b6956d6c4be71db7b66ec91985bd5eb128fb130e806f1c879f9d94a97c72`); the file's sha256 `8020de0f161d2a8311b468f646eb41b4fb3f25b582eb118e075d2841ef3c7cff`, decompressed `18117bddcde059b8e371722ee3e5998be2404c0614017ea30a8a1b7b1d912de6`, 3,575 lines | the document of record: it is the reference emulator's own, at the reference's own version. Section names in the prediction are its headings. The queries the harness uses (CPR, DECCIR, DECTABSR, DECRQSS, DECRQM, DECRQCRA, DECCRA, media copy, window reports) |
 | the same document at patch 411 | cited by PAX's `docs/SOURCES.md` | not read in this lane; W1 reads it for what changed after 390 |
 | **xterm(1)**, the manual page | `/usr/share/man/man1/xterm.1.gz` of the same package; sha256 `15b00c6a980100f7cd5ed903801c1e6f4db86d52df67f1e426be0ea139426dc6`, decompressed `6e1009c939e43df0c0d7a7a1289e4d9fe09ab3ce8d46060c641608102e2ae0d9` | the resources the harness sets: `printerCommand`, `printAttributes`, `printerExtent`, `printerAutoClose`, `checksumExtension`, `precompose`, `allowWindowOps`, `decTerminalID`, `utf8` |
-| ECMA-48, fifth edition | not fetched in this lane | the prediction cites its clause 8.3 for the control functions it defines; W1 fetches the standard, records its digest and checks each clause number |
+| ECMA-48, fifth edition | fetched in W1; PDF digest and checked clauses above | control grammar, cancellation and editing definitions; it was not fetched during the scaffold slice |
 | terminfo entries `xterm-256color`, `tmux-256color`, `linux` | the output of `infocmp -x -1` (ncurses 6.4.20240113, binary sha256 in `warren-oracle.toml`) in the oracle image; sha256 `3d3199307af19c9896cc368406ac5eaae134f7b93bb61566aeb854eae964298a`, `866b5efc77151c33470bd14faaafb20799eecaffbbb6de709f4474d25046975d`, `6f168924ab419936011b7f8577ba55a5128ee79b9a1108fd888b896cbbede3ab` | what a program is led to send by each name (`docs/TERM.md`) |
 | Organisation code: PAX's console and screen, its pseudo-terminal notes, yew's terminal layer, pelt's line editor, quarry, burrow's session code | their trunks | what the console serves; what the organisation's programs send and read |
 
