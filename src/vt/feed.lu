@@ -46,9 +46,24 @@ fn break_pair(mut screen: Screen, cols: int, row: int, col: int, background: int
     else if screen.cells[at].width == 0 && col > 1 { blank_cell_preserving_written(mut screen, at - 1, background) }
 }
 
+fn break_print_pair(mut screen: Screen, cols: int, row: int, col: int, background: int) {
+    let at = (row - 1) * cols + col - 1
+    if screen.cells[at].width == 2 && col < cols {
+        // Losing a lead discards its tail, including its written contribution.
+        blank_cell(mut screen, at + 1, background)
+        if screen.extents[row - 1] == col + 1 { recalculate_written_extent(mut screen, cols, row) }
+    } else if screen.cells[at].width == 0 && col > 1 {
+        // The surviving old lead becomes a space in its own old rendition.
+        screen.cells[at - 1].base = 32
+        screen.cells[at - 1].mark1 = 0
+        screen.cells[at - 1].mark2 = 0
+        screen.cells[at - 1].width = 1
+    }
+}
+
 fn write_narrow(mut screen: Screen, cols: int, row: int, col: int, cp: int,
         flags: int, foreground: int, background: int) {
-    break_pair(mut screen, cols, row, col, background)
+    break_print_pair(mut screen, cols, row, col, background)
     let at = (row - 1) * cols + col - 1
     screen.cells[at].base = cp
     screen.cells[at].mark1 = 0
@@ -79,7 +94,7 @@ fn write_glyph(mut screen: Screen, cols: int, row: int, col: int, cp: int,
     if width == 2 {
         // Repair the right boundary before writing the lead: writing the tail
         // afterwards must not treat our newly written lead as an old pair.
-        break_pair(mut screen, cols, row, col + 1, background)
+        break_print_pair(mut screen, cols, row, col + 1, background)
     }
     write_narrow(mut screen, cols, row, col, cp, flags, foreground, background)
     if width == 2 {
