@@ -65,7 +65,11 @@ instead prepares an ignored version member from the single manifest field.
   and public region conformance examples, for retained arena charges and
   affine region ownership. The replacement-storage witness does not infer
   per-buffer reclamation from list replacement; the adopted draft instead
-  budgets peak capacities and retained growth buffers explicitly.
+  budgets peak capacities and retained growth buffers explicitly. The scalar
+  Cell copy path also follows `[mem.tier0.move.3]` and the documented container
+  index-store rule: scalar-only structs copy independently without region
+  allocation. `src/vt/copy_rows.lu` checks that value/alias and allocation
+  contract on native and lupin rather than assuming it from native speed.
 
 ## Consulted for the incremental parser (2026-11-12)
 

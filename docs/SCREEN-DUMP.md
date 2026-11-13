@@ -45,6 +45,16 @@ then `fg=` and `bg=`. A colour is `idx:N` (0 to 255) or `rgb:R:G:B`: the form
 in which it was set is kept, so palette entry 196 and the same red set as
 24-bit colour are different.
 
+The row extent is backed by per-cell written/erased state, not inferred from
+whether a blank has a background. Partial erasure and inserted blanks can be
+written; a gap left unwritten before a distant glyph is not. Later edits may
+shift or discard those cells. This internal scalar bit is copied with cells
+and original-screen snapshots; it adds no field to format 1 or the wire.
+Canonical history retains logical content, whose materialized spaces are
+written, separately from unwritten background-only paint. Current measured
+native and interpreter charges are tabulated in
+[`notes/wr01-the-emulator.md`](../notes/wr01-the-emulator.md#grid-follow-on-resource-checkpoint).
+
 ## How the reference emulator is read
 
 It is run under a virtual X server and spoken to only through its own pty and

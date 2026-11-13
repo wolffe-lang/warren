@@ -18,7 +18,7 @@ The first coherent slice is the parser alone. It does not claim a terminal scree
 
 Next slices implement the grid and modes (the eight complete screen cases and the non-resize census), then resize and history (the resize census, reflow properties and storage accounting), then `vt-dump` and differential replay of the recorded and generated corpus. D1–D7 remain explicit written-expectation rows, not silent oracle normalisations. No screen agreement is claimed for this parser-only slice.
 
-For the eventual grid, a provisional budget of 64 bytes per cell gives 245,760 bytes for two 80×24 screens and 3,686,400 bytes for two 320×90 screens. With the default 8 MiB history cap, these are 8.235 MiB and 11.516 MiB before row headers, parser state, answers and events. These are predictions, not an implementation layout or an RSS claim. History must account its encoded bytes exactly and never allocate the whole cap in advance. The first parser slice will measure its own retained state and process peak separately; it cannot measure a pane that does not yet exist.
+For the eventual grid, the original provisional budget of 64 bytes per cell gives 245,760 bytes for two 80×24 screens and 3,686,400 bytes for two 320×90 screens. With the default 8 MiB history cap, these are 8.234 MiB and 11.516 MiB before row headers, parser state, answers and events. These are the original payload predictions, not RSS or complete-pane measurements. The initial intention not to preallocate the history cap was superseded by the adopted fixed-byte-ring model; the grid checkpoint below records its actual charges. The parser slice measured its own state and process peak separately.
 
 Expected parser throughput on one CPU is at least 5 MB/s natively and 30 kB/s under lupin for ASCII mixed with CSI. The retained parser payload should stay below 8 KiB, independent of input length: 32×6 parameter slots, two intermediates, 4096 OSC bytes, and a partial UTF-8 scalar. Runtime container and process overhead are measured separately from that logical payload.
 
@@ -105,6 +105,49 @@ measurement in this slice. D1, D2 and D4–D7 screen behavior is not evaluated.
 The 100 MB history soak and larger/nightly fuzz corpus remain later W1 work.
 The README and architecture map were refreshed; `src/proto` and
 `docs/PROTOCOL.md` were not changed.
+
+## Grid follow-on resource checkpoint
+
+The following are measured constructor region charges at `7450229`, asserted
+by the named entries. They include the pane's fixed buffers and initial
+resize state, before growing resize-only workspaces. They are not RSS or a
+bound on all future retained growth. The former 56-byte cell now has a scalar
+written bit and a measured 64-byte native payload; it preserves erased gaps
+through later edits and snapshots without changing history's logical format
+or the wire. `src/vt/cell_capacity_rows.lu` cancels allocator alignment with
+even cell counts and asserts that payload.
+
+| Tier / pane | History cap | Charged bytes | Asserting entry |
+|---|---:|---:|---|
+| native 80×24 | 0 | 268032 | `src/vt/pane_capacity_rows.lu` |
+| native 80×24 | 4096 | 272128 | same |
+| native 80×24 | 8388608 | 8656640 | same |
+| native 320×90 | 0 | 3713264 | same |
+| native 320×90 | 8388608 | 12101872 | same |
+| lupin 80×24 | 4096 | 781904 | `src/vt/pane_ledger_rows.lu` |
+
+The ring alone is unchanged: native default storage charges 8388656 bytes,
+asserted by `history_capacity_rows.lu`. Lupin's ring ledger remains 16 bytes
+per configured slot plus 176 fixed bytes (`history_ledger_rows.lu`). No
+interpreter cap is raised and no default-8MiB interpreter pane is claimed.
+The separate 4096-byte feed smoke retains zero additional pane charge in
+both tiers. `copy_rows.lu` holds independent scalar Cell copies to zero
+allocation over 1024 turns in both tiers. The full 100000000-byte native
+feed/RSS witness is prepared, not yet run; small smoke timings do not stand
+in for it. At `7450229`, den's unseeded and seeded full interpreter replays
+both completed under the unchanged 50000000-step and memory limits, with the
+title-only proof and whole-screen comparison passing. They took roughly
+550 seconds each; this is not a claim of improved wall-clock throughput.
+The remaining full-recording interpreter takes are still pending.
+
+At `4737ff8`, all eight full cases, 151 census inputs and five seeded
+recording comparisons passed natively; the recording setup also retained
+its paired unseeded-title-only proof. All baseline fuzz extent differences
+were fixed, but nine streams still have non-matching fields: named tab/bright
+report limits, an out-of-domain palette report, and unexplained background
+interactions. These are not silently counted as whole-screen passes.
+
+> PAX corpus leg: not run, no boot fixture in this repository yet
 
 ## Done-when
 

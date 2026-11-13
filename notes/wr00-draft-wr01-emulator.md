@@ -120,7 +120,8 @@ Vt      size, primary screen, alternate screen, which is active, pen, cursor,
         charsets G0 G1 and the shift, title, scrollback, parser, answers, events
 Screen  rows[R]
 Row     cells[C], extent, wrapped
-Cell    chars (base code point, up to 2 combining marks), width, rendition
+Cell    chars (base code point, up to 2 combining marks), width, rendition,
+        scalar written/erased state
 Pen     rendition: flags and two colours
 Colour  default | idx N | rgb R G B      (the form as set is kept)
 ```
@@ -214,7 +215,14 @@ by DCH (`bce-ich-dch`), lines opened by IL, DL and by scrolling
 (`bce-il-scroll`), and the alternate screen when it is entered
 (`alt-rendition-carries`). ED 2 does not move the cursor (`ed2-cursor`). ED 3
 clears scrollback and leaves the screen (`ed3`). Erasing to the end of a row
-lowers the extent to the cursor's left; erasing a whole row sets it to 0.
+lowers the extent to the last surviving written cell; erasing a whole row
+sets it to 0. A partial erase that does not reach the right edge counts its
+requested blank endpoint as written. ICH counts opened blanks as written,
+even beyond the old extent. Each cell retains a scalar written bit, so later
+shifts can discard a distant written suffix without treating erased gaps as
+content. Printing/editing pair repairs preserve writtenness where required;
+an erase through a pair boundary clears the extra repaired half. These
+boundaries are measured by the focused sparse-edit and full fuzz rows.
 
 ### 2.6 Regions, origin, saved cursor, the alternate screen
 
@@ -237,9 +245,11 @@ lowers the extent to the cursor's left; erasing a whole row sets it to 0.
   `wrap-decsc-decrc`). DECRC with nothing saved homes the cursor and resets
   the pen (`decrc-never-saved`).
 - Mode 1049: set saves the cursor, switches to the alternate screen and
-  clears it to the pen's background, without moving the cursor; reset
-  switches back and restores the cursor (`alt-1049-restores-cursor`). Set
-  again while set clears again (`alt-1049-twice`). Modes 47 and 1047 share
+  clears it to the pen's background, without moving the cursor. The clear
+  cancels the active pending wrap; reset switches back and restores the saved
+  cursor, including its pending wrap (`alt-1049-restores-cursor`). Reset does
+  not clear the shared alternate contents: a later mode-47 entry finds them.
+  Set again while set clears again (`alt-1049-twice`). Modes 47 and 1047 share
   the one alternate screen; 47 neither saves nor clears (`alt-47-keeps`). The
   pen, the region and the modes are shared by the two screens
   (`alt-rendition-carries`, `alt-region-shared`).
@@ -310,7 +320,11 @@ and they must all satisfy the same rows.
 **Terms.** A *line* is a maximal run of rows joined by `wrapped`. Its
 *content* is the cells of those rows up to each row's extent (a wrapped row's
 extent is the whole row). The *text* of a pane is its scrollback's lines
-followed by the primary screen's lines.
+followed by the primary screen's lines. The original-screen snapshot preserves
+per-cell written bits. Canonical history stores logical content rather than a
+physical erasedness bitmap: its materialized logical spaces are written,
+while background-only paint remains unwritten. This does not change the
+history header or wire encoding.
 
 - **R1 content is kept.** On the primary screen, a resize changes no line's
   content, except that whole oldest fragments may leave scrollback to stay

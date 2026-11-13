@@ -24,11 +24,12 @@ It is not a claim that the remaining W1 gates have passed.
    resource rows. No Unicode approximation is presented as the final table.
 
 The provisional 64-byte-cell prediction in the main note is now the approved
-native cell payload target, including a scalar written bit and alignment. The
-former seven-integer payload was 56 bytes; it could not retain erased gaps
-for later edits. The 64-byte size and revised whole-pane charges must be
-measured and asserted, separately from interpreter charges, before the new
-layout is called complete. Neither payload arithmetic is an RSS claim.
+native cell payload, including a scalar written bit and alignment, measured
+and asserted at `7450229` by `cell_capacity_rows.lu`. The former seven-integer
+payload was 56 bytes; it could not retain erased gaps for later edits. Current
+whole-pane charges and the independent interpreter ledger are measured and
+asserted in `pane_capacity_rows.lu` and `pane_ledger_rows.lu`; the table in
+`wr01-the-emulator.md` records them. None is an RSS claim.
 
 ## Continuation order
 
@@ -248,8 +249,12 @@ The raw/file/stdin CLI and explicit bounded recording replay now exist;
 input/output remains outside the pure VT module. Eight full cases passed
 native and lupin. All 151 frozen census inputs passed native and lupin,
 with D1-D7 selected by name; five recordings passed natively with the explicit
-startup-title fixture and paired unseeded-title-only proof. Lupin's first
-recording exceeded the observer's 180-second timeout and is not a pass.
+startup-title fixture and paired unseeded-title-only proof. The first lupin
+recording exceeded the original 180-second observer timeout and later exhausted
+its fixed evaluation-step budget. Both failures remain recorded. At `7450229`,
+den's unseeded/seeded pair completed with the unchanged interpreter caps and
+a visible 600-second wall-clock observer deadline; other full recordings remain
+pending under lupin.
 
 At `f688478`, P2 held for all 188 frozen corpus streams under bytewise and
 seeded-random output-record boundaries, preserving every input/resize event.
