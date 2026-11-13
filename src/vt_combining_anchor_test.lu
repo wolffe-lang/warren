@@ -1,0 +1,121 @@
+//! member: false
+//! Combine-anchor set/clear rows from the pinned full-cell print observations.
+use vt
+use std.mem.budget
+
+fn marked(pane: vt.Vt, row: int, col: int) -> bool {
+    let at = (row - 1) * pane.cols + col - 1
+    if pane.active_alternate { pane.alternate.cells[at].mark1 == 769 }
+    else { pane.primary.cells[at].mark1 == 769 }
+}
+
+fn test_anchor_distinguishes_print_from_same_cup() {
+    var printed = vt.new(12, 4, 0)
+    vt.feed(mut printed, "abcd\u{301}".bytes())
+    assert(marked(printed, 1, 4) && printed.cursor_col == 5)
+    var addressed = vt.new(12, 4, 0)
+    vt.feed(mut addressed, "abcd\u{1b}[1;5H\u{301}".bytes())
+    assert(marked(addressed, 1, 5) && addressed.primary.cells[4].base == 32 &&
+        addressed.primary.cells[4].written && addressed.primary.extents[0] == 5,
+        "combine-anchor-cup-clears-even-at-same-cursor")
+    assert(addressed.cursor_col == 5 && !addressed.pending_wrap)
+    var first = vt.new(12, 4, 0)
+    vt.feed(mut first, "\u{301}".bytes())
+    assert(marked(first, 1, 1) && first.primary.cells[0].written && first.primary.extents[0] == 1 &&
+        first.cursor_col == 1, "combine-anchor-first-column-keeps-mark")
+}
+
+fn test_anchor_clear_operations() {
+    let ops: List[str] = ["\r", "\n", "\b", "\u{1b}[0C", "\u{1b}[1C", "\u{1b}[0D", "\u{1b}[1D",
+        "\u{1b}[0A", "\u{1b}[1A", "\u{1b}[0B", "\u{1b}[1B", "\u{1b}[X", "\u{1b}[K", "\u{1b}[1K",
+        "\u{1b}7\u{1b}8", "\u{1b}[?1049h", "\u{1b}[?1049h\u{1b}[?1049l",
+        "\u{1b}[?1047h\u{1b}[?1047l"]
+    let rows: List[int] = [1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1]
+    let cols: List[int] = [1, 5, 4, 6, 6, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5]
+    var index = 0
+    while index < ops.len {
+        var pane = vt.new(12, 4, 0)
+        vt.feed(mut pane, "abcd".bytes())
+        vt.feed(mut pane, ops[index].bytes())
+        let row = pane.cursor_row
+        let col = pane.cursor_col
+        vt.feed(mut pane, "\u{301}".bytes())
+        assert(marked(pane, rows[index], cols[index]), "combine-anchor-clearing-operation-target")
+        assert(pane.cursor_row == row && pane.cursor_col == col, "combine-mark-never-moves-cursor")
+        index += 1
+    }
+    let disambiguated: List[str] = ["\b\t", "\u{1b}[0D\t", "\u{1b}[1D\t", "\u{1b}D\t", "\u{1b}E\t",
+        "\u{1b}[@\t", "\u{1b}[P\t"]
+    index = 0
+    while index < disambiguated.len {
+        var pane = vt.new(12, 4, 0)
+        vt.feed(mut pane, "abcd".bytes())
+        vt.feed(mut pane, disambiguated[index].bytes())
+        let row = pane.cursor_row
+        vt.feed(mut pane, "\u{301}".bytes())
+        assert(marked(pane, row, 9), "combine-anchor-cleared-before-preserving-tab")
+        index += 1
+    }
+}
+
+fn test_anchor_preserving_operations_and_rendition() {
+    let ops: List[str] = ["\t", "\u{1b}[1;31;45m", "\u{1b}7", "\u{1b}[?47h", "\u{1b}[?47h\u{1b}[?47l",
+        "\u{1b}[S\t", "\u{1b}[T\t"]
+    for op in ops {
+        var pane = vt.new(12, 4, 0)
+        vt.feed(mut pane, "abcd".bytes())
+        vt.feed(mut pane, op.bytes())
+        vt.feed(mut pane, "\u{301}\u{302}".bytes())
+        assert(marked(pane, 1, 4), "combine-anchor-preserving-operation-target")
+        let second = if pane.active_alternate { pane.alternate.cells[3].mark2 } else { pane.primary.cells[3].mark2 }
+        assert(second == 770)
+    }
+    var style = vt.new(12, 4, 0)
+    vt.feed(mut style, "abcd\u{1b}[1;5H\u{1b}[1;31;45m\u{301}".bytes())
+    assert(marked(style, 1, 5) && style.primary.cells[4].flags == 0 &&
+        style.primary.cells[4].foreground == 0 - 1 && style.primary.cells[4].background == 0 - 1,
+        "combine-fallback-preserves-existing-blank-rendition")
+    var current = vt.new(12, 4, 0)
+    vt.feed(mut current, "abcd\r\u{301}".bytes())
+    assert(marked(current, 1, 1) && current.primary.cells[0].base == 97,
+        "combine-fallback-preserves-existing-base")
+}
+
+fn test_anchor_survives_resize_as_logical_cell() {
+    var pane = vt.new(12, 4, 4096)
+    vt.feed(mut pane, "abcdefghijklmnop".bytes())
+    assert(vt.resize(mut pane, 3, 8) == "" && vt.resize(mut pane, 6, 8) == "")
+    vt.feed(mut pane, "\t\u{301}".bytes())
+    assert(marked(pane, 3, 4) && pane.primary.cells[15].base == 112,
+        "combine-anchor-reflows-with-its-graphic-cell-D6")
+    var same = vt.new(12, 4, 0)
+    vt.feed(mut same, "abcd".bytes())
+    assert(vt.resize(mut same, 12, 4) == "" && vt.resize(mut same, 0, 0) == "vt-size-area")
+    vt.feed(mut same, "\t\u{301}".bytes())
+    assert(marked(same, 1, 4), "combine-anchor-same-and-refused-resize-are-noops")
+    var alternate = vt.new(12, 4, 0)
+    vt.feed(mut alternate, "abcd\u{1b}[?47h".bytes())
+    assert(vt.resize(mut alternate, 3, 4) == "")
+    vt.feed(mut alternate, "\u{301}".bytes())
+    assert(marked(alternate, 1, 3), "combine-shared-anchor-clips-with-active-alternate")
+}
+
+fn test_anchor_feed_does_not_allocate() {
+    region frame(cap: 1048576) {
+        var pane = vt.new(12, 4, 0)
+        let data = "abcd\u{1b}[1;5H\u{301}\r".bytes()
+        let before = budget.charged(frame)
+        var turn = 0
+        while turn < 1024 { vt.feed(mut pane, data); turn += 1 }
+        assert(budget.charged(frame) == before, "combine-anchor-feed-flat-allocation")
+    }
+}
+
+fn main() -> int {
+    test_anchor_distinguishes_print_from_same_cup()
+    test_anchor_clear_operations()
+    test_anchor_preserving_operations_and_rendition()
+    test_anchor_survives_resize_as_logical_cell()
+    test_anchor_feed_does_not_allocate()
+    0
+}

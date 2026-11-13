@@ -124,8 +124,8 @@ fn test_zero_width_exception_attachment() {
         format.primary.cells[0].mark2 == 0x13431, "zero-width-format-attach-to-base")
     var blank = vt.new(12, 4, 0)
     vt.feed(mut blank, "\u{1b}[1;5H\u{1161}".bytes())
-    assert(blank.primary.cells[3].written && blank.primary.extents[0] == 4 &&
-        blank.primary.cells[3].mark1 == 0x1161, "zero-width-jamo-unwritten-base-D10")
+    assert(blank.primary.cells[4].written && blank.primary.extents[0] == 5 &&
+        blank.primary.cells[4].mark1 == 0x1161, "zero-width-jamo-unwritten-base-D10")
     var indicators = vt.new(12, 4, 0)
     vt.feed(mut indicators, "\u{1f1fa}\u{1f1f8}".bytes())
     assert(indicators.cursor_col == 3 && indicators.primary.cells[0].width == 1 &&
