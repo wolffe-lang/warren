@@ -1,0 +1,159 @@
+{
+  "schema": 1,
+  "complete_dump_count": 8,
+  "pins_sha256": "8d6d781805e6840a6a6becb059453cfa166fb7d53424fd4a89289ad827b7e992",
+  "cases": {
+    "unwritten-primary": {
+      "input_sha256": "1629975195018dd11eb3716d2177226e93de4a0711c7add52cad49ac7001f2cd",
+      "size": [
+        12,
+        2
+      ],
+      "kind": "combining-unwritten",
+      "error": "row 1: unprinted cell 5 is not blank",
+      "files": {
+        "unwritten-primary.in": "1629975195018dd11eb3716d2177226e93de4a0711c7add52cad49ac7001f2cd",
+        "unwritten-primary/A.json": "d926f52f72f97ff33c2253a1a8d834807d4c32b3aeb966d4c14cb4e11fc0ddbf",
+        "unwritten-primary/A.print": "dba5166ad9db9ba648c1032ebbd34dcd0d085b50023b839ef5c68ca1db93a563",
+        "unwritten-primary/S.json": "7269042e43957bda71b2452c5fc445f064843e8870acf9abb6aac1bf526938d8",
+        "unwritten-primary/S.print": "13ecea9268c49c563a3966fce1870e7300ed588c19b9e651e69d5dcbe303ecc2",
+        "unwritten-primary/continuation.json": "a683096011db3975a1e401e33b0047d1f2677a11efe85ef12806f016ae039795"
+      }
+    },
+    "unwritten-alternate": {
+      "input_sha256": "d492dc4c96633c71ad87b7482dafa354226c544c164a012439c3811870d5bd16",
+      "size": [
+        12,
+        2
+      ],
+      "kind": "combining-unwritten-alternate",
+      "error": "row 1: unprinted cell 5 is not blank",
+      "files": {
+        "unwritten-alternate.in": "d492dc4c96633c71ad87b7482dafa354226c544c164a012439c3811870d5bd16",
+        "unwritten-alternate/A.json": "bf41ae216e41c4bc6ae0b51d44971062185895e754f44d88d69475eb575d7ef3",
+        "unwritten-alternate/A.print": "dba5166ad9db9ba648c1032ebbd34dcd0d085b50023b839ef5c68ca1db93a563",
+        "unwritten-alternate/S.json": "7269042e43957bda71b2452c5fc445f064843e8870acf9abb6aac1bf526938d8",
+        "unwritten-alternate/S.print": "13ecea9268c49c563a3966fce1870e7300ed588c19b9e651e69d5dcbe303ecc2",
+        "unwritten-alternate/continuation.json": "a683096011db3975a1e401e33b0047d1f2677a11efe85ef12806f016ae039795"
+      }
+    },
+    "unwritten-resized": {
+      "input_sha256": "545e8a2c67b129acd90053c3bbcd88dfb1e126fdcf985d3553df609153b08b9b",
+      "size": [
+        12,
+        2
+      ],
+      "kind": "combining-unwritten-resize",
+      "target_size": [
+        6,
+        4
+      ],
+      "error": "row 1: unprinted cell 5 is not blank",
+      "files": {
+        "unwritten-resized.rec": "545e8a2c67b129acd90053c3bbcd88dfb1e126fdcf985d3553df609153b08b9b",
+        "unwritten-resized/A.json": "97a03a0de20c48c7fa31f069fae00f1770cbb4a4e58c1ef7c706015b000a4e10",
+        "unwritten-resized/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "unwritten-resized/S.json": "a024b1f6d6bd5eeb3ea60364ef3e14d342e2a5c6414ff74e6ee1414c37f4480f",
+        "unwritten-resized/S.print": "577a5cd267af64ab9e73f0343173098c65a927ccfad907348684c98560d1c402",
+        "unwritten-resized/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687"
+      }
+    },
+    "column-zero": {
+      "input_sha256": "11f0950ae2352821375e98798a9d35e8cfabb98de52dd88525e56bdfe667ebbf",
+      "size": [
+        12,
+        2
+      ],
+      "kind": "combining-no-left-cell",
+      "error": "row 1: unprinted cell 1 is not blank",
+      "files": {
+        "column-zero.in": "11f0950ae2352821375e98798a9d35e8cfabb98de52dd88525e56bdfe667ebbf",
+        "column-zero/A.json": "952df6d19721ff2363f78c4c287407ffde419b92741af14f81aa19c7651a4ca4",
+        "column-zero/A.print": "dba5166ad9db9ba648c1032ebbd34dcd0d085b50023b839ef5c68ca1db93a563",
+        "column-zero/S.json": "7269042e43957bda71b2452c5fc445f064843e8870acf9abb6aac1bf526938d8",
+        "column-zero/S.print": "899c5095a732e00302ea53485c13289a9291227714392c44653bf615dc2600c0",
+        "column-zero/continuation.json": "a683096011db3975a1e401e33b0047d1f2677a11efe85ef12806f016ae039795"
+      }
+    },
+    "after-erase": {
+      "input_sha256": "3fb5f85d975c6c07fa913bc9fcd2bf32873d5482643ed73aa661f0a848480054",
+      "size": [
+        12,
+        2
+      ],
+      "kind": "combining-erased-cell",
+      "error": "row 1: unprinted cell 4 is not blank",
+      "files": {
+        "after-erase.in": "3fb5f85d975c6c07fa913bc9fcd2bf32873d5482643ed73aa661f0a848480054",
+        "after-erase/A.json": "0c2fd750cff91a23edd83c7bafb1de12cb4a4c27cc501da36bf37562825c8c7e",
+        "after-erase/A.print": "dba5166ad9db9ba648c1032ebbd34dcd0d085b50023b839ef5c68ca1db93a563",
+        "after-erase/S.json": "7269042e43957bda71b2452c5fc445f064843e8870acf9abb6aac1bf526938d8",
+        "after-erase/S.print": "e08d5eb0c9bbad79062117fa3998dc38788bda97f07c48ed2228442d4f8f2f60",
+        "after-erase/continuation.json": "a683096011db3975a1e401e33b0047d1f2677a11efe85ef12806f016ae039795"
+      }
+    },
+    "wide-trailing-half": {
+      "input_sha256": "fa05fbb0fead9ea1bcbc33861347efd147d10453d91e474c9031b4d0d0adff31",
+      "size": [
+        12,
+        2
+      ],
+      "kind": "combining-wide-tail",
+      "screen_sha256": "4760dda4fee8a945d22b99ecf32c0b714fee36ce68659dd36f04868291eb3a34",
+      "files": {
+        "wide-trailing-half.in": "fa05fbb0fead9ea1bcbc33861347efd147d10453d91e474c9031b4d0d0adff31",
+        "wide-trailing-half/A.json": "8f4679d35b5630e1c08eb7808b2eeedf1cac3d0d258a825e55e86124cfad87dd",
+        "wide-trailing-half/A.print": "de821cb837c1f54bafd2b58310a9efefaef28ab66f7c687b495fee9dae9a69a4",
+        "wide-trailing-half/S.json": "7269042e43957bda71b2452c5fc445f064843e8870acf9abb6aac1bf526938d8",
+        "wide-trailing-half/S.print": "99a94a7cc2781e2a889d80ace6fbe78d1b989a978c19eefa6bd4ad97612ad903",
+        "wide-trailing-half/continuation.json": "7b05c4c2f7fa8e976e566ff191d2bf50f99918f771f6bec4231ae763efc62ca3",
+        "wide-trailing-half/got.screen": "4760dda4fee8a945d22b99ecf32c0b714fee36ce68659dd36f04868291eb3a34"
+      }
+    },
+    "last-column-addressed": {
+      "input_sha256": "96d907b00f9375ba8c7a9cc7fc6aa484db507b0a931d0b0f3a994121fcf6d377",
+      "size": [
+        12,
+        2
+      ],
+      "kind": "combining-before-last-column",
+      "error": "row 1: unprinted cell 12 is not blank",
+      "files": {
+        "last-column-addressed.in": "96d907b00f9375ba8c7a9cc7fc6aa484db507b0a931d0b0f3a994121fcf6d377",
+        "last-column-addressed/A.json": "320e9a8e7d76cf8602583360cbc963ce67410ce9b2ac027bdc57303e35b99842",
+        "last-column-addressed/A.print": "dba5166ad9db9ba648c1032ebbd34dcd0d085b50023b839ef5c68ca1db93a563",
+        "last-column-addressed/S.json": "7269042e43957bda71b2452c5fc445f064843e8870acf9abb6aac1bf526938d8",
+        "last-column-addressed/S.print": "f80256fdb346dee3be38992e35bfb209f21de88678d0263f66a88b849c3ac335",
+        "last-column-addressed/continuation.json": "a683096011db3975a1e401e33b0047d1f2677a11efe85ef12806f016ae039795"
+      }
+    },
+    "last-column-pending": {
+      "input_sha256": "18294d46595bb100568a7572d599484e42b65b2f804c10ef117dcd2043de037b",
+      "size": [
+        12,
+        2
+      ],
+      "kind": "combining-pending-last-column",
+      "screen_sha256": "281bc472328e1856f5ba4e8048531f5508f4b55caf97a92ca1a76aac44ac69bc",
+      "files": {
+        "last-column-pending.in": "18294d46595bb100568a7572d599484e42b65b2f804c10ef117dcd2043de037b",
+        "last-column-pending/A.json": "d0e5c7e2c2b70644dc8c2cc4d42640ca54ebc677d81f6b8995a7bb458037320e",
+        "last-column-pending/A.print": "57dca29c25b8a318de0740e8a7bd000528e0cf540b538986f0e5e8ad3a9c9dc1",
+        "last-column-pending/S.json": "7269042e43957bda71b2452c5fc445f064843e8870acf9abb6aac1bf526938d8",
+        "last-column-pending/S.print": "041440b3240c2ad83c6b261bd33de393778413292d6a5ebaf409e97be8e7e78d",
+        "last-column-pending/continuation.json": "a683096011db3975a1e401e33b0047d1f2677a11efe85ef12806f016ae039795",
+        "last-column-pending/got.screen": "281bc472328e1856f5ba4e8048531f5508f4b55caf97a92ca1a76aac44ac69bc"
+      }
+    }
+  },
+  "errors": [
+    "unwritten-primary",
+    "unwritten-alternate",
+    "unwritten-resized",
+    "column-zero",
+    "after-erase",
+    "last-column-addressed"
+  ],
+  "capture_head": "6a5b17f910eed15da7e004c729a122a01e2cdd20",
+  "capture_manifest_sha256": "0c0159b790eddf64517b86bf1fb20d87957fd566d65f9680c22c9af774d5671c"
+}
