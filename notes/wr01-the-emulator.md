@@ -200,11 +200,15 @@ Non-cell metadata is additionally checked against the raw reference queries.
 checks every evidence hash twice and verifies the two complete strict controls.
 Red-first `5021b75` independently failed primary/alternate extent and lost-mark
 resize rows; `cfe02f2` makes `combine_cell` set writtenness and extend the extent.
-The full post-correction rerun is pending. Its first attempt passed the 188
-frozen native frames and checked rows, then exposed a fixture metadata mistake:
-mode47's shared-screen queries report 47/1047/1049 all set, not independent bits.
-That expectation was corrected from the raw reference A replies, not the native
-frame; the failed take remains recorded.
+The complete post-correction macOS rerun at `4928447` passed all 105 real
+END steps, including all 188 frozen native frames, primary corpus properties,
+14 explicit checked-machine entries and all eight D10 native/interpreter frames.
+The aggregate entry passed 72 tests: 70 checked and the same two explicitly
+named native fallbacks. The first attempt passed the 188 frozen native frames
+and checked rows, then exposed a fixture metadata mistake: mode47's shared-screen
+queries report 47/1047/1049 all set, not independent bits. That expectation was
+corrected from the raw reference A replies, not the native frame; the failed
+take remains recorded.
 
 ## Grid follow-on resource checkpoint
 

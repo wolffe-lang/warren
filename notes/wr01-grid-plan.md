@@ -306,17 +306,26 @@ Correction `cfe02f2` makes `combine_cell` update writtenness and extent. The
 reference's six internally inconsistent blank-cell captures are now D10;
 independent complete contract frames and two strict reference controls retain
 the validator and failed raw captures. Its full-cell print keeps the acute at
-row1 column5 after the baseline resize, despite A's extent0. A fresh complete
-post-correction gate is still required. This edge is outside the existing fuzz
+row1 column5 after the baseline resize, despite A's extent0. The complete
+macOS rerun at `4928447` passed 105 real END steps, including all 188 frozen
+frames, primary corpus properties and all eight native/interpreter D10 frames.
+This edge is outside the existing fuzz
 pieces, which always introduce a combining mark with a preceding ASCII base.
 
-Before the one prepared Linux take: settle that invariant row, add the fresh
-200-seed 4096-byte comparison/P2/resize-property drive and its 5000-seed nightly
-configuration, prepare all commands against one committed snapshot with fresh
-targets, then run a standalone preflight. Include the assigned-scalar reference
-width sweep, actual native width vector, full 100000000-byte resource/RSS witness,
-remaining complete interpreter recordings, pure/native/checked gates and plants.
-Retain every named divergence and failure; never use candidate output as a golden
-or conceal report-limited fields. The full Linux take has not run.
+Before the canonical Linux merge record: settle every fresh fuzz difference,
+prepare all commands against one final committed snapshot with fresh targets,
+then run a standalone preflight. The 200-seed requested-4096-byte drive and
+5000-seed nightly profile now exist, including P2 and four primary resize paths.
+The raw Linux development take at `4928447` is running the assigned-scalar
+reference width sweep, actual native width vector, full 100000000-byte resource/
+RSS witness, complete interpreter recordings and pure/native/checked gates.
+Its outer wrapper omitted the required recorder and therefore cannot be the
+merge record. It is retained solely as development evidence, never replayed
+into a record. After its findings are settled, run one final canonical take
+under `gauntlet-record.sh` using `tests/vt/rig/w1-linux.manifest`, `--keep-going`
+and `--preflight`; its own `preflight=ok` and `RECORD-END` are required. Retake
+the one-hunk scalar plant in the recorder's plant mode at that same base head.
+Retain every named divergence and failure; never use candidate output as a
+golden or conceal report-limited fields. The canonical take has not run.
 
 > PAX corpus leg: not run, no boot fixture in this repository yet
