@@ -37,4 +37,4 @@ echo "END oracle-image exit=$rc secs=$((SECONDS-start))"
 if [ "${WARREN_PREPARE_ONLY:-0}" = 1 ]; then exit 0; fi
 if [ "$#" -eq 0 ]; then set -- bash tools/gate linux; fi
 "$engine" run --rm --init --memory "$memory" --pids-limit 4096 \
-  -e WARREN_ARCHIVES -v "$root:$root" -w "$root" "$image" taskset -c "$cpus" "$@"
+  -e WARREN_ARCHIVES -e WARREN_FUZZ_PROFILE -v "$root:$root" -w "$root" "$image" taskset -c "$cpus" "$@"

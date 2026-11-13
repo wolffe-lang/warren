@@ -54,6 +54,7 @@ jobs:
         env:
           WARREN_ENGINE: docker
           WARREN_CPUS: '0'
+          WARREN_FUZZ_PROFILE: ${{ github.event_name == 'schedule' && 'nightly' || 'pull-request' }}
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:

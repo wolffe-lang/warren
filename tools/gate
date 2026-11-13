@@ -70,6 +70,7 @@ step observer-deadline-rows python3 -I tests/vt/observer_rows.py
 step tier-planner python3 -I ci/tiers-test.py
 step harness-mutations python3 -I tools/oracle/run.py selftest tests/vt/expected/*.screen
 step fuzz-generator fuzz_generator
+step fresh-fuzz-drive-rows python3 -I tests/vt/fresh_fuzz_rows.py
 step corpus-digests corpus_digests
 [ "$mode" != unit ] || exit 0
 case "$mode" in macos|linux) ;; *) echo 'FAIL gate-mode'; exit 2 ;; esac
@@ -144,3 +145,4 @@ step fuzz-streams python3 -I tools/corpus/fuzz.py --digests 32 2048 --dir "$work
 step oracle-fuzz python3 -I tools/oracle/run.py digests "$work/fuzz" --out "$work/fuzz-out" --manifest tests/corpus/fuzz-screens.sha256
 step oracle-corpus python3 -I tools/oracle/run.py digests tests/corpus --out "$work/corpus-out" --manifest tests/corpus/recording-screens.sha256
 step tmux-rows python3 -I tools/session/tmux_rows.py --cases "$work/cases" --expected tests/vt/expected --out "$root/target/tmux"
+step fresh-fuzz-native python3 -I tests/vt/fresh_fuzz.py --profile "${WARREN_FUZZ_PROFILE:-pull-request}" --out "$work/fresh-fuzz" "$root/target/native/warren" "$root/target/native/corpus-properties"
