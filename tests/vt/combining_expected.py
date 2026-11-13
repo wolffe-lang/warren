@@ -28,5 +28,8 @@ def expected(name):
     result['extents'][0] = col
     result['cursor']['col'] = cursor
     if name == 'unwritten-alternate':
-        result['modes']['alternate-screen-47'] = 1
+        # The three DECRQM selectors report the shared active screen, not
+        # independent latch bits (also explicit in this case's raw A reply).
+        for mode in ('alternate-screen-47', 'alternate-screen-1047', 'alternate-screen-1049'):
+            result['modes'][mode] = 1
     return result

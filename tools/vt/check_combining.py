@@ -53,6 +53,11 @@ def check():
         if name in FAILURES:
             message = 'row 1: unprinted cell %d is not blank' % FAILURES[name]
             assert entry['error'] == message
+            partial = oracle.describe(a)
+            partial['modes']['synchronized-output'] = 0
+            contract = expected(name)
+            for field in ('size', 'cursor', 'region', 'tabs', 'title', 'modes'):
+                assert partial[field] == contract[field], (name, field)
             try:
                 oracle.finish(oracle.describe(a), a, s)
             except oracle.OracleError as error:
