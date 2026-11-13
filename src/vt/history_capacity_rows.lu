@@ -1,5 +1,6 @@
 //! member: false
-//! Bounded default-ring allocation witness; framing only, not screen history.
+//! Native-only default-ring allocation witness; the interpreter uses the
+//! smaller history_ledger_rows entry rather than raising this cap.
 use std.mem.budget
 use std.io
 
@@ -10,7 +11,7 @@ fn main() -> int {
         let retained = budget.charged(frame) - before
         assert(history.bytes.len == 8388608)
         assert(history.bytes[0] == 0 as byte && history.bytes[8388607] == 0 as byte)
-        assert(retained >= 8388608 && retained <= 8388608 + 8192, "history-capacity-retained-budget")
+        assert(retained == 8388656, "history-native-default-retained-budget")
         let stable = budget.charged(frame)
         var id = 0
         while id < 1024 {

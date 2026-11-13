@@ -1,0 +1,27 @@
+//! member: false
+//! Interpreter-only ring ledger: configured capacity is smaller, cap unchanged.
+use std.mem.budget
+use std.io
+
+fn main() -> int {
+    region frame(cap: 33554432) {
+        let first = budget.charged(frame)
+        let small = new_history(4096)
+        let small_charge = budget.charged(frame) - first
+        assert(small.bytes.len == 4096)
+        let second = budget.charged(frame)
+        var history = new_history(1048576)
+        let large_charge = budget.charged(frame) - second
+        assert(history.bytes.len == 1048576)
+        assert(large_charge - small_charge == 16 * (1048576 - 4096), "history-ledger-byte-formula")
+        let overhead = small_charge - 16 * 4096
+        assert(overhead >= 0 && overhead <= 8192)
+        let stable = budget.charged(frame)
+        var id = 0
+        while id < 1024 { assert(history_reserve(mut history, id, 0, 0) >= 0); id += 1 }
+        assert(history.used == 24576 && history.records == 1024)
+        assert(budget.charged(frame) == stable, "history-small-interpreter-feed-allocation")
+        io.write_line("MEASURE history-interpreter capacity=1048576 retained={large_charge} bytes-per-slot=16 fixed-overhead={overhead} append-turns=1024 feed-charge=0")
+    }
+    0
+}
