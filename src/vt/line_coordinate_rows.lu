@@ -2,6 +2,28 @@
 //! Counter seam crosses the finite coordinate boundary without a huge stream.
 use std.mem.budget
 
+fn test_coordinate_codec_boundary() {
+    var pane = new(3, 1, 0)
+    feed(mut pane, "abc".bytes())
+    var history = new_history(128)
+    var coordinate = LineCoordinate { id: 3, offset: 4294967295, next_id: 7 }
+    assert(history_encode_fragments(mut history, pane.primary, 3, 1, 1, mut coordinate) == 2)
+    assert(history_get_word(history, history.head, 8, 8) == 3)
+    assert(history_get_word(history, history.head, 16, 4) == 4294967295)
+    let at = (history.tail - history.newest_length + 128) % 128
+    assert(history_get_word(history, at, 8, 8) == 7 && history_get_word(history, at, 16, 4) == 0, "history-coordinate-address-never-wraps")
+    assert(coordinate.id == 7 && coordinate.offset == 2)
+    var wide = new(2, 1, 0)
+    feed(mut wide, "中".bytes())
+    coordinate.id = 3
+    coordinate.offset = 4294967295
+    coordinate.next_id = 7
+    assert(history_encode_fragments(mut history, wide.primary, 2, 1, 1, mut coordinate) == 1)
+    let wide_at = (history.tail - history.newest_length + 128) % 128
+    assert(history_get_word(history, wide_at, 8, 8) == 7 && history_get_word(history, wide_at, 16, 4) == 0)
+    assert(coordinate.offset == 2)
+}
+
 fn main() -> int {
     region frame(cap: 65536) {
         var coordinate = LineCoordinate { id: 3, offset: 4294967295, next_id: 7 }
@@ -19,5 +41,6 @@ fn main() -> int {
         assert(coordinate.offset == 2)
         assert(budget.charged(frame) == stable, "history-coordinate-allocation")
     }
+    test_coordinate_codec_boundary()
     0
 }

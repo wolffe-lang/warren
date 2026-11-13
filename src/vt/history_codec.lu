@@ -67,9 +67,47 @@ fn history_paint_end(screen: Screen, cols: int, row: int) -> int {
     end
 }
 
+fn history_natural_width(screen: Screen, cols: int, at: int) -> int {
+    if cols == 1 && scalar_width(screen.cells[at].base) == 2 { return 2 }
+    screen.cells[at].width
+}
+
+fn history_line_cells(screen: Screen, cols: int, first_row: int, last_row: int) -> int {
+    var total: int = 0
+    var row = first_row
+    while row <= last_row {
+        var col = 0
+        while col < screen.extents[row - 1] {
+            total += history_natural_width(screen, cols, (row - 1) * cols + col)
+            col += 1
+        }
+        row += 1
+    }
+    total
+}
+
+fn history_fragment_end(screen: Screen, cols: int, first_row: int,
+        last_row: int, first_cell: int, limit: int) -> int {
+    var logical: int = 0
+    var row = first_row
+    while row <= last_row {
+        var col = 0
+        while col < screen.extents[row - 1] {
+            let width = history_natural_width(screen, cols, (row - 1) * cols + col)
+            if width > 0 && logical >= first_cell && logical + width - first_cell > limit { return logical }
+            logical += width
+            col += 1
+        }
+        row += 1
+    }
+    logical
+}
+
 fn history_walk_line(mut history: History, screen: Screen, cols: int,
-        first_row: int, last_row: int, record_at: int) -> int {
+        first_row: int, last_row: int, record_at: int, first_cell: int,
+        last_cell: int, include_last_paint: bool) -> int {
     var position = 24
+    var logical: int = 0
     var run_at = 0 - 1
     var last_flags = 0 - 1
     var last_foreground = 0 - 2
@@ -83,6 +121,11 @@ fn history_walk_line(mut history: History, screen: Screen, cols: int,
             let cell_at = (row - 1) * cols + col - 1
             if screen.cells[cell_at].width != 0 {
                 let kind = if col > screen.extents[row - 1] { 1 } else { 0 }
+                let source_cell = logical
+                if kind == 0 { logical += history_natural_width(screen, cols, cell_at) }
+                let selected = source_cell >= first_cell && (source_cell < last_cell ||
+                    (kind == 1 && include_last_paint && source_cell == last_cell))
+                if !selected { col += 1; continue }
                 let flags = if kind == 1 { 0 } else { screen.cells[cell_at].flags }
                 let foreground = if kind == 1 { 0 - 1 } else { screen.cells[cell_at].foreground }
                 let background = screen.cells[cell_at].background
@@ -129,24 +172,56 @@ fn history_walk_line(mut history: History, screen: Screen, cols: int,
     position - 24
 }
 
-fn history_encode_line(mut history: History, screen: Screen, cols: int,
-        first_row: int, last_row: int, id: int, start_cell: int) -> bool {
+fn history_encode_slice(mut history: History, screen: Screen, cols: int,
+        first_row: int, last_row: int, id: int, start_cell: int,
+        first_cell: int, last_cell: int, include_last_paint: bool) -> bool {
     assert(cols >= 1 && first_row >= 1 && last_row >= first_row && screen.extents.len >= last_row)
     assert(cols <= screen.cells.len / last_row)
-    let body_length = history_walk_line(mut history, screen, cols, first_row, last_row, 0 - 1)
+    assert(first_cell >= 0 && last_cell >= first_cell && last_cell - first_cell <= 65536)
+    let body_length = history_walk_line(mut history, screen, cols, first_row, last_row,
+        0 - 1, first_cell, last_cell, include_last_paint)
     let at = history_reserve(mut history, id, start_cell, body_length)
     if at < 0 { return false }
-    let written = history_walk_line(mut history, screen, cols, first_row, last_row, at)
+    let written = history_walk_line(mut history, screen, cols, first_row, last_row,
+        at, first_cell, last_cell, include_last_paint)
     assert(written == body_length, "history-encoded-byte-count")
     true
 }
 
+fn history_encode_line(mut history: History, screen: Screen, cols: int,
+        first_row: int, last_row: int, id: int, start_cell: int) -> bool {
+    let cells = history_line_cells(screen, cols, first_row, last_row)
+    history_encode_slice(mut history, screen, cols, first_row, last_row, id, start_cell, 0, cells, true)
+}
+
 fn history_encode_fragments(mut history: History, screen: Screen, cols: int,
         first_row: int, last_row: int, mut coordinate: LineCoordinate) -> int {
-    assert(screen.cells.len >= cols && last_row >= first_row && coordinate.id >= 0)
-    history.used = history.used
-    coordinate.offset = coordinate.offset
-    0
+    assert(cols >= 1 && first_row >= 1 && last_row >= first_row && screen.extents.len >= last_row)
+    assert(cols <= screen.cells.len / last_row)
+    let cells = history_line_cells(screen, cols, first_row, last_row)
+    if cells == 0 {
+        return if history_encode_slice(mut history, screen, cols, first_row, last_row,
+            coordinate.id, coordinate.offset, 0, 0, true) { 1 } else { 0 }
+    }
+    var first: int = 0
+    var fragments = 0
+    while first < cells {
+        let room = 4294967296 - coordinate.offset
+        let limit = if room < 65536 { room } else { 65536 }
+        let end = history_fragment_end(screen, cols, first_row, last_row, first, limit)
+        if end == first {
+            // A wide glyph does not fit the final coordinate slot. Start its
+            // new logical line before writing either half of that glyph.
+            assert(room == 1)
+            prepare_line_coordinate(mut coordinate, 2)
+        } else {
+            if history_encode_slice(mut history, screen, cols, first_row, last_row,
+                    coordinate.id, coordinate.offset, first, end, end == cells) { fragments += 1 }
+            advance_line_coordinate(mut coordinate, end - first)
+            first = end
+        }
+    }
+    fragments
 }
 
 fn history_reader_start(mut reader: HistoryReader, history: History, at: int) {

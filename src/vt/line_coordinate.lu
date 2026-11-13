@@ -1,16 +1,25 @@
 //! member: true
-//! Logical-line coordinate seam; artificial fragments do not rename a line.
+//! Finite logical-line coordinates; ordinary fragments do not rename a line.
 
 /// Persistent line coordinates and the pane's next unused line identifier.
 /// Offset is kept within the header's u32 address space.
 pub struct LineCoordinate { id: int, offset: int, next_id: int }
 
+fn fresh_line_coordinate(mut coordinate: LineCoordinate) {
+    coordinate.id = coordinate.next_id
+    coordinate.next_id += 1
+    coordinate.offset = 0
+}
+
 fn prepare_line_coordinate(mut coordinate: LineCoordinate, width: int) {
     assert(width == 1 || width == 2)
-    coordinate.offset = coordinate.offset
+    assert(coordinate.offset >= 0 && coordinate.offset < 4294967296)
+    if coordinate.offset > 4294967296 - width { fresh_line_coordinate(mut coordinate) }
 }
 
 fn advance_line_coordinate(mut coordinate: LineCoordinate, cells: int) {
     assert(cells >= 0 && cells <= 65536)
-    coordinate.offset = coordinate.offset
+    assert(coordinate.offset >= 0 && cells <= 4294967296 - coordinate.offset)
+    coordinate.offset += cells
+    if coordinate.offset == 4294967296 { fresh_line_coordinate(mut coordinate) }
 }
