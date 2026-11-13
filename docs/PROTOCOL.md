@@ -276,4 +276,6 @@ them on the target machine before accepting clients.
    bootstrap refusal ordering are explicit. Terminal title/clipboard text
    must not be replayed as trusted escapes.
 
+9. At one column the server may send a width-1 record whose scalar is naturally wide, and the client clips or substitutes; nowhere else.
+
 No server, client, socket, pty or process is implemented by this document.
