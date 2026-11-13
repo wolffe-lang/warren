@@ -54,6 +54,12 @@ step pin-metadata python3 -I tools/check-pins.py
 step version-generation-rows python3 -I tests/vt/version_generation.py
 step version-generation python3 -I tools/vt/generate_version.py
 step frozen-references python3 -I tools/vt/check_references.py
+step frozen-checkpoints python3 -I tools/vt/check_checkpoints.py
+step inverse-reference python3 -I tools/vt/check_inverse.py
+step d9-reference python3 -I tools/vt/check_d9.py
+step d9-background-fixture python3 -I tests/vt/background_fixture_rows.py
+step d9-bounds python3 -I tests/vt/d9_bound_rows.py
+step report-forms python3 -I tests/vt/report_form_rows.py
 step prefix-tool-rows python3 -I tests/vt/prefix_tool_rows.py
 step assigned-scalar-rows python3 -I tests/vt/assigned_rows.py
 step width-sweep-framing python3 -I tests/vt/width_sweep_rows.py
@@ -79,9 +85,24 @@ step resource-smoke-build "$WOLF" build --deny-warnings src/vt_resource_test.lu 
 step resource-smoke-native "$root/target/native/measure-child" "$root/target/native/resource-smoke"
 step checked-vt python3 -I tests/vt/checked_rows.py "$WOLF"
 step build "$WOLF" build --deny-warnings src/warren.lu -o "$root/target/native/warren"
+step cli-native python3 -I tests/vt/cli_rows.py "$root/target/native/warren"
+step cases-native python3 -I tests/vt/compare_cases.py "$root/target/native/warren"
+step census-native python3 -I tests/vt/compare_suite.py --suite census "$root/target/native/warren"
+step recordings-native python3 -I tests/vt/compare_suite.py --suite recordings "$root/target/native/warren"
+step fuzz-baseline-native python3 -I tests/vt/compare_suite.py --suite fuzz-baseline "$root/target/native/warren"
+step d9-original-repaired-native python3 -I tests/vt/compare_d9.py "$root/target/native/warren"
+step focused-probes-native python3 -I tests/vt/compare_probes.py "$root/target/native/warren"
+step checkpoints-native python3 -I tests/vt/compare_checkpoints.py "$root/target/native/warren"
+step corpus-chunking-native python3 -I tests/vt/chunking_suite.py "$root/target/native/warren"
+step corpus-properties-build "$WOLF" build --deny-warnings src/vt/corpus_properties.lu -o "$root/target/native/corpus-properties"
+step corpus-properties-framing python3 -I tests/vt/corpus_property_rows.py "$root/target/native/corpus-properties" "$root/target/native/warren"
+step corpus-properties-native python3 -I tests/vt/corpus_properties.py "$root/target/native/corpus-properties" "$root/target/native/warren"
 step scaffold-run scaffold_run "$root/target/native/warren"
 step wolf-test "$WOLF" test --deny-warnings src
 step lupin-pure "$LUPIN" run src/pure_test.lu
+step cli-lupin python3 -I tests/vt/cli_rows.py "$LUPIN" run src/warren.lu
+step cases-lupin python3 -I tests/vt/compare_cases.py "$LUPIN" run src/warren.lu
+step census-lupin python3 -I tests/vt/compare_suite.py --suite census "$LUPIN" run src/warren.lu
 step answer-build "$WOLF" build --deny-warnings src/vt_answers_test.lu -o "$root/target/native/vt-answers"
 step version-answer-native python3 -I tests/vt/version_answer.py "$root/target/native/vt-answers"
 step version-answer-lupin python3 -I tests/vt/version_answer.py "$LUPIN" run src/vt_answers_test.lu
