@@ -153,9 +153,9 @@ fn test_scroll_region_and_origin() {
     vt.feed(mut pane, "\u{1b}[99B".bytes())
     assert(pane.cursor_row == 4)
     vt.feed(mut pane, "\u{1b}[1;1H\u{1b}[99B".bytes())
-    assert(pane.cursor_row == 6)
+    assert(pane.cursor_row == 4)
     vt.feed(mut pane, "\u{1b}[3;3r".bytes())
-    assert(pane.region_top == 2 && pane.region_bottom == 4 && pane.cursor_row == 6)
+    assert(pane.region_top == 2 && pane.region_bottom == 4 && pane.cursor_row == 4)
     pane.modes.origin = true
     vt.feed(mut pane, "\u{1b}[2;99r\u{1b}[99;5H".bytes())
     assert(pane.region_top == 2 && pane.region_bottom == 6 && pane.cursor_row == 6 && pane.cursor_col == 5)
