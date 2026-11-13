@@ -79,7 +79,7 @@ fn dispatch_tab_or_scroll(mut pane: Vt, final: int) {
             pane.default_tabs = false
         } else if mode == 3 {
             var col = 0
-            while col < pane.cols { pane.tabs[col] = false; col += 1 }
+            while col < pane.tabs.len { pane.tabs[col] = false; col += 1 }
             pane.default_tabs = false
         }
     } else {
