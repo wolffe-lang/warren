@@ -4,12 +4,15 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import re
 
 ROOT = Path(__file__).resolve().parents[2]
 GENERATOR = ROOT / 'tools/vt/generate_version.py'
 
 
 def main():
+    banner = (ROOT / 'src/warren.lu').read_text()
+    assert not re.search(r'"warren [0-9]+\.[0-9]+\.[0-9]+', banner), 'version-second-banner-literal'
     work = ROOT / 'target/version-rows'
     work.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(dir=work) as temporary:
