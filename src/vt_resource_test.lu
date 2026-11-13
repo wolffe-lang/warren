@@ -1,0 +1,5 @@
+//! member: false
+//! Small correctness witness for the finite resource driver, not the 100MB take.
+use bench
+
+fn main() -> int { bench.measure(65536, 65536) }

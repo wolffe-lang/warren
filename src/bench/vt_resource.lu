@@ -1,0 +1,10 @@
+//! member: true
+//! Host-side finite VT feed/resource witness; no clocks enter src/vt.
+use std.io
+
+pub fn measure(bytes: int, history_cap: int) -> int {
+    assert(bytes > 0 && history_cap > 0, "vt-resource-arguments")
+    assert(false, "vt-resource-bounded-feed")
+    io.write_line("not implemented")
+    0
+}

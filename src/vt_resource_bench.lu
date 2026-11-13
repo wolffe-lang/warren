@@ -1,0 +1,5 @@
+//! member: false
+//! Native Linux take only: exactly 100,000,000 input bytes, default 8MiB history.
+use bench
+
+fn main() -> int { bench.measure(100000000, 8388608) }
