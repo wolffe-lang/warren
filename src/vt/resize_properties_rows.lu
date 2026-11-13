@@ -200,6 +200,49 @@ fn test_alternate_and_hidden_primary() {
     assert(one.alternate.cells[0].width == 2 && one.alternate.cells[1].width == 0 && one.alternate.cells[0].mark1 == 769)
 }
 
+fn test_retained_logical_line_lookback() {
+    let data = "a中\u{301}b".repeat(16).bytes()
+    var direct = new(8, 3, 2048)
+    var via = new(8, 3, 2048)
+    feed(mut direct, data)
+    feed(mut via, data)
+    assert(direct.history.records > 0 && direct.history.evicted == 0)
+    let text = logical_text(direct)
+    assert(resize(mut direct, 5, 4) == "")
+    assert(resize(mut via, 1, 3) == "")
+    assert(resize(mut via, 5, 4) == "")
+    same_ints(logical_text(direct), text)
+    same_ints(logical_text(via), text)
+    assert(dump(direct) == dump(via), "resize-retained-line-wrap-phase")
+    assert(via.history.evicted == 0)
+}
+
+fn test_saved_projection_and_background_paths() {
+    var saved = new(4, 4, 4096)
+    feed(mut saved, "A\r\nB\r\nC\r\nD\u{1b}[1;2H\u{1b}7\u{1b}[4;2H".bytes())
+    assert(resize(mut saved, 4, 1) == "")
+    assert(saved.saved_primary.row == 1)
+    assert(resize(mut saved, 4, 4) == "")
+    feed(mut saved, "\u{1b}8".bytes())
+    assert(saved.cursor_row == 1 && saved.cursor_col == 2, "resize-saved-regrow-anchor")
+    var moved = new(8, 2, 4096)
+    feed(mut moved, "abcdefghij\u{1b}[1;5H\u{1b}7\u{1b}[2;3H".bytes())
+    assert(resize(mut moved, 3, 4) == "")
+    feed(mut moved, "\u{1b}8".bytes())
+    assert(moved.cursor_row == 2 && moved.cursor_col == 2 && moved.primary.cells[4].base == 101, "resize-saved-logical-cell")
+    let data = "abc\u{1b}[44m\u{1b}[K\u{1b}[2;1Hq\u{1b}[3;4H\u{1b}[42m\u{1b}[X\u{1b}[1;2H".bytes()
+    var direct = new(8, 3, 4096)
+    var via = new(8, 3, 4096)
+    feed(mut direct, data)
+    feed(mut via, data)
+    assert(resize(mut direct, 6, 4) == "")
+    assert(resize(mut via, 3, 3) == "")
+    assert(resize(mut via, 6, 4) == "")
+    assert(dump(direct) == dump(via), "resize-background-paint-path")
+    assert(via.primary.cells[3].background == 4 && via.primary.cells[15].background == 2)
+    assert(via.primary.extents[2] == 0)
+}
+
 fn test_resize_peak_charge() {
     region frame(cap: 2097152) {
         var pane = new(8, 4, 1024)
@@ -232,6 +275,8 @@ fn main() -> int {
     test_projection_feed_commit_and_eviction()
     test_region_saved_cursor_and_incremental_parser()
     test_alternate_and_hidden_primary()
+    test_retained_logical_line_lookback()
+    test_saved_projection_and_background_paths()
     test_resize_peak_charge()
     0
 }
