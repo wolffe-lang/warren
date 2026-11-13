@@ -1,0 +1,4 @@
+//! member: false
+//! Native width-vector seam: one byte per code point, checked by the host row.
+use std.io
+fn main() -> int { io.write("0"); 0 }
