@@ -282,8 +282,9 @@ The list, with the document's section for each, is in the prediction
 | D8 | DEL inside an OSC title becomes `?` (`tests/vt/parser-reference/osc-del.in`, title `613f62`) | DEL is silently dropped, yielding title `6162` | titles are display text; dropping the control is cleaner than adding a visible question mark |
 | D9 | a pre-restore background reappears after saved-pen restore followed by 7/27; an RGB integer can become invalid palette 15540094 | keep the restored colour value and set form; 7/27 change only inverse | post-restore inverse colour-cache defect; minimal bytes and both observations in `wr01-the-emulator.md` |
 | D10 | a combining mark on an unwritten blank is visible in the full-cell print beyond extent 0; a complete canonical frame is inconsistent | the target cell is written and extends the extent; resize keeps it, with the existing no-left-cell drop rule at column1 | G6 and R1; six named report failures, two strict written-base controls |
+| D11 | exactly 350 assigned scalars differ from the adopted table; libc agrees with the reference on them | keep the explicit Unicode 15.1.0 rule; exact ranges, counts and all measured columns are in `wr01-the-emulator.md` | shared width policy is deferred; no std display-width API exists at this pin |
 
-Rows for D1 to D10 compare with written expectations, never with the
+Rows for D1 to D11 compare with written expectations, never with the
 reference, and a corpus stream that exercises one is compared under that
 divergence's name or not at all. D9 is scoped to the first SGR sequence after
 a restore that contains 7 or 27 with no separate colour SGR intervening;
@@ -393,12 +394,16 @@ One table, generated from the Unicode Character Database at a pinned
 version, decides w for every code point: 0 for combining marks (general
 categories Mn, Me), for U+200B to U+200F and the other default-ignorable
 format characters; 2 for East Asian Wide and Fullwidth and for the emoji
-presentation ranges; 1 otherwise. **Ruled:** the version is the one the
-reference's C library carries, so the two can agree; W1's first row sweeps
-every assigned code point through the reference (print it, read the cursor
-column) and records every disagreement by name. The client is told nothing
-about this table: an outer terminal with other width rules (PAX's console
-draws every code point in one cell) is the renderer's problem, not the grid's.
+presentation ranges; 1 otherwise. **Ruled:** keep Unicode 15.1.0's explicit
+rule for this change. The assigned-scalar sweep records exactly 350 differences
+from the reference and libc under D11; its exact-set gate rejects any new,
+missing or changed difference. The original intention to match the reference's
+C-library version is not a claim that these scalar policies agree. Pinned std
+has no display-width API; its padding is byte-counted. The measured std-unavailable,
+libc, reference and actual regional-indicator pair columns are in the main note.
+The client is told nothing about this table: an outer terminal with other width
+rules (PAX's console draws every code point in one cell) is the renderer's
+problem, not the grid's.
 
 ## 6. Scrollback and what it costs
 

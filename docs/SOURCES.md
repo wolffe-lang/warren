@@ -60,7 +60,19 @@ instead prepares an ignored version member from the single manifest field.
 - The pinned image's public libc `wcwidth`/`iswprint` ABI, called as a black
   box in `C.UTF-8`: glibc 2.39 accepts the 15.1 sample U+2FFC but rejects the
   16.0 sample U+1C89. This identity probe supports the pin; it is not the
-  complete assigned-scalar xterm sweep, which remains pending.
+  complete assigned-scalar sweep. That development sweep has since measured
+  all 287346 assigned scalars and named exactly 350 differences under D11.
+  Black-box glibc `wcwidth` calls for exactly those 350 agree with the reference;
+  `wcswidth` and reference CPR both measure the US/GB indicator pairs as two
+  cells, while actual warren input advances four. No libc source was opened.
+- wolf-std commit `77cf3210a82c93dc05ded987c249bb69e79b0a89`, documented
+  `std.str` header (through line 210) and `std.fmt` header (through line 45):
+  no display-width family exists at this pin; padding counts bytes, not terminal
+  columns. Full-file SHA-256 identities checked twice are respectively
+  `76cf9a66c029cbc092641da0db805d988ddb1293fc322bfe387ad1fea5fac856` and
+  `16062a3401432140a005bd055a01fea3319e612c29cc585824a1435ea1c3cdb3`.
+  Only those documented boundaries were consulted for the std comparison;
+  no absent function or substitute width measurement is invented.
 - The pinned wolf language specification's memory-model and types documents
   and public region conformance examples, for retained arena charges and
   affine region ownership. The replacement-storage witness does not infer

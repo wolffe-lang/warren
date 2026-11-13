@@ -210,6 +210,44 @@ queries report 47/1047/1049 all set, not independent bits. That expectation was
 corrected from the raw reference A replies, not the native frame; the failed
 take remains recorded.
 
+## D11: exhaustive width-policy differences
+
+The adopted Unicode 15.1.0 table is kept for this change. All 287346 assigned
+scalars were measured through reference CPRs; 65 Cc controls are separately
+classified, 286931 non-controls agree and exactly 350 differ. The actual native
+width vector matches the generated table at every scalar, not just these 350.
+The gate compares the entire disagreement set with `width-divergences.json`;
+a missing, additional or different result is red, including a 351st difference.
+
+| Group and exact ranges | Count | Warren | Pinned std | libc `wcwidth` | Reference |
+|---|---:|---:|---|---:|---:|
+| soft hyphen U+00AD | 1 | 0 | unavailable | 1 | 1 |
+| Hangul V/T U+1160–11FF, U+D7B0–D7C6, U+D7CB–D7FB | 232 | 1 | unavailable | 0 | 0 |
+| format controls U+FFF9–FFFB, U+13430–1343F | 19 | 1 | unavailable | 0 | 0 |
+| enclosed numbers U+3248–324F and hexagrams U+4DC0–4DFF | 72 | 1 | unavailable | 2 | 2 |
+| regional indicators U+1F1E6–1F1FF | 26 | 2 | unavailable | 1 | 1 |
+
+The C calls are black-box `wcwidth` in glibc 2.39 under `C.UTF-8` in the pinned
+Linux image. For all 350 scalars, libc and the reference agree against warren's
+explicit table. This is evidence for a later shared policy decision, not a
+silent table adjustment here. The complete measured columns and raw pair CPRs
+are retained in `tests/vt/reference/width-columns`.
+
+There is **no display-width function at pinned wolf-std commit
+`77cf3210a82c93dc05ded987c249bb69e79b0a89`**, so no function name or computed std
+column is invented. Its `std.str` documentation says there is no width family;
+`std.fmt` documents padding in **bytes**, not code points or terminal cells,
+and says a future display-width family will have its own name. Programs that
+calculate terminal-cell positions must therefore currently supply their own
+width policy rather than obtain it from this std pin. Warren's pinned table is
+a candidate for that future shared family.
+
+Two adjacent regional indicators were also measured as actual input, not merely
+summed in this note: the US pair U+1F1FA U+1F1F8 and GB pair U+1F1EC U+1F1E7 each
+advance **4** cells in warren, **2** in libc `wcswidth` and **2** in reference CPR.
+Warren's scalar-width rule does not join a flag pair into a grapheme. The std
+pair column remains unavailable.
+
 ## Grid follow-on resource checkpoint
 
 The following are measured constructor region charges at `7450229`, asserted
@@ -236,9 +274,19 @@ per configured slot plus 176 fixed bytes (`history_ledger_rows.lu`). No
 interpreter cap is raised and no default-8MiB interpreter pane is claimed.
 The separate 4096-byte feed smoke retains zero additional pane charge in
 both tiers. `copy_rows.lu` holds independent scalar Cell copies to zero
-allocation over 1024 turns in both tiers. The full 100000000-byte native
-feed/RSS witness is prepared, not yet run; small smoke timings do not stand
-in for it. At `7450229`, den's unseeded and seeded full interpreter replays
+allocation over 1024 turns in both tiers. The raw Linux development take at
+`4928447` then fed exactly 100000000 bytes with default 8388608-byte history:
+8388502 retained encoded bytes in 71089 records, 8656640 charged pane bytes,
+zero outer feed charge, and 2800 peak turn bytes. Feed time was 85895044091 ns
+(about 1.164 MB/s); whole-child wall time was 85905799135 ns. The small parent
+measured peak RSS 28377088 bytes, child pre-exec peak 131072 bytes and its own
+inherited peak 1863680 bytes separately, under the 6GiB container limit. This
+is an actual full VT/history workload, not the small parser-only timing or a
+claim that its original 5 MB/s parser prediction applies to this workload.
+These are development observations; the canonical final-head merge take is
+still required.
+
+At `7450229`, den's unseeded and seeded full interpreter replays
 both completed under the unchanged 50000000-step and memory limits, with the
 title-only proof and whole-screen comparison passing. They took roughly
 550 seconds each; this is not a claim of improved wall-clock throughput.
