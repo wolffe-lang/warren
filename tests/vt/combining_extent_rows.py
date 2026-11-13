@@ -19,10 +19,10 @@ def main():
         got = subprocess.run(original, input=prefix + body, capture_output=True, cwd=ROOT, timeout=30)
         assert got.returncode == 0 and not got.stderr
         frame = screen.loads(got.stdout.decode())
-        assert frame['rows'][0][3][1] == 'U+0020+U+0301', 'fixture must actually store a mark on an unwritten blank'
-        good = frame['extents'][0] == 4
+        assert frame['rows'][0][4][1] == 'U+0020+U+0301', 'fixture must actually store a mark at the addressed cell'
+        good = frame['extents'][0] == 5
         failed += not good
-        print('%s combining-unwritten-%s G6 extent=%d expected=4' %
+        print('%s combining-unwritten-%s G6 extent=%d expected=5' %
               ('PASS' if good else 'FAIL', label, frame['extents'][0]), flush=True)
     replay = b'warren-rec 1\nsize 12 2\no %d\n' % len(body) + body + b'\nr 6 4\n'
     got = subprocess.run(command + ['vt-dump', '--replay', '--history-bytes', '4096'], input=replay,

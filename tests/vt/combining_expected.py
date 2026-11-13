@@ -7,8 +7,8 @@ def expected(name):
     result = blank(cols, rows)
     result['title'] = b'probe'.hex()
     if name == 'column-zero':
-        # No cell exists to the left of column1: the existing printing rule
-        # drops the mark, including when the addressing parameter was zero.
+        result['rows'][0][0] = [1, 'U+0020+U+0301', '-']
+        result['extents'][0] = 1
         return result
     if name == 'wide-trailing-half':
         result['rows'][0][0] = [2, 'U+4E2D+U+0301', '-']
@@ -21,9 +21,9 @@ def expected(name):
         result['extents'][0] = 12
         result['cursor'].update(col=12, pending_wrap=1)
         return result
-    col, cursor = {'unwritten-primary': (4, 5), 'unwritten-alternate': (4, 5),
-                   'unwritten-resized': (4, 5), 'after-erase': (3, 4),
-                   'last-column-addressed': (11, 12)}[name]
+    col, cursor = {'unwritten-primary': (5, 5), 'unwritten-alternate': (5, 5),
+                   'unwritten-resized': (5, 5), 'after-erase': (4, 4),
+                   'last-column-addressed': (12, 12)}[name]
     result['rows'][0][col - 1] = [1, 'U+0020+U+0301', '-']
     result['extents'][0] = col
     result['cursor']['col'] = cursor
