@@ -1,5 +1,13 @@
 # Draft for wr01: the emulator's contract (W1)
 
+Current width amendment: D11 is withdrawn. The pinned Unicode 15.1.0 base table
+is overridden by the 350 stated exception scalars in `tests/vt/width-exceptions.json`,
+matching measured glibc 2.39 `wcwidth` and the reference. The exhaustive sweep
+requires zero non-control differences. Jamo/format exceptions of width zero
+attach as marks under section 2.3 and D10; regional indicators are width one,
+so a pair advances two. Earlier D11 text below is retained only as history and
+does not override this amendment.
+
 An outline for the lane that writes `src/vt`. It is exact where exactness
 decides whether two implementations agree: the parser's states, the grid's
 invariants, resize, and what scrollback costs. "Measured" means a census

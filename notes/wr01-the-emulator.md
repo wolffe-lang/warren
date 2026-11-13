@@ -1,5 +1,28 @@
 # The emulator
 
+## Current width rule
+
+D11 is withdrawn as a live divergence; its older measurements below are history.
+The rule is now the pinned Unicode 15.1.0 table with exactly these stated
+exception classes, chosen to agree with what C programs compute using measured
+glibc 2.39 `wcwidth` and the pinned reference:
+
+| Exception ranges | Count | Current scalar width |
+|---|---:|---:|
+| U+00AD | 1 | 1 |
+| U+1160–11FF, U+D7B0–D7C6, U+D7CB–D7FB | 232 | 0 |
+| U+FFF9–FFFB, U+13430–1343F | 19 | 0 |
+| U+3248–324F, U+4DC0–4DFF | 72 | 2 |
+| U+1F1E6–1F1FF | 26 | 1 |
+
+Two adjacent regional indicators therefore advance two cells. Zero-width jamo
+and format controls use the combining-mark attachment path, including D10 for
+an unwritten base. Reference cell observations and the regenerated native-vector
+and exhaustive sweep reruns are pending at this checkpoint. The sweep now
+requires zero non-control differences, not an allowance of 350; the existing
+351st-difference plants remain red. The ranges, counts, reason and generation
+binding are in `tests/vt/width-exceptions.json` and `width-ranges.json`.
+
 ## Forbidden
 
 The parser is written from the emulator contract and published terminal documents. No terminal emulator, multiplexer, terminal-parsing library, ncurses or kernel implementation is consulted. The reference programs are binaries only. The protocol, server and client are outside this change.
@@ -210,7 +233,7 @@ queries report 47/1047/1049 all set, not independent bits. That expectation was
 corrected from the raw reference A replies, not the native frame; the failed
 take remains recorded.
 
-## D11: exhaustive width-policy differences
+## Historical D11 measurements (withdrawn)
 
 The adopted Unicode 15.1.0 table is kept for this change. All 287346 assigned
 scalars were measured through reference CPRs; 65 Cc controls are separately

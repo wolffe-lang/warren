@@ -1,5 +1,19 @@
 # Grid slice directive
 
+## Replacement width directive
+
+The owner withdrew interim D11. Red-first rows at `e1620a7` now require the
+350 measured C-library exception scalars (five classes, ranges/counts/reasons
+in `width-exceptions.json`) and a zero-difference assigned sweep outside Cc.
+Native assertion134 and both Python policy rows were observed red before the
+generator was changed. The generator now overrides exactly350 scalars and
+binds the exception data by digest; every other scalar is unchanged. Next:
+observe regenerated native/checked/interpreter rows, the actual full width
+vector, reference jamo/format attachment cells and the exhaustive zero-difference
+sweep; retain D11 only as historical measurement. Existing source frames must
+be rerun before the final canonical recorder take. The two erase extent cases
+54/175 remain separate and no erasure policy has been changed for them.
+
 This follow-on preserves the initial grid work begun from parser head
 `d966f49` and now runs on `wr01-grid` from merged parser trunk `2bb72fab`.
 It is not a claim that the remaining W1 gates have passed.
