@@ -80,7 +80,31 @@ fn test_bounded_unicode_feed() {
     }
 }
 
+fn test_output_pair_rendition_and_extent() {
+    var tail = vt.new(12, 4, 0)
+    vt.feed(mut tail, "\u{1b}[?7l\u{1b}[2;8;9;45m\u{1b}[11G中\u{1b}[0;42m\u{1b}[12GX".bytes())
+    assert(tail.primary.cells[10].base == 32 && tail.primary.cells[10].width == 1)
+    assert(tail.primary.cells[10].flags == 386 && tail.primary.cells[10].foreground == 0 - 1 &&
+        tail.primary.cells[10].background == 5, "printing-wide-tail-keeps-lead-rendition")
+    var lead = vt.new(12, 4, 0)
+    vt.feed(mut lead, "\u{1b}[?7l\u{1b}[2;8;9;45m\u{1b}[11G中\u{1b}[11GX".bytes())
+    assert(lead.primary.extents[0] == 11 && !lead.primary.cells[11].written,
+        "printing-wide-lead-clears-lost-tail-extent")
+    pairs(tail.primary, 12, 4)
+    pairs(lead.primary, 12, 4)
+}
+
+fn test_deleted_orphan_is_unwritten() {
+    var pane = vt.new(12, 4, 0)
+    vt.feed(mut pane, "\u{1b}[?7l\u{1b}[2;8;9;45m\u{1b}[11G中\u{1b}[0;42m\u{1b}[12G\u{1b}[P".bytes())
+    assert(pane.primary.extents[0] == 0 && !pane.primary.cells[10].written,
+        "deleted-wide-tail-erases-orphan-lead-writtenness")
+    pairs(pane.primary, 12, 4)
+}
+
 fn main() -> int {
+    test_output_pair_rendition_and_extent()
+    test_deleted_orphan_is_unwritten()
     test_printing()
     test_pair_repair()
     test_bounded_unicode_feed()
