@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 ENTRIES = ('vt_grid_test', 'vt_unicode_test', 'vt_ops_test', 'vt_screen_state_test',
            'vt_graphics_test', 'vt_events_test', 'vt_dump_test', 'vt_width_test',
            'vt_history_checked_semantics', 'vt_history_checked_allocation', 'vt_history_checked_chunking',
-           'vt_resize_test', 'vt_interaction_test')
+           'vt_resize_test', 'vt_interaction_test', 'vt_scalar_test')
 
 
 def validate(record, pin):

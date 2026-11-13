@@ -1,0 +1,17 @@
+//! member: false
+//! Named scalar-value plant row; the native prefix witness uses the same bytes.
+use vt
+use std.io
+
+fn test_scalar_value() {
+    var pane = vt.new(8, 2, 0)
+    vt.feed(mut pane, "AZZ".bytes())
+    assert(pane.primary.cells[0].base == 65 && pane.primary.cells[1].base == 90 && pane.primary.cells[2].base == 90,
+        "vt-scalar-value")
+}
+
+fn main() -> int {
+    test_scalar_value()
+    io.write_line("PASS vt-scalar-value")
+    0
+}
