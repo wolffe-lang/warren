@@ -82,6 +82,7 @@ step tier-planner python3 -I ci/tiers-test.py
 step harness-mutations python3 -I tools/oracle/run.py selftest tests/vt/expected/*.screen
 step fuzz-generator fuzz_generator
 step fresh-fuzz-drive-rows python3 -I tests/vt/fresh_fuzz_rows.py
+step fresh-reference-bound-rows python3 -I tests/vt/fresh_expectation_rows.py
 step canonical-rig-rows python3 -I tests/vt/rig_rows.py
 step corpus-digests corpus_digests
 [ "$mode" != unit ] || exit 0

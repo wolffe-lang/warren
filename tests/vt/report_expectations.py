@@ -36,7 +36,7 @@ def recompose_no_bold(name,background_reference,no_bold_reference):
                 assert 'bold' in before, ('foreground changed on a nonbold cell',r+1,c+1)
                 assert old_fg and new_fg and old_fg.startswith('fg=idx:') and new_fg.startswith('fg=idx:')
                 old_index,new_index=int(old_fg[7:]),int(new_fg[7:])
-                assert 0<=old_index<16 and 0<=new_index<16 and old_index^new_index==8
+                assert 0 <= old_index < 8 and 8 <= new_index < 16 and old_index ^ new_index == 8
                 without=replace_foreground(without,new_fg)
                 recomposed['rows'][r][c][2]=','.join(replace_foreground(before,new_fg))
                 changed.add((r+1,c+1))
