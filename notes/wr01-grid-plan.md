@@ -91,9 +91,10 @@ stable-ID assignment and the path-independent reflow source remain pending.
 
 ## Feed integration continuation
 
-Framing, run encoding/reading and bounded fragment/counter rows now exist;
-none is wired into Vt yet. The next coherent step adds row metadata for a
-stable logical-line ID and start offset, plus a primary-screen monotonic ID
+Framing, run encoding/reading and bounded fragment/counter rows now exist.
+The constructor seam allocates Vt's fixed ring and row metadata, but screen
+removals are not wired into history yet. The next coherent step connects
+stable logical-line IDs and start offsets to a primary-screen monotonic ID
 allocator. A physical row may produce one or more encoded fragments;
 fragments need not be maximal, and no fragment boundary is a logical newline.
 This permits appending the row leaving the top directly, without rewriting

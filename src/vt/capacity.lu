@@ -30,9 +30,15 @@ fn ensure_screen_capacity(mut screen: Screen, cells: int, rows: int) {
         let capacity = grown_capacity(screen.extents.len, rows)
         (mut screen.extents).reserve(capacity)
         (mut screen.wrapped).reserve(capacity)
+        (mut screen.line_ids).reserve(capacity)
+        (mut screen.line_offsets).reserve(capacity)
+        (mut screen.overflow_ids).reserve(capacity)
         while screen.extents.len < capacity {
             (mut screen.extents).push(0)
             (mut screen.wrapped).push(false)
+            (mut screen.line_ids).push(0 - 1)
+            (mut screen.line_offsets).push(0)
+            (mut screen.overflow_ids).push(0 - 1)
         }
     }
 }

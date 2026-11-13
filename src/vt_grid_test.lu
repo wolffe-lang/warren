@@ -28,7 +28,7 @@ fn test_rectangular() {
 }
 
 fn test_tabs_and_ownership() {
-    var pane = vt.new(20, 2, 8388608)
+    var pane = vt.new(20, 2, 4096)
     assert(pane.tabs.len == 20 && pane.default_tabs)
     var i = 0
     while i < 20 {
@@ -39,7 +39,7 @@ fn test_tabs_and_ownership() {
     pane.primary.extents[0] = 1
     assert(pane.alternate.cells[0].base == 32 && pane.alternate.extents[0] == 0, "grid-screen-ownership")
     assert(pane.pen.flags == 0 && pane.modes.autowrap && !pane.modes.origin)
-    assert(pane.scrollback_cap_bytes == 8388608)
+    assert(pane.scrollback_cap_bytes == 4096)
 }
 
 fn test_one_row() {
@@ -52,17 +52,17 @@ fn test_one_row() {
 fn test_constructor_charge() {
     region small(cap: 16777216) {
         let before = budget.charged(small)
-        let pane = vt.new(80, 24, 8388608)
+        let pane = vt.new(80, 24, 0)
         let charge = budget.charged(small) - before
         assert(pane.primary.cells.len == 1920 && pane.alternate.cells.len == 1920)
-        io.write_line("MEASURE grid-constructor cols=80 rows=24 history-cap=8388608 charged={charge}")
+        io.write_line("MEASURE grid-constructor cols=80 rows=24 history-cap=0 charged={charge}")
     }
     region large(cap: 67108864) {
         let before = budget.charged(large)
-        let pane = vt.new(320, 90, 8388608)
+        let pane = vt.new(320, 90, 0)
         let charge = budget.charged(large) - before
         assert(pane.primary.cells.len == 28800 && pane.alternate.cells.len == 28800)
-        io.write_line("MEASURE grid-constructor cols=320 rows=90 history-cap=8388608 charged={charge}")
+        io.write_line("MEASURE grid-constructor cols=320 rows=90 history-cap=0 charged={charge}")
     }
 }
 
