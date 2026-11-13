@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "unicode": "15.1.0",
+  "total": 350,
+  "rule": "Pinned Unicode table with measured C-library exception classes",
+  "groups": [
+    {"name":"soft-hyphen","ranges":[["00AD","00AD"]],"unicode_width":0,"width":1,"count":1,"reason":"Agreement with measured glibc 2.39 wcwidth and xterm 390"},
+    {"name":"hangul-v-t-jamo","ranges":[["1160","11FF"],["D7B0","D7C6"],["D7CB","D7FB"]],"unicode_width":1,"width":0,"count":232,"reason":"Agreement with measured glibc 2.39 wcwidth and xterm 390; zero-width components attach as marks"},
+    {"name":"format-controls","ranges":[["FFF9","FFFB"],["13430","1343F"]],"unicode_width":1,"width":0,"count":19,"reason":"Agreement with measured glibc 2.39 wcwidth and xterm 390; zero-width controls attach as marks"},
+    {"name":"enclosed-numbers-and-hexagrams","ranges":[["3248","324F"],["4DC0","4DFF"]],"unicode_width":1,"width":2,"count":72,"reason":"Agreement with measured glibc 2.39 wcwidth and xterm 390"},
+    {"name":"regional-indicators","ranges":[["1F1E6","1F1FF"]],"unicode_width":2,"width":1,"count":26,"reason":"Agreement with measured glibc 2.39 wcwidth and xterm 390; two adjacent indicators advance two cells"}
+  ]
+}

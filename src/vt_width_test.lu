@@ -7,13 +7,32 @@ fn test_width_properties() {
     assert(vt.scalar_width(65) == 1 && vt.scalar_width(32) == 1)
     assert(vt.scalar_width(20013) == 2, "vt-width-cjk")
     assert(vt.scalar_width(0xD55C) == 2 && vt.scalar_width(0xFF21) == 2)
-    assert(vt.scalar_width(0x1F600) == 2 && vt.scalar_width(0x1F1E6) == 2)
+    assert(vt.scalar_width(0x1F600) == 2 && vt.scalar_width(0x1F1E6) == 1)
     assert(vt.scalar_width(0x2764) == 1)
     assert(vt.scalar_width(0x0301) == 0 && vt.scalar_width(0x20D7) == 0)
     assert(vt.scalar_width(0xFE0F) == 0 && vt.scalar_width(0xE0100) == 0)
     assert(vt.scalar_width(0x200B) == 0 && vt.scalar_width(0x200D) == 0)
-    assert(vt.scalar_width(0x00AD) == 0)
+    assert(vt.scalar_width(0x00AD) == 1)
     assert(vt.scalar_width(0 - 1) == 1 && vt.scalar_width(0x110000) == 1)
 }
 
-fn main() -> int { test_width_properties(); 0 }
+fn test_measured_libc_exception_classes() {
+    var cp = 0x1160
+    while cp <= 0x11FF { assert(vt.scalar_width(cp) == 0, "width-hangul-v-t"); cp += 1 }
+    cp = 0xD7B0
+    while cp <= 0xD7C6 { assert(vt.scalar_width(cp) == 0); cp += 1 }
+    cp = 0xD7CB
+    while cp <= 0xD7FB { assert(vt.scalar_width(cp) == 0); cp += 1 }
+    cp = 0xFFF9
+    while cp <= 0xFFFB { assert(vt.scalar_width(cp) == 0, "width-format-controls"); cp += 1 }
+    cp = 0x13430
+    while cp <= 0x1343F { assert(vt.scalar_width(cp) == 0); cp += 1 }
+    cp = 0x3248
+    while cp <= 0x324F { assert(vt.scalar_width(cp) == 2, "width-enclosed-numbers"); cp += 1 }
+    cp = 0x4DC0
+    while cp <= 0x4DFF { assert(vt.scalar_width(cp) == 2, "width-hexagrams"); cp += 1 }
+    cp = 0x1F1E6
+    while cp <= 0x1F1FF { assert(vt.scalar_width(cp) == 1, "width-regional-indicators"); cp += 1 }
+}
+
+fn main() -> int { test_width_properties(); test_measured_libc_exception_classes(); 0 }
