@@ -25,7 +25,7 @@ pub fn measure(bytes: int, history_cap: int) -> int {
         let retained = budget.charged(measured) - before
         let stable = budget.charged(measured)
         var fed = 0
-        var elapsed = 0
+        var elapsed: int = 0
         var peak_turn = 0
         var report = 0
         while fed < bytes {
