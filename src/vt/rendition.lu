@@ -54,8 +54,13 @@ fn apply_sgr(mut pane: Vt) {
         if pane.parser.subs[i] > 1 {
             if code == 4 {
                 let style = sgr_sub(pane.parser, i, 1)
-                if style == 0 { pen_flag(mut pane.pen, 8, false) }
-                else if style >= 1 && style <= 5 { pen_flag(mut pane.pen, 8, true) }
+                if style == 0 {
+                    pen_flag(mut pane.pen, 8, false)
+                    pen_flag(mut pane.pen, 16, false)
+                } else if style >= 1 && style <= 5 {
+                    pen_flag(mut pane.pen, 16, false)
+                    pen_flag(mut pane.pen, 8, true)
+                }
             } else if code == 38 || code == 48 || code == 58 {
                 let form = sgr_sub(pane.parser, i, 1)
                 if form == 5 {
@@ -112,6 +117,8 @@ fn apply_sgr(mut pane: Vt) {
             pen_flag(mut pane.pen, 256, false)
         } else {
             let bit = sgr_flag(code)
+            if code == 4 { pen_flag(mut pane.pen, 16, false) }
+            if code == 21 { pen_flag(mut pane.pen, 8, false) }
             if bit > 0 { pen_flag(mut pane.pen, bit, true) }
         }
         i += consumed
