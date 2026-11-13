@@ -1,0 +1,79 @@
+//! member: true
+//! Tab editing, explicit scrolling and index operations.
+
+fn tab_forward(mut pane: Vt, count: int, clear_wrap: bool) {
+    if clear_wrap { pane.pending_wrap = false }
+    var remaining = count
+    while remaining > 0 && pane.cursor_col < pane.cols {
+        var col = pane.cursor_col + 1
+        while col < pane.cols && !pane.tabs[col - 1] { col += 1 }
+        pane.cursor_col = col
+        remaining -= 1
+    }
+}
+
+fn tab_backward(mut pane: Vt, count: int) {
+    pane.pending_wrap = false
+    var remaining = count
+    while remaining > 0 && pane.cursor_col > 1 {
+        var col = pane.cursor_col - 1
+        while col > 1 && !pane.tabs[col - 1] { col -= 1 }
+        pane.cursor_col = col
+        remaining -= 1
+    }
+}
+
+fn clear_line_wrap(mut pane: Vt) {
+    if pane.active_alternate { pane.alternate.wrapped[pane.cursor_row - 1] = false }
+    else { pane.primary.wrapped[pane.cursor_row - 1] = false }
+}
+
+fn reverse_index(mut pane: Vt) {
+    pane.pending_wrap = false
+    if pane.cursor_row == pane.region_top {
+        if pane.active_alternate {
+            shift_lines(mut pane.alternate, pane.cols, pane.region_top, pane.region_bottom, 1, pane.pen.background, true)
+        } else {
+            shift_lines(mut pane.primary, pane.cols, pane.region_top, pane.region_bottom, 1, pane.pen.background, true)
+        }
+    } else if pane.cursor_row > 1 { pane.cursor_row -= 1 }
+}
+
+fn dispatch_escape(mut pane: Vt, final: int) {
+    if pane.parser.inter_count != 0 { return }
+    if final == 68 || final == 69 {
+        clear_line_wrap(mut pane)
+        index_line(mut pane)
+        if final == 69 { pane.cursor_col = 1 }
+    } else if final == 77 { reverse_index(mut pane) }
+    else if final == 72 {
+        pane.tabs[pane.cursor_col - 1] = true
+        pane.default_tabs = false
+    }
+}
+
+fn dispatch_tab_or_scroll(mut pane: Vt, final: int) {
+    if pane.parser.param_count > 1 { return }
+    let amount = grid_param(pane.parser, 0, 1, true)
+    if final == 73 { tab_forward(mut pane, amount, true) }
+    else if final == 90 { tab_backward(mut pane, amount) }
+    else if final == 103 {
+        let mode = grid_param(pane.parser, 0, 0, false)
+        if mode == 0 {
+            pane.tabs[pane.cursor_col - 1] = false
+            pane.default_tabs = false
+        } else if mode == 3 {
+            var col = 0
+            while col < pane.cols { pane.tabs[col] = false; col += 1 }
+            pane.default_tabs = false
+        }
+    } else {
+        if pane.active_alternate {
+            shift_lines(mut pane.alternate, pane.cols, pane.region_top, pane.region_bottom,
+                amount, pane.pen.background, final == 84)
+        } else {
+            shift_lines(mut pane.primary, pane.cols, pane.region_top, pane.region_bottom,
+                amount, pane.pen.background, final == 84)
+        }
+    }
+}

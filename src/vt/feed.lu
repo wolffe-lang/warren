@@ -148,14 +148,9 @@ fn execute_c0(mut pane: Vt, cp: int) {
     else if cp == 8 {
         pane.pending_wrap = false
         if pane.cursor_col > 1 { pane.cursor_col -= 1 }
-    } else if cp == 9 {
-        var col = pane.cursor_col + 1
-        while col < pane.cols && !pane.tabs[col - 1] { col += 1 }
-        if col > pane.cols { col = pane.cols }
-        pane.cursor_col = col
+    } else if cp == 9 { tab_forward(mut pane, 1, false)
     } else if cp == 10 || cp == 11 || cp == 12 {
-        if pane.active_alternate { pane.alternate.wrapped[pane.cursor_row - 1] = false }
-        else { pane.primary.wrapped[pane.cursor_row - 1] = false }
+        clear_line_wrap(mut pane)
         index_line(mut pane)
         if pane.modes.newline { pane.cursor_col = 1 }
     } else if cp == 13 {
@@ -167,6 +162,7 @@ fn execute_c0(mut pane: Vt, cp: int) {
 fn dispatch_grid_token(mut pane: Vt, kind: int, value: int) {
     if kind == 1 { print_scalar(mut pane, value) }
     else if kind == 2 { execute_c0(mut pane, value) }
+    else if kind == 3 { dispatch_escape(mut pane, value) }
     else if kind == 4 { dispatch_csi(mut pane, value) }
     else if kind == 5 { dispatch_osc(mut pane) }
 }
