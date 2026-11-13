@@ -60,6 +60,7 @@ step d9-reference python3 -I tools/vt/check_d9.py
 step combining-reference python3 -I tools/vt/check_combining.py
 step d9-background-fixture python3 -I tests/vt/background_fixture_rows.py
 step d9-bounds python3 -I tests/vt/d9_bound_rows.py
+step origin-fixture-rows python3 -I tests/vt/origin_fixture_rows.py
 step report-forms python3 -I tests/vt/report_form_rows.py
 step prefix-tool-rows python3 -I tests/vt/prefix_tool_rows.py
 step assigned-scalar-rows python3 -I tests/vt/assigned_rows.py

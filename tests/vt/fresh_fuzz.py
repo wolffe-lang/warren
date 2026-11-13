@@ -53,6 +53,7 @@ def main():
     sys.path.insert(0, str(ROOT / 'tests/vt'))
     import run as oracle
     import screen
+    from origin_fixture import dump as reference_dump
     from chunking_suite import events, encode as chunk_encode
     from corpus_properties import encode as property_encode, observe as property_observe
     sys.path.insert(0, str(ROOT / 'tools/vt'))
@@ -78,8 +79,9 @@ def main():
             written = None
             repaired = None
             try:
-                reference = oracle.dump(display, source.resolve(), 80, 24, (work / 'reference').resolve())
+                reference = reference_dump(display, source.resolve(), 80, 24, (work / 'reference').resolve())
                 (work / 'reference.screen').write_text(screen.dumps(reference))
+                entry['reference_report_divergences'] = ['D12'] if (work / 'reference/D12.json').exists() else []
                 written = copy.deepcopy(reference)
                 assert written['modes']['synchronized-output'] == '?'
                 modes = re.findall(rb'\x1b\[\?2026([hl])', data)
@@ -90,7 +92,7 @@ def main():
                 if injections:
                     fixed = work / 'background-repaired.in'
                     fixed.write_bytes(repaired_input)
-                    repaired = oracle.dump(display, fixed.resolve(), 80, 24, (work / 'repaired-reference').resolve())
+                    repaired = reference_dump(display, fixed.resolve(), 80, 24, (work / 'repaired-reference').resolve())
                     (work / 'background-repaired-reference.screen').write_text(screen.dumps(repaired))
                     # Evidence, not an automatic D9 disposition: the original
                     # complete comparison below still fails on every difference.
