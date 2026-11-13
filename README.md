@@ -5,7 +5,7 @@ for PAX first, and measured on x86-64 Linux and macOS arm64 from the first
 pull request. It takes its ideas from tmux, zellij and herdr, and none of
 their code.
 
-**Status: the map, pure terminal core in progress and protocol v1 codec.
+**Status: a pure terminal core and protocol v1 codec, with a diagnostic CLI.
 No working multiplexer is implemented yet.** The repository holds the pins,
 tiered CI, a pinned reference emulator with a cell-for-cell harness, a survey,
 recorded corpus, and reference contracts for the emulator and protocol.
@@ -15,15 +15,18 @@ under lupin. The initial grid serves Unicode widths/combining marks, wide-pair
 repair, cursor/erase/edit/SGR, tabs/index/scroll operations, saved cursors,
 alternate-screen/reset/DEC-graphics/REP/alignment controls, bounded events,
 query answers, deterministic dumps, bounded primary-history retention and
-resize/reflow. Resize rows cover content/path independence, projected and
-saved cursors, wide/combining glyphs, alternate screens and retained-capacity
-plateaus on native and lupin. `warren vt-dump` accepts raw stdin/files and
-explicit recording replay. The 188 frozen corpus streams have complete-frame
-native comparisons under named policies, bytewise/random feed boundaries and
-primary resize properties. Reference-report limitations are explicit, never
-ignored fields or strict agreement. Fresh fuzz, the assigned-scalar width sweep
-and the complete resource/platform evidence are still being evaluated; W1 is
-not complete.
+resize/reflow. Combining marks use a measured shared anchor, including
+current-cell fallback at the first column. The width table is Unicode 15.1 with
+explicit C-library-compatible exceptions; indicator pairs advance two cells.
+Resize rows cover content/path independence, projected and
+saved cursors, wide/combining glyphs, erased colour bars, alternate screens and
+retained-capacity plateaus on native and lupin. `warren vt-dump` accepts raw
+stdin/files and explicit recording replay. The gates compare 188 frozen corpus
+streams, 113 measured anchor frames and live 200/5000-seed profiles with
+bytewise/random feed boundaries and primary resize properties. Reference-report
+limitations are explicit, never ignored fields or strict agreement. Assigned
+scalar widths, actual 100 MB history retention and platform records have separate
+measurement entries; PAX replay remains unavailable without a boot fixture.
 `src/proto` implements bounded transport framing, message validation/encoding,
 fragment assembly and connection-wide image acknowledgement sequencing;
 [PROTOCOL](docs/PROTOCOL.md) fixes the bytes and [SERVER](docs/SERVER.md) is
@@ -60,7 +63,7 @@ implemented diagnostic command.
 | Milestone | What | State |
 |---|---|---|
 | W0 | the map: pins, CI, the oracle, the survey, the prediction | in progress |
-| W1 | the emulator | pure core/history/reflow, diagnostic CLI and frozen full-frame comparisons; final measurements pending |
+| W1 | the emulator | pure core/history/reflow, diagnostic CLI and full-frame/property gates |
 | W2 | one pane; detach and attach | pure protocol codec and server contract; I/O planned |
 | W3 | panes, tabs, the bar, keys | planned |
 | W4 | mouse, scrollback, copy | planned |
@@ -118,12 +121,14 @@ printed text and titles: sixteen agree and one uses the named D8 policy
 (DEL is dropped from a title, rather than changed to `?`). The other two
 measure a one-row region. Those parser projections are not whole-screen
 comparisons. Current whole-frame comparisons cover eight cases, 151 census
-streams and five recordings, plus the frozen 32-seed baseline. D1–D10 and
-source-proved report limits are separately named; repaired-reference D9 frames
-and D10's failed raw reports never become candidate-derived goldens. The new
-Linux drive records 200 fresh requested-4KiB streams with bytewise/random P2
-and primary content/rendition/resize-path checks; the nightly profile uses
-5000 seeds. The complete assigned-scalar width sweep remains separate evidence.
+streams and five recordings, plus the frozen 32-seed baseline. Named divergences
+and source-triggered report limits have complete-frame fixtures; repaired D9/D13
+reference inputs and D10's failed raw reports never become candidate-derived
+goldens. The Linux drive records 200 requested-4KiB streams with bytewise/random
+P2 and primary content/rendition/resize-path checks; the nightly profile uses
+5000 seeds. Each rule records its source triggers, permitted field deltas and
+case counts; an unexplained difference remains red. The assigned-scalar width
+sweep permits zero non-control differences.
 The finite hostile row uses capped
 regions, and the measurement entry reports retained region charge and feed
 rate separately from process startup. The [emulator contract](notes/wr00-draft-wr01-emulator.md)

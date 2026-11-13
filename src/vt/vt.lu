@@ -1,8 +1,8 @@
 //! member: true
 //! The emulator: escape-sequence parser, cell grid and scrollback.
 //!
-//! The pane value, grid and scrollback remain stubs. `parser.lu` implements
-//! the incremental decoder and sequence parser independently of the grid.
+//! Incremental parsing, bounded pane storage, history and resize are pure.
+//! The diagnostic command supplies I/O outside this module.
 
 /// The milestone that fills this module in.
 pub fn milestone() -> str {
