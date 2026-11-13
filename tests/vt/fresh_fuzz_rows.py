@@ -6,7 +6,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'tests/vt'))
 sys.path.insert(0, str(ROOT / 'tools/corpus'))
-from fresh_fuzz import generated, profile_settings
+from fresh_fuzz import generated, profile_settings, select_cases
 import fuzz
 
 
@@ -25,6 +25,15 @@ def main():
         assert name == 'fresh-%04d' % seed and data == fuzz.stream(seed, 4096)
         assert len(data) >= 4096
     assert generated(2, 1024) == generated(2, 1024)
+    assert select_cases(cases, None) == cases
+    assert list(select_cases(cases, ['fresh-0015', 'fresh-0032'])) == ['fresh-0015', 'fresh-0032']
+    for selection in (['fresh-0015', 'fresh-0015'], ['fresh-0201'], ['unknown']):
+        try:
+            select_cases(cases, selection)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError('duplicate or unknown diagnostic selection accepted')
     assert len(generated(5000, 64)) == 5000
     for count, size in ((0, 4096), (5001, 4096), (200, 0), (1, 65537)):
         try:
