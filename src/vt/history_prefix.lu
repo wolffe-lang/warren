@@ -1,16 +1,52 @@
 //! member: true
-//! Encoded-prefix slice seams for a viewport starting inside a fragment.
+//! Whole-glyph encoded-prefix slices for a viewport inside a fragment.
 
 fn history_prefix_span(mut reader: HistoryReader, source: History, at: int, cells: int) -> int {
-    assert(source.records > 0 && at >= 0 && cells >= 0)
-    reader.value = 0
-    0
+    assert(cells >= 0)
+    let body_length = history_get_word(source, at, 0, 4) - 24
+    assert(body_length >= 0 && body_length < 16777216, "reflow-prefix-span-bound")
+    history_reader_start(mut reader, source, at)
+    var logical: int = 0
+    var last_run: int = 0 - 1
+    while reader.remaining > 0 {
+        let consumed = body_length - reader.remaining
+        let new_run = reader.run_left == 0
+        assert(history_reader_next(mut reader, source))
+        if reader.kind == 0 {
+            let width = scalar_width(reader.value)
+            if width > 0 {
+                if logical >= cells || logical + width > cells {
+                    // Pack two bounded scalar offsets, not an allocated
+                    // result record. A cut inside a wide glyph rounds down.
+                    return consumed * 16777216 + last_run + 1
+                }
+                logical += width
+            }
+        }
+        // Marks on the last included base and its following background
+        // paint stay in the prefix, even at the logical content boundary.
+        if new_run { last_run = 24 + consumed }
+    }
+    assert(last_run + 1 < 16777216)
+    body_length * 16777216 + last_run + 1
 }
 
 fn history_copy_prefix(mut destination: History, source: History, at: int,
         cells: int, mut reader: HistoryReader) -> int {
-    assert(source.records > 0 && at >= 0 && cells >= 0)
-    reader.value = 0
-    destination.used = destination.used
-    0
+    let span = history_prefix_span(mut reader, source, at, cells)
+    let body_length = span / 16777216
+    let last_run = span % 16777216 - 1
+    if body_length == 0 { return 0 }
+    assert(last_run >= 24 && last_run + 12 < body_length + 24)
+    let id = history_get_word(source, at, 8, 8)
+    let offset = history_get_word(source, at, 16, 4)
+    let target = history_reserve(mut destination, id, offset, body_length)
+    if target < 0 { return 0 }
+    var i = 24
+    while i < body_length + 24 {
+        destination.bytes[(target + i) % destination.bytes.len] = source.bytes[(at + i) % source.bytes.len]
+        i += 1
+    }
+    history_put_word(mut destination, target, last_run, 4, body_length + 24 - last_run - 12)
+    1
 }
