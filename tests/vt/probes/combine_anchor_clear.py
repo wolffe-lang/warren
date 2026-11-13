@@ -52,6 +52,20 @@ def cases():
     return result
 
 
+def followup_cases():
+    bodies = {'bs-then-ht': b'\b\t', 'cub0-then-ht': C + b'0D\t', 'cub1-then-ht': C + b'1D\t',
+              'su-then-ht': C + b'S\t', 'sd-then-ht': C + b'T\t',
+              'ind-then-ht': E + b'D\t', 'nel-then-ht': E + b'E\t', 'ri-then-ht': E + b'M\t',
+              'ich-then-ht': C + b'@\t', 'dch-then-ht': C + b'P\t',
+              'alt1047-roundtrip': C + b'?1047h' + C + b'?1047l',
+              'cup-new-style': C + b'1;5H' + C + b'1;31;45m',
+              'cr-new-style': b'\r' + C + b'1;31;45m'}
+    result = {name: ([('o', HEAD + b'abcd' + body)], 12, 4) for name, body in bodies.items()}
+    result['resize-wrapped-anchor'] = ([('o', HEAD + b'abcdefghijklmnop'), ('r', 6, 8)], 12, 4)
+    assert len(result) == 14
+    return result
+
+
 def encode(events, cols, rows):
     result = bytearray(b'warren-rec 1\nsize %d %d\n' % (cols, rows))
     for event in events + [('o', MARK)]:
@@ -62,13 +76,14 @@ def encode(events, cols, rows):
     return bytes(result)
 
 
-def status_inner(out):
+def status_inner(out, followups=False):
     old = termios.tcgetattr(0)
     records = {}
     try:
         tty.setraw(0)
         terminal = Tty(20)
-        for name, (events, cols, rows) in cases().items():
+        selected = followup_cases() if followups else cases()
+        for name, (events, cols, rows) in selected.items():
             replay(terminal, [('r', cols, rows), ('o', E + b'c')] + events)
             terminal.sync()
             before = {'cpr_hex': terminal.ask(C + b'6n', b'R').hex(),
@@ -91,25 +106,32 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--status-inner', action='store_true', help=argparse.SUPPRESS)
+    parser.add_argument('--followups', action='store_true')
     args = parser.parse_args()
+    followups = args.followups
     if args.status_inner:
-        return status_inner(args.out)
+        return status_inner(args.out, followups)
     args.out.mkdir(parents=True, exist_ok=False)
-    manifest = {'schema': 1, 'frame_count': 34, 'terminal_process_budget': 69, 'cases': {}, 'errors': []}
-    print('BUNDLE raw-frames=34 status-processes=1 terminal-processes-at-most=69 CPR-queries=68 DECCIR-queries=68', flush=True)
+    count = 14 if followups else 34
+    manifest = {'schema': 1, 'frame_count': count, 'terminal_process_budget': 2 * count + 1, 'cases': {}, 'errors': []}
+    print('BUNDLE raw-frames=%d status-processes=1 terminal-processes-at-most=%d CPR-queries=%d DECCIR-queries=%d' %
+          (count, 2 * count + 1, 2 * count, 2 * count), flush=True)
     with oracle.Display() as display:
         status = args.out / 'status.json'
         command = ['xterm', '-u8', '-geometry', '12x4', '-fn', 'fixed']
         for key, value in oracle.RESOURCES.items():
             command += ['-xrm', 'XTerm*%s: %s' % (key, value)]
         command += ['-e', sys.executable, '-I', str(Path(__file__).resolve()), '--status-inner', '--out', str(status.resolve())]
+        if followups:
+            command += ['--followups']
         env = {'DISPLAY': display.name, 'LC_ALL': 'C.UTF-8', 'PATH': os.environ['PATH'],
                'HOME': str(args.out.resolve()), 'TERM': 'xterm-256color'}
         done = subprocess.run(command, env=env, capture_output=True, timeout=180)
         assert done.returncode == 0 and status.exists(), (done.returncode, done.stderr[-500:])
         statuses = json.loads(status.read_text())
         assert 'error' not in statuses, statuses
-        for name, (events, cols, rows) in cases().items():
+        selected = followup_cases() if followups else cases()
+        for name, (events, cols, rows) in selected.items():
             data = encode(events, cols, rows)
             path = args.out / (name + '.rec')
             path.write_bytes(data)
@@ -140,7 +162,7 @@ def main():
                 print('MEASURE-ERROR', name, str(error), flush=True)
             manifest['cases'][name] = entry
             (args.out / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
-    print('MEASUREMENTS cases=34 errors=%d' % len(manifest['errors']), flush=True)
+    print('MEASUREMENTS cases=%d errors=%d' % (count, len(manifest['errors'])), flush=True)
     return bool(manifest['errors'])
 
 
