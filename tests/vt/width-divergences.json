@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "unicode": "15.1.0",
+  "assigned_scalars": 287346,
+  "controls": 65,
+  "divergence": "D11",
+  "total": 350,
+  "groups": [
+    {"name": "soft-hyphen", "category": "Cf", "ranges": [["00AD", "00AD"]], "native": 0, "reference": 1, "count": 1},
+    {"name": "hangul-v-t-jamo", "category": "Lo", "ranges": [["1160", "11FF"], ["D7B0", "D7C6"], ["D7CB", "D7FB"]], "native": 1, "reference": 0, "count": 232},
+    {"name": "format-controls", "category": "Cf", "ranges": [["FFF9", "FFFB"], ["13430", "1343F"]], "native": 1, "reference": 0, "count": 19},
+    {"name": "enclosed-numbers-and-hexagrams", "category": null, "ranges": [["3248", "324F"], ["4DC0", "4DFF"]], "native": 1, "reference": 2, "count": 72},
+    {"name": "regional-indicators", "category": "So", "ranges": [["1F1E6", "1F1FF"]], "native": 2, "reference": 1, "count": 26}
+  ]
+}
