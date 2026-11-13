@@ -18,10 +18,12 @@ case "${1:-}" in
  widths)
   "$WOLF" build --deny-warnings src/vt_width_vector.lu -o "$root/target/native/vt-width-vector"
   python3 -I tests/vt/width_vector_rows.py --out target/vt/canonical-native-widths.bin "$root/target/native/vt-width-vector"
-  exec python3 -I tools/vt/width_sweep.py --out target/vt/canonical-assigned-widths --native-vector target/vt/canonical-native-widths.bin
+  python3 -I tools/vt/width_sweep.py --out target/vt/canonical-assigned-widths --native-vector target/vt/canonical-native-widths.bin
+  "$WOLF" build --deny-warnings src/warren.lu -o "$root/target/native/warren-width-columns"
+  exec python3 -I tests/vt/probes/width_columns.py --out target/vt/canonical-width-columns --native-vector target/vt/canonical-native-widths.bin --warren "$root/target/native/warren-width-columns" --warren-head "$(git rev-parse HEAD)"
   ;;
  recordings)
-  exec python3 -I tests/vt/compare_suite.py --suite recordings --observer-timeout 900 "$LUPIN" run src/warren.lu
+  exec python3 -I tests/vt/compare_suite.py --suite recordings --observer-timeout 1800 "$LUPIN" run src/warren.lu
   ;;
  *) printf 'FAIL w1-rig unknown-step\n'; exit 2 ;;
 esac

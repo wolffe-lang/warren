@@ -1,6 +1,6 @@
 # Run inside the preflighted pinned image, from a clean committed checkout.
 floor 35
-rig w1-step.sh sha256=2728d89007f07898b43c7b9a51ceb25246911c22d0dcb1bcfb18f3fc1403d69b
+rig w1-step.sh sha256=2ff4783ecfb12b37b5aaf4a38ddd8981ab4c3ed6fa3ceab22dbb2901dde24a80
 step w1-linux-gate tools=python3,cc script=w1-step.sh -- gate
 step w1-resource tools=python3,cc script=w1-step.sh -- resource
 step w1-widths tools=python3 script=w1-step.sh -- widths
