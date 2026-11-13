@@ -12,9 +12,10 @@ recorded corpus, and predictions/drafts for the next milestones.
 `src/vt/parser.lu` decodes split UTF-8 and recognises bounded terminal
 sequences; its native test entry is `src/vt_parser_test.lu`, also runnable
 under lupin. The initial grid serves Unicode widths/combining marks, wide-pair
-repair, cursor/erase/edit/SGR, tabs/index/scroll operations, bounded events,
-query answers and deterministic dumps. Resize, history, remaining ESC/modes
-and the `vt-dump` command are not implemented; W1 is not complete.
+repair, cursor/erase/edit/SGR, tabs/index/scroll operations, saved cursors,
+alternate-screen/reset/DEC-graphics/REP/alignment controls, bounded events,
+query answers and deterministic dumps. Resize, history integration and the
+`vt-dump` command are not implemented; W1 is not complete.
 `src/proto` implements bounded transport framing, message validation/encoding,
 fragment assembly and connection-wide image acknowledgement sequencing;
 [PROTOCOL](docs/PROTOCOL.md) fixes the bytes and [SERVER](docs/SERVER.md) is

@@ -5,6 +5,19 @@ consulted, with a digest where the document is a file, and what it was used
 for. The lists of what may and may not be read are in the README. The
 reference programs were run as binaries and never opened as implementations.
 
+## Consulted for DEC graphics and saved cursors (2026-11-13 UTC)
+
+The DEC **VT100 User Guide**, chapter 3, at
+https://vt100.net/docs/vt100-ug/chapter3.html, SHA-256
+`f2264dfbfc0277b7a59764284336ab509011ce229f322dd0d2a61724d914c7b2`
+(checked twice): table 3-9 names the 32 special graphics; the DECSC prose
+specifies saved position, graphic rendition and character set; DECALN
+specifies uppercase E screen alignment. These are documentation, not an
+emulator implementation. The patch-390 control-sequences document also
+specifies the 1047/1048/1049 transitions and REP's preceding-graphic form.
+The committed `ris` census summary shows the window title surviving reset;
+the adopted draft now states that boundary explicitly.
+
 ## Consulted for query answers (2026-11-13 UTC)
 
 The exact patch-390 control-sequences document listed below was fetched

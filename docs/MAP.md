@@ -3,17 +3,19 @@
 | Stage | Capability | State |
 |---|---|---|
 | W0 | pins, tiered CI, the oracle, the survey, the prediction | the repository half is here; the PAX readiness half is measured in PAX |
-| W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | incremental parser implemented; grid and command planned |
+| W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | parser and initial grid/queries implemented; history/reflow and command remain |
 | W2 | server, client, protocol v1; one pane; detach and attach | pure protocol codec and server contract; I/O planned |
 | W3 | split tree, tabs, modes, the hint bar, configuration v1 | planned |
 | W4 | mouse, scrollback, copy mode, search, OSC 52 | planned |
 | W5 | command socket, CLI verbs, layout files, save and restore | planned |
 | W6 | static on the PAX image; rows in PAX's own suites | planned |
 
-The incremental parser and protocol codec are implemented; the screen grid,
+The incremental parser, initial grid and protocol codec are implemented;
 server and client remain planned here. A statement is marked *planned* or
-names its measuring rows. `src/vt_parser_test.lu` exercises the parser without
-a grid.
+names its measuring rows. `src/vt_parser_test.lu` exercises parsing alone;
+`vt_grid_test`, `vt_unicode_test`, `vt_ops_test`, `vt_screen_state_test`,
+`vt_graphics_test` and `vt_answers_test` exercise the current screen subset.
+They are not a claim that history, reflow or the full corpus agree yet.
 
 ## The frame
 
@@ -46,7 +48,7 @@ a grid.
 
 | Module | Pure | Milestone | Measured today |
 |---|---|---|---|
-| `src/vt` | yes | W1 | exists and compiles (`build`, `wolf-test`, `lupin-pure`) |
+| `src/vt` | yes | W1 | parser, initial screen operations and bounded events/answers; native and lupin entries, plus three initial full-dump cases |
 | `src/proto` | yes | W2 | bounded framing, payload validation, encode, assembly and ACK model (`protocol_rows`, `protocol_fuzz`) |
 | `src/layout` | yes | W3 | exists and compiles |
 | `src/server` | no | W2 | exists and compiles |
@@ -57,8 +59,9 @@ a grid.
 ## Three kinds of row
 
 - **Emulator rows:** bytes in, a screen out, compared cell for cell with a
-  pinned reference emulator run as a binary. *Planned for W1; the harness is
-  W0's.*
+  pinned reference emulator run as a binary. Three initial cases have full
+  comparisons in `tests/vt/grid_reference.py`; the full W1 census, recordings,
+  width sweep and resize properties are pending.
 - **Session rows:** a scripted client on a pseudo-terminal of the suite's own,
   compared with tmux as a black box where the behaviour is comparable, and
   with a written expectation where warren differs on purpose. *Planned.*
@@ -81,9 +84,10 @@ No row sends a signal from a script.
 
 ## Evidence boundaries
 
-- Every row above measures the harness and the reference emulator. There is
-  no grid of warren's to compare yet. `src/vt/parser.lu` is the incremental
-  parser; `src/vt/vt.lu` remains a scaffold.
+- Every oracle row in the table above measures the harness and the reference
+  emulator, not the entire current grid. `src/vt/parser.lu` is incremental;
+  the grid's separate native/lupin and initial comparison rows are listed
+  above. `src/vt/vt.lu` still reports scaffold status until a command exists.
 - The scaffold proves only that the pins resolve, the module tree compiles on
   the native tier, its tests pass on the checked machine and the reference
   interpreter, and the tier planner plans what the workflow runs.
