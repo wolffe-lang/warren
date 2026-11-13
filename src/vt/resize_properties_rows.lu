@@ -268,7 +268,21 @@ fn test_resize_peak_charge() {
     }
 }
 
+fn test_snapshot_coordinate_boundary() {
+    var pane = new(1, 1, 4096)
+    pane.primary.line_offsets[0] = 4294967295
+    pane.primary.next_line_id = 7
+    feed(mut pane, "中".bytes())
+    assert(resize(mut pane, 1, 2) == "")
+    assert(pane.primary.cells[0].base == 20013 && pane.history.records == 0, "resize-snapshot-overflow-prefix-address")
+    assert(resize(mut pane, 2, 2) == "")
+    assert(pane.primary.cells[0].width == 2 && pane.primary.cells[1].width == 0)
+    assert(resize(mut pane, 1, 1) == "")
+    assert(pane.primary.cells[0].base == 20013 && pane.primary.cells[0].width == 1 && pane.history.records == 0)
+}
+
 fn main() -> int {
+    test_snapshot_coordinate_boundary()
     test_custom_tabs_and_hidden_capacity()
     test_content_and_path_independence()
     test_one_column_and_unwritten_gap()
