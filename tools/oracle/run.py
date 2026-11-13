@@ -134,6 +134,12 @@ def attrs_text(state):
 def is_combining(cp):
     if cp > 0x10FFFF:
         return False
+    # The pinned reference prints these zero-width Lo/Cf classes attached to
+    # their base. Do not absorb arbitrary Lo/Cf: sampled FFF9 is not printed,
+    # and the checksum/layout/whole-frame consistency checks remain strict.
+    if (0x1160 <= cp <= 0x11FF or 0xD7B0 <= cp <= 0xD7C6 or
+            0xD7CB <= cp <= 0xD7FB or 0x13430 <= cp <= 0x1343F):
+        return True
     ch = chr(cp)
     return unicodedata.combining(ch) != 0 or unicodedata.category(ch) in ('Mn', 'Me')
 
