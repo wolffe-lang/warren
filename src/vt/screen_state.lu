@@ -1,0 +1,157 @@
+//! member: true
+//! Saved cursors, shared alternate-screen switching and bounded resets.
+
+fn new_saved_cursor() -> SavedCursor {
+    SavedCursor { valid: false, row: 1, col: 1, flags: 0, foreground: 0 - 1,
+        background: 0 - 1, origin: false, pending_wrap: false, g0: 0, g1: 0, shifted: false }
+}
+
+fn reset_saved_cursor(mut saved: SavedCursor) {
+    saved.valid = false
+    saved.row = 1
+    saved.col = 1
+    saved.flags = 0
+    saved.foreground = 0 - 1
+    saved.background = 0 - 1
+    saved.origin = false
+    saved.pending_wrap = false
+    saved.g0 = 0
+    saved.g1 = 0
+    saved.shifted = false
+}
+
+fn store_cursor(mut saved: SavedCursor, row: int, col: int, flags: int,
+        foreground: int, background: int, origin: bool, pending: bool,
+        g0: int, g1: int, shifted: bool) {
+    saved.valid = true
+    saved.row = row
+    saved.col = col
+    saved.flags = flags
+    saved.foreground = foreground
+    saved.background = background
+    saved.origin = origin
+    saved.pending_wrap = pending
+    saved.g0 = g0
+    saved.g1 = g1
+    saved.shifted = shifted
+}
+
+fn save_cursor(mut pane: Vt) {
+    if pane.active_alternate {
+        store_cursor(mut pane.saved_alternate, pane.cursor_row, pane.cursor_col,
+            pane.pen.flags, pane.pen.foreground, pane.pen.background, pane.modes.origin,
+            pane.pending_wrap, pane.g0, pane.g1, pane.shifted)
+    } else {
+        store_cursor(mut pane.saved_primary, pane.cursor_row, pane.cursor_col,
+            pane.pen.flags, pane.pen.foreground, pane.pen.background, pane.modes.origin,
+            pane.pending_wrap, pane.g0, pane.g1, pane.shifted)
+    }
+}
+
+fn restore_cursor(mut pane: Vt) {
+    // Read scalar projections, never copy a transient saved-cursor record.
+    let alt = pane.active_alternate
+    let row = if alt { pane.saved_alternate.row } else { pane.saved_primary.row }
+    let col = if alt { pane.saved_alternate.col } else { pane.saved_primary.col }
+    let origin = if alt { pane.saved_alternate.origin } else { pane.saved_primary.origin }
+    let pending = if alt { pane.saved_alternate.pending_wrap } else { pane.saved_primary.pending_wrap }
+    pane.pen.flags = if alt { pane.saved_alternate.flags } else { pane.saved_primary.flags }
+    pane.pen.foreground = if alt { pane.saved_alternate.foreground } else { pane.saved_primary.foreground }
+    pane.pen.background = if alt { pane.saved_alternate.background } else { pane.saved_primary.background }
+    pane.g0 = if alt { pane.saved_alternate.g0 } else { pane.saved_primary.g0 }
+    pane.g1 = if alt { pane.saved_alternate.g1 } else { pane.saved_primary.g1 }
+    pane.shifted = if alt { pane.saved_alternate.shifted } else { pane.saved_primary.shifted }
+    pane.modes.origin = origin
+    change_mode_value(mut pane, 3, if origin { 1 } else { 0 })
+    pane.cursor_row = grid_clamp(row, if origin { pane.region_top } else { 1 }, if origin { pane.region_bottom } else { pane.rows })
+    pane.cursor_col = grid_clamp(col, 1, pane.cols)
+    pane.pending_wrap = pending && pane.cursor_col == pane.cols
+}
+
+fn clear_screen(mut screen: Screen, cols: int, rows: int, background: int) {
+    var row = 1
+    while row <= rows { blank_row(mut screen, cols, row, background); row += 1 }
+}
+
+fn alternate_state(mut pane: Vt, enabled: bool) {
+    pane.active_alternate = enabled
+    let value = if enabled { 1 } else { 0 }
+    change_mode_value(mut pane, 16, value)
+    change_mode_value(mut pane, 17, value)
+    change_mode_value(mut pane, 18, value)
+}
+
+fn alternate_mode(mut pane: Vt, code: int, enabled: bool) {
+    if code == 1048 {
+        if enabled { save_cursor(mut pane) } else { restore_cursor(mut pane) }
+        return
+    }
+    if enabled {
+        if code == 1049 {
+            save_cursor(mut pane)
+            clear_screen(mut pane.alternate, pane.cols, pane.rows, pane.pen.background)
+        }
+        alternate_state(mut pane, true)
+    } else {
+        if (code == 1047 || code == 1049) && pane.active_alternate {
+            clear_screen(mut pane.alternate, pane.cols, pane.rows, pane.pen.background)
+        }
+        alternate_state(mut pane, false)
+        if code == 1049 { restore_cursor(mut pane) }
+    }
+}
+
+fn reset_pen(mut pane: Vt) {
+    pane.pen.flags = 0
+    pane.pen.foreground = 0 - 1
+    pane.pen.background = 0 - 1
+}
+
+fn soft_reset(mut pane: Vt) {
+    reset_pen(mut pane)
+    pane.region_top = 1
+    pane.region_bottom = pane.rows
+    pane.modes.origin = false
+    pane.modes.insert = false
+    pane.modes.cursor_visible = true
+    pane.pending_wrap = false
+    change_mode_value(mut pane, 0, 0)
+    change_mode_value(mut pane, 3, 0)
+    change_mode_value(mut pane, 6, 1)
+}
+
+fn full_reset(mut pane: Vt) {
+    soft_reset(mut pane)
+    clear_screen(mut pane.primary, pane.cols, pane.rows, 0 - 1)
+    clear_screen(mut pane.alternate, pane.cols, pane.rows, 0 - 1)
+    alternate_state(mut pane, false)
+    reset_saved_cursor(mut pane.saved_primary)
+    reset_saved_cursor(mut pane.saved_alternate)
+    pane.g0 = 0
+    pane.g1 = 0
+    pane.shifted = false
+    pane.cursor_row = 1
+    pane.cursor_col = 1
+    pane.cursor_shape = 2
+    pane.modes.autowrap = true
+    pane.modes.newline = false
+    var i = 0
+    while i < 16 { change_mode_value(mut pane, i, if i == 4 || i == 6 { 1 } else { 0 }); i += 1 }
+    i = 0
+    while i < pane.cols { pane.tabs[i] = i > 0 && i % 8 == 0; i += 1 }
+    pane.default_tabs = true
+    pane.answer_length = 0
+    begin_sequence(mut pane.parser, 0)
+    pane.parser.utf_code = 0
+    pane.parser.utf_left = 0
+    pane.parser.utf_lead = 0
+    pane.parser.utf_seen = 0
+    pane.parser.string_osc = false
+    pane.parser.output_count = 0
+    pane.parser.first_kind = 0
+    pane.parser.first_value = 0
+    pane.parser.second_kind = 0
+    pane.parser.second_value = 0
+    // Window title and undrained external notifications are not screen state.
+    // The history ring, once implemented, is emptied here too.
+}

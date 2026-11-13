@@ -47,6 +47,11 @@ fn dispatch_escape(mut pane: Vt, final: int) {
         if final == 69 { pane.cursor_col = 1 }
     } else if final == 77 { reverse_index(mut pane) }
     else if final == 90 { answer_primary_identity(mut pane) }
+    else if final == 55 { save_cursor(mut pane) }
+    else if final == 56 { restore_cursor(mut pane) }
+    else if final == 61 { set_grid_mode(mut pane, true, 66, true) }
+    else if final == 62 { set_grid_mode(mut pane, true, 66, false) }
+    else if final == 99 { full_reset(mut pane) }
     else if final == 72 {
         pane.tabs[pane.cursor_col - 1] = true
         pane.default_tabs = false

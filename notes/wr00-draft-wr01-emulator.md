@@ -241,7 +241,9 @@ lowers the extent to the cursor's left; erasing a whole row sets it to 0.
   the one alternate screen; 47 neither saves nor clears (`alt-47-keeps`). The
   pen, the region and the modes are shared by the two screens
   (`alt-rendition-carries`, `alt-region-shared`).
-- RIS resets everything and clears both screens and scrollback (`ris`).
+- RIS resets terminal/parser state, both screens, scrollback, modes, tabs,
+  saved cursors and queued answers, but keeps the title (`ris` in
+  `tests/vt/census.txt`). The title is the window's, not the screen's.
   DECSTR resets the pen, region, origin, insert mode and cursor visibility,
   and leaves the screen and the cursor's position (`decstr`).
 

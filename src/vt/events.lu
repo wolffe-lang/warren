@@ -65,12 +65,15 @@ fn event_mode_code(index: int) -> int {
     if index == 13 { return 1007 }
     if index == 14 { return 2004 }
     if index == 15 { return 2026 }
+    if index == 16 { return 47 }
+    if index == 17 { return 1047 }
+    if index == 18 { return 1049 }
     0 - 1
 }
 
 fn event_mode_index(private_mode: bool, code: int) -> int {
     var i = if private_mode { 2 } else { 0 }
-    let end = if private_mode { 16 } else { 2 }
+    let end = if private_mode { 19 } else { 2 }
     while i < end {
         if event_mode_code(i) == code { return i }
         i += 1
@@ -86,6 +89,10 @@ fn change_mode_value(mut pane: Vt, index: int, value: int) {
 }
 
 fn set_grid_mode(mut pane: Vt, private_mode: bool, code: int, enabled: bool) {
+    if private_mode && (code == 47 || code == 1047 || code == 1048 || code == 1049) {
+        alternate_mode(mut pane, code, enabled)
+        return
+    }
     let index = event_mode_index(private_mode, code)
     if index < 0 { return }
     let value = if enabled { 1 } else { 0 }
@@ -212,7 +219,7 @@ fn plain_event(kind: int, private_mode: bool, mode: int, value: int) -> Event {
 /// the pending state. Allocation is bounded by supported modes and 4096 bytes.
 pub fn take_events(mut pane: Vt) -> List[Event] {
     var out = List[Event]()
-    (mut out).reserve(19)
+    (mut out).reserve(22)
     if pane.events.title_changed {
         (mut out).push(plain_event(1, false, 0, 0))
         pane.events.title_changed = false
@@ -223,7 +230,7 @@ pub fn take_events(mut pane: Vt) -> List[Event] {
         pane.events.bell_count = 0
     }
     var i = 0
-    while i < 16 {
+    while i < 19 {
         if pane.events.mode_changed[i] {
             (mut out).push(plain_event(3, i >= 2, event_mode_code(i), pane.mode_values[i]))
             pane.events.mode_changed[i] = false
