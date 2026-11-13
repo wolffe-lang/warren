@@ -1,0 +1,290 @@
+{
+  "schema": 1,
+  "complete_dump_count": 12,
+  "pen_status_count": 12,
+  "refinement": false,
+  "inverse": true,
+  "pins_sha256": "8d6d781805e6840a6a6becb059453cfa166fb7d53424fd4a89289ad827b7e992",
+  "cases": {
+    "inactive-default-reset-then-inverse": {
+      "input_sha256": "a0d91beb2347f14317ca558266cf65cf47d326af1389c832c7c6dac7ac0e2bf5",
+      "size": [
+        12,
+        4
+      ],
+      "screen_sha256": "9d4a9e2b91a5d4356091320c82465b6b8003312cb8a6b56459b210cbc170a65a",
+      "sgr_report_hex": "1b50312472303b373b34383a353a3138316d1b5c",
+      "classification": "measured",
+      "input_path": "inactive-default-reset-then-inverse.in",
+      "files": {
+        "inactive-default-reset-then-inverse/A.json": "cec714b4570cea810f489d97e7719e87a1eb320137d9cb391e7eb5587db63505",
+        "inactive-default-reset-then-inverse/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "inactive-default-reset-then-inverse/A.print": "ee29e233e38061178cedd69c5ae8f049d26d844381b49b12988bbe5a55e71795",
+        "inactive-default-reset-then-inverse/S.print": "0d97e914a0cf3143b1e78f10e2f9ef351efab4da21ba36b4e65972b1a3017209",
+        "inactive-default-reset-then-inverse/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "inactive-default-reset-then-inverse/got.screen": "9d4a9e2b91a5d4356091320c82465b6b8003312cb8a6b56459b210cbc170a65a",
+        "inactive-default-reset-then-inverse/pen.json": "723ce00282685898661e7a12978f53809b62f4f44b2177c802c933fe1c957d06",
+        "inactive-default-reset-then-inverse.in": "a0d91beb2347f14317ca558266cf65cf47d326af1389c832c7c6dac7ac0e2bf5",
+        "inactive-default-reset-then-inverse/written.screen": "e4839d0297244e6450029f593841389a6d288abae8d75f20aa25097b35d1b3d6"
+      },
+      "written_sha256": "e4839d0297244e6450029f593841389a6d288abae8d75f20aa25097b35d1b3d6"
+    },
+    "inactive-default-reset-then-uninverse": {
+      "input_sha256": "da281a9886a8dabdaff7a716be90da72693473322a90ead3a18bae3d67805ab0",
+      "size": [
+        12,
+        4
+      ],
+      "screen_sha256": "d99585336334dd88655bf6ebcc38435617c9905b69016fdbdf232ae3b5b0809b",
+      "sgr_report_hex": "1b50312472303b34383a353a3138316d1b5c",
+      "classification": "measured",
+      "input_path": "inactive-default-reset-then-uninverse.in",
+      "files": {
+        "inactive-default-reset-then-uninverse/A.json": "987ee09324ba63e977d24e4eb248ec2119ea2ae700a210e0fd74ad99297e7566",
+        "inactive-default-reset-then-uninverse/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "inactive-default-reset-then-uninverse/A.print": "a58aefaa5a16d1a6ba8208e34033c0f66d60025124fe73f183941a4f0ade8315",
+        "inactive-default-reset-then-uninverse/S.print": "e2022c67a80a25c83227c799c7e45523f3bd40a9bce318e202d662c6dccdb8de",
+        "inactive-default-reset-then-uninverse/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "inactive-default-reset-then-uninverse/got.screen": "d99585336334dd88655bf6ebcc38435617c9905b69016fdbdf232ae3b5b0809b",
+        "inactive-default-reset-then-uninverse/pen.json": "ef5dc484f1050c396f90ef378cf3242757dbf8576026c497d9057db4c05f43c4",
+        "inactive-default-reset-then-uninverse.in": "da281a9886a8dabdaff7a716be90da72693473322a90ead3a18bae3d67805ab0",
+        "inactive-default-reset-then-uninverse/written.screen": "b5095e4af5d213a935cdc9a4307103dc0a616418b67203dbcb29933691c31fdf"
+      },
+      "written_sha256": "b5095e4af5d213a935cdc9a4307103dc0a616418b67203dbcb29933691c31fdf"
+    },
+    "dec-default-restore-then-inverse": {
+      "input_sha256": "5520d3860386227bbbc17b798ebddb7a94002da0b8d0ac9d2c59167b01a9274c",
+      "size": [
+        12,
+        4
+      ],
+      "screen_sha256": "9d4a9e2b91a5d4356091320c82465b6b8003312cb8a6b56459b210cbc170a65a",
+      "sgr_report_hex": "1b50312472303b373b34383a353a3138316d1b5c",
+      "classification": "measured",
+      "input_path": "dec-default-restore-then-inverse.in",
+      "files": {
+        "dec-default-restore-then-inverse/A.json": "cec714b4570cea810f489d97e7719e87a1eb320137d9cb391e7eb5587db63505",
+        "dec-default-restore-then-inverse/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "dec-default-restore-then-inverse/A.print": "ee29e233e38061178cedd69c5ae8f049d26d844381b49b12988bbe5a55e71795",
+        "dec-default-restore-then-inverse/S.print": "0d97e914a0cf3143b1e78f10e2f9ef351efab4da21ba36b4e65972b1a3017209",
+        "dec-default-restore-then-inverse/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "dec-default-restore-then-inverse/got.screen": "9d4a9e2b91a5d4356091320c82465b6b8003312cb8a6b56459b210cbc170a65a",
+        "dec-default-restore-then-inverse/pen.json": "723ce00282685898661e7a12978f53809b62f4f44b2177c802c933fe1c957d06",
+        "dec-default-restore-then-inverse.in": "5520d3860386227bbbc17b798ebddb7a94002da0b8d0ac9d2c59167b01a9274c",
+        "dec-default-restore-then-inverse/written.screen": "e4839d0297244e6450029f593841389a6d288abae8d75f20aa25097b35d1b3d6"
+      },
+      "written_sha256": "e4839d0297244e6450029f593841389a6d288abae8d75f20aa25097b35d1b3d6"
+    },
+    "dec-default-restore-then-uninverse": {
+      "input_sha256": "c97c650dec69ee52b4566ebb849ea441dc98c2f9434038cb9dde022223f7772a",
+      "size": [
+        12,
+        4
+      ],
+      "screen_sha256": "d99585336334dd88655bf6ebcc38435617c9905b69016fdbdf232ae3b5b0809b",
+      "sgr_report_hex": "1b50312472303b34383a353a3138316d1b5c",
+      "classification": "measured",
+      "input_path": "dec-default-restore-then-uninverse.in",
+      "files": {
+        "dec-default-restore-then-uninverse/A.json": "987ee09324ba63e977d24e4eb248ec2119ea2ae700a210e0fd74ad99297e7566",
+        "dec-default-restore-then-uninverse/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "dec-default-restore-then-uninverse/A.print": "a58aefaa5a16d1a6ba8208e34033c0f66d60025124fe73f183941a4f0ade8315",
+        "dec-default-restore-then-uninverse/S.print": "e2022c67a80a25c83227c799c7e45523f3bd40a9bce318e202d662c6dccdb8de",
+        "dec-default-restore-then-uninverse/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "dec-default-restore-then-uninverse/got.screen": "d99585336334dd88655bf6ebcc38435617c9905b69016fdbdf232ae3b5b0809b",
+        "dec-default-restore-then-uninverse/pen.json": "ef5dc484f1050c396f90ef378cf3242757dbf8576026c497d9057db4c05f43c4",
+        "dec-default-restore-then-uninverse.in": "c97c650dec69ee52b4566ebb849ea441dc98c2f9434038cb9dde022223f7772a",
+        "dec-default-restore-then-uninverse/written.screen": "b5095e4af5d213a935cdc9a4307103dc0a616418b67203dbcb29933691c31fdf"
+      },
+      "written_sha256": "b5095e4af5d213a935cdc9a4307103dc0a616418b67203dbcb29933691c31fdf"
+    },
+    "dec-palette-rgb-restore-then-uninverse": {
+      "input_sha256": "325cbe4710fbe00d33ea54b0dea6ac536e4860fa9f1993ebc63615020c677014",
+      "size": [
+        12,
+        4
+      ],
+      "screen_sha256": "5fe3e39d011dc1dd380ebf15ccd47c15614f55bd4e65d060786062905f186193",
+      "sgr_report_hex": "1b50312472303b34383a353a31353534303039346d1b5c",
+      "classification": "measured",
+      "input_path": "dec-palette-rgb-restore-then-uninverse.in",
+      "files": {
+        "dec-palette-rgb-restore-then-uninverse/A.json": "987ee09324ba63e977d24e4eb248ec2119ea2ae700a210e0fd74ad99297e7566",
+        "dec-palette-rgb-restore-then-uninverse/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "dec-palette-rgb-restore-then-uninverse/A.print": "542be5138a41671cf32c2c97aa8e40a0545e4d355c75e9577cd3499725048550",
+        "dec-palette-rgb-restore-then-uninverse/S.print": "fb8078c35c47d96de60a43dccf91a8d700726d8c775ad3df1592f613ba453ff2",
+        "dec-palette-rgb-restore-then-uninverse/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "dec-palette-rgb-restore-then-uninverse/got.screen": "5fe3e39d011dc1dd380ebf15ccd47c15614f55bd4e65d060786062905f186193",
+        "dec-palette-rgb-restore-then-uninverse/pen.json": "ebda38664f76381042cbf106d36dde86cc9e0ca1be32f42ac786e0a817a5fdfa",
+        "dec-palette-rgb-restore-then-uninverse.in": "325cbe4710fbe00d33ea54b0dea6ac536e4860fa9f1993ebc63615020c677014",
+        "dec-palette-rgb-restore-then-uninverse/written.screen": "b8d8db21f9d1f356481671e655573804a713d0e62ab0a06c5cd25df7a2890212"
+      },
+      "written_sha256": "b8d8db21f9d1f356481671e655573804a713d0e62ab0a06c5cd25df7a2890212"
+    },
+    "dec-palette-rgb-restore-then-inverse": {
+      "input_sha256": "729bbcc85bc6733eccf1c6dfdbb493edc96d3c4299944d293e4afbfae247c893",
+      "size": [
+        12,
+        4
+      ],
+      "screen_sha256": "c0198f0ab81c781511a680c4f4bcaaef7394d1344709b0f657cff9689782f92c",
+      "sgr_report_hex": "1b50312472303b373b34383a353a31353534303039346d1b5c",
+      "classification": "measured",
+      "input_path": "dec-palette-rgb-restore-then-inverse.in",
+      "files": {
+        "dec-palette-rgb-restore-then-inverse/A.json": "cec714b4570cea810f489d97e7719e87a1eb320137d9cb391e7eb5587db63505",
+        "dec-palette-rgb-restore-then-inverse/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "dec-palette-rgb-restore-then-inverse/A.print": "efdd8ae71400dec4499102aa7df9fd9ae33f15cf6b5895ffb23235ddae62e44e",
+        "dec-palette-rgb-restore-then-inverse/S.print": "8e2a4fc26c7e6785a5500f04216b5b6a5b76c48c8d4cd87bf51f47008153b439",
+        "dec-palette-rgb-restore-then-inverse/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "dec-palette-rgb-restore-then-inverse/got.screen": "c0198f0ab81c781511a680c4f4bcaaef7394d1344709b0f657cff9689782f92c",
+        "dec-palette-rgb-restore-then-inverse/pen.json": "52816e77e7c8a80aa14c1aa9001479eb9bb8c7c6695e5898594f5143fa51c7d2",
+        "dec-palette-rgb-restore-then-inverse.in": "729bbcc85bc6733eccf1c6dfdbb493edc96d3c4299944d293e4afbfae247c893",
+        "dec-palette-rgb-restore-then-inverse/written.screen": "730645e24281d098ca17f859cdccac476623f5830c0e0bd49ca87c065613058c"
+      },
+      "written_sha256": "730645e24281d098ca17f859cdccac476623f5830c0e0bd49ca87c065613058c"
+    },
+    "repeat-alt-reset-then-uninverse": {
+      "input_sha256": "40a594b3ac12a0ae3892eb3f9ad77863a4c76a820e1ef760043debaf0c8acdbd",
+      "size": [
+        12,
+        4
+      ],
+      "screen_sha256": "d99585336334dd88655bf6ebcc38435617c9905b69016fdbdf232ae3b5b0809b",
+      "sgr_report_hex": "1b50312472303b34383a353a3138316d1b5c",
+      "classification": "measured",
+      "input_path": "repeat-alt-reset-then-uninverse.in",
+      "files": {
+        "repeat-alt-reset-then-uninverse/A.json": "987ee09324ba63e977d24e4eb248ec2119ea2ae700a210e0fd74ad99297e7566",
+        "repeat-alt-reset-then-uninverse/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "repeat-alt-reset-then-uninverse/A.print": "a58aefaa5a16d1a6ba8208e34033c0f66d60025124fe73f183941a4f0ade8315",
+        "repeat-alt-reset-then-uninverse/S.print": "e2022c67a80a25c83227c799c7e45523f3bd40a9bce318e202d662c6dccdb8de",
+        "repeat-alt-reset-then-uninverse/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "repeat-alt-reset-then-uninverse/got.screen": "d99585336334dd88655bf6ebcc38435617c9905b69016fdbdf232ae3b5b0809b",
+        "repeat-alt-reset-then-uninverse/pen.json": "ef5dc484f1050c396f90ef378cf3242757dbf8576026c497d9057db4c05f43c4",
+        "repeat-alt-reset-then-uninverse.in": "40a594b3ac12a0ae3892eb3f9ad77863a4c76a820e1ef760043debaf0c8acdbd",
+        "repeat-alt-reset-then-uninverse/written.screen": "b5095e4af5d213a935cdc9a4307103dc0a616418b67203dbcb29933691c31fdf"
+      },
+      "written_sha256": "b5095e4af5d213a935cdc9a4307103dc0a616418b67203dbcb29933691c31fdf"
+    },
+    "saved-fg-repeat-alt-then-uninverse": {
+      "input_sha256": "b56892d457979c6b70fe24f58c433cc7efbb8ec1e6e608b05e98725598098fae",
+      "size": [
+        12,
+        4
+      ],
+      "screen_sha256": "e2e98af3b43d233337d4a0fa3b28c13ce4ffb1e5fb47a081e90321bbef7478f9",
+      "sgr_report_hex": "1b50312472303b39373b34383a353a3138316d1b5c",
+      "classification": "measured",
+      "input_path": "saved-fg-repeat-alt-then-uninverse.in",
+      "files": {
+        "saved-fg-repeat-alt-then-uninverse/A.json": "987ee09324ba63e977d24e4eb248ec2119ea2ae700a210e0fd74ad99297e7566",
+        "saved-fg-repeat-alt-then-uninverse/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "saved-fg-repeat-alt-then-uninverse/A.print": "a328c86e3e665bc6e2f16cce6c2a90e227c1288bb8c947dbb5d260aa4d5bff95",
+        "saved-fg-repeat-alt-then-uninverse/S.print": "19ed2005760e1dcf8a40d0d82f9e1f1f2d7066af294bf690f90ba500266392cb",
+        "saved-fg-repeat-alt-then-uninverse/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "saved-fg-repeat-alt-then-uninverse/got.screen": "e2e98af3b43d233337d4a0fa3b28c13ce4ffb1e5fb47a081e90321bbef7478f9",
+        "saved-fg-repeat-alt-then-uninverse/pen.json": "408bb702c95b05fb7814a6503cbe2be8d9b402bfdd4c9b8370f0942d61ebfc86",
+        "saved-fg-repeat-alt-then-uninverse.in": "b56892d457979c6b70fe24f58c433cc7efbb8ec1e6e608b05e98725598098fae",
+        "saved-fg-repeat-alt-then-uninverse/written.screen": "2348eb5311e3659307ad8f89b07bbc9a24a54e163556112199976e4477c8832a"
+      },
+      "written_sha256": "2348eb5311e3659307ad8f89b07bbc9a24a54e163556112199976e4477c8832a"
+    },
+    "unsaved-explicit-default-then-inverse": {
+      "input_sha256": "1ae3b52c2af127fb7d6a23953857786418a3bab5ff0a49009dfe4191a5dbaa46",
+      "size": [
+        12,
+        4
+      ],
+      "screen_sha256": "5a75faed6eac5394b9e00561c25e923a82b722dfc5b0d3258973db672a042fa4",
+      "sgr_report_hex": "1b50312472303b376d1b5c",
+      "classification": "measured",
+      "input_path": "unsaved-explicit-default-then-inverse.in",
+      "files": {
+        "unsaved-explicit-default-then-inverse/A.json": "cec714b4570cea810f489d97e7719e87a1eb320137d9cb391e7eb5587db63505",
+        "unsaved-explicit-default-then-inverse/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "unsaved-explicit-default-then-inverse/A.print": "8277548f1d54535d187ef846723ec0cd4d04204d986c7a2cdb4b04157870af8f",
+        "unsaved-explicit-default-then-inverse/S.print": "ba3e3a6b1ad33ed30e18e0f6d770275a72d4fe5f75ffd70d96cbad24b5e0ea89",
+        "unsaved-explicit-default-then-inverse/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "unsaved-explicit-default-then-inverse/got.screen": "5a75faed6eac5394b9e00561c25e923a82b722dfc5b0d3258973db672a042fa4",
+        "unsaved-explicit-default-then-inverse/pen.json": "f950f1bd1b45928e3daf94b1d0958ee9052f7844bbcc890461743803f0e44b18",
+        "unsaved-explicit-default-then-inverse.in": "1ae3b52c2af127fb7d6a23953857786418a3bab5ff0a49009dfe4191a5dbaa46",
+        "unsaved-explicit-default-then-inverse/written.screen": "e4839d0297244e6450029f593841389a6d288abae8d75f20aa25097b35d1b3d6"
+      },
+      "written_sha256": "e4839d0297244e6450029f593841389a6d288abae8d75f20aa25097b35d1b3d6"
+    },
+    "restored-explicit-default-then-inverse": {
+      "input_sha256": "56b139f9c2d3ed53db7ad1fafc328ea9829bda4ca20686cd080816b00d30a56f",
+      "size": [
+        12,
+        4
+      ],
+      "screen_sha256": "5a75faed6eac5394b9e00561c25e923a82b722dfc5b0d3258973db672a042fa4",
+      "sgr_report_hex": "1b50312472303b376d1b5c",
+      "classification": "measured",
+      "input_path": "restored-explicit-default-then-inverse.in",
+      "files": {
+        "restored-explicit-default-then-inverse/A.json": "cec714b4570cea810f489d97e7719e87a1eb320137d9cb391e7eb5587db63505",
+        "restored-explicit-default-then-inverse/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "restored-explicit-default-then-inverse/A.print": "8277548f1d54535d187ef846723ec0cd4d04204d986c7a2cdb4b04157870af8f",
+        "restored-explicit-default-then-inverse/S.print": "ba3e3a6b1ad33ed30e18e0f6d770275a72d4fe5f75ffd70d96cbad24b5e0ea89",
+        "restored-explicit-default-then-inverse/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "restored-explicit-default-then-inverse/got.screen": "5a75faed6eac5394b9e00561c25e923a82b722dfc5b0d3258973db672a042fa4",
+        "restored-explicit-default-then-inverse/pen.json": "f950f1bd1b45928e3daf94b1d0958ee9052f7844bbcc890461743803f0e44b18",
+        "restored-explicit-default-then-inverse.in": "56b139f9c2d3ed53db7ad1fafc328ea9829bda4ca20686cd080816b00d30a56f",
+        "restored-explicit-default-then-inverse/written.screen": "e4839d0297244e6450029f593841389a6d288abae8d75f20aa25097b35d1b3d6"
+      },
+      "written_sha256": "e4839d0297244e6450029f593841389a6d288abae8d75f20aa25097b35d1b3d6"
+    },
+    "inactive-default-reset-then-bold": {
+      "input_sha256": "f58726c8d1ec1e09e4ac99a85b6bc801a706760ce60f45a84c505b4352c412ad",
+      "size": [
+        12,
+        4
+      ],
+      "screen_sha256": "43ab76ee6963443cde1db7b871008f8c9ededb041360333ea96c684085c6069e",
+      "sgr_report_hex": "1b50312472303b316d1b5c",
+      "classification": "measured",
+      "input_path": "inactive-default-reset-then-bold.in",
+      "files": {
+        "inactive-default-reset-then-bold/A.json": "072135d304d14be07fef105e1aa50daf357d3eb2ea8181c4ffc64fb75cc85b33",
+        "inactive-default-reset-then-bold/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "inactive-default-reset-then-bold/A.print": "0bf7f0db0c9274f75e19426265190b5fc89be4d2f1bf1f535a8255be720f124e",
+        "inactive-default-reset-then-bold/S.print": "c2704f7e03e28fecc4d2b578a4bf9174edb54718e8b4da32f32b542a22896647",
+        "inactive-default-reset-then-bold/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "inactive-default-reset-then-bold/got.screen": "43ab76ee6963443cde1db7b871008f8c9ededb041360333ea96c684085c6069e",
+        "inactive-default-reset-then-bold/pen.json": "f8f80696c65666ef2e6a27f6580be10aa3e593d7e2b9a6c648bb7c4f5e7f7f85",
+        "inactive-default-reset-then-bold.in": "f58726c8d1ec1e09e4ac99a85b6bc801a706760ce60f45a84c505b4352c412ad",
+        "inactive-default-reset-then-bold/written.screen": "20028580149df669b43ffa5c6efe472fce776951cc54a2d861abddcfb0764891"
+      },
+      "written_sha256": "20028580149df669b43ffa5c6efe472fce776951cc54a2d861abddcfb0764891"
+    },
+    "inactive-default-reset-then-underline": {
+      "input_sha256": "ed2b9b9cfffd052c46b1b900e526875307b2350a0aee6cc899d7c0eea5c17d7f",
+      "size": [
+        12,
+        4
+      ],
+      "screen_sha256": "1511668db5a1e58d967dc7b8d920e274941ec1c91bb2e4ee21d5c13515d7382e",
+      "sgr_report_hex": "1b50312472303b346d1b5c",
+      "classification": "measured",
+      "input_path": "inactive-default-reset-then-underline.in",
+      "files": {
+        "inactive-default-reset-then-underline/A.json": "6d2b4aacd54ecd82c994c4a86adfc91880909af10b1c7875557048f4daac9289",
+        "inactive-default-reset-then-underline/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "inactive-default-reset-then-underline/A.print": "6a9f92affbedf166c0904664af045879a94bad06e15bcb3e405e40fe12e7ece2",
+        "inactive-default-reset-then-underline/S.print": "de976e3c6f86bce8ce9cb9139d02517099191952b21bd823ef1f361ecb084f9a",
+        "inactive-default-reset-then-underline/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "inactive-default-reset-then-underline/got.screen": "1511668db5a1e58d967dc7b8d920e274941ec1c91bb2e4ee21d5c13515d7382e",
+        "inactive-default-reset-then-underline/pen.json": "4442f8ea0ac3fe2f1912905174bd2b9393ea06cbf999591a342d196483a4a158",
+        "inactive-default-reset-then-underline.in": "ed2b9b9cfffd052c46b1b900e526875307b2350a0aee6cc899d7c0eea5c17d7f",
+        "inactive-default-reset-then-underline/written.screen": "ac053c557c9a2e87ba0e2b6afd9e6808e119bf2c05114d8416c06107acbb46d3"
+      },
+      "written_sha256": "ac053c557c9a2e87ba0e2b6afd9e6808e119bf2c05114d8416c06107acbb46d3"
+    }
+  },
+  "errors": [],
+  "capture_head": "97e42dc",
+  "capture_manifest_sha256": "b0e0955adfb20f37e1af2aa74ab0ba0dde2af1ad5f974aa7eead63b479a202ba",
+  "written_model_sha256": "a6dc5c5a67fd5f353cea0b029e15a813bb899d2f3acdf5c7bc8c6f2a748a9b02"
+}
