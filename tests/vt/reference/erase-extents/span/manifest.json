@@ -1,0 +1,1202 @@
+{
+  "schema": 1,
+  "dump_budget": 16,
+  "terminal_process_budget": 32,
+  "cases": {
+    "same-background": {
+      "input_sha256": "0565d3f809cb4a5516a95ceb985e13033a7866cffd916be794a0deb959d795bb",
+      "replay": false,
+      "screen_sha256": "331beb9c039731d297100a082d7bd8c1b6edf625e82e2984fa5cfe8f02261049",
+      "size": [
+        12,
+        4
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "background_cells": [
+        [
+          4,
+          1,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          2,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          3,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          4,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          5,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          6,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          7,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          8,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          9,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          10,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          11,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          12,
+          "bg=idx:5"
+        ]
+      ],
+      "files": {
+        "same-background.in": "0565d3f809cb4a5516a95ceb985e13033a7866cffd916be794a0deb959d795bb",
+        "same-background/A.json": "87c77cd0e6055ce0ce9f6da6e2055f772e1a63a50ef84706aec593a942f13fcb",
+        "same-background/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "same-background/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "same-background/S.print": "25996b8e1b5f5fba1fe09ca3f2a3d41e3e26918c213b521af2f2335f3700a3d1",
+        "same-background/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "same-background/got.screen": "331beb9c039731d297100a082d7bd8c1b6edf625e82e2984fa5cfe8f02261049"
+      }
+    },
+    "print-before": {
+      "input_sha256": "a3ea367f648740d26615382083463a51229ea26b48bd2b214e8433f1ce5cfd58",
+      "replay": false,
+      "screen_sha256": "50ea2d4d4a913e7ddef872ab610b8b3776ccec453086c341688e07e4f3d33ba2",
+      "size": [
+        12,
+        4
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        4
+      ],
+      "background_cells": [
+        [
+          4,
+          1,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          2,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          3,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          4,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          5,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          6,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          7,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          8,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          9,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          10,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          11,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          12,
+          "bg=idx:5"
+        ]
+      ],
+      "files": {
+        "print-before.in": "a3ea367f648740d26615382083463a51229ea26b48bd2b214e8433f1ce5cfd58",
+        "print-before/A.json": "38dc2ff28ecb51cf08a3fbfa5c7c7c01c453d6fd58167eab3d0c9876b5ae6083",
+        "print-before/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "print-before/A.print": "aaf02af701a712d4c49420a8b5dcdfbf22b75c54f126222e40426321b27aeada",
+        "print-before/S.print": "ff381d0c611ef5de86c966c94879b455862887908d839624dca04877778cb149",
+        "print-before/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "print-before/got.screen": "50ea2d4d4a913e7ddef872ab610b8b3776ccec453086c341688e07e4f3d33ba2"
+      }
+    },
+    "print-first": {
+      "input_sha256": "9d52ddbff5e6cd85a78ba8edaa58f067e0e335bad052d396fbe5e15e9a04dcc0",
+      "replay": false,
+      "screen_sha256": "331beb9c039731d297100a082d7bd8c1b6edf625e82e2984fa5cfe8f02261049",
+      "size": [
+        12,
+        4
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "background_cells": [
+        [
+          4,
+          1,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          2,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          3,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          4,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          5,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          6,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          7,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          8,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          9,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          10,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          11,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          12,
+          "bg=idx:5"
+        ]
+      ],
+      "files": {
+        "print-first.in": "9d52ddbff5e6cd85a78ba8edaa58f067e0e335bad052d396fbe5e15e9a04dcc0",
+        "print-first/A.json": "87c77cd0e6055ce0ce9f6da6e2055f772e1a63a50ef84706aec593a942f13fcb",
+        "print-first/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "print-first/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "print-first/S.print": "25996b8e1b5f5fba1fe09ca3f2a3d41e3e26918c213b521af2f2335f3700a3d1",
+        "print-first/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "print-first/got.screen": "331beb9c039731d297100a082d7bd8c1b6edf625e82e2984fa5cfe8f02261049"
+      }
+    },
+    "print-first-then-trim-last": {
+      "input_sha256": "b394b1b0169e376a4c7b2932038e6dc318c70b0ea93fc5dca18733801d8ef067",
+      "replay": false,
+      "screen_sha256": "cd2dcfe0f71aef347a7d2a2c3855ce624984542f1ddf246ae9b5345eb98892f2",
+      "size": [
+        12,
+        4
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "background_cells": [
+        [
+          4,
+          1,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          2,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          3,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          4,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          5,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          6,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          7,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          8,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          9,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          10,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          11,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          12,
+          "bg=idx:5"
+        ]
+      ],
+      "files": {
+        "print-first-then-trim-last.in": "b394b1b0169e376a4c7b2932038e6dc318c70b0ea93fc5dca18733801d8ef067",
+        "print-first-then-trim-last/A.json": "952fc0d600c6b2b0bffd4caa5cad2be70662608db09e9a2d4f253e3706cdd93d",
+        "print-first-then-trim-last/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "print-first-then-trim-last/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "print-first-then-trim-last/S.print": "25996b8e1b5f5fba1fe09ca3f2a3d41e3e26918c213b521af2f2335f3700a3d1",
+        "print-first-then-trim-last/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "print-first-then-trim-last/got.screen": "cd2dcfe0f71aef347a7d2a2c3855ce624984542f1ddf246ae9b5345eb98892f2"
+      }
+    },
+    "print-last": {
+      "input_sha256": "a9ef10b272a69f4c968d3da0e98adba7a9f10777c25af409168d2991cd1312b1",
+      "replay": false,
+      "screen_sha256": "331beb9c039731d297100a082d7bd8c1b6edf625e82e2984fa5cfe8f02261049",
+      "size": [
+        12,
+        4
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "background_cells": [
+        [
+          4,
+          1,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          2,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          3,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          4,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          5,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          6,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          7,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          8,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          9,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          10,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          11,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          12,
+          "bg=idx:5"
+        ]
+      ],
+      "files": {
+        "print-last.in": "a9ef10b272a69f4c968d3da0e98adba7a9f10777c25af409168d2991cd1312b1",
+        "print-last/A.json": "87c77cd0e6055ce0ce9f6da6e2055f772e1a63a50ef84706aec593a942f13fcb",
+        "print-last/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "print-last/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "print-last/S.print": "25996b8e1b5f5fba1fe09ca3f2a3d41e3e26918c213b521af2f2335f3700a3d1",
+        "print-last/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "print-last/got.screen": "331beb9c039731d297100a082d7bd8c1b6edf625e82e2984fa5cfe8f02261049"
+      }
+    },
+    "print-last-then-trim-last": {
+      "input_sha256": "7f5aeafe1f6b4b6d5645fab4aefe36c2de7b1d1b5080e048ceeaf4818c658ba7",
+      "replay": false,
+      "screen_sha256": "cd2dcfe0f71aef347a7d2a2c3855ce624984542f1ddf246ae9b5345eb98892f2",
+      "size": [
+        12,
+        4
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "background_cells": [
+        [
+          4,
+          1,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          2,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          3,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          4,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          5,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          6,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          7,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          8,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          9,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          10,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          11,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          12,
+          "bg=idx:5"
+        ]
+      ],
+      "files": {
+        "print-last-then-trim-last.in": "7f5aeafe1f6b4b6d5645fab4aefe36c2de7b1d1b5080e048ceeaf4818c658ba7",
+        "print-last-then-trim-last/A.json": "952fc0d600c6b2b0bffd4caa5cad2be70662608db09e9a2d4f253e3706cdd93d",
+        "print-last-then-trim-last/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "print-last-then-trim-last/A.print": "e6c767aaabb678ed4d3fb4f5c9193c55abf9739f641095705e94f198f08010f9",
+        "print-last-then-trim-last/S.print": "25996b8e1b5f5fba1fe09ca3f2a3d41e3e26918c213b521af2f2335f3700a3d1",
+        "print-last-then-trim-last/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "print-last-then-trim-last/got.screen": "cd2dcfe0f71aef347a7d2a2c3855ce624984542f1ddf246ae9b5345eb98892f2"
+      }
+    },
+    "print-after": {
+      "input_sha256": "fec5f32be41f2367e71556767791a66db7b24842090600b815b26c7455139d2d",
+      "replay": false,
+      "screen_sha256": "7db518d57dc347a81ce5dbe789fd9ceb27958ae9234ec233d4f7c5f9f6601d54",
+      "size": [
+        12,
+        4
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        10
+      ],
+      "background_cells": [
+        [
+          4,
+          1,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          2,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          3,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          4,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          5,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          6,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          7,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          8,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          9,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          10,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          11,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          12,
+          "bg=idx:5"
+        ]
+      ],
+      "files": {
+        "print-after.in": "fec5f32be41f2367e71556767791a66db7b24842090600b815b26c7455139d2d",
+        "print-after/A.json": "e720287cafaa43cc382becd6717e13da05a4299788da47fbcafebe740ef054bf",
+        "print-after/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "print-after/A.print": "50ef7cc0ae84ffeb749f48e7e1c26f1b15b79a14f2d6eb62e3d2190f41b95077",
+        "print-after/S.print": "1d545f3f389b5649119ef673c7fdfb5099e9a042583ddb4174a320f4d38d0cd6",
+        "print-after/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "print-after/got.screen": "7db518d57dc347a81ce5dbe789fd9ceb27958ae9234ec233d4f7c5f9f6601d54"
+      }
+    },
+    "background-first": {
+      "input_sha256": "7424b36dc54d4c1d7e1f06ce8cb158c6e7b1ed78ae326902233b2c362eccd1e0",
+      "replay": false,
+      "screen_sha256": "4d2837c637302c06784962edcd8b617b17451b6cd28e17eaeffa51b59ab3aacc",
+      "size": [
+        12,
+        4
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        9
+      ],
+      "background_cells": [
+        [
+          4,
+          1,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          2,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          3,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          4,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          5,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          6,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          7,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          8,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          9,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          10,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          11,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          12,
+          "bg=idx:5"
+        ]
+      ],
+      "files": {
+        "background-first.in": "7424b36dc54d4c1d7e1f06ce8cb158c6e7b1ed78ae326902233b2c362eccd1e0",
+        "background-first/A.json": "87c77cd0e6055ce0ce9f6da6e2055f772e1a63a50ef84706aec593a942f13fcb",
+        "background-first/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "background-first/A.print": "53889114f25a61192437c8599b0e87cdc413320ab3af1eb6f2454b2ab4de0887",
+        "background-first/S.print": "25996b8e1b5f5fba1fe09ca3f2a3d41e3e26918c213b521af2f2335f3700a3d1",
+        "background-first/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "background-first/got.screen": "4d2837c637302c06784962edcd8b617b17451b6cd28e17eaeffa51b59ab3aacc"
+      }
+    },
+    "background-last": {
+      "input_sha256": "17f3a2bb03ad742e9877dd86e0fa4798cb152a2740a950eddbe1c3a054bf956c",
+      "replay": false,
+      "screen_sha256": "4d2837c637302c06784962edcd8b617b17451b6cd28e17eaeffa51b59ab3aacc",
+      "size": [
+        12,
+        4
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        9
+      ],
+      "background_cells": [
+        [
+          4,
+          1,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          2,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          3,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          4,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          5,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          6,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          7,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          8,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          9,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          10,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          11,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          12,
+          "bg=idx:5"
+        ]
+      ],
+      "files": {
+        "background-last.in": "17f3a2bb03ad742e9877dd86e0fa4798cb152a2740a950eddbe1c3a054bf956c",
+        "background-last/A.json": "87c77cd0e6055ce0ce9f6da6e2055f772e1a63a50ef84706aec593a942f13fcb",
+        "background-last/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "background-last/A.print": "53889114f25a61192437c8599b0e87cdc413320ab3af1eb6f2454b2ab4de0887",
+        "background-last/S.print": "25996b8e1b5f5fba1fe09ca3f2a3d41e3e26918c213b521af2f2335f3700a3d1",
+        "background-last/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "background-last/got.screen": "4d2837c637302c06784962edcd8b617b17451b6cd28e17eaeffa51b59ab3aacc"
+      }
+    },
+    "changed-pen-background": {
+      "input_sha256": "79f0421c03b83cde18c246c870140b4d81f4cf6236d50066bc2220bbb0e654b9",
+      "replay": false,
+      "screen_sha256": "b17dca17c575b78a51e09f8d8f9ba7fff0eaa7e6f28ee6cd128014b12ceee332",
+      "size": [
+        12,
+        4
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        9
+      ],
+      "background_cells": [
+        [
+          4,
+          1,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          2,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          3,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          4,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          5,
+          "bg=idx:2"
+        ],
+        [
+          4,
+          6,
+          "bg=idx:2"
+        ],
+        [
+          4,
+          7,
+          "bg=idx:2"
+        ],
+        [
+          4,
+          8,
+          "bg=idx:2"
+        ],
+        [
+          4,
+          9,
+          "bg=idx:2"
+        ],
+        [
+          4,
+          10,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          11,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          12,
+          "bg=idx:5"
+        ]
+      ],
+      "files": {
+        "changed-pen-background.in": "79f0421c03b83cde18c246c870140b4d81f4cf6236d50066bc2220bbb0e654b9",
+        "changed-pen-background/A.json": "87c77cd0e6055ce0ce9f6da6e2055f772e1a63a50ef84706aec593a942f13fcb",
+        "changed-pen-background/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "changed-pen-background/A.print": "affbe76aba5b79346ab21c9269ee25070c6809dfb403548218c01cddf046231a",
+        "changed-pen-background/S.print": "1a932beadb8e6ff4b4eda4f1ea6803ca1dec2988b58bd94fe956647b438935d1",
+        "changed-pen-background/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "changed-pen-background/got.screen": "b17dca17c575b78a51e09f8d8f9ba7fff0eaa7e6f28ee6cd128014b12ceee332"
+      }
+    },
+    "scroll-default-before": {
+      "input_sha256": "52c1816bb5d715b6332ed66016fabe94b97e7ec4e769d74363ce49e9af072e00",
+      "replay": true,
+      "screen_sha256": "12afd8ddc84de9eb1325c63ec0125b8a0a6ce435ed909ede5ca1974667ef5759",
+      "size": [
+        12,
+        4
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        4
+      ],
+      "background_cells": [],
+      "files": {
+        "scroll-default-before.rec": "52c1816bb5d715b6332ed66016fabe94b97e7ec4e769d74363ce49e9af072e00",
+        "scroll-default-before/A.json": "e091e795cdaf0e89f1b5435d623a4e367793ae388e0a26ff471764ea31129274",
+        "scroll-default-before/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "scroll-default-before/A.print": "aaf14a4f9ab7444ac8a0c21838ba315991c65063d42ae35f7e1be8b07bf40da0",
+        "scroll-default-before/S.print": "f727613909ef96e5f0368f8902bec972808a4d976bf08cb1097dde51891ca4ba",
+        "scroll-default-before/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "scroll-default-before/got.screen": "12afd8ddc84de9eb1325c63ec0125b8a0a6ce435ed909ede5ca1974667ef5759"
+      }
+    },
+    "scroll-default-resized": {
+      "input_sha256": "07c47e4cb66117a1633d0299bd9941333766945314b436a2f4ce0798200bb6b1",
+      "replay": true,
+      "screen_sha256": "2ba2df8efef3151cbce3707ea49eef3be90acb5d712fd9ec6e8f7823ba7d54a1",
+      "size": [
+        6,
+        8
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        0,
+        4,
+        0,
+        0,
+        0
+      ],
+      "background_cells": [],
+      "files": {
+        "scroll-default-resized.rec": "07c47e4cb66117a1633d0299bd9941333766945314b436a2f4ce0798200bb6b1",
+        "scroll-default-resized/A.json": "5106e5e988c2b99a8b0dcb14910b9841205aae710416b027eaec7fd3e6a853c5",
+        "scroll-default-resized/S.json": "014cd76dd99ac88f4292901366dd80b69b2a78f2ae82d4006e3a3d5aa9cb7662",
+        "scroll-default-resized/A.print": "c20e5664115895df7e7ed6ba6181de2d7c2458ccbc2d9486a63380ae5aed25ac",
+        "scroll-default-resized/S.print": "13e9de806b3952e361ead8c5bb8bbe7e4d15be83acd277b1c384110b236b66a3",
+        "scroll-default-resized/continuation.json": "e0af4f4b011b185c68cff16ce759752c7c787cdde1333c8bc4a0883ba296fe8c",
+        "scroll-default-resized/got.screen": "2ba2df8efef3151cbce3707ea49eef3be90acb5d712fd9ec6e8f7823ba7d54a1"
+      }
+    },
+    "scroll-background-before": {
+      "input_sha256": "145aaa864a5a6bf1abf4de89625fb0e2d8d4bee4843f8b7ef7323782c3347176",
+      "replay": true,
+      "screen_sha256": "9701ca6a1978ec8428fa6f01947977ed6feb5a3664b68f34cfa1bac21a606ff1",
+      "size": [
+        12,
+        4
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        4
+      ],
+      "background_cells": [
+        [
+          4,
+          1,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          2,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          3,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          4,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          5,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          6,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          7,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          8,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          9,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          10,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          11,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          12,
+          "bg=idx:5"
+        ]
+      ],
+      "files": {
+        "scroll-background-before.rec": "145aaa864a5a6bf1abf4de89625fb0e2d8d4bee4843f8b7ef7323782c3347176",
+        "scroll-background-before/A.json": "e091e795cdaf0e89f1b5435d623a4e367793ae388e0a26ff471764ea31129274",
+        "scroll-background-before/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "scroll-background-before/A.print": "880aa44a31378adb6addc74d0f39ffd79c48d70628ac63072813988ffad0439e",
+        "scroll-background-before/S.print": "f22f45f6231eb373c1a908f5c112d6c63b8193cb846ff486a533ee56debc6932",
+        "scroll-background-before/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "scroll-background-before/got.screen": "9701ca6a1978ec8428fa6f01947977ed6feb5a3664b68f34cfa1bac21a606ff1"
+      }
+    },
+    "scroll-background-resized": {
+      "input_sha256": "6642edd43aac0f710f1c116d305648490997c0fe7dfcb98e70f766bf4d56cf78",
+      "replay": true,
+      "screen_sha256": "d040440863fb34bc361fcb9017ae0dd509d987f4e080e24fb4435ee11947c802",
+      "size": [
+        6,
+        8
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        0,
+        4,
+        0,
+        0,
+        0
+      ],
+      "background_cells": [
+        [
+          5,
+          1,
+          "bg=idx:5"
+        ],
+        [
+          5,
+          2,
+          "bg=idx:5"
+        ],
+        [
+          5,
+          3,
+          "bg=idx:5"
+        ],
+        [
+          5,
+          4,
+          "bg=idx:5"
+        ],
+        [
+          5,
+          5,
+          "bg=idx:5"
+        ],
+        [
+          5,
+          6,
+          "bg=idx:5"
+        ]
+      ],
+      "files": {
+        "scroll-background-resized.rec": "6642edd43aac0f710f1c116d305648490997c0fe7dfcb98e70f766bf4d56cf78",
+        "scroll-background-resized/A.json": "5106e5e988c2b99a8b0dcb14910b9841205aae710416b027eaec7fd3e6a853c5",
+        "scroll-background-resized/S.json": "014cd76dd99ac88f4292901366dd80b69b2a78f2ae82d4006e3a3d5aa9cb7662",
+        "scroll-background-resized/A.print": "df5d3cd270e9ceed0ca0b9c5e308f242b92661f2202754b301cb94bdc3508259",
+        "scroll-background-resized/S.print": "bf3a0869f0da6624261976a9b1114ffe1a31cc4400a16bd39e69375c503cd613",
+        "scroll-background-resized/continuation.json": "e0af4f4b011b185c68cff16ce759752c7c787cdde1333c8bc4a0883ba296fe8c",
+        "scroll-background-resized/got.screen": "d040440863fb34bc361fcb9017ae0dd509d987f4e080e24fb4435ee11947c802"
+      }
+    },
+    "fresh-background-before": {
+      "input_sha256": "848cb1c3bb0da79253fbf1e563d79175da07ec446b538ee36252dd76d49e5c22",
+      "replay": true,
+      "screen_sha256": "d96464a85658335881de0d48c8444a029a454ebc83feb7027766c23471857f4e",
+      "size": [
+        12,
+        4
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        9
+      ],
+      "background_cells": [
+        [
+          4,
+          1,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          2,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          3,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          4,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          5,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          6,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          7,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          8,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          9,
+          "bg=idx:5"
+        ]
+      ],
+      "files": {
+        "fresh-background-before.rec": "848cb1c3bb0da79253fbf1e563d79175da07ec446b538ee36252dd76d49e5c22",
+        "fresh-background-before/A.json": "e091e795cdaf0e89f1b5435d623a4e367793ae388e0a26ff471764ea31129274",
+        "fresh-background-before/S.json": "1a25fba43c2a5e3cdd74489e74e870f1d78573f86f0384026d61c88d2bd21bba",
+        "fresh-background-before/A.print": "a7cd5642d7df224791920d4c1cc908b99ff26c80486771659b2c8880abb47666",
+        "fresh-background-before/S.print": "fc9c44ee83d2f898c0bbc331850977588af49a0a50a0580efec2014f6c0a6082",
+        "fresh-background-before/continuation.json": "453a39b98df6359822c48cf564842ecf4b8b70a0520a145ccfff84370b3fe687",
+        "fresh-background-before/got.screen": "d96464a85658335881de0d48c8444a029a454ebc83feb7027766c23471857f4e"
+      }
+    },
+    "fresh-background-resized": {
+      "input_sha256": "81448edb58d6bbcad99725ea957841dbf604b83d4b31c4be5bc28863e97888e1",
+      "replay": true,
+      "screen_sha256": "1598326da5a6c8147d5661f337eff63220201c186af106ca0ad79d7339a67c5c",
+      "size": [
+        6,
+        8
+      ],
+      "extents": [
+        0,
+        0,
+        0,
+        6,
+        0,
+        0,
+        0,
+        0
+      ],
+      "background_cells": [
+        [
+          4,
+          1,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          2,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          3,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          4,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          5,
+          "bg=idx:5"
+        ],
+        [
+          4,
+          6,
+          "bg=idx:5"
+        ]
+      ],
+      "files": {
+        "fresh-background-resized.rec": "81448edb58d6bbcad99725ea957841dbf604b83d4b31c4be5bc28863e97888e1",
+        "fresh-background-resized/A.json": "3e500c1333a6b427ea20c09990631c4ce0c10e00204ea8c8c2b51bda32ab0d69",
+        "fresh-background-resized/S.json": "014cd76dd99ac88f4292901366dd80b69b2a78f2ae82d4006e3a3d5aa9cb7662",
+        "fresh-background-resized/A.print": "dc82d8490b7e5227ea451ebcb7d6ac805305dc82de089f79e5d41ddae9923642",
+        "fresh-background-resized/S.print": "fddb5e26085abe63018142579bc0d41688e6605fda7c9c1861dd6d2752c6d053",
+        "fresh-background-resized/continuation.json": "e0af4f4b011b185c68cff16ce759752c7c787cdde1333c8bc4a0883ba296fe8c",
+        "fresh-background-resized/got.screen": "1598326da5a6c8147d5661f337eff63220201c186af106ca0ad79d7339a67c5c"
+      }
+    }
+  },
+  "errors": [],
+  "capture_head": "0f724eea5c66e12cb8db409a2fb52908a546ac4b",
+  "pins_sha256": "8d6d781805e6840a6a6becb059453cfa166fb7d53424fd4a89289ad827b7e992",
+  "capture_manifest_sha256": "6ed2bb8c3812bcf8e8dc254ecb6658313b46c118ebe59ef01e5f37ab5416dd1b"
+}
