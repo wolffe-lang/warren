@@ -26,13 +26,17 @@ Expected parser throughput on one CPU is at least 5 MB/s natively and 30 kB/s un
 
 This is the parser-only slice, not a completed emulator. The final-head
 platform and plant records accompany the pull request; they are not claims
-of whole-screen agreement.
+of whole-screen agreement. The original `d966f49` records are retained as
+historical evidence. After the protocol work reached trunk at `5bbc399`,
+this slice was rebased without changing any parser or parser-fixture bytes;
+README and MAP preserve both implementations' status. A fresh exact-head
+record is required for the rebased pull request.
 
 | Row | Entry or data | What it establishes |
 |---|---|---|
 | decoder, transitions, caps, every split point | `src/vt_parser_test.lu` | ten decoder fixtures, twenty initial transition fixtures, the measured edge corrections, fixed metadata bounds and chunking |
 | hostile input | `src/vt_hostile_test.lu` | eight seeded raw-byte streams, 65,536 ESC bytes, unterminated strings and saturating parameters, each under a 32 KiB region cap |
-| state-loss plant | `src/vt_state_test.lu` | losing the parser state between bytes is red at `parser-state-loss`; the one-line break is isolated on `wr01-plant-state-loss-final` |
+| state-loss plant | `src/vt_state_test.lu` | losing the parser state between bytes is red at `parser-state-loss`; the one-line break is isolated on `wr01-plant-state-loss-rebased` |
 | reference projection | `src/vt_fixture_test.lu`, `tests/vt/parser_reference.py` | printed scalars and the last title on seventeen identical reference streams; **not** cells, attributes, cursor or modes |
 | reference snapshots | `tests/vt/parser-reference/` | nineteen whole-screen snapshots bound by digest to the unchanged oracle pin; two additionally measure a one-row region |
 | allocation and throughput | `src/vt_bench_test.lu` | 61,440 mixed bytes, a named region and an isolated feed-loop clock; no clock in the parser |
