@@ -49,15 +49,19 @@ fn break_pair(mut screen: Screen, cols: int, row: int, col: int, background: int
 fn break_print_pair(mut screen: Screen, cols: int, row: int, col: int, background: int) {
     let at = (row - 1) * cols + col - 1
     if screen.cells[at].width == 2 && col < cols {
-        // Losing a lead discards its tail, including its written contribution.
-        blank_cell(mut screen, at + 1, background)
-        if screen.extents[row - 1] == col + 1 { recalculate_written_extent(mut screen, cols, row) }
+        // The right-edge tail is discarded; an interior tail stays a written blank.
+        if col + 1 == cols {
+            blank_cell(mut screen, at + 1, background)
+            if screen.extents[row - 1] == col + 1 { recalculate_written_extent(mut screen, cols, row) }
+        } else { blank_cell_preserving_written(mut screen, at + 1, background) }
     } else if screen.cells[at].width == 0 && col > 1 {
-        // The surviving old lead becomes a space in its own old rendition.
-        screen.cells[at - 1].base = 32
-        screen.cells[at - 1].mark1 = 0
-        screen.cells[at - 1].mark2 = 0
-        screen.cells[at - 1].width = 1
+        if col == cols {
+            // Only the right-edge overwrite retains the old lead's rendition.
+            screen.cells[at - 1].base = 32
+            screen.cells[at - 1].mark1 = 0
+            screen.cells[at - 1].mark2 = 0
+            screen.cells[at - 1].width = 1
+        } else { blank_cell_preserving_written(mut screen, at - 1, background) }
     }
 }
 

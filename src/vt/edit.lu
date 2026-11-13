@@ -11,11 +11,11 @@ fn repair_row_pairs_policy(mut screen: Screen, cols: int, row: int, background: 
     let start = (row - 1) * cols
     while col < cols {
         if screen.cells[start + col].width == 2 {
-            if col + 1 >= cols { blank_repaired_cell(mut screen, start + col, background, preserve_written) }
-            else if screen.cells[start + col + 1].width != 0 { blank_repaired_cell(mut screen, start + col, background, preserve_written) }
+            if col + 1 >= cols { blank_repaired_cell(mut screen, start + col, background, true) }
+            else if screen.cells[start + col + 1].width != 0 { blank_repaired_cell(mut screen, start + col, background, preserve_written || col + 2 != cols) }
         } else if screen.cells[start + col].width == 0 {
-            if col == 0 { blank_repaired_cell(mut screen, start + col, background, preserve_written) }
-            else if screen.cells[start + col - 1].width != 2 { blank_repaired_cell(mut screen, start + col, background, preserve_written) }
+            if col == 0 { blank_repaired_cell(mut screen, start + col, background, true) }
+            else if screen.cells[start + col - 1].width != 2 { blank_repaired_cell(mut screen, start + col, background, true) }
         }
         col += 1
     }

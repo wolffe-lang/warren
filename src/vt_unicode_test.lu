@@ -90,6 +90,13 @@ fn test_output_pair_rendition_and_extent() {
     vt.feed(mut lead, "\u{1b}[?7l\u{1b}[2;8;9;45m\u{1b}[11G中\u{1b}[11GX".bytes())
     assert(lead.primary.extents[0] == 11 && !lead.primary.cells[11].written,
         "printing-wide-lead-clears-lost-tail-extent")
+    var interior = vt.new(12, 4, 0)
+    vt.feed(mut interior, "\u{1b}[?7l\u{1b}[2;8;9;45m\u{1b}[5G中\u{1b}[0;42m\u{1b}[6GX".bytes())
+    assert(interior.primary.cells[4].flags == 0 && interior.primary.cells[4].background == 2,
+        "interior-tail-repair-clears-rendition")
+    var interior_lead = vt.new(12, 4, 0)
+    vt.feed(mut interior_lead, "中\rX".bytes())
+    assert(interior_lead.primary.extents[0] == 2, "interior-lead-repair-keeps-written-blank")
     pairs(tail.primary, 12, 4)
     pairs(lead.primary, 12, 4)
 }
@@ -100,6 +107,9 @@ fn test_deleted_orphan_is_unwritten() {
     assert(pane.primary.extents[0] == 0 && !pane.primary.cells[10].written,
         "deleted-wide-tail-erases-orphan-lead-writtenness")
     pairs(pane.primary, 12, 4)
+    var interior = vt.new(12, 4, 0)
+    vt.feed(mut interior, "\u{1b}[5G中\u{1b}[6G\u{1b}[P".bytes())
+    assert(interior.primary.extents[0] == 5, "interior-deleted-tail-retains-repaired-blank")
 }
 
 fn main() -> int {
