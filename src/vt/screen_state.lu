@@ -90,10 +90,11 @@ fn alternate_mode(mut pane: Vt, code: int, enabled: bool) {
         if code == 1049 {
             save_cursor(mut pane)
             clear_screen(mut pane.alternate, pane.cols, pane.rows, pane.pen.background)
+            pane.pending_wrap = false
         }
         alternate_state(mut pane, true)
     } else {
-        if (code == 1047 || code == 1049) && pane.active_alternate {
+        if code == 1047 && pane.active_alternate {
             clear_screen(mut pane.alternate, pane.cols, pane.rows, pane.pen.background)
         }
         alternate_state(mut pane, false)
