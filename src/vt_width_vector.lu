@@ -1,4 +1,22 @@
 //! member: false
-//! Native width-vector seam: one byte per code point, checked by the host row.
-use std.io
-fn main() -> int { io.write("0"); 0 }
+//! Native-only vector: every natural-width result, with bounded byte output.
+use vt
+use std.fs
+
+fn main() -> int {
+    var output = fs.stdout()
+    var buffer = List[byte]()
+    (mut buffer).reserve(4096)
+    var i = 0
+    while i < 4096 { (mut buffer).push(0 as byte); i += 1 }
+    var cp: int = 0
+    while cp < 1114112 {
+        let remaining = 1114112 - cp
+        let count = if remaining < 4096 { remaining } else { 4096 }
+        i = 0
+        while i < count { buffer[i] = vt.scalar_width(cp + i) as byte; i += 1 }
+        region chunk { fs.write_chunk(mut output, buffer[0..count]) else { return 1 } }
+        cp += count
+    }
+    0
+}

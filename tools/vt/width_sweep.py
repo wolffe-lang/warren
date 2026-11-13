@@ -6,7 +6,6 @@ Cc controls are measured but never misreported as scalar-width disagreements.
 The reference binary is only run, never read as implementation source.
 """
 import argparse
-from bisect import bisect_right
 from collections import Counter
 import hashlib
 from itertools import islice
@@ -14,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import re
+import runpy
 import subprocess
 import sys
 import time
@@ -40,7 +40,7 @@ def positions(data, count):
     return [(int(match[1]), int(match[2])) for match in matches]
 
 
-def inner(out):
+def inner(out, native_path):
     sys.path.insert(0, str(ROOT / 'tools/oracle'))
     from feeder import Tty
     assigned_path = ROOT / 'tests/vt/assigned-ranges.json'
@@ -49,12 +49,15 @@ def inner(out):
     widths = json.loads(widths_path.read_text())
     if assigned['version'] != widths['version']:
         raise ValueError('assigned and width Unicode versions differ')
-    ranges = widths['ranges']
-    starts = [item[0] for item in ranges]
+    if native_path.stat().st_size != 0x110000:
+        raise ValueError('native width vector is missing code points')
+    native = native_path.read_bytes()
+    expected_vector = runpy.run_path(str(ROOT / 'tests/vt/width_vector_rows.py'))['expected_vector']
+    if native != expected_vector():
+        raise ValueError('native width vector differs from the pinned table')
 
     def expected(cp):
-        index = bisect_right(starts, cp) - 1
-        return ranges[index][2] if index >= 0 and cp <= ranges[index][1] else 1
+        return native[cp]
 
     points = ((cp, category) for low, high, category in assigned['ranges'] for cp in range(low, high + 1))
     terminal = Tty(20)
@@ -100,6 +103,7 @@ def inner(out):
         result = {'schema': 1, 'status': 'measured-not-an-agreement-verdict', 'unicode': assigned['version'],
                   'assigned_sha256': hashlib.sha256(assigned_path.read_bytes()).hexdigest(),
                   'widths_sha256': hashlib.sha256(widths_path.read_bytes()).hexdigest(),
+                  'native_vector_sha256': hashlib.sha256(native).hexdigest(),
                   'measured_scalars': measured, 'excluded_non_scalars': assigned['excluded_non_scalars'],
                   'batch_size': BATCH, 'classifications': dict(sorted(classes.items())),
                   'controls': controls, 'disagreements': disagreements}
@@ -113,12 +117,14 @@ def inner(out):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--native-vector', type=Path, required=True,
+                        help='validated output of the actual native vt_width_vector program')
     parser.add_argument('--inner', action='store_true', help=argparse.SUPPRESS)
     args = parser.parse_args()
     out = args.out.resolve()
     if args.inner:
         try:
-            inner(out)
+            inner(out, args.native_vector.resolve())
             return 0
         except Exception as error:
             (out / 'error.json').write_text(json.dumps({'error': str(error), 'traceback': traceback.format_exc()}) + '\n')
@@ -130,7 +136,8 @@ def main():
         command = ['xterm', '-u8', '-geometry', '12x4', '-fn', 'fixed']
         for key, value in oracle.RESOURCES.items():
             command += ['-xrm', 'XTerm*%s: %s' % (key, value)]
-        command += ['-e', sys.executable, '-I', str(Path(__file__).resolve()), '--inner', '--out', str(out)]
+        command += ['-e', sys.executable, '-I', str(Path(__file__).resolve()), '--inner', '--out', str(out),
+                    '--native-vector', str(args.native_vector.resolve())]
         env = {'DISPLAY': display.name, 'LC_ALL': 'C.UTF-8', 'PATH': os.environ['PATH'],
                'HOME': str(out), 'TERM': 'xterm-256color'}
         proc = subprocess.Popen(command, env=env, stdout=log, stderr=log)

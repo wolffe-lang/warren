@@ -72,6 +72,8 @@ step toolchain "${fetch[@]}"
 mkdir -p target/native
 step resource-wrapper-build cc -std=c11 -O2 -Wall -Wextra -Werror tools/vt/measure_child.c -o "$root/target/native/measure-child"
 step resource-wrapper-rows python3 -I tests/vt/resource_wrapper_rows.py "$root/target/native/measure-child"
+step width-vector-build "$WOLF" build --deny-warnings src/vt_width_vector.lu -o "$root/target/native/vt-width-vector"
+step width-vector-native python3 -I tests/vt/width_vector_rows.py --out "$root/target/vt/native-widths.bin" "$root/target/native/vt-width-vector"
 step resource-smoke-build "$WOLF" build --deny-warnings src/vt_resource_test.lu -o "$root/target/native/resource-smoke"
 step resource-smoke-native "$root/target/native/measure-child" "$root/target/native/resource-smoke"
 step checked-vt python3 -I tests/vt/checked_rows.py "$WOLF"
