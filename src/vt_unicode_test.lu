@@ -112,7 +112,28 @@ fn test_deleted_orphan_is_unwritten() {
     assert(interior.primary.extents[0] == 5, "interior-deleted-tail-retains-repaired-blank")
 }
 
+fn test_zero_width_exception_attachment() {
+    var jamo = vt.new(12, 4, 0)
+    vt.feed(mut jamo, "a\u{1160}\u{11a8}".bytes())
+    assert(jamo.cursor_col == 2 && jamo.primary.cells[0].base == 97 &&
+        jamo.primary.cells[0].mark1 == 0x1160 && jamo.primary.cells[0].mark2 == 0x11A8,
+        "zero-width-jamo-attach-to-base")
+    var format = vt.new(12, 4, 0)
+    vt.feed(mut format, "a\u{fff9}\u{13430}".bytes())
+    assert(format.cursor_col == 2 && format.primary.cells[0].mark1 == 0xFFF9 &&
+        format.primary.cells[0].mark2 == 0x13430, "zero-width-format-attach-to-base")
+    var blank = vt.new(12, 4, 0)
+    vt.feed(mut blank, "\u{1b}[1;5H\u{1161}".bytes())
+    assert(blank.primary.cells[3].written && blank.primary.extents[0] == 4 &&
+        blank.primary.cells[3].mark1 == 0x1161, "zero-width-jamo-unwritten-base-D10")
+    var indicators = vt.new(12, 4, 0)
+    vt.feed(mut indicators, "\u{1f1fa}\u{1f1f8}".bytes())
+    assert(indicators.cursor_col == 3 && indicators.primary.cells[0].width == 1 &&
+        indicators.primary.cells[1].width == 1, "regional-indicator-pair-two-cells")
+}
+
 fn main() -> int {
+    test_zero_width_exception_attachment()
     test_output_pair_rendition_and_extent()
     test_deleted_orphan_is_unwritten()
     test_printing()
