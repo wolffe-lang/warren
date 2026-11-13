@@ -1,8 +1,140 @@
 //! member: true
-//! Query answer queue seam.
+//! Bounded terminal answers. Overflow drops an entire query, never a prefix.
 
-/// Drain terminal answers. Query dispatch is added by the next slice.
+fn answer_room(pane: Vt, amount: int) -> bool {
+    amount <= 4096 - pane.answer_length
+}
+
+fn answer_byte(mut pane: Vt, value: int) {
+    pane.answer_storage[pane.answer_length] = value as byte
+    pane.answer_length += 1
+}
+
+fn answer_text(mut pane: Vt, text: str) {
+    // The consumed byte view is a lend, not a bound, materialized byte list.
+    for b in text.bytes() {
+        pane.answer_storage[pane.answer_length] = b
+        pane.answer_length += 1
+    }
+}
+
+fn answer_literal(mut pane: Vt, text: str) {
+    if answer_room(pane, text.len) { answer_text(mut pane, text) }
+}
+
+fn decimal_digits(n: int) -> int {
+    var remaining = n
+    var count = 1
+    while remaining >= 10 { remaining = remaining / 10; count += 1 }
+    count
+}
+
+fn answer_decimal(mut pane: Vt, n: int) {
+    var divisor = 1
+    while n / divisor >= 10 { divisor *= 10 }
+    while divisor > 0 {
+        answer_byte(mut pane, 48 + n / divisor % 10)
+        divisor = divisor / 10
+    }
+}
+
+fn answer_primary_identity(mut pane: Vt) {
+    // VT220-style report, ANSI colour only: no graphics or printer claims.
+    answer_literal(mut pane, "\u{1b}[?62;22c")
+}
+
+fn answer_version(mut pane: Vt) {
+    let prefix = "\u{1b}P>|warren "
+    let suffix = "\u{1b}\\"
+    let version = package_version()
+    if !answer_room(pane, prefix.len + version.len + suffix.len) { return }
+    answer_text(mut pane, prefix)
+    answer_text(mut pane, version)
+    answer_text(mut pane, suffix)
+}
+
+fn answer_cursor(mut pane: Vt, private_query: bool) {
+    let row = if pane.modes.origin { pane.cursor_row - pane.region_top + 1 } else { pane.cursor_row }
+    let extra = if private_query { 1 } else { 0 }
+    if !answer_room(pane, 4 + decimal_digits(row) + decimal_digits(pane.cursor_col) + extra) { return }
+    answer_text(mut pane, "\u{1b}[")
+    if private_query { answer_byte(mut pane, 63) }
+    answer_decimal(mut pane, row)
+    answer_byte(mut pane, 59)
+    answer_decimal(mut pane, pane.cursor_col)
+    answer_byte(mut pane, 82)
+}
+
+fn reported_mode(pane: Vt, private_query: bool, code: int) -> int {
+    let index = event_mode_index(private_query, code)
+    if index >= 0 { return if pane.mode_values[index] == 1 { 1 } else { 2 } }
+    if !private_query && code == 12 { return 3 }
+    if private_query {
+        if code == 47 || code == 1047 || code == 1049 { return if pane.active_alternate { 1 } else { 2 } }
+        // Save/restore is an action, not a stored mode (as in the census).
+        if code == 1048 { return 1 }
+        if code == 45 || code == 69 || code == 1005 || code == 1015 { return 4 }
+    }
+    0
+}
+
+fn answer_mode(mut pane: Vt, private_query: bool, code: int) {
+    let value = reported_mode(pane, private_query, code)
+    let extra = if private_query { 1 } else { 0 }
+    if !answer_room(pane, 6 + decimal_digits(code) + extra) { return }
+    answer_text(mut pane, "\u{1b}[")
+    if private_query { answer_byte(mut pane, 63) }
+    answer_decimal(mut pane, code)
+    answer_byte(mut pane, 59)
+    answer_decimal(mut pane, value)
+    answer_text(mut pane, "$y")
+}
+
+fn one_query_param(p: Parser) -> bool {
+    p.param_count <= 1 && (p.param_count == 0 || p.subs[0] == 1)
+}
+
+fn dispatch_query(mut pane: Vt, final: int) -> bool {
+    if final == 99 {
+        if !one_query_param(pane.parser) || pane.parser.inter_count != 0 { return true }
+        if grid_param(pane.parser, 0, 0, false) != 0 { return true }
+        if pane.parser.private_marker == 0 { answer_primary_identity(mut pane) }
+        else if pane.parser.private_marker == 62 { answer_literal(mut pane, "\u{1b}[>0;1;0c") }
+        return true
+    }
+    if final == 113 && pane.parser.private_marker == 62 {
+        if one_query_param(pane.parser) && pane.parser.inter_count == 0 && grid_param(pane.parser, 0, 0, false) == 0 {
+            answer_version(mut pane)
+        }
+        return true
+    }
+    if final == 110 {
+        if !one_query_param(pane.parser) || pane.parser.inter_count != 0 { return true }
+        let private_query = pane.parser.private_marker == 63
+        if pane.parser.private_marker != 0 && !private_query { return true }
+        let code = grid_param(pane.parser, 0, 0, false)
+        if code == 5 && !private_query { answer_literal(mut pane, "\u{1b}[0n") }
+        else if code == 6 { answer_cursor(mut pane, private_query) }
+        return true
+    }
+    if final == 112 && pane.parser.inter_count == 1 && pane.parser.inter[0] == 36 {
+        if !one_query_param(pane.parser) { return true }
+        let private_query = pane.parser.private_marker == 63
+        if pane.parser.private_marker != 0 && !private_query { return true }
+        answer_mode(mut pane, private_query, grid_param(pane.parser, 0, 0, false))
+        return true
+    }
+    false
+}
+
+/// Drain terminal answers in query order, then clear the fixed 4096-byte
+/// queue. Feed never allocates answer records; a query that would exceed
+/// remaining space is dropped whole, leaving room for a later smaller one.
 pub fn take_answers(mut pane: Vt) -> List[byte] {
+    var out = List[byte]()
+    (mut out).reserve(pane.answer_length)
+    var i = 0
+    while i < pane.answer_length { (mut out).push(pane.answer_storage[i]); i += 1 }
     pane.answer_length = 0
-    List[byte]()
+    out
 }
