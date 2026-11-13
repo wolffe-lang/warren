@@ -26,7 +26,7 @@ fn test_anchor_distinguishes_print_from_same_cup() {
 }
 
 fn test_anchor_clear_operations() {
-    let ops: List[str] = ["\r", "\n", "\b", "\u{1b}[0C", "\u{1b}[1C", "\u{1b}[0D", "\u{1b}[1D",
+    let ops: List[str] = ["\r", "\n", "\u{8}", "\u{1b}[0C", "\u{1b}[1C", "\u{1b}[0D", "\u{1b}[1D",
         "\u{1b}[0A", "\u{1b}[1A", "\u{1b}[0B", "\u{1b}[1B", "\u{1b}[X", "\u{1b}[K", "\u{1b}[1K",
         "\u{1b}7\u{1b}8", "\u{1b}[?1049h", "\u{1b}[?1049h\u{1b}[?1049l",
         "\u{1b}[?1047h\u{1b}[?1047l"]
@@ -44,7 +44,7 @@ fn test_anchor_clear_operations() {
         assert(pane.cursor_row == row && pane.cursor_col == col, "combine-mark-never-moves-cursor")
         index += 1
     }
-    let disambiguated: List[str] = ["\b\t", "\u{1b}[0D\t", "\u{1b}[1D\t", "\u{1b}D\t", "\u{1b}E\t",
+    let disambiguated: List[str] = ["\u{8}\t", "\u{1b}[0D\t", "\u{1b}[1D\t", "\u{1b}D\t", "\u{1b}E\t",
         "\u{1b}[@\t", "\u{1b}[P\t"]
     index = 0
     while index < disambiguated.len {
