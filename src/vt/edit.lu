@@ -1,19 +1,28 @@
 //! member: true
 //! Cell and row editing with wide-character boundary repair.
 
-fn repair_row_pairs(mut screen: Screen, cols: int, row: int, background: int) {
+fn blank_repaired_cell(mut screen: Screen, at: int, background: int, preserve_written: bool) {
+    if preserve_written { blank_cell_preserving_written(mut screen, at, background) }
+    else { blank_cell(mut screen, at, background) }
+}
+
+fn repair_row_pairs_policy(mut screen: Screen, cols: int, row: int, background: int, preserve_written: bool) {
     var col = 0
     let start = (row - 1) * cols
     while col < cols {
         if screen.cells[start + col].width == 2 {
-            if col + 1 >= cols { blank_cell_preserving_written(mut screen, start + col, background) }
-            else if screen.cells[start + col + 1].width != 0 { blank_cell_preserving_written(mut screen, start + col, background) }
+            if col + 1 >= cols { blank_repaired_cell(mut screen, start + col, background, preserve_written) }
+            else if screen.cells[start + col + 1].width != 0 { blank_repaired_cell(mut screen, start + col, background, preserve_written) }
         } else if screen.cells[start + col].width == 0 {
-            if col == 0 { blank_cell_preserving_written(mut screen, start + col, background) }
-            else if screen.cells[start + col - 1].width != 2 { blank_cell_preserving_written(mut screen, start + col, background) }
+            if col == 0 { blank_repaired_cell(mut screen, start + col, background, preserve_written) }
+            else if screen.cells[start + col - 1].width != 2 { blank_repaired_cell(mut screen, start + col, background, preserve_written) }
         }
         col += 1
     }
+}
+
+fn repair_row_pairs(mut screen: Screen, cols: int, row: int, background: int) {
+    repair_row_pairs_policy(mut screen, cols, row, background, true)
 }
 
 fn recalculate_written_extent(mut screen: Screen, cols: int, row: int) {
@@ -48,7 +57,7 @@ fn shift_characters(mut screen: Screen, cols: int, row: int, col: int,
         var at = cols - n + 1
         while at <= cols { blank_cell(mut screen, (row - 1) * cols + at - 1, background); at += 1 }
     }
-    repair_row_pairs(mut screen, cols, row, background)
+    repair_row_pairs_policy(mut screen, cols, row, background, insert)
     recalculate_written_extent(mut screen, cols, row)
 }
 
