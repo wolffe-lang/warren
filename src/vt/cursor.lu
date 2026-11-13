@@ -27,10 +27,8 @@ fn simple_grid_params(p: Parser) -> bool {
 fn move_vertical(mut pane: Vt, amount: int) {
     var low = 1
     var high = pane.rows
-    if pane.cursor_row >= pane.region_top && pane.cursor_row <= pane.region_bottom {
-        low = pane.region_top
-        high = pane.region_bottom
-    }
+    if amount < 0 && pane.cursor_row >= pane.region_top { low = pane.region_top }
+    if amount > 0 && pane.cursor_row <= pane.region_bottom { high = pane.region_bottom }
     pane.cursor_row = grid_clamp(pane.cursor_row + amount, low, high)
 }
 
