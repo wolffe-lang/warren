@@ -63,7 +63,7 @@ fn restore_cursor(mut pane: Vt) {
     pane.shifted = if alt { pane.saved_alternate.shifted } else { pane.saved_primary.shifted }
     pane.modes.origin = origin
     change_mode_value(mut pane, 3, if origin { 1 } else { 0 })
-    pane.cursor_row = grid_clamp(row, if origin { pane.region_top } else { 1 }, if origin { pane.region_bottom } else { pane.rows })
+    pane.cursor_row = grid_clamp(row, 1, if origin { pane.region_bottom } else { pane.rows })
     pane.cursor_col = grid_clamp(col, 1, pane.cols)
     pane.pending_wrap = pending && pane.cursor_col == pane.cols
 }
