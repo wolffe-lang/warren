@@ -1,9 +1,8 @@
-// No dependency but wolf-std. The scaffold writes to standard output, which
-// std.io reaches through fs; the server will ask for env, net and exec when
-// it exists.
+// The dump command reads argv (env) and byte streams (fs). The pure VT
+// module uses neither; server net/exec capabilities remain for later work.
 pkg {
     name: "warren",
     version: "0.0.0",
     edition: "1",
-    capabilities: [fs],
+    capabilities: [fs, env],
 }

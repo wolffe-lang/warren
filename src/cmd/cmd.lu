@@ -1,8 +1,8 @@
 //! member: true
 //! The command client and dispatcher behind `warren <verb>`.
 //!
-//! Stub. Nothing here is implemented; the module exists so that the tree,
-//! the build and the tests have their final shape from the first commit.
+//! The bounded vt-dump raw/replay diagnostic is implemented. Command-client
+//! operations for a live server remain for W5.
 
 /// The milestone that fills this module in.
 pub fn milestone() -> str {

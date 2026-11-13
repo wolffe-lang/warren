@@ -1,0 +1,216 @@
+//! member: true
+//! Host-side bounded raw/replay input for the vt-dump diagnostic.
+use std.fs
+use std.io
+use vt
+
+struct DumpInput { file: fs.File, buffer: List[byte], at: int, status: int, header: List[byte] }
+struct DumpOptions { cols: int, rows: int, history: int, replay: bool, file: str, valid: bool }
+struct DumpHeader { kind: int, first: int, second: int, length: int, at: int }
+
+/// Print the diagnostic's usage and return its usage-error status.
+pub fn usage() -> int {
+    io.write_err_line("usage: warren vt-dump [--cols N --rows N] [--history-bytes N] [--replay] [FILE|-]")
+    2
+}
+
+fn decimal_argument(text: str, limit: int) -> int {
+    if text.len == 0 { return 0 - 1 }
+    var value: int = 0
+    for raw in text.bytes() {
+        let digit = raw as int - 48
+        if digit < 0 || digit > 9 || value > (limit - digit) / 10 { return 0 - 1 }
+        value = value * 10 + digit
+    }
+    value
+}
+
+fn dump_options(args: List[str]) -> DumpOptions {
+    var result = DumpOptions { cols: 80, rows: 24, history: 8388608, replay: false, file: "-", valid: false }
+    var index = 1
+    var operand = false
+    var ended = false
+    var raw_size = false
+    while index < args.len {
+        let word = args[index]
+        if !ended && word == "--" { ended = true }
+        else if !ended && (word == "--cols" || word == "--rows" || word == "--history-bytes") {
+            index += 1
+            if index >= args.len { return result }
+            let limit = if word == "--history-bytes" { 8388608 } else { 262144 }
+            let value = decimal_argument(args[index], limit)
+            if value < 0 { return result }
+            if word == "--history-bytes" { result.history = value }
+            else {
+                raw_size = true
+                if value == 0 { return result }
+                if word == "--cols" { result.cols = value } else { result.rows = value }
+            }
+        } else if !ended && word == "--replay" { result.replay = true }
+        else {
+            if operand || word.len == 0 { return result }
+            if !ended && word != "-" && word.bytes()[0] == 45 as byte { return result }
+            result.file = word
+            operand = true
+        }
+        index += 1
+    }
+    if result.cols > 262144 / result.rows || (result.replay && raw_size) { return result }
+    result.valid = true
+    result
+}
+
+fn new_dump_input(take file: fs.File) -> DumpInput {
+    var buffer = List[byte]()
+    (mut buffer).reserve(4096)
+    var header = List[byte]()
+    (mut header).reserve(64)
+    var i = 0
+    while i < 64 { (mut header).push(0 as byte); i += 1 }
+    DumpInput { file: file, buffer: buffer, at: 0, status: 0, header: header }
+}
+
+fn dump_fill(mut input: DumpInput) -> int {
+    if input.status < 0 { return input.status }
+    if input.at < input.buffer.len { return input.buffer.len - input.at }
+    let count = fs.read_into(mut input.file, mut input.buffer, 4096) else |error| match error {
+        eof => { input.status = 0 - 1; return 0 - 1 },
+        io => { input.status = 0 - 2; return 0 - 2 },
+    }
+    input.at = 0
+    if count == 0 { input.status = 0 - 1; return 0 - 1 }
+    count
+}
+
+fn dump_byte(mut input: DumpInput) -> int {
+    let available = dump_fill(mut input)
+    if available < 0 { return available }
+    let value = input.buffer[input.at] as int
+    input.at += 1
+    value
+}
+
+fn dump_line(mut input: DumpInput) -> int {
+    var length = 0
+    while true {
+        let value = dump_byte(mut input)
+        if value < 0 {
+            if value == 0 - 2 { return value }
+            return if length == 0 { 0 - 1 } else { 0 - 3 }
+        }
+        if value == 10 { return length }
+        if length == 64 { return 0 - 3 }
+        input.header[length] = value as byte
+        length += 1
+    }
+}
+
+fn header_starts(input: DumpInput, length: int, text: str) -> bool {
+    if length < text.len { return false }
+    var at = 0
+    for raw in text.bytes() { if input.header[at] != raw { return false }; at += 1 }
+    true
+}
+
+fn header_number(input: DumpInput, mut header: DumpHeader) -> int {
+    var value: int = 0
+    var seen = false
+    while header.at < header.length && input.header[header.at] != 32 as byte {
+        let digit = input.header[header.at] as int - 48
+        if digit < 0 || digit > 9 || value > (9223372036854775807 - digit) / 10 { return 0 - 1 }
+        value = value * 10 + digit
+        header.at += 1
+        seen = true
+    }
+    if !seen { return 0 - 1 }
+    value
+}
+
+fn parse_dump_header(input: DumpInput, length: int, mut header: DumpHeader) -> bool {
+    header.length = length
+    header.kind = 0
+    header.at = 2
+    if header_starts(input, length, "size ") { header.kind = 1; header.at = 5 }
+    else if header_starts(input, length, "r ") { header.kind = 2 }
+    else if header_starts(input, length, "o ") { header.kind = 3 }
+    else if header_starts(input, length, "i ") { header.kind = 4 }
+    else { return false }
+    header.first = header_number(input, mut header)
+    if header.first < 0 { return false }
+    if header.kind <= 2 {
+        if header.at >= length || input.header[header.at] != 32 as byte { return false }
+        header.at += 1
+        header.second = header_number(input, mut header)
+        if header.first < 1 || header.second < 1 || header.first > 262144 / header.second { return false }
+    }
+    header.at == length
+}
+
+fn dump_failure(status: int) -> int {
+    if status == 0 - 2 { io.write_err_line("warren: cannot read input"); return 1 }
+    io.write_err_line("warren: invalid recording")
+    2
+}
+
+fn dump_raw(mut input: DumpInput, options: DumpOptions) -> int {
+    var pane = vt.new(options.cols, options.rows, options.history)
+    while true {
+        let count = dump_fill(mut input)
+        if count == 0 - 1 { break }
+        if count < 0 { return dump_failure(count) }
+        let start = input.at
+        region chunk { vt.feed(mut pane, input.buffer[start..input.buffer.len]) }
+        input.at = input.buffer.len
+    }
+    io.write(vt.dump(pane))
+    0
+}
+
+fn dump_recording(mut input: DumpInput, options: DumpOptions) -> int {
+    let magic = dump_line(mut input)
+    if magic < 0 { return dump_failure(magic) }
+    if magic != 12 || !header_starts(input, magic, "warren-rec 1") { return dump_failure(0 - 3) }
+    let initial = dump_line(mut input)
+    if initial < 0 { return dump_failure(initial) }
+    var header = DumpHeader { kind: 0, first: 0, second: 0, length: 0, at: 0 }
+    if !parse_dump_header(input, initial, mut header) || header.kind != 1 { return dump_failure(0 - 3) }
+    var pane = vt.new(header.first, header.second, options.history)
+    while true {
+        let length = dump_line(mut input)
+        if length == 0 - 1 { break }
+        if length < 0 { return dump_failure(length) }
+        if !parse_dump_header(input, length, mut header) || header.kind == 1 { return dump_failure(0 - 3) }
+        if header.kind == 2 {
+            if vt.resize(mut pane, header.first, header.second) != "" { return dump_failure(0 - 3) }
+        } else {
+            var remaining = header.first
+            while remaining > 0 {
+                let available = dump_fill(mut input)
+                if available < 0 { return dump_failure(available) }
+                let count = if available < remaining { available } else { remaining }
+                let start = input.at
+                if header.kind == 3 { region chunk { vt.feed(mut pane, input.buffer[start..start + count]) } }
+                input.at += count
+                remaining -= count
+            }
+            let newline = dump_byte(mut input)
+            if newline != 10 { return dump_failure(if newline < 0 { newline } else { 0 - 3 }) }
+        }
+    }
+    io.write(vt.dump(pane))
+    0
+}
+
+/// Render raw input or an explicit warren-rec 1 replay as screen-dump format
+/// one. Byte input is streamed; argument/replay bookkeeping is bounded.
+pub fn vt_dump(args: List[str]) -> int {
+    let options = dump_options(args)
+    if !options.valid { return usage() }
+    let file = if options.file == "-" { fs.stdin() } else {
+        fs.open(options.file) else { io.write_err_line("warren: cannot open input"); return 1 }
+    }
+    var input = new_dump_input(take file)
+    let result = if options.replay { dump_recording(mut input, options) } else { dump_raw(mut input, options) }
+    fs.close(take input.file) else { io.write_err_line("warren: cannot close input"); return 1 }
+    result
+}
