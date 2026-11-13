@@ -17,14 +17,20 @@ alternate-screen/reset/DEC-graphics/REP/alignment controls, bounded events,
 query answers, deterministic dumps, bounded primary-history retention and
 resize/reflow. Resize rows cover content/path independence, projected and
 saved cursors, wide/combining glyphs, alternate screens and retained-capacity
-plateaus on native and lupin. The `vt-dump` command, full corpus comparison
-and assigned-scalar width sweep remain pending. W1 is not complete.
+plateaus on native and lupin. `warren vt-dump` accepts raw stdin/files and
+explicit recording replay. The 188 frozen corpus streams have complete-frame
+native comparisons under named policies, bytewise/random feed boundaries and
+primary resize properties. Reference-report limitations are explicit, never
+ignored fields or strict agreement. Fresh fuzz, the assigned-scalar width sweep
+and the complete resource/platform evidence are still being evaluated; W1 is
+not complete.
 `src/proto` implements bounded transport framing, message validation/encoding,
 fragment assembly and connection-wide image acknowledgement sequencing;
 [PROTOCOL](docs/PROTOCOL.md) fixes the bytes and [SERVER](docs/SERVER.md) is
 the event-loop contract and its blocking library dependencies. No server,
-client, socket or pty is implemented. The `warren` binary still prints its
-executable scaffold status and exits 1.
+client, socket or pty is implemented. With no arguments the `warren` binary
+still prints its executable scaffold status and exits 1; `vt-dump` is the
+implemented diagnostic command.
 [MAP](docs/MAP.md) separates what is planned from what is measured.
 
 ## What is planned
@@ -54,7 +60,7 @@ executable scaffold status and exits 1.
 | Milestone | What | State |
 |---|---|---|
 | W0 | the map: pins, CI, the oracle, the survey, the prediction | in progress |
-| W1 | the emulator | pure core/history/reflow implemented; CLI and full comparison remain |
+| W1 | the emulator | pure core/history/reflow, diagnostic CLI and frozen full-frame comparisons; final measurements pending |
 | W2 | one pane; detach and attach | pure protocol codec and server contract; I/O planned |
 | W3 | panes, tabs, the bar, keys | planned |
 | W4 | mouse, scrollback, copy | planned |
@@ -111,9 +117,14 @@ Nineteen extra synthetic reference screens are committed under
 printed text and titles: sixteen agree and one uses the named D8 policy
 (DEL is dropped from a title, rather than changed to `?`). The other two
 measure a one-row region. Those parser projections are not whole-screen
-comparisons. The initial grid has three separate full-dump comparisons under
-`tests/vt/grid_reference.py`, with D7 named; the full grid census and width
-sweep remain pending. The finite hostile row uses capped
+comparisons. Current whole-frame comparisons cover eight cases, 151 census
+streams and five recordings, plus the frozen 32-seed baseline. D1–D10 and
+source-proved report limits are separately named; repaired-reference D9 frames
+and D10's failed raw reports never become candidate-derived goldens. The new
+Linux drive records 200 fresh requested-4KiB streams with bytewise/random P2
+and primary content/rendition/resize-path checks; the nightly profile uses
+5000 seeds. The complete assigned-scalar width sweep remains separate evidence.
+The finite hostile row uses capped
 regions, and the measurement entry reports retained region charge and feed
 rate separately from process startup. [The note](notes/wr01-the-emulator.md)
 records the prediction, failed takes and scope boundaries.

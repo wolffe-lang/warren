@@ -3,7 +3,7 @@
 | Stage | Capability | State |
 |---|---|---|
 | W0 | pins, tiered CI, the oracle, the survey, the prediction | the repository half is here; the PAX readiness half is measured in PAX |
-| W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | pure core/history/reflow implemented; command and full comparison remain |
+| W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | pure core, CLI/replay and frozen complete-frame comparisons; final measurements pending |
 | W2 | server, client, protocol v1; one pane; detach and attach | pure protocol codec and server contract; I/O planned |
 | W3 | split tree, tabs, modes, the hint bar, configuration v1 | planned |
 | W4 | mouse, scrollback, copy mode, search, OSC 52 | planned |
@@ -16,8 +16,9 @@ names its measuring rows. `src/vt_parser_test.lu` exercises parsing alone;
 `vt_grid_test`, `vt_unicode_test`, `vt_ops_test`, `vt_screen_state_test`,
 `vt_graphics_test`, `vt_answers_test`, `vt_history_test`, `vt_resize_test` and
 `src/vt/resize_properties_rows.lu` exercise screen/retention/reflow. The resize
-properties have native and lupin rows; the full corpus and width sweep are
-still pending.
+properties have native and lupin rows. Frozen complete-frame comparisons and
+corpus-wide primary resize properties now exist; the fresh fuzz and complete
+width/resource/platform evidence remain separate pending measurements.
 
 ## The frame
 
@@ -50,21 +51,23 @@ still pending.
 
 | Module | Pure | Milestone | Measured today |
 |---|---|---|---|
-| `src/vt` | yes | W1 | pure screen/history/reflow with bounded events/answers; native/lupin operation and resize properties, plus three initial full-dump cases |
+| `src/vt` | yes | W1 | pure screen/history/reflow, bounded events/answers, native/lupin operation rows and complete frozen corpus comparisons with named policies |
 | `src/proto` | yes | W2 | bounded framing, payload validation, encode, assembly and ACK model (`protocol_rows`, `protocol_fuzz`) |
 | `src/layout` | yes | W3 | exists and compiles |
 | `src/server` | no | W2 | exists and compiles |
 | `src/client` | no | W2 | exists and compiles |
-| `src/cmd` | no | W5 | exists and compiles |
+| `src/cmd` | no | W1/W5 | bounded raw/file/stdin and recording-replay `vt-dump`; other verbs planned |
 | `src/config` | no | W3 | exists and compiles |
 
 ## Three kinds of row
 
 - **Emulator rows:** bytes in, a screen out, compared cell for cell with a
-  pinned reference emulator run as a binary. Three initial cases have full
-  comparisons in `tests/vt/grid_reference.py`; the full W1 census, recordings
-  and width sweep are pending. Written resize invariants are tested separately
-  against the pure implementation on native and lupin.
+  pinned reference emulator run as a binary. Eight cases, the 151-stream census,
+  five recordings and frozen baseline fuzz have complete-frame comparisons.
+  Written divergences and source-proved report limitations remain named rather
+  than ignored. Written resize invariants and corpus-wide primary properties
+  are separate native/interpreter checks; assigned widths and fresh fuzz remain
+  separately recorded measurements.
 - **Session rows:** a scripted client on a pseudo-terminal of the suite's own,
   compared with tmux as a black box where the behaviour is comparable, and
   with a written expectation where warren differs on purpose. *Planned.*
@@ -87,10 +90,11 @@ No row sends a signal from a script.
 
 ## Evidence boundaries
 
-- Every oracle row in the table above measures the harness and the reference
-  emulator, not the entire current grid. `src/vt/parser.lu` is incremental;
-  the grid's separate native/lupin and initial comparison rows are listed
-  above. `src/vt/vt.lu` still reports scaffold status until a command exists.
+- The oracle rows in the table above bind the harness/reference alone. Separate
+  candidate comparisons in `tests/vt/compare_suite.py`, `compare_d9.py` and
+  `compare_combining.py` judge complete frames with explicit written/report
+  boundaries. `warren vt-dump` is implemented; a no-argument run still prints
+  the honest scaffold status for the remaining modules.
 - The scaffold proves only that the pins resolve, the module tree compiles on
   the native tier, its tests pass on the checked machine and the reference
   interpreter, and the tier planner plans what the workflow runs.
