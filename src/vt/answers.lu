@@ -54,7 +54,8 @@ fn answer_version(mut pane: Vt) {
 }
 
 fn answer_cursor(mut pane: Vt, private_query: bool) {
-    let row = if pane.modes.origin { pane.cursor_row - pane.region_top + 1 } else { pane.cursor_row }
+    let relative_row = if pane.modes.origin { pane.cursor_row - pane.region_top + 1 } else { pane.cursor_row }
+    let row = if relative_row < 1 { 1 } else { relative_row }
     let extra = if private_query { 1 } else { 0 }
     if !answer_room(pane, 4 + decimal_digits(row) + decimal_digits(pane.cursor_col) + extra) { return }
     answer_text(mut pane, "\u{1b}[")
