@@ -95,6 +95,7 @@ pub fn resize(mut pane: Vt, cols: int, rows: int) -> str {
     clear_resize_output(mut pane, cols, rows, false)
     run_resize_window(mut pane, cols, pane.resize_state.first_visible, pane.resize_state.last_visible, true)
     pane.resize_state.lost = false
+    resize_anchor_from_screen(mut pane.resize_state.first, pane.resize_state.output, cols, 1, 1)
     retain_resize_prefix(mut pane)
     apply_primary_resize(mut pane, cols, rows)
     resize_alternate(mut pane, cols, rows)

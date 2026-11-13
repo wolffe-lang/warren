@@ -105,8 +105,8 @@ fn append_resize_record(mut pane: Vt, at: int) {
 }
 
 fn retain_resize_prefix(mut pane: Vt) {
-    let id = pane.resize_state.output.line_ids[0]
-    let offset = pane.resize_state.output.line_offsets[0]
+    let id = pane.resize_state.first.id
+    let offset = pane.resize_state.first.offset
     var at = pane.resize_state.canonical.head
     var record = 0
     while record < pane.resize_state.canonical.records {
