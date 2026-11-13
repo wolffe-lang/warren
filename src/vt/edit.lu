@@ -1,5 +1,20 @@
 //! member: true
-//! Narrow-cell editing. Wide-character boundary repair is added with widths.
+//! Cell and row editing with wide-character boundary repair.
+
+fn repair_row_pairs(mut screen: Screen, cols: int, row: int, background: int) {
+    var col = 0
+    let start = (row - 1) * cols
+    while col < cols {
+        if screen.cells[start + col].width == 2 {
+            if col + 1 >= cols { blank_cell(mut screen, start + col, background) }
+            else if screen.cells[start + col + 1].width != 0 { blank_cell(mut screen, start + col, background) }
+        } else if screen.cells[start + col].width == 0 {
+            if col == 0 { blank_cell(mut screen, start + col, background) }
+            else if screen.cells[start + col - 1].width != 2 { blank_cell(mut screen, start + col, background) }
+        }
+        col += 1
+    }
+}
 
 fn shift_characters(mut screen: Screen, cols: int, row: int, col: int,
         amount: int, background: int, insert: bool) {
@@ -24,6 +39,7 @@ fn shift_characters(mut screen: Screen, cols: int, row: int, col: int,
         while at <= cols { blank_cell(mut screen, (row - 1) * cols + at - 1, background); at += 1 }
         if extent >= col { screen.extents[row - 1] = grid_clamp(extent - n, col - 1, cols) }
     }
+    repair_row_pairs(mut screen, cols, row, background)
 }
 
 fn copy_row(mut screen: Screen, cols: int, to: int, from: int) {

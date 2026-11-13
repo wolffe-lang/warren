@@ -1,6 +1,5 @@
 //! member: true
-//! Initial screen dispatch: narrow ASCII and BS/HT/LF/VT/FF/CR. Unicode
-//! widths, sequence operations, history and events are later grid slices.
+//! Incremental screen dispatch, width-aware printing and C0 operations.
 
 fn blank_cell(mut screen: Screen, at: int, background: int) {
     screen.cells[at].base = 32
@@ -53,8 +52,15 @@ fn index_line(mut pane: Vt) {
     }
 }
 
+fn break_pair(mut screen: Screen, cols: int, row: int, col: int, background: int) {
+    let at = (row - 1) * cols + col - 1
+    if screen.cells[at].width == 2 && col < cols { blank_cell(mut screen, at + 1, background) }
+    else if screen.cells[at].width == 0 && col > 1 { blank_cell(mut screen, at - 1, background) }
+}
+
 fn write_narrow(mut screen: Screen, cols: int, row: int, col: int, cp: int,
         flags: int, foreground: int, background: int) {
+    break_pair(mut screen, cols, row, col, background)
     let at = (row - 1) * cols + col - 1
     screen.cells[at].base = cp
     screen.cells[at].mark1 = 0
@@ -66,29 +72,75 @@ fn write_narrow(mut screen: Screen, cols: int, row: int, col: int, cp: int,
     if screen.extents[row - 1] < col { screen.extents[row - 1] = col }
 }
 
-fn print_ascii(mut pane: Vt, cp: int) {
-    if pane.pending_wrap && pane.modes.autowrap {
-        if pane.active_alternate { pane.alternate.wrapped[pane.cursor_row - 1] = true }
-        else { pane.primary.wrapped[pane.cursor_row - 1] = true }
-        index_line(mut pane)
-        pane.cursor_col = 1
+fn combine_cell(mut screen: Screen, cols: int, row: int, col: int, pending: bool, cp: int) {
+    if cp == 8205 || (col == 1 && !pending) { return }
+    var at = (row - 1) * cols + col - 1
+    if !pending { at -= 1 }
+    if screen.cells[at].width == 0 { at -= 1 }
+    if screen.cells[at].mark1 == 0 { screen.cells[at].mark1 = cp }
+    else if screen.cells[at].mark2 == 0 { screen.cells[at].mark2 = cp }
+}
+
+fn write_glyph(mut screen: Screen, cols: int, row: int, col: int, cp: int,
+        width: int, flags: int, foreground: int, background: int) {
+    if width == 2 {
+        // Repair the right boundary before writing the lead: writing the tail
+        // afterwards must not treat our newly written lead as an old pair.
+        break_pair(mut screen, cols, row, col + 1, background)
+    }
+    write_narrow(mut screen, cols, row, col, cp, flags, foreground, background)
+    if width == 2 {
+        let at = (row - 1) * cols + col - 1
+        blank_cell(mut screen, at + 1, background)
+        screen.cells[at].width = 2
+        screen.cells[at + 1].width = 0
+        screen.cells[at + 1].flags = flags
+        screen.cells[at + 1].foreground = foreground
+        if screen.extents[row - 1] < col + 1 { screen.extents[row - 1] = col + 1 }
+    }
+}
+
+fn wrap_line(mut pane: Vt) {
+    if pane.active_alternate { pane.alternate.wrapped[pane.cursor_row - 1] = true }
+    else { pane.primary.wrapped[pane.cursor_row - 1] = true }
+    index_line(mut pane)
+    pane.cursor_col = 1
+}
+
+fn print_scalar(mut pane: Vt, cp: int) {
+    var width = scalar_width(cp)
+    if width == 0 {
+        if pane.active_alternate {
+            combine_cell(mut pane.alternate, pane.cols, pane.cursor_row, pane.cursor_col, pane.pending_wrap, cp)
+        } else {
+            combine_cell(mut pane.primary, pane.cols, pane.cursor_row, pane.cursor_col, pane.pending_wrap, cp)
+        }
+        return
+    }
+    if pane.pending_wrap && pane.modes.autowrap { wrap_line(mut pane) }
+    if pane.cols == 1 { width = 1 }
+    if width == 2 && pane.cursor_col == pane.cols {
+        if !pane.modes.autowrap { return }
+        wrap_line(mut pane)
     }
     if pane.modes.insert {
         if pane.active_alternate {
-            shift_characters(mut pane.alternate, pane.cols, pane.cursor_row, pane.cursor_col, 1, pane.pen.background, true)
+            shift_characters(mut pane.alternate, pane.cols, pane.cursor_row, pane.cursor_col, width, pane.pen.background, true)
         } else {
-            shift_characters(mut pane.primary, pane.cols, pane.cursor_row, pane.cursor_col, 1, pane.pen.background, true)
+            shift_characters(mut pane.primary, pane.cols, pane.cursor_row, pane.cursor_col, width, pane.pen.background, true)
         }
     }
     if pane.active_alternate {
-        write_narrow(mut pane.alternate, pane.cols, pane.cursor_row, pane.cursor_col, cp,
-            pane.pen.flags, pane.pen.foreground, pane.pen.background)
+        write_glyph(mut pane.alternate, pane.cols, pane.cursor_row, pane.cursor_col, cp,
+            width, pane.pen.flags, pane.pen.foreground, pane.pen.background)
     } else {
-        write_narrow(mut pane.primary, pane.cols, pane.cursor_row, pane.cursor_col, cp,
-            pane.pen.flags, pane.pen.foreground, pane.pen.background)
+        write_glyph(mut pane.primary, pane.cols, pane.cursor_row, pane.cursor_col, cp,
+            width, pane.pen.flags, pane.pen.foreground, pane.pen.background)
     }
-    if pane.cursor_col == pane.cols { pane.pending_wrap = true }
-    else { pane.cursor_col += 1 }
+    if pane.cursor_col + width > pane.cols {
+        pane.cursor_col = pane.cols
+        pane.pending_wrap = true
+    } else { pane.cursor_col += width }
 }
 
 fn execute_c0(mut pane: Vt, cp: int) {
@@ -113,17 +165,17 @@ fn execute_c0(mut pane: Vt, cp: int) {
 }
 
 fn dispatch_grid_token(mut pane: Vt, kind: int, value: int) {
-    if kind == 1 && value >= 32 && value <= 126 { print_ascii(mut pane, value) }
+    if kind == 1 { print_scalar(mut pane, value) }
     else if kind == 2 { execute_c0(mut pane, value) }
     else if kind == 4 { dispatch_csi(mut pane, value) }
     else if kind == 5 { dispatch_osc(mut pane) }
 }
 
-/// Consume bytes with incremental parsing and initial ASCII/C0 screen
+/// Consume bytes with incremental parsing, width-aware printing, C0 screen
 /// operations, cursor addressing, scroll regions, erasure, SGR, titles,
 /// stored mode state and bounded final-state events. The grid is incomplete:
-/// Unicode, alternate-screen and other ESC operations, scrollback and
-/// answers are not served by this slice yet.
+/// alternate-screen and other ESC operations, scrollback and answers are
+/// not served by this slice yet.
 pub fn feed(mut pane: Vt, data: List[byte]) {
     for b in data {
         advance_in_place(mut pane.parser, b)
