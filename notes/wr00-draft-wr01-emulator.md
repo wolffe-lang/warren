@@ -329,6 +329,11 @@ followed by the primary screen's lines.
   as far as the new height allows: when rows are lost they go to scrollback
   from the top; when rows are gained they come back from scrollback (measured
   on the reference, which does this much: `resize-shorter`, `resize-taller`).
+  **Ruled:** when older history is exhausted, existing text stays top-anchored
+  and remaining new rows are blank padding at the bottom; no top padding is
+  manufactured just to preserve a former bottom distance. Rows cover 4x1 to
+  4x3 with no history, exactly one older line (pulled above the current text),
+  and more history than the added rows.
 - **R6 the alternate screen is not reflowed.** It is cut or padded at the
   right and the bottom, top-left anchored, and the cursor is clamped
   (measured: `resize-alt`). The primary screen behind it is reflowed at the

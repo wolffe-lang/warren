@@ -164,11 +164,12 @@ a result record or mutate state for a refused or same-size request.
   reset the region/default-tab growth and clear pending wrap. Reflow primary
   even while alternate is active; map primary saved cursors independently.
 
-The empty-history taller case needs an explicit bottom-anchor interpretation
-before these rows are fixed: preserve existing text at the top and add bottom
-padding when no older rows can be pulled, or manufacture top padding to keep
-its previous absolute distance from the bottom. No resize implementation is
-claimed by this prediction.
+Lane decision for R5: when growing taller, pull older rows while available;
+when history is exhausted, existing text remains top-anchored and extra rows
+are bottom padding. A fresh shell prompt does not move down merely because
+its window grows. The first rows are 4x1 to 4x3 with no older line, exactly
+one older line, and more history than the two added rows. This resolves the
+open interpretation above; no resize implementation is claimed yet.
 
 One standalone read-only host preflight has passed. Prepare the complete
 host take before acquiring a pool slot; no heavy work is assigned to the

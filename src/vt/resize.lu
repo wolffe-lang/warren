@@ -1,0 +1,11 @@
+//! member: true
+//! Resize boundary seam. Geometry/reflow is supplied by the following slice.
+
+/// Resize a pane, returning empty text on success or the static refusal name
+/// vt-size-area. Refused and same-size requests leave all state unchanged.
+pub fn resize(mut pane: Vt, cols: int, rows: int) -> str {
+    if !valid_vt_size(cols, rows) { return "vt-size-area" }
+    if cols == pane.cols && rows == pane.rows { return "" }
+    pane.pending_wrap = false
+    ""
+}
