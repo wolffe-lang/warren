@@ -126,6 +126,50 @@ requires. This is a tiered test configuration, not a hidden skip or an
 increased interpreter budget. Resize/reflow and its canonical resize-only
 source remain the major step after feed integration.
 
+## Resize epoch prediction, before code
+
+The proposed pure boundary returns the empty string on success or the static
+name `vt-size-area` on an invalid/oversized rectangle; it does not allocate
+a result record or mutate state for a refused or same-size request.
+
+- Keep a reusable original-primary snapshot for a resize-only epoch and a
+  separate output workspace. Capture cursor and saved-cursor logical anchors
+  plus original physical positions. A nonempty feed commits the displayed
+  projection and invalidates the epoch; eviction invalidates it too.
+- Keep an encoded canonical deque of epoch screen rows and only the history
+  suffix brought into the reflow window. Prepend whole original history
+  records as needed; do not copy or walk the entire history on each resize.
+  The original snapshot permits exact restoration at the epoch's original
+  geometry, including an unwritten wide-wrap gap or background paint that
+  canonical text alone cannot reconstruct.
+- Track how many leading live-history records still belong to the original
+  prefix. Resize-generated prefix copies are a trailing shared portion:
+  remove those copies before the next resize, then work from original history
+  plus the canonical deque without duplication. Pulling an original record
+  decrements the original-prefix count and gives its canonical copy ownership.
+  Re-encode/copy the canonical portion before the new viewport into history.
+  A cap eviction commits the finished materialized state as a new epoch, so
+  no retained snapshot can resurrect an evicted prefix.
+- Bound canonical storage by peak screen capacity and one bounded history
+  fragment of lookback; include retained geometric growth buffers in the
+  ledger. Capacities must be prepared so a resize within the measured peak
+  adds no charge. Verify an outer-owned pane resized through short-lived
+  turn regions, not only a pane and resize born in the same region.
+- Reflow in two scalar passes: count/locate the new viewport and anchor maps,
+  then fill only its rows. Background-paint runs never become logical content
+  or extra rows. A wide glyph moves whole; one-column presentation keeps its
+  natural-width address. Preserve the original off-viewport anchor until
+  feed or eviction commits a projected position.
+- Resize the alternate screen top-left without reflow, repair cut pairs,
+  reset the region/default-tab growth and clear pending wrap. Reflow primary
+  even while alternate is active; map primary saved cursors independently.
+
+The empty-history taller case needs an explicit bottom-anchor interpretation
+before these rows are fixed: preserve existing text at the top and add bottom
+padding when no older rows can be pulled, or manufacture top padding to keep
+its previous absolute distance from the bottom. No resize implementation is
+claimed by this prediction.
+
 One standalone read-only host preflight has passed. Prepare the complete
 host take before acquiring a pool slot; no heavy work is assigned to the
 other pool host. The first grid review leaves this exact Done-when row open:

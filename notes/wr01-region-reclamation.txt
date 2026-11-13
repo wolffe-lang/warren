@@ -48,3 +48,11 @@ asserts both the 16-byte slope and 176-byte fixed term, and 1,024 appends add
 zero charge. src/vt/history_capacity_rows.lu independently asserts the exact
 native default bound. A ledger or representation change must move its row,
 not be hidden by raising the interpreter cap. No issue is filed here.
+
+After feed integration, the native 80x24 pane with the default ring retains
+8,624,960 arena bytes before any resize workspace exists, under the witness's
+16 MiB cap and 9 MiB pane bound. The ring-only native bound remains 8,388,656.
+Generic interpreter screen rows use history cap zero; ownership/feed rows
+explicitly use a small configured ring. Capacity rows also grow an
+outer-owned pane through short-lived child turn regions and require the
+outer retained charge to plateau; both native and interpreter pass.
