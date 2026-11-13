@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Finite named-red diagnostics: default-colour restore and sparse cell repair.
 
-Twenty complete A/S dumps plus twenty direct SGR status observations, sixty
-terminal processes total. The reference is only run as a pinned binary.
+The base set has twenty dumps/status observations (sixty terminal processes);
+the refinement has fourteen (forty-two processes). No set exceeds 24 dumps.
+The reference is only run as a pinned binary.
 """
 import argparse
 import hashlib
@@ -60,6 +61,29 @@ def cases():
     return result
 
 
+def refinement_cases():
+    indexed = C + b'38;5;48m'
+    truecolour = C + b'38;' + RGB
+    bodies = {
+        'default-restored-then-indexed-fg': E + b'7' + BG + E + b'8' + indexed + b'X',
+        'default-restored-then-rgb-fg': E + b'7' + BG + E + b'8' + truecolour + b'X',
+        'default-restored-then-colon-fg': E + b'7' + BG + E + b'8' + C + b'38:5:48mX',
+        'default-rgb-current-then-indexed-fg': E + b'7' + C + b'48;' + RGB + E + b'8' + indexed + b'X',
+        'palette-rgb-current-then-rgb-fg': C + b'40m' + E + b'7' + C + b'48;' + RGB + E + b'8' + truecolour + b'X',
+        'palette-rgb-current-then-indexed-fg': C + b'40m' + E + b'7' + C + b'48;' + RGB + E + b'8' + indexed + b'X',
+        'valid-inactive-reset-then-indexed-fg': H + L + BG + L + C + b'38;5;240;7mX',
+        'repeat-alt-then-indexed-fg': H + BG + H + L + L + indexed + b'X',
+        'saved-fg-repeat-alt-then-indexed-fg': C + b'97m' + H + BG + H + L + C + b'36;9m' + L + indexed + b'X',
+        'legacy-foreground-control': E + b'7' + BG + E + b'8' + C + b'36mX',
+        'sgr-zero-before-indexed-fg': E + b'7' + BG + E + b'8' + C + b'0m' + indexed + b'X',
+        'explicit-default-before-indexed-fg': E + b'7' + BG + E + b'8' + C + b'49m' + indexed + b'X',
+        'unsaved-default-before-indexed-fg': BG + C + b'49m' + indexed + b'X',
+        'explicit-palette-restored-then-indexed-fg': C + b'40m' + E + b'7' + BG + E + b'8' + indexed + b'X',
+    }
+    assert len(bodies) == 14
+    return {name: (HEAD + body, 12, 4) for name, body in bodies.items()}
+
+
 def pen_inner(source, out):
     old = termios.tcgetattr(0)
     try:
@@ -99,13 +123,17 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path)
     parser.add_argument('--list', action='store_true')
+    parser.add_argument('--refine', action='store_true', help='fourteen extended-foreground restore discriminators')
     parser.add_argument('--pen-inner', type=Path, help=argparse.SUPPRESS)
     parser.add_argument('--pen-out', type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.pen_inner:
         return pen_inner(args.pen_inner, args.pen_out)
-    selected = cases()
-    print('BUNDLE complete-dumps=20 pen-status-observations=20 terminal-passes=60 hard-cap=24', flush=True)
+    selected = refinement_cases() if args.refine else cases()
+    count = len(selected)
+    assert count <= 24
+    print('BUNDLE complete-dumps=%d pen-status-observations=%d terminal-passes=%d hard-cap=24' %
+          (count, count, 3 * count), flush=True)
     if args.list:
         for name in selected:
             print(name)
@@ -113,7 +141,7 @@ def main():
     if not args.out:
         parser.error('--out required unless --list')
     args.out.mkdir(parents=True, exist_ok=False)
-    manifest = {'schema': 1, 'complete_dump_count': 20, 'pen_status_count': 20,
+    manifest = {'schema': 1, 'complete_dump_count': count, 'pen_status_count': count, 'refinement': args.refine,
                 'pins_sha256': hashlib.sha256((ROOT / 'warren-oracle.toml').read_bytes()).hexdigest(),
                 'cases': {}, 'errors': []}
     with oracle.Display() as display:
@@ -135,7 +163,7 @@ def main():
                 print('MEASURE-ERROR %s %s' % (name, error), flush=True)
             manifest['cases'][name] = entry
             (args.out / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
-    print('MEASUREMENTS cases=20 errors=%d' % len(manifest['errors']), flush=True)
+    print('MEASUREMENTS cases=%d errors=%d' % (count, len(manifest['errors'])), flush=True)
     return bool(manifest['errors'])
 
 
