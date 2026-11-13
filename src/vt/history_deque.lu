@@ -1,5 +1,5 @@
 //! member: true
-//! Private deque/capacity seams for the canonical resize window.
+//! Bounded deque transfers and retained storage for a canonical resize window.
 
 fn history_newest_at(history: History) -> int {
     assert(history.records > 0)
@@ -7,23 +7,93 @@ fn history_newest_at(history: History) -> int {
 }
 
 fn history_copy_front(mut destination: History, source: History, at: int) -> bool {
-    assert(source.records > 0 && at >= 0)
-    destination.used = destination.used
-    false
+    let length = history_get_word(source, at, 0, 4)
+    assert(length >= 24 && length <= source.used)
+    if length > destination.bytes.len - destination.used { return false }
+    let was_empty = destination.records == 0
+    let old_head = destination.head
+    let head = (old_head - length + destination.bytes.len) % destination.bytes.len
+    var i = 0
+    while i < length {
+        destination.bytes[(head + i) % destination.bytes.len] = source.bytes[(at + i) % source.bytes.len]
+        i += 1
+    }
+    history_put_word(mut destination, head, 4, 4, 0)
+    if was_empty {
+        destination.tail = (head + length) % destination.bytes.len
+        destination.newest_length = length
+    } else { history_put_word(mut destination, old_head, 4, 4, length) }
+    destination.head = head
+    destination.used += length
+    destination.records += 1
+    true
 }
 
 fn history_copy_back(mut destination: History, source: History, at: int) -> bool {
-    assert(source.records > 0 && at >= 0)
-    destination.used = destination.used
-    false
+    let length = history_get_word(source, at, 0, 4)
+    assert(length >= 24 && length <= source.used)
+    assert(history_get_word(source, at, 20, 4) == 0)
+    let id = history_get_word(source, at, 8, 8)
+    let offset = history_get_word(source, at, 16, 4)
+    let target = history_reserve(mut destination, id, offset, length - 24)
+    if target < 0 { return false }
+    var i = 24
+    while i < length {
+        destination.bytes[(target + i) % destination.bytes.len] = source.bytes[(at + i) % source.bytes.len]
+        i += 1
+    }
+    true
 }
 
 fn history_pop_back(mut history: History) {
-    assert(history.records > 0)
-    history.used = history.used
+    let at = history_newest_at(history)
+    let length = history.newest_length
+    let previous = history_get_word(history, at, 4, 4)
+    history.used -= length
+    history.records -= 1
+    history.tail = at
+    if history.records == 0 {
+        history.head = at
+        history.newest_length = 0
+    } else {
+        assert(previous >= 24 && previous <= history.used)
+        history.newest_length = previous
+    }
+    // This transfers ownership to the canonical window, not a cap eviction.
 }
 
 fn ensure_history_capacity(mut history: History, needed: int) {
-    assert(needed >= 0)
-    history.used = history.used
+    // The resize-window bound is <=144 times the 262144-cell ceiling;
+    // geometric rounding therefore never needs more than 64 MiB here.
+    assert(needed >= 0 && needed <= 67108864, "reflow-cache-bound")
+    if needed <= history.bytes.len { return }
+    var capacity: int = if history.bytes.len < 1 { 1 } else { history.bytes.len }
+    while capacity < needed {
+        if capacity > 33554432 { capacity = 67108864 }
+        else { capacity *= 2 }
+    }
+    region temporary {
+        let zeroes = "\u{0}".repeat(capacity)
+        var next = zeroes.bytes()
+        var from = history.head
+        var to = 0
+        var record = 0
+        while record < history.records {
+            let length = history_get_word(history, from, 0, 4)
+            var i = 0
+            while i < length {
+                next[to + i] = history.bytes[(from + i) % history.bytes.len]
+                i += 1
+            }
+            from = (from + length) % history.bytes.len
+            to += length
+            record += 1
+        }
+        assert(to == history.used)
+        // Explicit copy targets the List field's owning region. Temporary
+        // construction is reclaimed, abandoned older capacities are not.
+        history.bytes = copy next
+    }
+    history.head = 0
+    history.tail = history.used
 }
