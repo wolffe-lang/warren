@@ -1,5 +1,5 @@
 //! member: true
-//! Fixed-byte history framing seam, independent of screen-line encoding.
+//! Fixed-byte history framing, independent of screen-line encoding.
 
 /// The retained encoded history ring. Header lengths include every encoded
 /// byte. Head/tail are byte positions; previous lengths support reverse reads.
@@ -11,6 +11,9 @@ pub struct History {
 
 fn new_history(cap: int) -> History {
     assert(cap >= 0)
+    // Repeat and materialize in a short-lived region, then deep-copy the
+    // byte buffer out. This avoids millions of interpreted push operations;
+    // no child-region allocation is retained or mistaken for the ring itself.
     let data = copy region {
         let zeroes = "\u{0}".repeat(cap)
         zeroes.bytes()
@@ -18,18 +21,88 @@ fn new_history(cap: int) -> History {
     History { bytes: data, head: 0, tail: 0, used: 0, records: 0, newest_length: 0, evicted: 0 }
 }
 
-fn history_reserve(mut history: History, id: int, start_cell: int, body_length: int) -> int {
-    assert(id >= 0 && start_cell >= 0 && body_length >= 0)
-    history.used = 0
-    0 - 1
+fn history_get_word(history: History, at: int, offset: int, width: int) -> int {
+    assert(at >= 0 && at < history.bytes.len && offset >= 0 && offset + width <= 24)
+    assert(width == 4 || width == 8)
+    var value: int = 0
+    var factor: int = 1
+    var i = 0
+    while i < width {
+        value += (history.bytes[(at + offset + i) % history.bytes.len] as int) * factor
+        if i + 1 < width { factor *= 256 }
+        i += 1
+    }
+    value
 }
 
-fn history_get_word(history: History, at: int, offset: int, width: int) -> int {
-    assert(at >= 0 && offset >= 0 && width >= 1 && history.bytes.len >= 0)
-    0
+fn history_put_word(mut history: History, at: int, offset: int, width: int, value: int) {
+    assert(value >= 0 && (width == 4 || width == 8))
+    if width == 4 { assert(value <= 4294967295) }
+    var remaining = value
+    var i = 0
+    while i < width {
+        history.bytes[(at + offset + i) % history.bytes.len] = (remaining % 256) as byte
+        remaining = remaining / 256
+        i += 1
+    }
+}
+
+fn history_clear(mut history: History) {
+    history.head = 0
+    history.tail = 0
+    history.used = 0
+    history.records = 0
+    history.newest_length = 0
+}
+
+fn history_count_evicted(mut history: History, amount: int) {
+    if history.evicted > 9223372036854775807 - amount { history.evicted = 9223372036854775807 }
+    else { history.evicted += amount }
+}
+
+fn history_evict_oldest(mut history: History) {
+    assert(history.records > 0)
+    let length = history_get_word(history, history.head, 0, 4)
+    assert(length >= 24 && length <= history.used)
+    history.head = (history.head + length) % history.bytes.len
+    history.used -= length
+    history.records -= 1
+    history_count_evicted(mut history, 1)
+    if history.records == 0 { history.newest_length = 0 }
+    else { history_put_word(mut history, history.head, 4, 4, 0) }
+}
+
+fn history_reserve(mut history: History, id: int, start_cell: int, body_length: int) -> int {
+    assert(id >= 0 && start_cell >= 0 && start_cell <= 4294967295 && body_length >= 0)
+    if history.bytes.len < 24 || body_length > history.bytes.len - 24 || body_length > 4294967271 {
+        // Keeping older text behind an unstorable newer record would leave a
+        // hole instead of a retained suffix. Drop that older prefix as well.
+        history_count_evicted(mut history, history.records + 1)
+        history_clear(mut history)
+        return 0 - 1
+    }
+    let length = body_length + 24
+    while history.used > history.bytes.len - length { history_evict_oldest(mut history) }
+    let at = history.tail
+    if history.records == 0 { history.head = at }
+    history_put_word(mut history, at, 0, 4, length)
+    history_put_word(mut history, at, 4, 4, history.newest_length)
+    history_put_word(mut history, at, 8, 8, id)
+    history_put_word(mut history, at, 16, 4, start_cell)
+    history_put_word(mut history, at, 20, 4, 0)
+    history.tail = (at + length) % history.bytes.len
+    history.used += length
+    history.records += 1
+    history.newest_length = length
+    // The caller writes exactly body_length bytes before returning to feed
+    // or resize. No observer can see this private construction in progress.
+    at
 }
 
 fn history_previous(history: History, at: int) -> int {
-    assert(at >= 0 && history.used >= 0)
-    0 - 1
+    assert(history.records > 0 && at >= 0 && at < history.bytes.len)
+    if at == history.head { return 0 - 1 }
+    let previous = history_get_word(history, at, 4, 4)
+    assert(previous >= 24 && previous <= history.used)
+    (at - previous + history.bytes.len) % history.bytes.len
 }
