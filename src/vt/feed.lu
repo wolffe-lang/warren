@@ -190,6 +190,7 @@ fn dispatch_grid_token(mut pane: Vt, kind: int, value: int) {
 /// row one; alternate scrolling never enters that history. Feeding mutates
 /// preallocated storage, not an input-sized event or answer log.
 pub fn feed(mut pane: Vt, data: List[byte]) {
+    if data.len > 0 { pane.resize_state.active = false }
     for b in data {
         advance_in_place(mut pane.parser, b)
         if pane.parser.output_count > 0 {

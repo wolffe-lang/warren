@@ -1,11 +1,109 @@
 //! member: true
-//! Resize boundary seam. Geometry/reflow is supplied by the following slice.
+//! Resize orchestration over a retained canonical epoch and reusable buffers.
+
+fn clear_resize_output(mut pane: Vt, cols: int, rows: int, alternate: bool) {
+    pane.resize_state.output.next_line_id = if alternate { pane.alternate.next_line_id } else { pane.primary.next_line_id }
+    var row = 1
+    while row <= rows { blank_row(mut pane.resize_state.output, cols, row, 0 - 1); row += 1 }
+}
+
+fn apply_primary_resize(mut pane: Vt, cols: int, rows: int) {
+    copy_screen_rectangle(mut pane.primary, pane.resize_state.output, cols, rows)
+    if pane.primary.next_line_id < pane.resize_state.output.next_line_id {
+        pane.primary.next_line_id = pane.resize_state.output.next_line_id
+    }
+    if !pane.active_alternate {
+        pane.cursor_row = grid_clamp(pane.resize_state.flow.cursor.row - pane.resize_state.first_visible + 1, 1, rows)
+        pane.cursor_col = grid_clamp(pane.resize_state.flow.cursor.col, 1, cols)
+    }
+    if pane.saved_primary.valid {
+        assert(pane.resize_state.flow.saved.found, "reflow-saved-anchor")
+        pane.saved_primary.row = grid_clamp(pane.resize_state.flow.saved.row - pane.resize_state.first_visible + 1, 1, rows)
+        pane.saved_primary.col = grid_clamp(pane.resize_state.flow.saved.col, 1, cols)
+    } else {
+        pane.saved_primary.row = 1
+        pane.saved_primary.col = 1
+    }
+    pane.saved_primary.pending_wrap = false
+}
+
+fn resize_alternate(mut pane: Vt, cols: int, rows: int) {
+    clear_resize_output(mut pane, cols, rows, true)
+    let kept_rows = if rows < pane.rows { rows } else { pane.rows }
+    let kept_cols = if cols < pane.cols { cols } else { pane.cols }
+    var row = 0
+    while row < kept_rows {
+        var col = 0
+        while col < kept_cols {
+            copy_screen_cell(mut pane.resize_state.output, pane.alternate, row * cols + col, row * pane.cols + col)
+            col += 1
+        }
+        pane.resize_state.output.extents[row] = grid_clamp(pane.alternate.extents[row], 0, cols)
+        pane.resize_state.output.wrapped[row] = pane.alternate.wrapped[row]
+        pane.resize_state.output.line_ids[row] = pane.alternate.line_ids[row]
+        pane.resize_state.output.line_offsets[row] = pane.alternate.line_offsets[row]
+        pane.resize_state.output.overflow_ids[row] = pane.alternate.overflow_ids[row]
+        if cols == 1 && pane.resize_state.output.cells[row].width == 2 {
+            pane.resize_state.output.cells[row].width = 1
+        } else if pane.cols == 1 && cols > 1 && pane.resize_state.output.extents[row] > 0 &&
+                scalar_width(pane.resize_state.output.cells[row * cols].base) == 2 {
+            let at = row * cols
+            pane.resize_state.output.cells[at].width = 2
+            pane.resize_state.output.cells[at + 1].width = 0
+            pane.resize_state.output.cells[at + 1].flags = pane.resize_state.output.cells[at].flags
+            pane.resize_state.output.cells[at + 1].foreground = pane.resize_state.output.cells[at].foreground
+            pane.resize_state.output.cells[at + 1].background = pane.resize_state.output.cells[at].background
+            pane.resize_state.output.extents[row] = 2
+        }
+        repair_row_pairs(mut pane.resize_state.output, cols, row + 1, pane.pen.background)
+        row += 1
+    }
+    copy_screen_rectangle(mut pane.alternate, pane.resize_state.output, cols, rows)
+    if pane.alternate.next_line_id < pane.resize_state.output.next_line_id {
+        pane.alternate.next_line_id = pane.resize_state.output.next_line_id
+    }
+    if pane.active_alternate {
+        pane.cursor_row = grid_clamp(pane.cursor_row, 1, rows)
+        pane.cursor_col = grid_clamp(pane.cursor_col, 1, cols)
+    }
+    pane.saved_alternate.row = grid_clamp(pane.saved_alternate.row, 1, rows)
+    pane.saved_alternate.col = grid_clamp(pane.saved_alternate.col, 1, cols)
+    pane.saved_alternate.pending_wrap = false
+}
+
+fn resize_tabs(mut pane: Vt, cols: int) {
+    if pane.default_tabs {
+        var col = 0
+        while col < cols { pane.tabs[col] = col > 0 && col % 8 == 0; col += 1 }
+    } else if cols > pane.resize_state.max_columns {
+        var col = pane.resize_state.max_columns
+        while col < cols { pane.tabs[col] = false; col += 1 }
+    }
+    if cols > pane.resize_state.max_columns { pane.resize_state.max_columns = cols }
+}
 
 /// Resize a pane, returning empty text on success or the static refusal name
 /// vt-size-area. Refused and same-size requests leave all state unchanged.
+/// History ownership and the original logical anchors persist across a
+/// resize-only epoch; nonempty feed or cap eviction commits the projection.
 pub fn resize(mut pane: Vt, cols: int, rows: int) -> str {
     if !valid_vt_size(cols, rows) { return "vt-size-area" }
     if cols == pane.cols && rows == pane.rows { return "" }
+    prepare_resize_storage(mut pane, cols, rows)
+    if !pane.resize_state.active { begin_resize_epoch(mut pane) }
+    choose_resize_window(mut pane, cols, rows)
+    clear_resize_output(mut pane, cols, rows, false)
+    run_resize_window(mut pane, cols, pane.resize_state.first_visible, pane.resize_state.last_visible, true)
+    pane.resize_state.lost = false
+    retain_resize_prefix(mut pane)
+    apply_primary_resize(mut pane, cols, rows)
+    resize_alternate(mut pane, cols, rows)
+    resize_tabs(mut pane, cols)
+    pane.cols = cols
+    pane.rows = rows
+    pane.region_top = 1
+    pane.region_bottom = rows
     pane.pending_wrap = false
+    if pane.resize_state.lost { pane.resize_state.active = false }
     ""
 }

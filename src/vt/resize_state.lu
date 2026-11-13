@@ -1,0 +1,154 @@
+//! member: true
+//! Reusable storage and original anchors for one resize-only epoch.
+
+/// A resize-only epoch owns bounded snapshot/output storage and canonical
+/// encoded rows. A nonempty feed or history eviction commits the projection.
+pub struct ResizeState {
+    active: bool, original_cols: int, original_rows: int,
+    original_history_records: int, snapshot_records: int,
+    cursor_row: int, cursor_col: int, saved_row: int, saved_col: int,
+    bottom_row: int, padding: int, first_visible: int, last_visible: int,
+    max_columns: int, lost: bool,
+    snapshot: Screen, output: Screen, canonical: History,
+    reader: HistoryReader, flow: ReflowState, first: ReflowAnchor,
+    row_records: List[int],
+}
+
+fn new_resize_state(cols: int) -> ResizeState {
+    ResizeState { active: false, original_cols: 0, original_rows: 0,
+        original_history_records: 0, snapshot_records: 0,
+        cursor_row: 1, cursor_col: 1, saved_row: 1, saved_col: 1,
+        bottom_row: 1, padding: 0, first_visible: 1, last_visible: 1,
+        max_columns: cols, lost: false,
+        snapshot: new_screen(1, 1), output: new_screen(1, 1), canonical: new_history(0),
+        reader: new_history_reader(), flow: new_reflow_state(), first: new_reflow_anchor(),
+        row_records: List[int]() }
+}
+
+fn copy_screen_cell(mut destination: Screen, source: Screen, to: int, from: int) {
+    destination.cells[to].base = source.cells[from].base
+    destination.cells[to].mark1 = source.cells[from].mark1
+    destination.cells[to].mark2 = source.cells[from].mark2
+    destination.cells[to].width = source.cells[from].width
+    destination.cells[to].flags = source.cells[from].flags
+    destination.cells[to].foreground = source.cells[from].foreground
+    destination.cells[to].background = source.cells[from].background
+}
+
+fn copy_screen_row(mut destination: Screen, source: Screen, cols: int, to: int, from: int) {
+    var col = 0
+    while col < cols {
+        copy_screen_cell(mut destination, source, (to - 1) * cols + col, (from - 1) * cols + col)
+        col += 1
+    }
+    destination.extents[to - 1] = source.extents[from - 1]
+    destination.wrapped[to - 1] = source.wrapped[from - 1]
+    destination.line_ids[to - 1] = source.line_ids[from - 1]
+    destination.line_offsets[to - 1] = source.line_offsets[from - 1]
+    destination.overflow_ids[to - 1] = source.overflow_ids[from - 1]
+}
+
+fn copy_screen_rectangle(mut destination: Screen, source: Screen, cols: int, rows: int) {
+    var row = 1
+    while row <= rows { copy_screen_row(mut destination, source, cols, row, row); row += 1 }
+}
+
+fn resize_anchor_from_screen(mut anchor: ReflowAnchor, screen: Screen, cols: int, row: int, col: int) {
+    var before: int = 0
+    var physical = 1
+    while physical < col {
+        let at = (row - 1) * cols + physical - 1
+        let width = screen.cells[at].width
+        if width == 2 && physical + 1 == col { before += 1; break }
+        before += history_natural_width(screen, cols, at)
+        physical += if width == 2 { 2 } else { 1 }
+    }
+    anchor.id = screen.line_ids[row - 1]
+    anchor.offset = screen.line_offsets[row - 1] + before
+    if screen.overflow_ids[row - 1] >= 0 {
+        let total = history_line_cells(screen, cols, row, row)
+        let boundary = history_fragment_end(screen, cols, row, row, 0, 4294967296 - screen.line_offsets[row - 1])
+        if boundary < total && before >= boundary {
+            anchor.id = screen.overflow_ids[row - 1]
+            anchor.offset = before - boundary
+        }
+    }
+    reset_reflow_anchor(mut anchor)
+}
+
+fn prepare_resize_storage(mut pane: Vt, cols: int, rows: int) {
+    let cells = cols * rows
+    let row_capacity = if rows > pane.rows { rows } else { pane.rows }
+    ensure_screen_capacity(mut pane.primary, cells, row_capacity)
+    ensure_screen_capacity(mut pane.alternate, cells, row_capacity)
+    let peak = pane.primary.cells.len
+    ensure_screen_capacity(mut pane.resize_state.snapshot, peak, row_capacity)
+    ensure_screen_capacity(mut pane.resize_state.output, peak, row_capacity)
+    // Rounded screen storage may have grown further in the workspace.
+    let cache_peak = pane.resize_state.output.cells.len
+    ensure_history_capacity(mut pane.resize_state.canonical, pane.history.bytes.len + 48 * cache_peak)
+    ensure_tab_capacity(mut pane, cols)
+    if row_capacity > pane.resize_state.row_records.len {
+        let capacity = grown_capacity(pane.resize_state.row_records.len, row_capacity)
+        (mut pane.resize_state.row_records).reserve(capacity)
+        while pane.resize_state.row_records.len < capacity { (mut pane.resize_state.row_records).push(0) }
+    }
+}
+
+fn begin_resize_epoch(mut pane: Vt) {
+    repair_primary_lineage(mut pane)
+    history_clear(mut pane.resize_state.canonical)
+    pane.resize_state.original_cols = pane.cols
+    pane.resize_state.original_rows = pane.rows
+    pane.resize_state.original_history_records = pane.history.records
+    var row = 1
+    while row <= pane.rows {
+        prime_primary_coordinate(mut pane, row)
+        let count = history_encode_fragments(mut pane.resize_state.canonical, pane.primary,
+            pane.cols, row, row, mut pane.line_coordinate)
+        assert(count >= 1 && pane.resize_state.canonical.evicted == 0, "reflow-cache-bound")
+        pane.resize_state.row_records[row - 1] = count
+        commit_primary_coordinate(mut pane, row)
+        row += 1
+    }
+    pane.resize_state.snapshot_records = pane.resize_state.canonical.records
+    copy_screen_rectangle(mut pane.resize_state.snapshot, pane.primary, pane.cols, pane.rows)
+    pane.resize_state.snapshot.next_line_id = pane.primary.next_line_id
+    var cursor_row = pane.cursor_row
+    var cursor_col = pane.cursor_col
+    if pane.active_alternate && pane.saved_primary.valid {
+        cursor_row = pane.saved_primary.row
+        cursor_col = pane.saved_primary.col
+    }
+    cursor_row = grid_clamp(cursor_row, 1, pane.rows)
+    cursor_col = grid_clamp(cursor_col, 1, pane.cols)
+    pane.resize_state.cursor_row = cursor_row
+    pane.resize_state.cursor_col = cursor_col
+    pane.resize_state.saved_row = pane.saved_primary.row
+    pane.resize_state.saved_col = pane.saved_primary.col
+    resize_anchor_from_screen(mut pane.resize_state.flow.cursor, pane.primary, pane.cols, cursor_row, cursor_col)
+    if pane.saved_primary.valid {
+        resize_anchor_from_screen(mut pane.resize_state.flow.saved, pane.primary, pane.cols,
+            pane.saved_primary.row, pane.saved_primary.col)
+    } else { pane.resize_state.flow.saved.id = 0 - 1 }
+    resize_anchor_from_screen(mut pane.resize_state.first, pane.primary, pane.cols, 1, 1)
+    var bottom = cursor_row
+    row = cursor_row
+    while row <= pane.rows {
+        var used = pane.primary.extents[row - 1] > 0
+        var col = 0
+        while !used && col < pane.cols {
+            if pane.primary.cells[(row - 1) * pane.cols + col].background != 0 - 1 { used = true }
+            col += 1
+        }
+        if used { bottom = row }
+        row += 1
+    }
+    var bottom_col = pane.primary.extents[bottom - 1]
+    if bottom == cursor_row && cursor_col > bottom_col { bottom_col = cursor_col }
+    bottom_col = grid_clamp(bottom_col, 1, pane.cols)
+    pane.resize_state.bottom_row = bottom
+    pane.resize_state.padding = pane.rows - bottom
+    resize_anchor_from_screen(mut pane.resize_state.flow.bottom, pane.primary, pane.cols, bottom, bottom_col)
+    pane.resize_state.active = true
+}

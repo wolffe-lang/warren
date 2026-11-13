@@ -404,8 +404,11 @@ draws every code point in one cell) is the renderer's problem, not the grid's.
 
 Costs to hold, as rows with numbers taken on one machine and compared only
 with that machine: appending a line is O(its length); eviction is O(1)
-amortised; a resize is O(rows on screen + the lines they hold), independent
-of history. The allocation budget counts the fixed-capacity encoded history
+amortised; a resize is O(rows on screen + the retained logical lines they
+hold), independent of unrelated history lines. A logical line includes its
+retained continuation fragments, so an endless visible line can require
+lookback up to the configured history cap. The allocation budget counts the
+fixed-capacity encoded history
 ring, peak screen/workspace capacities and all retained arena growth buffers;
 replaced arena buffers are not claimed freed. Backing capacity is reused on
 shrink and on regrowth within the previous peak, with no further charge.

@@ -63,13 +63,13 @@ fn history_pop_back(mut history: History) {
 }
 
 fn ensure_history_capacity(mut history: History, needed: int) {
-    // The resize-window bound is <=144 times the 262144-cell ceiling;
-    // geometric rounding therefore never needs more than 64 MiB here.
-    assert(needed >= 0 && needed <= 67108864, "reflow-cache-bound")
+    // The configured history cap plus peak screen encoding bounds this
+    // cache. Geometric growth retains old arena buffers and counts them.
+    assert(needed >= 0, "reflow-cache-bound")
     if needed <= history.bytes.len { return }
     var capacity: int = if history.bytes.len < 1 { 1 } else { history.bytes.len }
     while capacity < needed {
-        if capacity > 33554432 { capacity = 67108864 }
+        if capacity > 4611686018427387903 { capacity = needed }
         else { capacity *= 2 }
     }
     region temporary {

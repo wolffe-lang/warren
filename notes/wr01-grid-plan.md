@@ -137,11 +137,13 @@ a result record or mutate state for a refused or same-size request.
   plus original physical positions. A nonempty feed commits the displayed
   projection and invalidates the epoch; eviction invalidates it too.
 - Keep an encoded canonical deque of epoch screen rows and only the history
-  suffix brought into the reflow window. Prepend whole original history
-  records as needed; do not copy or walk the entire history on each resize.
-  The original snapshot permits exact restoration at the epoch's original
-  geometry, including an unwritten wide-wrap gap or background paint that
-  canonical text alone cannot reconstruct.
+  suffix brought into the reflow window. Complete the first retained logical
+  line before counting its wrap phase; then batch older whole logical lines
+  to fill a height deficit, not one fragment/recount at a time. A visible
+  logical line may span the retained history cap; unrelated lines are not
+  scanned. The snapshot preserves original physical rows whenever the target
+  width equals the epoch's original width, including unwritten wide-wrap
+  gaps and background paint that canonical text alone cannot reconstruct.
 - Track how many leading live-history records still belong to the original
   prefix. Resize-generated prefix copies are a trailing shared portion:
   remove those copies before the next resize, then work from original history
@@ -150,11 +152,13 @@ a result record or mutate state for a refused or same-size request.
   Re-encode/copy the canonical portion before the new viewport into history.
   A cap eviction commits the finished materialized state as a new epoch, so
   no retained snapshot can resurrect an evicted prefix.
-- Bound canonical storage by peak screen capacity and one bounded history
-  fragment of lookback; include retained geometric growth buffers in the
-  ledger. Capacities must be prepared so a resize within the measured peak
-  adds no charge. Verify an outer-owned pane resized through short-lived
-  turn regions, not only a pane and resize born in the same region.
+- Bound canonical bytes by the configured history cap plus 48 times peak
+  cell capacity: at most the original retained history plus the epoch screen
+  encoding. Include geometric rounding and abandoned growth buffers in the
+  ledger. This is an explicit extra workspace term, not free duplication of
+  history. A resize within peak capacity adds no charge. Verify an outer-owned
+  pane resized through short-lived turn regions, not only a pane and resize
+  born in the same region.
 - Reflow in two scalar passes: count/locate the new viewport and anchor maps,
   then fill only its rows. Background-paint runs never become logical content
   or extra rows. A wide glyph moves whole; one-column presentation keeps its

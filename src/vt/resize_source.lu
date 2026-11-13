@@ -1,0 +1,133 @@
+//! member: true
+//! Canonical-source ownership and two-pass viewport selection.
+
+fn discard_resize_shared_tail(mut pane: Vt) {
+    assert(pane.history.records >= pane.resize_state.original_history_records)
+    while pane.history.records > pane.resize_state.original_history_records { history_pop_back(mut pane.history) }
+}
+
+fn pull_resize_line(mut pane: Vt) {
+    assert(pane.resize_state.original_history_records > 0)
+    let newest = history_newest_at(pane.history)
+    let id = history_get_word(pane.history, newest, 8, 8)
+    while pane.resize_state.original_history_records > 0 {
+        let at = history_newest_at(pane.history)
+        if history_get_word(pane.history, at, 8, 8) != id { break }
+        assert(history_copy_front(mut pane.resize_state.canonical, pane.history, at), "reflow-cache-bound")
+        history_pop_back(mut pane.history)
+        pane.resize_state.original_history_records -= 1
+    }
+}
+
+fn complete_resize_first_line(mut pane: Vt) {
+    if pane.resize_state.original_history_records == 0 { return }
+    let id = history_get_word(pane.resize_state.canonical, pane.resize_state.canonical.head, 8, 8)
+    let newest = history_newest_at(pane.history)
+    if history_get_word(pane.history, newest, 8, 8) == id { pull_resize_line(mut pane) }
+}
+
+fn run_resize_window(mut pane: Vt, cols: int, first: int, last: int, emit: bool) {
+    reflow_start(mut pane.resize_state.flow)
+    let preserve_rows = cols == pane.resize_state.original_cols
+    let prefix_records = pane.resize_state.canonical.records - pane.resize_state.snapshot_records
+    let record_count = if preserve_rows { prefix_records } else { pane.resize_state.canonical.records }
+    var at = pane.resize_state.canonical.head
+    var record = 0
+    while record < record_count {
+        reflow_record(mut pane.resize_state.flow, pane.resize_state.canonical, at,
+            mut pane.resize_state.reader, mut pane.resize_state.output, cols, first, last, emit)
+        at = (at + history_get_word(pane.resize_state.canonical, at, 0, 4)) % pane.resize_state.canonical.bytes.len
+        record += 1
+    }
+    if preserve_rows {
+        let prefix_rows = pane.resize_state.flow.row
+        var row = 1
+        while row <= pane.resize_state.original_rows {
+            let target = prefix_rows + row
+            if emit && target >= first && target <= last {
+                copy_screen_row(mut pane.resize_state.output, pane.resize_state.snapshot, cols, target - first + 1, row)
+            }
+            row += 1
+        }
+        pane.resize_state.flow.row = prefix_rows + pane.resize_state.original_rows
+        pane.resize_state.flow.cursor.row = prefix_rows + pane.resize_state.cursor_row
+        pane.resize_state.flow.cursor.col = pane.resize_state.cursor_col
+        pane.resize_state.flow.cursor.found = true
+        pane.resize_state.flow.bottom.row = prefix_rows + pane.resize_state.bottom_row
+        pane.resize_state.flow.bottom.col = 1
+        pane.resize_state.flow.bottom.found = true
+        if pane.saved_primary.valid {
+            pane.resize_state.flow.saved.row = prefix_rows + pane.resize_state.saved_row
+            pane.resize_state.flow.saved.col = pane.resize_state.saved_col
+            pane.resize_state.flow.saved.found = true
+        }
+    }
+}
+
+fn choose_resize_window(mut pane: Vt, cols: int, rows: int) {
+    discard_resize_shared_tail(mut pane)
+    complete_resize_first_line(mut pane)
+    run_resize_window(mut pane, cols, 1, rows, false)
+    assert(pane.resize_state.flow.cursor.found && pane.resize_state.flow.bottom.found, "reflow-anchor")
+    let padding = grid_clamp(pane.resize_state.padding, 0, rows - 1)
+    let room = rows - padding
+    var missing = room - pane.resize_state.flow.bottom.row
+    if missing > 0 && pane.resize_state.original_history_records > 0 {
+        // Each additional complete logical line contributes at least one
+        // physical row. Batch the deficit instead of recounting per record.
+        while missing > 0 && pane.resize_state.original_history_records > 0 {
+            pull_resize_line(mut pane)
+            missing -= 1
+        }
+        run_resize_window(mut pane, cols, 1, rows, false)
+    }
+    pane.resize_state.last_visible = pane.resize_state.flow.bottom.row + padding
+    if pane.resize_state.last_visible > pane.resize_state.flow.row {
+        pane.resize_state.last_visible = pane.resize_state.flow.row
+    }
+    pane.resize_state.first_visible = pane.resize_state.last_visible - rows + 1
+    if pane.resize_state.first_visible < 1 { pane.resize_state.first_visible = 1 }
+}
+
+fn resize_record_cells(mut reader: HistoryReader, source: History, at: int) -> int {
+    history_reader_start(mut reader, source, at)
+    var cells: int = 0
+    while history_reader_next(mut reader, source) {
+        if reader.kind == 0 { cells += scalar_width(reader.value) }
+    }
+    cells
+}
+
+fn append_resize_record(mut pane: Vt, at: int) {
+    let length = history_get_word(pane.resize_state.canonical, at, 0, 4)
+    if length > pane.history.bytes.len - pane.history.used { pane.resize_state.lost = true }
+    if !history_copy_back(mut pane.history, pane.resize_state.canonical, at) { pane.resize_state.lost = true }
+}
+
+fn retain_resize_prefix(mut pane: Vt) {
+    let id = pane.resize_state.output.line_ids[0]
+    let offset = pane.resize_state.output.line_offsets[0]
+    var at = pane.resize_state.canonical.head
+    var record = 0
+    while record < pane.resize_state.canonical.records {
+        let source_id = history_get_word(pane.resize_state.canonical, at, 8, 8)
+        let source_offset = history_get_word(pane.resize_state.canonical, at, 16, 4)
+        if source_id == id {
+            if source_offset >= offset { return }
+            let cells = resize_record_cells(mut pane.resize_state.reader, pane.resize_state.canonical, at)
+            if source_offset + cells <= offset { append_resize_record(mut pane, at) }
+            else {
+                let span = history_prefix_span(mut pane.resize_state.reader, pane.resize_state.canonical, at, offset - source_offset)
+                let body = span / 16777216
+                if body > 0 && body + 24 > pane.history.bytes.len - pane.history.used { pane.resize_state.lost = true }
+                let copied = history_copy_prefix(mut pane.history, pane.resize_state.canonical,
+                    at, offset - source_offset, mut pane.resize_state.reader)
+                if body > 0 && copied == 0 { pane.resize_state.lost = true }
+                return
+            }
+        } else { append_resize_record(mut pane, at) }
+        at = (at + history_get_word(pane.resize_state.canonical, at, 0, 4)) % pane.resize_state.canonical.bytes.len
+        record += 1
+    }
+    assert(false, "reflow-viewport-prefix")
+}
