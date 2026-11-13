@@ -30,7 +30,8 @@ fn test_history_unwrapped_runs_and_paint_gaps() {
     assert(history_encode_line(mut history, pane.primary, 8, 1, 2, 0, 0))
     assert(history.used == 47, "history-runs-merge-across-wrap")
     var paint = new(8, 1, 0)
-    feed(mut paint, "A\u{1b}[1;7H\u{1b}[42m\u{1b}[X".bytes())
+    // End erases leave paint unwritten. A partial ECH is logical content.
+    feed(mut paint, "A\u{1b}[1;7H\u{1b}[42m\u{1b}[K\u{1b}[49m\u{1b}[1;8H\u{1b}[K".bytes())
     assert(paint.primary.extents[0] == 1)
     assert(history_encode_line(mut history, paint.primary, 8, 1, 1, 1, 0))
     let at = (history.tail - history.newest_length + 256) % 256
@@ -45,6 +46,25 @@ fn test_history_unwrapped_runs_and_paint_gaps() {
         i += 1
     }
     assert(i == 7, "history-paint-default-gap")
+}
+
+fn test_partial_erasure_is_logical_content() {
+    var pane = new(8, 1, 0)
+    feed(mut pane, "A\u{1b}[1;7H\u{1b}[42m\u{1b}[X".bytes())
+    assert(pane.primary.extents[0] == 7)
+    var history = new_history(128)
+    assert(history_encode_line(mut history, pane.primary, 8, 1, 1, 0, 0))
+    assert(history.newest_length == 55, "history-partial-erase-logical-byte-count")
+    var reader = new_history_reader()
+    history_reader_start(mut reader, history, history.head)
+    var count = 0
+    while history_reader_next(mut reader, history) {
+        assert(reader.kind == 0, "history-partial-erase-not-background-paint")
+        assert(reader.value == (if count == 0 { 65 } else { 32 }))
+        assert(reader.background == (if count == 6 { 2 } else { 0 - 1 }))
+        count += 1
+    }
+    assert(count == 7)
 }
 
 fn test_history_codec_allocation() {
@@ -94,4 +114,4 @@ fn test_history_colour_matrix_and_four_byte_scalars() {
     }
 }
 
-fn main() -> int { test_history_line_roundtrip(); test_history_unwrapped_runs_and_paint_gaps(); test_history_codec_allocation(); test_history_colour_matrix_and_four_byte_scalars(); 0 }
+fn main() -> int { test_history_line_roundtrip(); test_history_unwrapped_runs_and_paint_gaps(); test_partial_erasure_is_logical_content(); test_history_codec_allocation(); test_history_colour_matrix_and_four_byte_scalars(); 0 }
