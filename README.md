@@ -14,9 +14,11 @@ sequences; its native test entry is `src/vt_parser_test.lu`, also runnable
 under lupin. The initial grid serves Unicode widths/combining marks, wide-pair
 repair, cursor/erase/edit/SGR, tabs/index/scroll operations, saved cursors,
 alternate-screen/reset/DEC-graphics/REP/alignment controls, bounded events,
-query answers, deterministic dumps and bounded primary-history retention.
-Resize/reflow and the `vt-dump` command are not implemented; the full corpus
-comparison and assigned-scalar width sweep remain pending. W1 is not complete.
+query answers, deterministic dumps, bounded primary-history retention and
+resize/reflow. Resize rows cover content/path independence, projected and
+saved cursors, wide/combining glyphs, alternate screens and retained-capacity
+plateaus on native and lupin. The `vt-dump` command, full corpus comparison
+and assigned-scalar width sweep remain pending. W1 is not complete.
 `src/proto` implements bounded transport framing, message validation/encoding,
 fragment assembly and connection-wide image acknowledgement sequencing;
 [PROTOCOL](docs/PROTOCOL.md) fixes the bytes and [SERVER](docs/SERVER.md) is
@@ -52,7 +54,7 @@ executable scaffold status and exits 1.
 | Milestone | What | State |
 |---|---|---|
 | W0 | the map: pins, CI, the oracle, the survey, the prediction | in progress |
-| W1 | the emulator | parser, grid/queries and history retention implemented; resize/CLI and full comparison remain |
+| W1 | the emulator | pure core/history/reflow implemented; CLI and full comparison remain |
 | W2 | one pane; detach and attach | pure protocol codec and server contract; I/O planned |
 | W3 | panes, tabs, the bar, keys | planned |
 | W4 | mouse, scrollback, copy | planned |

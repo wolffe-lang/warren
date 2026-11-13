@@ -3,7 +3,7 @@
 | Stage | Capability | State |
 |---|---|---|
 | W0 | pins, tiered CI, the oracle, the survey, the prediction | the repository half is here; the PAX readiness half is measured in PAX |
-| W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | parser, grid/queries and history retention implemented; reflow and command remain |
+| W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | pure core/history/reflow implemented; command and full comparison remain |
 | W2 | server, client, protocol v1; one pane; detach and attach | pure protocol codec and server contract; I/O planned |
 | W3 | split tree, tabs, modes, the hint bar, configuration v1 | planned |
 | W4 | mouse, scrollback, copy mode, search, OSC 52 | planned |
@@ -14,9 +14,10 @@ The incremental parser, initial grid and protocol codec are implemented;
 server and client remain planned here. A statement is marked *planned* or
 names its measuring rows. `src/vt_parser_test.lu` exercises parsing alone;
 `vt_grid_test`, `vt_unicode_test`, `vt_ops_test`, `vt_screen_state_test`,
-`vt_graphics_test`, `vt_answers_test` and `vt_history_test` exercise the current
-screen/retention subset. They are not a claim that reflow or the full corpus
-agree yet.
+`vt_graphics_test`, `vt_answers_test`, `vt_history_test`, `vt_resize_test` and
+`src/vt/resize_properties_rows.lu` exercise screen/retention/reflow. The resize
+properties have native and lupin rows; the full corpus and width sweep are
+still pending.
 
 ## The frame
 
@@ -49,7 +50,7 @@ agree yet.
 
 | Module | Pure | Milestone | Measured today |
 |---|---|---|---|
-| `src/vt` | yes | W1 | parser, initial screen operations and bounded events/answers; native and lupin entries, plus three initial full-dump cases |
+| `src/vt` | yes | W1 | pure screen/history/reflow with bounded events/answers; native/lupin operation and resize properties, plus three initial full-dump cases |
 | `src/proto` | yes | W2 | bounded framing, payload validation, encode, assembly and ACK model (`protocol_rows`, `protocol_fuzz`) |
 | `src/layout` | yes | W3 | exists and compiles |
 | `src/server` | no | W2 | exists and compiles |
@@ -61,8 +62,9 @@ agree yet.
 
 - **Emulator rows:** bytes in, a screen out, compared cell for cell with a
   pinned reference emulator run as a binary. Three initial cases have full
-  comparisons in `tests/vt/grid_reference.py`; the full W1 census, recordings,
-  width sweep and resize properties are pending.
+  comparisons in `tests/vt/grid_reference.py`; the full W1 census, recordings
+  and width sweep are pending. Written resize invariants are tested separately
+  against the pure implementation on native and lupin.
 - **Session rows:** a scripted client on a pseudo-terminal of the suite's own,
   compared with tmux as a black box where the behaviour is comparable, and
   with a written expectation where warren differs on purpose. *Planned.*

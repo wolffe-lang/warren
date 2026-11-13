@@ -15,8 +15,8 @@ beyond the stated caps. One value, `Vt`, is one pane's terminal.
 ```
 new(cols, rows, scrollback_cap_bytes) -> Vt
 feed(vt, bytes)                 total; never fails
-resize(vt, cols, rows)          total for positive sizes up to 262144 cells;
-                               larger rectangles refused as vt-size-area
+resize(vt, cols, rows) -> str   empty on success; vt-size-area on refused size
+                               positive sizes up to 262144 cells are accepted
 take_answers(vt) -> bytes       what the terminal says back (DA, DSR, CPR, DECRPM)
 take_events(vt) -> [Event]      title changed, bell, clipboard write, mode changed
 dump(vt) -> text                the screen dump, format 1 (docs/SCREEN-DUMP.md)
@@ -410,7 +410,10 @@ retained continuation fragments, so an endless visible line can require
 lookback up to the configured history cap. The allocation budget counts the
 fixed-capacity encoded history
 ring, peak screen/workspace capacities and all retained arena growth buffers;
-replaced arena buffers are not claimed freed. Backing capacity is reused on
+replaced arena buffers are not claimed freed. The canonical resize deque has
+an explicit additional bound of the configured history cap plus 48 bytes per
+peak cell before geometric rounding; it is not treated as free duplication
+of history. Backing capacity is reused on
 shrink and on regrowth within the previous peak, with no further charge.
 Growth is bounded by the protocol's 262144-cell area ceiling. Tests repeat
 small→large→small→large under native and interpreter region caps and require

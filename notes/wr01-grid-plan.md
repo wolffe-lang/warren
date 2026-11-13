@@ -123,8 +123,8 @@ use cap zero and ownership rows use a small configured cap.
 Keep default-8MiB pane/ring rows native-only; interpreter entries explicitly
 configure a smaller ring under the unchanged cap, as the ledger finding
 requires. This is a tiered test configuration, not a hidden skip or an
-increased interpreter budget. Resize/reflow and its canonical resize-only
-source remain the major step after feed integration.
+increased interpreter budget. Resize/reflow follows as the next section's
+original prediction; its implemented checkpoint is recorded below.
 
 ## Resize epoch prediction, before code
 
@@ -172,8 +172,26 @@ Lane decision for R5: when growing taller, pull older rows while available;
 when history is exhausted, existing text remains top-anchored and extra rows
 are bottom padding. A fresh shell prompt does not move down merely because
 its window grows. The first rows are 4x1 to 4x3 with no older line, exactly
-one older line, and more history than the two added rows. This resolves the
-open interpretation above; no resize implementation is claimed yet.
+one older line, and more history than the two added rows. These rows now
+exist and had an observed geometry assertion before their implementation.
+
+## Implemented resize checkpoint
+
+The pure resize entry and its native/lupin properties now cover R1-R8:
+content and direct-versus-intermediate paths, bounded original-history
+ownership, logical/saved/projected cursor anchors and feed/eviction commits,
+one-column natural widths and unwritten wide-wrap gaps, alternate clipping
+and hidden-primary reflow, region/tab resets, incremental CSI/UTF-8, exact
+same-size/refused no-ops and repeated outer-owned child-turn capacity reuse.
+The original-width path uses snapshot rows for all heights, not just the
+original height. A retained first logical line is completed before counting
+its wrap phase. TBC-all now clears retained hidden stops; that regression
+was observed red before its one-line correction. This is written-property
+evidence, not a claim that the full reference corpus or width sweep passed.
+
+Next: CLI/raw and recording replay, complete corpus comparison with named
+divergences, the assigned-scalar width sweep, first-divergent-prefix tooling,
+resource/performance and plants, then the single prepared host take and PR.
 
 One standalone read-only host preflight has passed. Prepare the complete
 host take before acquiring a pool slot; no heavy work is assigned to the
