@@ -1,0 +1,77 @@
+//! member: false
+//! Private framed-ring rows, not yet a test of screen history or reflow.
+use std.mem.budget
+use std.io
+
+fn append_history_fixture(mut history: History, id: int, start_cell: int, body: List[byte]) -> bool {
+    let at = history_reserve(mut history, id, start_cell, body.len)
+    if at < 0 { return false }
+    var i = 0
+    for b in body {
+        history.bytes[(at + 24 + i) % history.bytes.len] = b
+        i += 1
+    }
+    true
+}
+
+fn test_history_header() {
+    var history = new_history(128)
+    assert(append_history_fixture(mut history, 0x0102030405060708, 0x11223344, "abcdefgh".bytes()), "history-append")
+    assert(history.used == 32 && history.records == 1)
+    assert(history.bytes[0] == 32 as byte && history.bytes[1] == 0 as byte)
+    assert(history.bytes[8] == 8 as byte && history.bytes[15] == 1 as byte)
+    assert(history.bytes[16] == 0x44 as byte && history.bytes[19] == 0x11 as byte)
+    assert(history_get_word(history, 0, 0, 4) == 32)
+    assert(history_get_word(history, 0, 4, 4) == 0)
+    assert(history_get_word(history, 0, 8, 8) == 0x0102030405060708)
+    assert(history_get_word(history, 0, 16, 4) == 0x11223344)
+    assert(history_get_word(history, 0, 20, 4) == 0, "history-unused-flags-zero")
+    assert(history_previous(history, 0) == 0 - 1)
+}
+
+fn test_history_wrap_and_exact_eviction() {
+    var history = new_history(128)
+    let body = "abcdefgh".bytes()
+    var id = 0
+    while id < 4 { assert(append_history_fixture(mut history, id, 0, body)); id += 1 }
+    assert(history.used == 128 && history.records == 4 && history.evicted == 0)
+    assert(append_history_fixture(mut history, 4, 0, body))
+    assert(history.used == 128 && history.records == 4 && history.evicted == 1, "history-exactly-one-eviction")
+    assert(history.head == 32 && history.tail == 32)
+    assert(history_get_word(history, history.head, 4, 4) == 0)
+    var at = (history.tail - history.newest_length + history.bytes.len) % history.bytes.len
+    id = 4
+    while id >= 1 {
+        assert(history_get_word(history, at, 8, 8) == id, "history-reverse-wrap")
+        assert(history_get_word(history, at, 20, 4) == 0)
+        at = history_previous(history, at)
+        id -= 1
+    }
+    assert(at == 0 - 1)
+    var crossing = new_history(110)
+    id = 0
+    while id < 4 { assert(append_history_fixture(mut crossing, id, id * 7, body)); id += 1 }
+    at = (crossing.tail - crossing.newest_length + 110) % 110
+    assert(at == 96 && history_get_word(crossing, at, 8, 8) == 3)
+    assert(history_get_word(crossing, at, 16, 4) == 21, "history-header-straddles-wrap")
+}
+
+fn test_history_flat_allocation() {
+    region frame(cap: 1048576) {
+        var history = new_history(128)
+        let body = "abcdefgh".bytes()
+        let stable = budget.charged(frame)
+        var id = 0
+        while id < 1024 { assert(append_history_fixture(mut history, id, 0, body)); id += 1 }
+        assert(history.used == 128 && history.records == 4)
+        assert(history.evicted == 1020 && budget.charged(frame) == stable, "history-append-allocation")
+        let oversized = "x".repeat(105).bytes()
+        assert(!append_history_fixture(mut history, 1024, 0, oversized))
+        assert(history.used == 0 && history.records == 0, "history-oversize-drops-old-prefix")
+        var disabled = new_history(0)
+        assert(!append_history_fixture(mut disabled, 0, 0, body) && disabled.used == 0)
+        io.write_line("MEASURE history-ring capacity=128 append-turns=1024 feed-charge=0")
+    }
+}
+
+fn main() -> int { test_history_header(); test_history_wrap_and_exact_eviction(); test_history_flat_allocation(); 0 }

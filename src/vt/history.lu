@@ -1,0 +1,35 @@
+//! member: true
+//! Fixed-byte history framing seam, independent of screen-line encoding.
+
+/// The retained encoded history ring. Header lengths include every encoded
+/// byte. Head/tail are byte positions; previous lengths support reverse reads.
+/// Screen-line encoding and feed integration are not implemented yet.
+pub struct History {
+    bytes: List[byte], head: int, tail: int, used: int,
+    records: int, newest_length: int, evicted: int,
+}
+
+fn new_history(cap: int) -> History {
+    assert(cap >= 0)
+    let data = copy region {
+        let zeroes = "\u{0}".repeat(cap)
+        zeroes.bytes()
+    }
+    History { bytes: data, head: 0, tail: 0, used: 0, records: 0, newest_length: 0, evicted: 0 }
+}
+
+fn history_reserve(mut history: History, id: int, start_cell: int, body_length: int) -> int {
+    assert(id >= 0 && start_cell >= 0 && body_length >= 0)
+    history.used = 0
+    0 - 1
+}
+
+fn history_get_word(history: History, at: int, offset: int, width: int) -> int {
+    assert(at >= 0 && offset >= 0 && width >= 1 && history.bytes.len >= 0)
+    0
+}
+
+fn history_previous(history: History, at: int) -> int {
+    assert(at >= 0 && history.used >= 0)
+    0 - 1
+}

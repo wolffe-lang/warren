@@ -55,6 +55,15 @@ cells, including integer-overflow inputs. This groundwork is not a resize
 or history claim. Reflow later adds reusable source/output workspaces and
 must include their actual peak charges in the ledger.
 
+The history groundwork next tests the fixed-byte framed ring independently
+of screen encoding: 24-byte LE headers, whole-record eviction, constant-time
+oldest removal, reverse traversal through previous lengths across wrap,
+and no per-append allocation. A record that cannot fit even in an empty ring
+must discard the older prefix and itself, not keep stale older text after a
+missing newer record. Screen-line encoding, stable IDs through reflow and
+history feed integration remain separate rows; a ring-only pass proves none
+of those. The first implementation uses no unbounded line index.
+
 One standalone read-only host preflight has passed. Prepare the complete
 host take before acquiring a pool slot; no heavy work is assigned to the
 other pool host. The first grid review leaves this exact Done-when row open:
