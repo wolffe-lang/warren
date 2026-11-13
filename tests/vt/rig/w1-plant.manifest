@@ -1,0 +1,5 @@
+# Use the recorder's --base and --plant vt-scalar-value mode on the plant branch.
+floor 15
+rig w1-plant-step.sh sha256=03ae52b090638905b769099556c7787e23acf256e8bba2cd7afac7d9c6fefc21
+step w1-plant-build tools=python3 script=w1-plant-step.sh -- build
+step vt-scalar-value needs=w1-plant-build tools=python3 script=w1-plant-step.sh -- row
