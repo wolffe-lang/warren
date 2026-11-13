@@ -49,10 +49,21 @@ zero charge. src/vt/history_capacity_rows.lu independently asserts the exact
 native default bound. A ledger or representation change must move its row,
 not be hidden by raising the interpreter cap. No issue is filed here.
 
-After feed integration, the native 80x24 pane with the default ring retains
-8,624,960 arena bytes before any resize workspace exists, under the witness's
-16 MiB cap and 9 MiB pane bound. The ring-only native bound remains 8,388,656.
+At the feed-only checkpoint, the native 80x24 pane with the default ring
+retained 8,624,960 arena bytes before resize-state storage existed, under the
+witness's 16 MiB cap and 9 MiB pane bound. With initialized resize scratch,
+the same before-first-resize witness retains 8,625,920. The ring-only native
+bound remains 8,388,656.
 Generic interpreter screen rows use history cap zero; ownership/feed rows
 explicitly use a small configured ring. Capacity rows also grow an
 outer-owned pane through short-lived child turn regions and require the
 outer retained charge to plateau; both native and interpreter pass.
+
+Resize adds reusable snapshot/output screens and a canonical deque, charged
+separately. Canonical bytes are bounded by the configured history cap plus
+48 times peak cell capacity before geometric rounding; old growth buffers
+remain charged. The native/lupin resize row warms all cell/row/tab/cache
+capacities, then repeats 32 grow/shrink/regrow cycles through child regions
+and requires unchanged outer charge. A retained visible logical line may
+span history fragments up to the configured cap; unrelated history lines
+are not scanned just to resize the viewport.
