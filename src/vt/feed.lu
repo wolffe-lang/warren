@@ -9,6 +9,13 @@ fn blank_cell(mut screen: Screen, at: int, background: int) {
     screen.cells[at].flags = 0
     screen.cells[at].foreground = 0 - 1
     screen.cells[at].background = background
+    screen.cells[at].written = false
+}
+
+fn blank_cell_preserving_written(mut screen: Screen, at: int, background: int) {
+    let written = screen.cells[at].written
+    blank_cell(mut screen, at, background)
+    screen.cells[at].written = written
 }
 
 fn copy_cell(mut screen: Screen, to: int, from: int) {
@@ -19,6 +26,7 @@ fn copy_cell(mut screen: Screen, to: int, from: int) {
     screen.cells[to].flags = screen.cells[from].flags
     screen.cells[to].foreground = screen.cells[from].foreground
     screen.cells[to].background = screen.cells[from].background
+    screen.cells[to].written = screen.cells[from].written
 }
 
 fn scroll_up_one(mut screen: Screen, cols: int, top: int, bottom: int, background: int) {
@@ -40,8 +48,8 @@ fn index_line(mut pane: Vt) {
 
 fn break_pair(mut screen: Screen, cols: int, row: int, col: int, background: int) {
     let at = (row - 1) * cols + col - 1
-    if screen.cells[at].width == 2 && col < cols { blank_cell(mut screen, at + 1, background) }
-    else if screen.cells[at].width == 0 && col > 1 { blank_cell(mut screen, at - 1, background) }
+    if screen.cells[at].width == 2 && col < cols { blank_cell_preserving_written(mut screen, at + 1, background) }
+    else if screen.cells[at].width == 0 && col > 1 { blank_cell_preserving_written(mut screen, at - 1, background) }
 }
 
 fn write_narrow(mut screen: Screen, cols: int, row: int, col: int, cp: int,
@@ -55,6 +63,7 @@ fn write_narrow(mut screen: Screen, cols: int, row: int, col: int, cp: int,
     screen.cells[at].flags = flags
     screen.cells[at].foreground = foreground
     screen.cells[at].background = background
+    screen.cells[at].written = true
     if screen.extents[row - 1] < col { screen.extents[row - 1] = col }
 }
 
@@ -83,6 +92,7 @@ fn write_glyph(mut screen: Screen, cols: int, row: int, col: int, cp: int,
         screen.cells[at + 1].width = 0
         screen.cells[at + 1].flags = flags
         screen.cells[at + 1].foreground = foreground
+        screen.cells[at + 1].written = true
         if screen.extents[row - 1] < col + 1 { screen.extents[row - 1] = col + 1 }
     }
 }

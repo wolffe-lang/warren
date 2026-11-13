@@ -53,9 +53,11 @@ fn resize_alternate(mut pane: Vt, cols: int, rows: int) {
             pane.resize_state.output.cells[at + 1].flags = pane.resize_state.output.cells[at].flags
             pane.resize_state.output.cells[at + 1].foreground = pane.resize_state.output.cells[at].foreground
             pane.resize_state.output.cells[at + 1].background = pane.resize_state.output.cells[at].background
+            pane.resize_state.output.cells[at + 1].written = pane.resize_state.output.cells[at].written
             pane.resize_state.output.extents[row] = 2
         }
         repair_row_pairs(mut pane.resize_state.output, cols, row + 1, pane.pen.background)
+        recalculate_written_extent(mut pane.resize_state.output, cols, row + 1)
         row += 1
     }
     copy_screen_rectangle(mut pane.alternate, pane.resize_state.output, cols, rows)

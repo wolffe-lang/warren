@@ -62,6 +62,35 @@ fn test_sparse_insert_discards_last_written_cell() {
     assert(pane.primary.cells[0].base == 97 && pane.primary.cells[1].base == 98 && pane.primary.cells[2].base == 32)
 }
 
+fn test_written_bits_survive_original_snapshot() {
+    var pane = vt.new(12, 2, 4096)
+    vt.feed(mut pane, "a\u{1b}[12GZ".bytes())
+    assert(vt.resize(mut pane, 6, 4) == "" && vt.resize(mut pane, 12, 2) == "")
+    var at = 0
+    while at < 24 {
+        assert(pane.primary.cells[at].written == (at == 0 || at == 11), "written-bit-original-snapshot")
+        at += 1
+    }
+}
+
+fn test_alternate_clip_recomputes_sparse_extent() {
+    var pane = vt.new(12, 2, 0)
+    vt.feed(mut pane, "\u{1b}[?1049ha\u{1b}[12GZ".bytes())
+    assert(vt.resize(mut pane, 6, 2) == "")
+    assert(pane.alternate.extents[0] == 1 && pane.alternate.cells[0].written,
+        "alternate-clip-discards-distant-written-cell")
+}
+
+fn test_history_materializes_logical_spaces_written() {
+    var pane = vt.new(4, 2, 4096)
+    vt.feed(mut pane, "a\u{1b}[4GZ\r\nq\r\nr".bytes())
+    assert(pane.history.records == 1)
+    assert(vt.resize(mut pane, 2, 4) == "")
+    assert(pane.primary.cells[0].base == 97 && pane.primary.cells[3].base == 90)
+    assert(pane.primary.cells[1].base == 32 && pane.primary.cells[1].written &&
+        pane.primary.cells[2].base == 32 && pane.primary.cells[2].written, "history-logical-spaces-are-written")
+}
+
 fn main() -> int {
     test_cursor_toward_region()
     test_mouse_reset_is_one_tracking_mode()
@@ -70,5 +99,8 @@ fn main() -> int {
     test_1049_reset_keeps_alternate_content()
     test_1049_clear_cancels_active_pending_wrap()
     test_sparse_insert_discards_last_written_cell()
+    test_written_bits_survive_original_snapshot()
+    test_alternate_clip_recomputes_sparse_extent()
+    test_history_materializes_logical_spaces_written()
     0
 }

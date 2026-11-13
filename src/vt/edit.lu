@@ -6,20 +6,26 @@ fn repair_row_pairs(mut screen: Screen, cols: int, row: int, background: int) {
     let start = (row - 1) * cols
     while col < cols {
         if screen.cells[start + col].width == 2 {
-            if col + 1 >= cols { blank_cell(mut screen, start + col, background) }
-            else if screen.cells[start + col + 1].width != 0 { blank_cell(mut screen, start + col, background) }
+            if col + 1 >= cols { blank_cell_preserving_written(mut screen, start + col, background) }
+            else if screen.cells[start + col + 1].width != 0 { blank_cell_preserving_written(mut screen, start + col, background) }
         } else if screen.cells[start + col].width == 0 {
-            if col == 0 { blank_cell(mut screen, start + col, background) }
-            else if screen.cells[start + col - 1].width != 2 { blank_cell(mut screen, start + col, background) }
+            if col == 0 { blank_cell_preserving_written(mut screen, start + col, background) }
+            else if screen.cells[start + col - 1].width != 2 { blank_cell_preserving_written(mut screen, start + col, background) }
         }
         col += 1
     }
 }
 
+fn recalculate_written_extent(mut screen: Screen, cols: int, row: int) {
+    var end = cols
+    let start = (row - 1) * cols
+    while end > 0 && !screen.cells[start + end - 1].written { end -= 1 }
+    screen.extents[row - 1] = end
+}
+
 fn shift_characters(mut screen: Screen, cols: int, row: int, col: int,
         amount: int, background: int, insert: bool) {
     let n = grid_clamp(amount, 1, cols - col + 1)
-    let extent = screen.extents[row - 1]
     if insert {
         var to = cols
         while to >= col + n {
@@ -27,8 +33,12 @@ fn shift_characters(mut screen: Screen, cols: int, row: int, col: int,
             to -= 1
         }
         var at = col
-        while at < col + n { blank_cell(mut screen, (row - 1) * cols + at - 1, background); at += 1 }
-        screen.extents[row - 1] = grid_clamp((if extent >= col { extent } else { col - 1 }) + n, 0, cols)
+        while at < col + n {
+            let cell_at = (row - 1) * cols + at - 1
+            blank_cell(mut screen, cell_at, background)
+            screen.cells[cell_at].written = true
+            at += 1
+        }
     } else {
         var to = col
         while to <= cols - n {
@@ -37,9 +47,9 @@ fn shift_characters(mut screen: Screen, cols: int, row: int, col: int,
         }
         var at = cols - n + 1
         while at <= cols { blank_cell(mut screen, (row - 1) * cols + at - 1, background); at += 1 }
-        if extent >= col { screen.extents[row - 1] = grid_clamp(extent - n, col - 1, cols) }
     }
     repair_row_pairs(mut screen, cols, row, background)
+    recalculate_written_extent(mut screen, cols, row)
 }
 
 fn copy_row(mut screen: Screen, cols: int, to: int, from: int) {

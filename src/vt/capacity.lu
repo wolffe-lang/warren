@@ -23,7 +23,7 @@ fn ensure_screen_capacity(mut screen: Screen, cells: int, rows: int) {
         (mut screen.cells).reserve(capacity)
         while screen.cells.len < capacity {
             (mut screen.cells).push(Cell { base: 32, mark1: 0, mark2: 0, width: 1,
-                flags: 0, foreground: 0 - 1, background: 0 - 1 })
+                flags: 0, foreground: 0 - 1, background: 0 - 1, written: false })
         }
     }
     if rows > screen.extents.len {

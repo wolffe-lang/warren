@@ -40,20 +40,21 @@ fn address_row(pane: Vt, row: int) -> int {
 }
 
 fn erase_row(mut screen: Screen, cols: int, row: int, first: int, last: int, background: int) {
-    let starts_in_tail = screen.cells[(row - 1) * cols + first - 1].width == 0
+    let start = (row - 1) * cols
+    let starts_in_tail = screen.cells[start + first - 1].width == 0
+    let ends_in_lead = screen.cells[start + last - 1].width == 2
     break_pair(mut screen, cols, row, first, background)
     break_pair(mut screen, cols, row, last, background)
+    if starts_in_tail && first > 1 { screen.cells[start + first - 2].written = false }
+    if ends_in_lead && last < cols { screen.cells[start + last].written = false }
     var col = first
     while col <= last {
-        blank_cell(mut screen, (row - 1) * cols + col - 1, background)
+        blank_cell(mut screen, start + col - 1, background)
+        screen.cells[start + col - 1].written = last < cols
         col += 1
     }
-    if last == cols {
-        if screen.extents[row - 1] >= first { screen.extents[row - 1] = first - 1 - (if starts_in_tail { 1 } else { 0 }) }
-        screen.wrapped[row - 1] = false
-    } else if screen.extents[row - 1] < last {
-        screen.extents[row - 1] = last
-    }
+    if last == cols { screen.wrapped[row - 1] = false }
+    recalculate_written_extent(mut screen, cols, row)
 }
 
 fn erase_active_screen(mut screen: Screen, cols: int, rows: int, row: int, col: int,

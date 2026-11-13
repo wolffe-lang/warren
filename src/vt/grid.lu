@@ -5,9 +5,11 @@
 /// A cell's scalar payload. Width is 1, 2, or 0 for a wide continuation;
 /// mark fields are zero when absent. Rendition colours are -1 for default,
 /// 0..255 for a palette entry, or 16777216 + packed RGB for true colour.
+/// Written tracks erased gaps for later edits; it is not a rendition bit.
+/// Logical history content is materialized written; original snapshots retain it.
 pub struct Cell {
     base: int, mark1: int, mark2: int, width: int,
-    flags: int, foreground: int, background: int,
+    flags: int, foreground: int, background: int, written: bool,
 }
 
 /// One rectangular logical screen, stored flat. Backing arrays may retain a
@@ -65,7 +67,7 @@ fn new_screen(cols: int, rows: int) -> Screen {
     var i = 0
     while i < cols * rows {
         (mut cells).push(Cell { base: 32, mark1: 0, mark2: 0, width: 1,
-            flags: 0, foreground: 0 - 1, background: 0 - 1 })
+            flags: 0, foreground: 0 - 1, background: 0 - 1, written: false })
         i += 1
     }
     var extents = List[int]()
