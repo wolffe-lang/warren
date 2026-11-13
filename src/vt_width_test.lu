@@ -1,0 +1,19 @@
+//! member: false
+//! Normative width properties; reference disagreements are measured separately.
+use vt
+
+fn test_width_properties() {
+    assert(vt.width_version() == "15.1.0")
+    assert(vt.scalar_width(65) == 1 && vt.scalar_width(32) == 1)
+    assert(vt.scalar_width(20013) == 2, "vt-width-cjk")
+    assert(vt.scalar_width(0xD55C) == 2 && vt.scalar_width(0xFF21) == 2)
+    assert(vt.scalar_width(0x1F600) == 2 && vt.scalar_width(0x1F1E6) == 2)
+    assert(vt.scalar_width(0x2764) == 1)
+    assert(vt.scalar_width(0x0301) == 0 && vt.scalar_width(0x20D7) == 0)
+    assert(vt.scalar_width(0xFE0F) == 0 && vt.scalar_width(0xE0100) == 0)
+    assert(vt.scalar_width(0x200B) == 0 && vt.scalar_width(0x200D) == 0)
+    assert(vt.scalar_width(0x00AD) == 0)
+    assert(vt.scalar_width(0 - 1) == 1 && vt.scalar_width(0x110000) == 1)
+}
+
+fn main() -> int { test_width_properties(); 0 }

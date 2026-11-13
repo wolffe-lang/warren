@@ -1,0 +1,12 @@
+//! member: true
+//! Red-first natural-width seam; replaced by the pinned data generator.
+
+/// Natural cell width. The initial seam deliberately reports every scalar
+/// narrow so the Unicode property rows establish their red state first.
+pub fn scalar_width(cp: int) -> int {
+    if cp < 0 { return 1 }
+    1
+}
+
+/// The normative data version selected for the first generated table.
+pub fn width_version() -> str { "15.1.0" }
