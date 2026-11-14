@@ -49,6 +49,16 @@ attached, one worst-case image and a 64-byte-a-cell shadow of what its
 client holds). These counts are revisited when one session holds many
 panes.
 
+Measured, the projection undercounts a session. A server's resident size is
+about 9 MB at start and grows by about 50 MB for each 80x24 session (PAX under
+QEMU: 9,156 kB, then 67,056 and 116,736 kB; Linux 111,644 kB with two), then
+stays flat (the same before and after 10,000 keystrokes beside a flooding
+pane). Most of it is the emulator's history ring: it is materialized whole
+when the emulator is made (about 17 MB resident for an 8 MiB ring, the copy
+included) and made again when the pane is resized (about 16 MB more). The
+limits stand for this version; a ring that grows as history arrives, and a
+resize that keeps it, are the emulator's to do.
+
 **On PAX**, a server takes three of the machine's 64 thread slots (its main
 thread and two the runtime starts for signals and children; measured under
 QEMU), and every wolf program inside a pane takes two (pax#354 is the
@@ -289,9 +299,23 @@ too-small attach (WELCOME then BYE, no session created), the HELLO deadline,
 stale and future ACKs, a message inside a paste's fragment chain, two client
 sizes converging to their minima and back, a client that never ACKs beside an
 active one, detach by the prefix binding and by DETACH, Ctrl-C as the byte 03,
-the last session ending the server, the command role, and a second server
-meeting the start lock. `src/compose_rows.lu` holds every composed image,
-applied by the client's applier, to the emulator's stored cells.
+the last session ending the server, the command role, a second server
+meeting the start lock, a pane's last output reaching its client before the
+session ends, a program that outlives its pane being reaped, a pane's program
+starting with no signal ignored or blocked and no inherited descriptor, the
+server's thread count, the pre-HELLO and session limits, a resize while an
+image is outstanding, a client too slow for its events beside one that keeps
+up, a keystroke's delay beside a flooding pane, and a flat resident size over
+10,000 keystrokes. `src/compose_rows.lu` holds every composed image, applied
+by the client's applier, to the emulator's stored cells, and holds the event
+queue's cap to the bytes a client has yet to take (a small socket under a
+steady pane never empties the queue, and must not count what it sent).
+
+On PAX a pane ends when its program ends, not when the program closes its
+terminal: the late-child row measures the session's end about a second after
+the command there (the program's lifetime) and the server's exit right after
+it, where Linux ends the session at once and the server a second
+later. Either way the server does not end before the program does.
 
 This version answers a command connection's COMMAND for `kill-server` and
 `list-sessions` only; every other verb replies status 2 and names itself as
