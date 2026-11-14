@@ -234,6 +234,23 @@ fn measure(cols: int, rows: int) {
     let delta = server.compose(mut sh, one, 2, false)
     let t4 = time.monotonic_ns()
     let dwire = server.frame_wire(delta)
+    // The client's render of the full image and of the one-cell delta.
+    var img = proto.image()
+    var sh1 = server.no_shadow()
+    let _f = proto.apply(mut img, server.compose(mut sh1, pane, 1, true))
+    var drawn = proto.image()
+    let pol = client.policy_for("xterm-256color", "truecolor", false)
+    let r0 = time.monotonic_ns()
+    let full_bytes = client.render(mut drawn, img, pol)
+    let r1 = time.monotonic_ns()
+    var img2 = copy img
+    var sh2 = server.no_shadow()
+    let _g = server.compose(mut sh2, pane, 1, true)
+    let _h = proto.apply(mut img2, server.compose(mut sh2, one, 2, false))
+    let r2 = time.monotonic_ns()
+    let delta_bytes = client.render(mut drawn, img2, pol)
+    let r3 = time.monotonic_ns()
+    eprint("MEASURE render {cols}x{rows} full-ns={r1 - r0} full-bytes={full_bytes.len} one-cell-ns={r3 - r2} one-cell-bytes={delta_bytes.len}")
     eprint("MEASURE compose {cols}x{rows} full-compose+encode-ns={best_compose} full-apply-ns={best_apply} full-wire-bytes={bytes} one-cell-delta-compose-ns={t4 - t3} one-cell-delta-wire-bytes={dwire.len}")
 }
 
