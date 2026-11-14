@@ -11,7 +11,10 @@ use proto
 /// waiting for a pane slot made between turns (its input waits behind it);
 /// `message` shows on the client's hint line until `message_until`;
 /// `seen_*` say what its last image already holds (the layout and bar
-/// generations, and each pane slot's damage count).
+/// generations, and each pane slot's damage count). Keys are the client's
+/// own: its `mode` (config's MODE_*), the sticky mode or normal that confirm,
+/// help and the prompts go `back` to, the `prompt` being typed, the action a
+/// `confirm` waits on, and the key list's first line `help_top`.
 pub struct Conn {
     live: bool,
     fd: int,
@@ -48,7 +51,11 @@ pub struct Conn {
     features: int,
     write_on: bool,
     read_on: bool,
-    prefix: bool,
+    mode: int,
+    back: int,
+    prompt: List[byte],
+    confirm: int,
+    help_top: int,
     hello: List[byte],
     hello_len: int,
     hello_ready: bool,
@@ -88,7 +95,7 @@ pub fn new_conn() -> Conn {
         tx: List[byte](), tx_off: 0, tx_len: 0, image_start: 0, image_end: 0 - 1, image_seq: 0,
         ack: proto.ack_state(), force_full: true, ending: false, ending_gen: 0, stale: false, stale_since: 0, last_frame: 0,
         shadow: no_shadow(), cols: 0, rows: 0, depth: 0, features: 0, write_on: false, read_on: false,
-        prefix: false, hello: List[byte](), hello_len: 0, hello_ready: false,
+        mode: 0, back: 0, prompt: List[byte](), confirm: 0, help_top: 0, hello: List[byte](), hello_len: 0, hello_ready: false,
         resize_ready: false, resize_cols: 0, resize_rows: 0, command_ready: false, command: List[byte](),
         command_len: 0, stop_after: false, pending: 0, pending_arg: 0, message: List[byte](), message_until: 0,
         seen_layout: 0 - 1, seen_bar: 0 - 1, seen_damage: List[int](),
@@ -129,7 +136,11 @@ pub fn reset_conn(mut c: Conn, fd: int, id: int, now: int) {
     c.rows = 0
     c.write_on = false
     c.read_on = true
-    c.prefix = false
+    c.mode = 0
+    c.back = 0
+    (mut c.prompt).reset()
+    c.confirm = 0
+    c.help_top = 0
     c.hello_len = 0
     c.hello_ready = false
     c.resize_ready = false

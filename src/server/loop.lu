@@ -14,6 +14,7 @@ use std.poll
 use std.process
 use std.signal
 use std.time
+use config
 use layout
 use proto
 use vt
@@ -57,6 +58,8 @@ pub struct Server {
     budget: int,
     uid: int,
     inherited: List[int],
+    keys: config.Keys,
+    help: List[str],
 }
 
 fn now_ns() -> int {
@@ -609,25 +612,85 @@ fn tab_label(t: layout.Tab, n: int) -> str {
     " {n}:{name} "
 }
 
-/// The bar's two lines for one client: line one the session's name and
-/// its tabs (the active one inverse; tabs that do not fit are left out on
-/// the far side of the active one, marked `<` and `>`); line two the
-/// client's message while it lasts, else blank.
-fn bar_cells(s: Server, si: int, index: int, now: int) -> List[vt.Cell] {
-    let cols = s.sessions[si].cols
-    var bar = List[vt.Cell]()
-    var i = 0
-    while i < BAR_LINES * cols {
-        (mut bar).push(blank_cell())
-        i += 1
-    }
+fn blank_line(cols: int) -> List[vt.Cell] {
     var line = List[vt.Cell]()
-    i = 0
+    var i = 0
     while i < cols {
         (mut line).push(blank_cell())
         i += 1
     }
-    var col = put_text(mut line, 1, cols, " " + name_of(s.sessions[si]) + " ", INVERSE)
+    line
+}
+
+/// The last scalars of a prompt that fit in `room` columns (a long line
+/// scrolls left as it is typed).
+fn prompt_tail(prompt: List[byte], room: int) -> str {
+    let text = str_from_utf8(prompt[0..prompt.len]) else ""
+    var width = text_width(text)
+    if width <= room { return text }
+    var off = 0
+    for cp in text.code_points() {
+        if width <= room { break }
+        var base = cp
+        if base < 32 || (base >= 127 && base < 160) { base = 63 }
+        width -= vt.scalar_width(base)
+        off += if cp < 128 then 1 else if cp < 2048 then 2 else if cp < 65536 then 3 else 4
+    }
+    str_from_utf8(prompt[off..prompt.len]) else ""
+}
+
+/// The hint line's text in a prompt mode (rename, command), the cursor
+/// after it; "" in any other mode.
+fn prompt_line(s: Server, index: int, cols: int) -> str {
+    let mode = s.conns[index].mode
+    var lead = ""
+    if mode == config.MODE_COMMAND { lead = " :" }
+    if mode == config.MODE_RENAME { lead = " rename tab: " }
+    if lead.len == 0 { return "" }
+    lead + prompt_tail(s.conns[index].prompt, cols - text_width(lead) - 1)
+}
+
+// A hint line drawn at a column of a bar line: its text, its keys inverse.
+fn put_hints(mut line: List[vt.Cell], col: int, cols: int, h: config.HintLine) {
+    let _t = put_text(mut line, col, cols, h.text, 0)
+    var q = 0
+    while q + 1 < h.keys.len {
+        var x = h.keys[q]
+        while x < h.keys[q + 1] {
+            let at = col - 1 + x
+            if at >= 0 && at < line.len { line[at] = chrome_cell(line[at].base, INVERSE, 0 - 1) }
+            x += 1
+        }
+        q += 2
+    }
+}
+
+/// The client's cells over the frame's last rows: the bar's two lines,
+/// with the key list over the tab area above them while it is open. Line
+/// one: the session's name, its tabs (the active one inverse; tabs that do
+/// not fit are left out on the far side of the active one, marked `<` and
+/// `>`), and the client's mode in a fixed field at the right end. Line two:
+/// the prompt being typed, the confirm question, the client's message while
+/// it lasts, or the mode's hints with their keys inverse.
+fn bar_cells(s: Server, si: int, index: int, now: int) -> List[vt.Cell] {
+    let cols = s.sessions[si].cols
+    let area = s.sessions[si].rows - BAR_LINES
+    let mode = s.conns[index].mode
+    var bar = List[vt.Cell]()
+    if mode == config.MODE_HELP && area > 0 {
+        var r = 0
+        while r < area {
+            var help = blank_line(cols)
+            let at = s.conns[index].help_top + r
+            if at < s.help.len { let _h = put_text(mut help, 1, cols, s.help[at], 0) }
+            for cell in help { (mut bar).push(cell) }
+            r += 1
+        }
+    }
+    var line = blank_line(cols)
+    // The tabs end one column before the mode field.
+    let tab_end = cols - MODE_FIELD - 1
+    var col = put_text(mut line, 1, tab_end, " " + name_of(s.sessions[si]) + " ", INVERSE)
     var labels = List[str]()
     var active = 0
     var t = 0
@@ -639,7 +702,7 @@ fn bar_cells(s: Server, si: int, index: int, now: int) -> List[vt.Cell] {
     if labels.len > 0 {
         // The widest run of labels that fits and holds the active one: from
         // the active label back as far as fits, then forward.
-        let room = cols - col + 1 - 2
+        let room = tab_end - col + 1 - 2
         var from = active
         var to = active
         var used = text_width(labels[active])
@@ -651,34 +714,38 @@ fn bar_cells(s: Server, si: int, index: int, now: int) -> List[vt.Cell] {
             to += 1
             used += text_width(labels[to])
         }
-        if from > 0 { col = put_text(mut line, col, cols, "<", 0) }
+        if from > 0 { col = put_text(mut line, col, tab_end, "<", 0) }
         t = from
         while t <= to {
-            col = put_text(mut line, col, cols, labels[t], if t == active then INVERSE else 0)
+            col = put_text(mut line, col, tab_end, labels[t], if t == active then INVERSE else 0)
             t += 1
         }
-        if to + 1 < labels.len { col = put_text(mut line, col, cols, ">", 0) }
+        if to + 1 < labels.len { col = put_text(mut line, col, tab_end, ">", 0) }
     }
-    i = 0
-    while i < cols {
-        bar[i] = line[i]
-        i += 1
-    }
-    if s.conns[index].message_until > now && s.conns[index].message.len > 0 {
-        var msg = List[vt.Cell]()
-        i = 0
-        while i < cols {
-            (mut msg).push(blank_cell())
-            i += 1
+    if cols >= MODE_FIELD {
+        var c = cols - MODE_FIELD
+        while c < cols {
+            line[c] = chrome_cell(32, INVERSE | BOLD, 0 - 1)
+            c += 1
         }
+        let _f = put_text(mut line, cols - MODE_FIELD + 2, cols, config.mode_name(mode), INVERSE | BOLD)
+    }
+    for cell in line { (mut bar).push(cell) }
+    var two = blank_line(cols)
+    let prompt = prompt_line(s, index, cols)
+    if prompt.len > 0 {
+        let _p = put_text(mut two, 1, cols, prompt, 0)
+    } else if mode == config.MODE_CONFIRM {
+        let question = if s.conns[index].confirm == config.A_CLOSE_TAB then " close this tab and its panes?" else " close this pane?"
+        let q = put_text(mut two, 1, cols, question, 0)
+        put_hints(mut two, q, cols, config.hint_line(s.keys, mode, cols - q + 1))
+    } else if s.conns[index].message_until > now && s.conns[index].message.len > 0 {
         let text = str_from_utf8(s.conns[index].message[0..s.conns[index].message.len]) else ""
-        let _m = put_text(mut msg, 1, cols, text, 0)
-        i = 0
-        while i < cols {
-            bar[cols + i] = msg[i]
-            i += 1
-        }
+        let _m = put_text(mut two, 1, cols, text, 0)
+    } else {
+        put_hints(mut two, 1, cols, config.hint_line(s.keys, mode, cols))
     }
+    for cell in two { (mut bar).push(cell) }
     bar
 }
 
@@ -828,6 +895,31 @@ fn act_resize(mut s: Server, si: int, direction: int) {
     layout_changed(mut s, si)
 }
 
+/// Close the active tab: its panes leave their slots (their programs hear
+/// the hangup); the last tab ends the session instead.
+fn close_tab(mut s: Server, si: int) {
+    let tab = s.sessions[si].layout.active
+    var ids = List[int]()
+    for t in s.sessions[si].layout.tabs {
+        if t.id == tab {
+            for id in t.focus_order { (mut ids).push(id) }
+        }
+    }
+    let from = focused_slot(s, si)
+    var last = false
+    layout.close_tab(mut s.sessions[si].layout, tab) else |e| { last = "{e}" == "last_tab" }
+    if last {
+        end_session(mut s, si)
+        return
+    }
+    for id in ids {
+        let k = slot_of(s, id)
+        if k >= 0 { drop_pane(mut s, k) }
+    }
+    layout_changed(mut s, si)
+    focus_moved(mut s, si, from)
+}
+
 /// Do a key's action for a client. LATER when it waits for a pane slot
 /// made between turns (it is taken again on the next turn).
 fn do_action(mut s: Server, index: int, action: int, arg: int) -> int {
@@ -837,38 +929,42 @@ fn do_action(mut s: Server, index: int, action: int, arg: int) -> int {
     let area = s.sessions[si].rows - BAR_LINES
     let tab = s.sessions[si].layout.active
     let from = focused_slot(s, si)
-    if action == ACT_SPLIT { return act_split(mut s, index, si, arg) }
-    if action == ACT_NEW_TAB { return act_new_tab(mut s, index, si) }
-    if action == ACT_DETACH {
+    if action == config.A_SPLIT { return act_split(mut s, index, si, arg) }
+    if action == config.A_NEW_TAB { return act_new_tab(mut s, index, si) }
+    if action == config.A_DETACH {
         terminal(mut s, index, 135, 1, "detached")
         return DONE
     }
-    if action == ACT_SEND_PREFIX {
+    if action == config.A_SEND_PREFIX {
         if from >= 0 { queue_to(mut s, from, key_bytes(s.panes[from].screen, 4, 0, 32)) }
         return DONE
     }
-    if action == ACT_CLOSE {
+    if action == config.A_CLOSE {
         if from >= 0 { close_pane(mut s, si, from) }
         return DONE
     }
-    if action == ACT_RESIZE {
+    if action == config.A_CLOSE_TAB {
+        close_tab(mut s, si)
+        return DONE
+    }
+    if action == config.A_RESIZE {
         act_resize(mut s, si, arg)
         return DONE
     }
     var refused = false
-    if action == ACT_FOCUS {
+    if action == config.A_FOCUS {
         layout.focus(mut s.sessions[si].layout, tab, arg, cols, area) else |_| { refused = true }
-    } else if action == ACT_FOCUS_NEXT {
+    } else if action == config.A_FOCUS_NEXT {
         layout.focus_next(mut s.sessions[si].layout, tab) else |_| { refused = true }
-    } else if action == ACT_ZOOM {
+    } else if action == config.A_ZOOM {
         layout.zoom(mut s.sessions[si].layout, tab) else |_| { refused = true }
-    } else if action == ACT_EQUALIZE {
+    } else if action == config.A_EQUALIZE {
         layout.equalize(mut s.sessions[si].layout, tab) else |_| { refused = true }
-    } else if action == ACT_NEXT_TAB {
+    } else if action == config.A_NEXT_TAB {
         layout.next_tab(mut s.sessions[si].layout)
-    } else if action == ACT_PREVIOUS_TAB {
+    } else if action == config.A_PREVIOUS_TAB {
         layout.previous_tab(mut s.sessions[si].layout)
-    } else if action == ACT_SELECT_TAB {
+    } else if action == config.A_SELECT_TAB {
         layout.select_tab(mut s.sessions[si].layout, arg) else |_| { refused = true }
     } else {
         refused = true
@@ -940,37 +1036,200 @@ fn finish_ending(mut s: Server, index: int) {
     if s.conns[index].live { terminal(mut s, index, 135, 2, "session ended") }
 }
 
+// ---- keys and modes ----
+
+/// INPUT, PASTE and the mouse reach the pane only in normal and locked mode.
+fn passing(mode: int) -> bool {
+    mode == config.MODE_NORMAL || mode == config.MODE_LOCKED
+}
+
+fn sticky(mode: int) -> bool {
+    mode == config.MODE_PANE || mode == config.MODE_TAB || mode == config.MODE_RESIZE || mode == config.MODE_SESSION
+}
+
+// Confirm, help and the prompts: left for the mode they came from.
+fn passing_through(mode: int) -> bool {
+    mode == config.MODE_CONFIRM || mode == config.MODE_HELP || mode == config.MODE_COMMAND || mode == config.MODE_RENAME
+}
+
+// The client's bar is drawn again (its mode, prompt or question changed).
+fn bar_moved(mut s: Server, index: int) {
+    s.conns[index].seen_bar = 0 - 1
+    mark_stale(mut s.conns[index], now_ns())
+}
+
+// The client's whole frame is scanned again (its key list opened, moved or
+// closed).
+fn frame_moved(mut s: Server, index: int) {
+    s.conns[index].seen_layout = 0 - 1
+    bar_moved(mut s, index)
+}
+
+fn set_mode(mut s: Server, index: int, mode: int) {
+    let was = s.conns[index].mode
+    if was == mode { return }
+    s.conns[index].mode = mode
+    if was == config.MODE_HELP || mode == config.MODE_HELP { frame_moved(mut s, index) } else { bar_moved(mut s, index) }
+}
+
+/// Do an action for a client `count` times (a command's resize); one that
+/// waits for a pane slot is taken again on the next turn.
+fn act(mut s: Server, index: int, action: int, arg: int, count: int) {
+    if action == config.A_LOCK {
+        set_mode(mut s, index, config.MODE_LOCKED)
+        return
+    }
+    var n = 0
+    while n < count && s.conns[index].live {
+        if do_action(mut s, index, action, arg) == LATER {
+            s.conns[index].pending = action
+            s.conns[index].pending_arg = arg
+            return
+        }
+        n += 1
+    }
+}
+
+/// The active tab's new name.
+fn rename_active(mut s: Server, index: int, name: str) {
+    let si = s.conns[index].session
+    if si < 0 || !s.sessions[si].live { return }
+    layout.rename_tab(mut s.sessions[si].layout, s.sessions[si].layout.active, name) else |_| { return }
+    s.sessions[si].bar_gen = s.sessions[si].bar_gen + 1
+    session_changed(mut s, si, now_ns())
+}
+
+// The prompt's line, run as the mode it was typed in says: a rename, or a
+// command of the key table's action names.
+fn run_prompt(mut s: Server, index: int, was: int) {
+    let text = str_from_utf8(s.conns[index].prompt[0..s.conns[index].prompt.len]) else ""
+    (mut s.conns[index].prompt).reset()
+    if was == config.MODE_RENAME {
+        rename_active(mut s, index, text)
+        return
+    }
+    let c = config.command(text)
+    if !c.ok {
+        if c.why.len > 0 { tell(mut s, index, c.why) }
+        return
+    }
+    if c.action == config.A_RENAME_TAB {
+        rename_active(mut s, index, c.text)
+        return
+    }
+    act(mut s, index, c.action, c.arg, c.count)
+}
+
+// The prompt's bytes: the active tab's name for a rename, else empty.
+fn fill_prompt(mut s: Server, index: int, rename: bool) {
+    (mut s.conns[index].prompt).reset()
+    let si = s.conns[index].session
+    if !rename || si < 0 { return }
+    for t in s.sessions[si].layout.tabs {
+        if t.id == s.sessions[si].layout.active {
+            for b in t.name {
+                if s.conns[index].prompt.len < PROMPT_BYTES { (mut s.conns[index].prompt).push(b) }
+            }
+        }
+    }
+}
+
+fn prompt_type(mut s: Server, index: int, cp: int) {
+    var bytes = List[byte]()
+    push_scalar(mut bytes, cp)
+    if s.conns[index].prompt.len + bytes.len > PROMPT_BYTES { return }
+    for b in bytes { (mut s.conns[index].prompt).push(b) }
+    bar_moved(mut s, index)
+}
+
+fn prompt_erase(mut s: Server, index: int) {
+    // Drop continuation bytes, then the scalar's lead byte.
+    while s.conns[index].prompt.len > 0 {
+        let b = (mut s.conns[index].prompt).pop() else { return }
+        if (b as int) & 192 != 128 { break }
+    }
+    bar_moved(mut s, index)
+}
+
+/// A KEY from a client, through the key table in the client's mode: passed
+/// to the focused pane, or an action and the next mode.
+fn key_event(mut s: Server, index: int, mods: int, kind: int, code: int) {
+    let si = s.conns[index].session
+    let mode = s.conns[index].mode
+    let st = config.step(s.keys, mode, mods, kind, code)
+    let a = st.action
+    if a == config.A_PASS {
+        if si >= 0 {
+            let f = focused_slot(s, si)
+            if f >= 0 { queue_to(mut s, f, key_bytes(s.panes[f].screen, mods, kind, code)) }
+        }
+        return
+    }
+    var next = st.mode
+    if next == config.MODE_BACK { next = s.conns[index].back }
+    if passing_through(next) && !passing_through(mode) {
+        s.conns[index].back = if sticky(mode) then mode else config.MODE_NORMAL
+    }
+    if a == config.A_TYPE {
+        prompt_type(mut s, index, st.arg)
+        return
+    }
+    if a == config.A_ERASE {
+        prompt_erase(mut s, index)
+        return
+    }
+    if a == config.A_CLEAR {
+        (mut s.conns[index].prompt).reset()
+        bar_moved(mut s, index)
+        return
+    }
+    if a == config.A_SCROLL {
+        let area = if si >= 0 then s.sessions[si].rows - BAR_LINES else 0
+        var top = s.conns[index].help_top + st.arg
+        if top > s.help.len - area { top = s.help.len - area }
+        if top < 0 { top = 0 }
+        if top != s.conns[index].help_top {
+            s.conns[index].help_top = top
+            frame_moved(mut s, index)
+        }
+        return
+    }
+    set_mode(mut s, index, next)
+    if a == config.A_NONE { return }
+    if a == config.A_RUN {
+        run_prompt(mut s, index, mode)
+        return
+    }
+    if a == config.A_CONFIRM {
+        s.conns[index].confirm = st.arg
+        return
+    }
+    if a == config.A_YES {
+        act(mut s, index, s.conns[index].confirm, 0, 1)
+        return
+    }
+    if a == config.A_RENAME_TAB || a == config.A_COMMAND {
+        fill_prompt(mut s, index, a == config.A_RENAME_TAB)
+        return
+    }
+    if a == config.A_HELP {
+        s.conns[index].help_top = 0
+        return
+    }
+    act(mut s, index, a, st.arg, 1)
+}
+
 fn attached_message(mut s: Server, index: int, kind: int, body: List[byte]) {
     let si = s.conns[index].session
     // A client whose session ended takes only its ACK.
     if s.conns[index].ending && kind != 8 { return }
     if kind == 2 {
-        let mods = u(body, 0, 1)
-        let k = u(body, 1, 1)
-        let code = u(body, 2, 4)
-        // The prefix (Ctrl-Space) and its table are the server's.
-        if s.conns[index].prefix {
-            s.conns[index].prefix = false
-            let b = prefix_action(mods, k, code)
-            if b.action == ACT_NONE { return }
-            if do_action(mut s, index, b.action, b.arg) == LATER {
-                s.conns[index].pending = b.action
-                s.conns[index].pending_arg = b.arg
-            }
-            return
-        }
-        if is_prefix(mods, k, code) {
-            s.conns[index].prefix = true
-            return
-        }
-        if si >= 0 {
-            let f = focused_slot(s, si)
-            if f >= 0 { queue_to(mut s, f, key_bytes(s.panes[f].screen, mods, k, code)) }
-        }
+        key_event(mut s, index, u(body, 0, 1), u(body, 1, 1), u(body, 2, 4))
     } else if kind == 3 {
         // A mouse event inside the focused pane goes to it, relative to
-        // its rect; any other is dropped.
-        if si >= 0 {
+        // its rect; any other is dropped, and every one outside normal and
+        // locked mode.
+        if si >= 0 && passing(s.conns[index].mode) {
             let f = focused_slot(s, si)
             let col = u(body, 3, 2)
             let row = u(body, 5, 2)
@@ -982,7 +1241,7 @@ fn attached_message(mut s: Server, index: int, kind: int, body: List[byte]) {
             }
         }
     } else if kind == 4 {
-        if si >= 0 {
+        if si >= 0 && passing(s.conns[index].mode) {
             let f = focused_slot(s, si)
             if f >= 0 { queue_to(mut s, f, paste_bytes(s.panes[f].screen, body[4..body.len])) }
         }
@@ -1004,7 +1263,7 @@ fn attached_message(mut s: Server, index: int, kind: int, body: List[byte]) {
         mark_stale(mut s.conns[index], now_ns())
         if si >= 0 { recompute_size(mut s, si) }
     } else if kind == 7 {
-        to_pane(mut s, index, body[4..body.len])
+        if passing(s.conns[index].mode) { to_pane(mut s, index, body[4..body.len]) }
     } else if kind == 8 {
         if proto.ack(mut s.conns[index].ack, u(body, 0, 4)) != 0 {
             protocol_error(mut s, index, "ack of an image not sent")
@@ -1581,7 +1840,8 @@ fn compose_now(mut s: Server, index: int, now: int) {
     // client's message), and the shown panes whose grids moved.
     var scans = List[int]()
     let area = s.sessions[si].rows - BAR_LINES
-    if s.conns[index].seen_bar != s.sessions[si].bar_gen || s.conns[index].message_until != 0 {
+    let bar_scan = s.conns[index].seen_bar != s.sessions[si].bar_gen || s.conns[index].message_until != 0
+    if bar_scan {
         (mut scans).push(1)
         (mut scans).push(area + 1)
         (mut scans).push(s.sessions[si].cols)
@@ -1600,7 +1860,20 @@ fn compose_now(mut s: Server, index: int, now: int) {
     }
     var cursor = List[int]()
     let f = focused_slot(s, si)
-    if f >= 0 && s.panes[f].shown {
+    let mode = s.conns[index].mode
+    let prompt = prompt_line(s, index, s.sessions[si].cols)
+    if prompt.len > 0 {
+        // A prompt's cursor follows its text on the hint line.
+        (mut cursor).push(s.sessions[si].rows)
+        (mut cursor).push(1 + text_width(prompt))
+        (mut cursor).push(0)
+        (mut cursor).push(1)
+    } else if mode == config.MODE_HELP {
+        (mut cursor).push(1)
+        (mut cursor).push(1)
+        (mut cursor).push(0)
+        (mut cursor).push(0)
+    } else if f >= 0 && s.panes[f].shown {
         let (cr, cc, shape, visible) = cursor_of(s.panes[f].screen)
         (mut cursor).push(s.panes[f].at_row + cr - 1)
         (mut cursor).push(s.panes[f].at_col + cc - 1)
@@ -1612,7 +1885,11 @@ fn compose_now(mut s: Server, index: int, now: int) {
         (mut cursor).push(0)
         (mut cursor).push(0)
     }
-    let bar = bar_cells(s, si, index, now)
+    // The client's own cells are made only when a row of theirs is read.
+    var bar = List[vt.Cell]()
+    let whole = full || !s.conns[index].shadow.valid || s.conns[index].shadow.cols != s.sessions[si].cols ||
+        s.conns[index].shadow.rows != s.sessions[si].rows
+    if whole || all || bar_scan || mode == config.MODE_HELP { bar = bar_cells(s, si, index, now) }
     let payload = compose_frame(mut s.conns[index].shadow, s.panes, s.sessions[si], bar, seq, full, all, scans, cursor)
     s.conns[index].stale = false
     s.conns[index].seen_layout = gen
@@ -1972,6 +2249,8 @@ pub fn serve() -> int {
         (mut conns).push(new_conn())
         i += 1
     }
+    // The key table: the defaults until the configuration file is read.
+    let keys = config.defaults()
     let waiter = poll.open() else |e| {
         eprint("warren server: no readiness set: {e}")
         finish(take place)
@@ -1984,7 +2263,7 @@ pub fn serve() -> int {
         started: now_ns(), idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
         version: vt.package_version(), again: false, need_slot: false, need_pane: false, want_cols: 0,
         want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, master_read: master_read,
-        budget: budget, uid: env.euid() else 0 - 1, inherited: inherited,
+        budget: budget, uid: env.euid() else 0 - 1, inherited: inherited, keys: keys, help: config.help_lines(keys),
     }
     net.set_listener_deadline(mut s.place.listener, 1) else |_| {}
     listener_interest(mut s)
