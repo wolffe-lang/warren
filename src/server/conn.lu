@@ -52,6 +52,8 @@ pub struct Conn {
     resize_cols: int,
     resize_rows: int,
     command_ready: bool,
+    command: List[byte],
+    command_len: int,
     stop_after: bool,
 }
 
@@ -76,7 +78,8 @@ pub fn new_conn() -> Conn {
         ack: proto.ack_state(), force_full: true, ending: false, ending_gen: 0, stale: false, stale_since: 0, last_frame: 0,
         shadow: no_shadow(), cols: 0, rows: 0, depth: 0, features: 0, write_on: false, read_on: false,
         prefix: false, hello: List[byte](), hello_len: 0, hello_ready: false,
-        resize_ready: false, resize_cols: 0, resize_rows: 0, command_ready: false, stop_after: false,
+        resize_ready: false, resize_cols: 0, resize_rows: 0, command_ready: false, command: List[byte](),
+        command_len: 0, stop_after: false,
     }
 }
 
@@ -119,6 +122,7 @@ pub fn reset_conn(mut c: Conn, fd: int, id: int, now: int) {
     c.hello_ready = false
     c.resize_ready = false
     c.command_ready = false
+    c.command_len = 0
     c.stop_after = false
 }
 

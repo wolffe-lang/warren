@@ -438,6 +438,29 @@ fn attached_message(mut s: Server, index: int, kind: int, body: List[byte]) {
     }
 }
 
+// A COMMAND's argument list (after its id).
+fn argv_of(body: List[byte]) -> List[str] {
+    var out = List[str]()
+    let count = u(body, 4, 2)
+    var at = 6
+    var i = 0
+    while i < count && at + 2 <= body.len {
+        let n = u(body, at, 2)
+        if at + 2 + n > body.len { return out }
+        (mut out).push(str_from_utf8(body[at + 2..at + 2 + n]) else "")
+        at = at + 2 + n
+        i += 1
+    }
+    out
+}
+
+// The lowest positive number no live session is named.
+fn free_number(s: Server) -> str {
+    var n = 1
+    while find_session(s, "{n}") >= 0 { n += 1 }
+    "{n}"
+}
+
 fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
     if kind == 12 {
         let _p = send(mut s.conns[index], 137, number_payload(u(body, 0, 4)))
@@ -463,6 +486,41 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
         err = ""
         for x in s.sessions {
             if x.live { out = out + "{name_of(x)}: {x.cols}x{x.rows} ({x.members} attached)\n" }
+        }
+    } else if verb == "new-session" && (argc == 1 || argc == 2) {
+        let argv = argv_of(body)
+        let h = read_hello(s.conns[index].hello[0..s.conns[index].hello_len])
+        let name = if argc == 2 then argv[1] else free_number(s)
+        let cols = if h.cols == 0 then 80 else h.cols
+        let rows = if h.rows == 0 then 24 else h.rows
+        status = 1
+        let problem = name_problem(name)
+        if problem.len > 0 {
+            err = "warren: new-session: {problem}\n"
+        } else if find_session(s, name) >= 0 {
+            err = "warren: a session named {name} already exists\n"
+        } else if cols < MIN_COLS || rows < MIN_ROWS {
+            err = "warren: new-session: {cols}x{rows} is smaller than {MIN_COLS}x{MIN_ROWS}\n"
+        } else {
+            let m = make_session(mut s, name, cols, rows, h.cwd, h.names, h.values, 0)
+            if m.later {
+                // Asked again next turn, once a slot is made (as a HELLO is).
+                var j = 0
+                for b in body {
+                    if j < s.conns[index].command.len { s.conns[index].command[j] = b } else { (mut s.conns[index].command).push(b) }
+                    j += 1
+                }
+                s.conns[index].command_len = body.len
+                s.conns[index].command_ready = true
+                return
+            }
+            if m.si < 0 {
+                err = "warren: new-session: {m.why}\n"
+            } else {
+                status = 0
+                out = name + "\n"
+                err = ""
+            }
         }
     }
     let ok = send(mut s.conns[index], 136, reply_payload(id, status, out, err))
@@ -525,7 +583,7 @@ fn message(mut s: Server, index: int, kind: int, body: List[byte]) {
 /// Parse at most PARSE_BUDGET bytes of complete frames already received.
 fn parse(mut s: Server, index: int) {
     var spent = 0
-    while s.conns[index].live && spent < PARSE_BUDGET && !s.conns[index].hello_ready {
+    while s.conns[index].live && spent < PARSE_BUDGET && !s.conns[index].hello_ready && !s.conns[index].command_ready {
         if s.conns[index].phase == DRAINING {
             s.conns[index].rx_off = s.conns[index].rx_len
             return
@@ -572,7 +630,7 @@ fn parse(mut s: Server, index: int) {
 
 fn next_complete(c: Conn) -> bool {
     let have = c.rx_len - c.rx_off
-    if have < 6 || c.hello_ready { return false }
+    if have < 6 || c.hello_ready || c.command_ready { return false }
     let n = (c.rx[c.rx_off] as int) + (c.rx[c.rx_off + 1] as int) * 256 + (c.rx[c.rx_off + 2] as int) * 65536 + (c.rx[c.rx_off + 3] as int) * 16777216
     have >= 6 + n
 }
@@ -598,6 +656,72 @@ fn read_conn(mut s: Server, index: int) {
 
 fn welcome_conn(mut s: Server, index: int, session: str) -> bool {
     send(mut s.conns[index], 129, welcome(s.conns[index].id, s.pid, session, s.version))
+}
+
+/// What a name may hold: compared as bytes, it may not be empty or hold
+/// '/' or a control byte. Returns the problem, or "" for a good name.
+pub fn name_problem(name: str) -> str {
+    if name.len == 0 { return "a session name may not be empty" }
+    for b in name.bytes() {
+        let v = b as int
+        if v == 47 { return "a session name may not hold '/'" }
+        if v < 32 || v == 127 { return "a session name may not hold a control byte" }
+    }
+    ""
+}
+
+// What making a session came to: its slot; a refusal (REFUSE code and
+// text); or, `later`, a wait for a slot made between turns.
+struct Made {
+    si: int,
+    code: int,
+    why: str,
+    later: bool,
+}
+
+// Make session `name` at cols x rows, its pane's program started in `cwd`
+// with the given environment. `extra` is what the asking connection adds
+// to the projected memory beside the pane.
+fn make_session(mut s: Server, name: str, cols: int, rows: int, cwd: str, names: List[str], values: List[str],
+    extra: int) -> Made {
+    let problem = name_problem(name)
+    if problem.len > 0 { return Made { si: 0 - 1, code: 6, why: problem, later: false } }
+    if s.stopping || live_sessions(s) >= MAX_SESSIONS || projected(s, pane_bytes(cols, rows) + extra) > s.budget {
+        return Made { si: 0 - 1, code: 7, why: "resource limit", later: false }
+    }
+    var slot = 0 - 1
+    var i = 0
+    while i < s.sessions.len {
+        if !s.sessions[i].live && slot < 0 { slot = i }
+        i += 1
+    }
+    if slot < 0 {
+        s.need_slot = true
+        return Made { si: 0 - 1, code: 0, why: "", later: true }
+    }
+    set_name(mut s.sessions[slot], name)
+    s.sessions[slot].cols = cols
+    s.sessions[slot].rows = rows
+    s.sessions[slot].members = 0
+    fresh_screen(mut s.sessions[slot], cols, rows)
+    let sp = Spawn { cols: cols, rows: rows, cwd: cwd, names: names, values: values, pane_id: slot }
+    let why = start_pane(mut s.sessions[slot], sp, shell_argv(), s.inherited)
+    if why.len > 0 {
+        trace(s, "spawn failed: {why}")
+        return Made { si: 0 - 1, code: 6, why: "the pane's program did not start: {why}", later: false }
+    }
+    let key = poll.add_file(mut s.w, master_file(s.sessions[slot].pane), poll.READ) else |e| {
+        close_master(mut s.sessions[slot].pane)
+        return Made { si: 0 - 1, code: 7, why: "readiness set: {e}", later: false }
+    }
+    s.sessions[slot].generation = s.sessions[slot].generation + 1
+    let generation = s.sessions[slot].generation
+    record_key(mut s, key, KEY_MASTER, slot, generation)
+    s.sessions[slot].pane.key = key
+    s.sessions[slot].pane.last_output = now_ns()
+    s.sessions[slot].live = true
+    trace(s, "session {slot} created: {name}")
+    Made { si: slot, code: 0, why: "", later: false }
 }
 
 fn hello(mut s: Server, index: int) {
@@ -650,49 +774,17 @@ fn hello(mut s: Server, index: int) {
             terminal(mut s, index, 130, 2, "no session {name}")
             return
         }
-        if s.stopping || live_sessions(s) >= MAX_SESSIONS ||
-            projected(s, pane_bytes(h.cols, h.rows) + attached_bytes(h.cols, h.rows) - connection_bytes()) > s.budget {
+        let m = make_session(mut s, name, h.cols, h.rows, h.cwd, h.names, h.values,
+            attached_bytes(h.cols, h.rows) - connection_bytes())
+        // A new slot (and its emulator) is made between turns; the HELLO
+        // is taken again then.
+        if m.later { return }
+        if m.si < 0 {
             s.conns[index].hello_ready = false
-            terminal(mut s, index, 130, 7, "resource limit")
+            terminal(mut s, index, 130, m.code, m.why)
             return
         }
-        var slot = 0 - 1
-        var i = 0
-        while i < s.sessions.len {
-            if !s.sessions[i].live && slot < 0 { slot = i }
-            i += 1
-        }
-        if slot < 0 {
-            // A new slot (and its emulator) is made between turns.
-            s.need_slot = true
-            return
-        }
-        s.conns[index].hello_ready = false
-        set_name(mut s.sessions[slot], name)
-        s.sessions[slot].cols = h.cols
-        s.sessions[slot].rows = h.rows
-        s.sessions[slot].members = 0
-        fresh_screen(mut s.sessions[slot], h.cols, h.rows)
-        let sp = Spawn { cols: h.cols, rows: h.rows, cwd: h.cwd, names: h.names, values: h.values, pane_id: slot }
-        let why = start_pane(mut s.sessions[slot], sp, shell_argv(), s.inherited)
-        if why.len > 0 {
-            trace(s, "spawn failed: {why}")
-            terminal(mut s, index, 130, 6, "the pane's program did not start: {why}")
-            return
-        }
-        let key = poll.add_file(mut s.w, master_file(s.sessions[slot].pane), poll.READ) else |e| {
-            close_master(mut s.sessions[slot].pane)
-            terminal(mut s, index, 130, 7, "readiness set: {e}")
-            return
-        }
-        s.sessions[slot].generation = s.sessions[slot].generation + 1
-        let generation = s.sessions[slot].generation
-        record_key(mut s, key, KEY_MASTER, slot, generation)
-        s.sessions[slot].pane.key = key
-        s.sessions[slot].pane.last_output = now_ns()
-        s.sessions[slot].live = true
-        si = slot
-        trace(s, "session {si} created: {name}")
+        si = m.si
     } else if projected(s, attached_bytes(s.sessions[si].cols, s.sessions[si].rows) - connection_bytes()) > s.budget {
         s.conns[index].hello_ready = false
         terminal(mut s, index, 130, 7, "resource limit")
@@ -1079,6 +1171,11 @@ fn turn(mut s: Server) -> bool {
     var i = 0
     while i < s.conns.len {
         if s.conns[i].live && s.conns[i].hello_ready { hello(mut s, i) }
+        if s.conns[i].live && s.conns[i].command_ready {
+            s.conns[i].command_ready = false
+            let waiting = s.conns[i].command[0..s.conns[i].command_len]
+            command_message(mut s, i, 11, waiting)
+        }
         if s.conns[i].live && !s.conns[i].hello_ready && next_complete(s.conns[i]) { parse(mut s, i) }
         i += 1
     }
