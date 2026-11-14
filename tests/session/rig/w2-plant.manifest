@@ -1,0 +1,6 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# lets the server send an image while another is outstanding.
+floor 15
+rig w2-plant-step.sh sha256=5b1d3f326b7e3edd01459cbb708da3d80a4e0b84b06295c9d9638c9bc2553b45
+step w2-plant-build tools=python3,cc script=w2-plant-step.sh -- build
+step one-image needs=w2-plant-build tools=python3 script=w2-plant-step.sh -- rows
