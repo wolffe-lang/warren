@@ -1,0 +1,1113 @@
+//! member: true
+//! The event loop: one wait a turn over the listener, every connection,
+//! every pane's master, the listened signals and the nearest deadline.
+//! A turn's scratch lives in a region that ends with the turn; long-lived
+//! state is changed in place. No helper process and no thread.
+use std.env
+use std.fs
+use std.net
+use std.poll
+use std.process
+use std.signal
+use std.time
+use proto
+use vt
+
+const KEY_NONE: int = 0
+const KEY_LISTENER: int = 1
+const KEY_CONN: int = 2
+const KEY_MASTER: int = 3
+
+/// The whole server.
+pub struct Server {
+    place: Start,
+    w: poll.Waiter,
+    listen_key: int,
+    listening: bool,
+    conns: List[Conn],
+    sessions: List[Session],
+    key_kind: List[int],
+    key_owner: List[int],
+    key_gen: List[int],
+    next_id: int,
+    stopping: bool,
+    stop_deadline: int,
+    started: int,
+    idle_since: int,
+    lifetime: int,
+    pid: int,
+    version: str,
+    again: bool,
+    need_slot: bool,
+    rotate: int,
+    trace: bool,
+    turns: int,
+}
+
+fn now_ns() -> int {
+    time.monotonic_ns()
+}
+
+fn trace(s: Server, text: str) {
+    if s.trace { eprint("warren-server: {text}") }
+}
+
+fn record_key(mut s: Server, key: int, kind: int, owner: int, gen: int) {
+    while s.key_kind.len <= key {
+        (mut s.key_kind).push(KEY_NONE)
+        (mut s.key_owner).push(0 - 1)
+        (mut s.key_gen).push(0)
+    }
+    s.key_kind[key] = kind
+    s.key_owner[key] = owner
+    s.key_gen[key] = gen
+}
+
+fn forget_key(mut s: Server, key: int) {
+    if key >= 0 && key < s.key_kind.len {
+        poll.remove(mut s.w, key) else |_| {}
+        s.key_kind[key] = KEY_NONE
+        s.key_owner[key] = 0 - 1
+    }
+}
+
+fn socket_of(c: Conn) -> net.Socket {
+    net.Socket { fd: c.fd }
+}
+
+// ---- connections ----
+
+fn interest(c: Conn) -> int {
+    var i = 0
+    if c.read_on { i = i | poll.READ }
+    if queued(c) > 0 { i = i | poll.WRITE }
+    if i == 0 { i = poll.READ }
+    i
+}
+
+fn sync_interest(mut s: Server, index: int) {
+    if !s.conns[index].live || s.conns[index].key < 0 { return }
+    let want_write = queued(s.conns[index]) > 0
+    if want_write != s.conns[index].write_on {
+        let key = s.conns[index].key
+        let i = interest(s.conns[index])
+        poll.modify(mut s.w, key, i) else |_| {}
+        s.conns[index].write_on = want_write
+    }
+}
+
+/// Close a connection: membership leaves exactly once, the readiness
+/// entry goes before the socket, the slot is kept for reuse.
+fn close_conn(mut s: Server, index: int) {
+    if !s.conns[index].live { return }
+    leave(mut s, index)
+    let key = s.conns[index].key
+    forget_key(mut s, key)
+    var sock = net.Socket { fd: s.conns[index].fd }
+    net.close(take sock) else |_| {}
+    s.conns[index].live = false
+    s.conns[index].phase = CLOSED
+    s.conns[index].key = 0 - 1
+    s.conns[index].fd = 0 - 1
+    trace(s, "conn {index} closed")
+}
+
+fn leave(mut s: Server, index: int) {
+    if !s.conns[index].member { return }
+    let si = s.conns[index].session
+    s.conns[index].member = false
+    if si >= 0 && si < s.sessions.len && s.sessions[si].live {
+        s.sessions[si].members = s.sessions[si].members - 1
+        recompute_size(mut s, si)
+    }
+}
+
+/// Queue a terminal message (REFUSE or BYE) and drain; if it cannot be
+/// queued whole, close at once.
+fn terminal(mut s: Server, index: int, kind: int, code: int, text: str) {
+    leave(mut s, index)
+    let ok = send(mut s.conns[index], kind, coded(code, text))
+    if !ok {
+        close_conn(mut s, index)
+        return
+    }
+    s.conns[index].phase = DRAINING
+    s.conns[index].deadline = now_ns() + DRAIN_MS * 1000000
+    flush(mut s, index)
+}
+
+fn protocol_error(mut s: Server, index: int, why: str) {
+    trace(s, "conn {index} protocol error: {why}")
+    if s.conns[index].phase == ACCEPTED {
+        close_conn(mut s, index)
+        return
+    }
+    terminal(mut s, index, 135, 6, why)
+}
+
+/// One write of at most WRITE_BUDGET bytes; busy keeps the suffix; a
+/// gone peer closes. Then WRITE interest follows the queue.
+fn flush(mut s: Server, index: int) {
+    if !s.conns[index].live || queued(s.conns[index]) == 0 {
+        if s.conns[index].live { after_write(mut s, index) }
+        return
+    }
+    var sock = socket_of(s.conns[index])
+    let chunk = next_write(s.conns[index])
+    var gone = false
+    let n = net.write_some(mut sock, chunk) else |e| {
+        if "{e}" != "busy" { gone = true }
+        0
+    }
+    if gone {
+        close_conn(mut s, index)
+        return
+    }
+    wrote(mut s.conns[index], n)
+    after_write(mut s, index)
+}
+
+fn after_write(mut s: Server, index: int) {
+    if s.conns[index].image_end >= 0 && s.conns[index].tx_off >= s.conns[index].image_end {
+        let seq = s.conns[index].image_seq
+        let _sent = proto.sent(mut s.conns[index].ack, seq)
+        s.conns[index].image_end = 0 - 1
+    }
+    if s.conns[index].phase == DRAINING && queued(s.conns[index]) == 0 {
+        close_conn(mut s, index)
+        return
+    }
+    sync_interest(mut s, index)
+}
+
+// ---- sessions ----
+
+fn find_session(s: Server, name: str) -> int {
+    var i = 0
+    while i < s.sessions.len {
+        if named(s.sessions[i], name) { return i }
+        i += 1
+    }
+    0 - 1
+}
+
+fn live_sessions(s: Server) -> int {
+    var n = 0
+    for x in s.sessions {
+        if x.live { n += 1 }
+    }
+    n
+}
+
+fn live_conns(s: Server) -> int {
+    var n = 0
+    for c in s.conns {
+        if c.live { n += 1 }
+    }
+    n
+}
+
+fn pending_conns(s: Server) -> int {
+    var n = 0
+    for c in s.conns {
+        if c.live && c.phase == ACCEPTED { n += 1 }
+    }
+    n
+}
+
+/// The projected memory of what is held now, plus an addition.
+fn projected(s: Server, extra: int) -> int {
+    var total = extra
+    for x in s.sessions {
+        if x.live { total += pane_bytes(x.cols, x.rows) }
+    }
+    for c in s.conns {
+        if c.live {
+            if c.member && c.session >= 0 {
+                total += attached_bytes(s.sessions[c.session].cols, s.sessions[c.session].rows)
+            } else {
+                total += connection_bytes()
+            }
+        }
+    }
+    total
+}
+
+/// The session's size: the smallest columns and, independently, rows of
+/// its attached members; unchanged when nobody is attached.
+fn recompute_size(mut s: Server, si: int) {
+    var cols = 0
+    var rows = 0
+    for c in s.conns {
+        if c.live && c.member && c.session == si {
+            if cols == 0 || c.cols < cols { cols = c.cols }
+            if rows == 0 || c.rows < rows { rows = c.rows }
+        }
+    }
+    if cols == 0 || rows == 0 { return }
+    if cols == s.sessions[si].cols && rows == s.sessions[si].rows { return }
+    s.sessions[si].cols = cols
+    s.sessions[si].rows = rows
+    let _r = vt.resize(mut s.sessions[si].pane.screen, cols, rows)
+    if s.sessions[si].pane.master >= 0 {
+        let f = master_file(s.sessions[si].pane)
+        term_size(f, cols, rows)
+    }
+    var i = 0
+    while i < s.conns.len {
+        if s.conns[i].live && s.conns[i].member && s.conns[i].session == si {
+            s.conns[i].force_full = true
+            mark_stale(mut s.conns[i], now_ns())
+        }
+        i += 1
+    }
+    trace(s, "session {si} size {cols}x{rows}")
+}
+
+fn mark_stale(mut c: Conn, now: int) {
+    if !c.stale {
+        c.stale = true
+        c.stale_since = now
+    }
+}
+
+/// The session's pane changed: every member has damage to compose.
+fn session_changed(mut s: Server, si: int, now: int) {
+    var i = 0
+    while i < s.conns.len {
+        if s.conns[i].live && s.conns[i].member && s.conns[i].session == si {
+            mark_stale(mut s.conns[i], now)
+        }
+        i += 1
+    }
+}
+
+/// A session ends: members are told, the master is closed, the child
+/// stays in process.poll's care, the slot keeps its emulator for reuse.
+fn end_session(mut s: Server, si: int) {
+    trace(s, "session {si} ended")
+    var i = 0
+    while i < s.conns.len {
+        if s.conns[i].live && s.conns[i].member && s.conns[i].session == si {
+            terminal(mut s, i, 135, 2, "session ended")
+        }
+        i += 1
+    }
+    let key = s.sessions[si].pane.key
+    forget_key(mut s, key)
+    s.sessions[si].pane.key = 0 - 1
+    close_master(mut s.sessions[si].pane)
+    s.sessions[si].live = false
+    s.sessions[si].members = 0
+    if live_sessions(s) == 0 { begin_stop(mut s, "the last session ended") }
+}
+
+// ---- input from clients ----
+
+fn to_pane(mut s: Server, index: int, data: List[byte]) {
+    let si = s.conns[index].session
+    if si < 0 || !s.sessions[si].live || data.len == 0 { return }
+    if !queue_input(mut s.sessions[si].pane, data) {
+        trace(s, "session {si} input queue full: dropped {data.len}")
+        return
+    }
+    write_pane(mut s, si)
+}
+
+fn write_pane(mut s: Server, si: int) {
+    if s.sessions[si].pane.ended || s.sessions[si].pane.master < 0 { return }
+    let off = s.sessions[si].pane.in_off
+    let len = s.sessions[si].pane.in_len
+    if len > off {
+        var f = fs.File { fd: s.sessions[si].pane.master }
+        let end = if len - off > WRITE_BUDGET then off + WRITE_BUDGET else len
+        let n = fs.write_some(mut f, s.sessions[si].pane.input[off..end]) else |_| { 0 }
+        s.sessions[si].pane.in_off = off + n
+    }
+    let want = s.sessions[si].pane.in_len > s.sessions[si].pane.in_off
+    if want != s.sessions[si].pane.write_on && s.sessions[si].pane.key >= 0 {
+        let i = if want then poll.READ | poll.WRITE else poll.READ
+        poll.modify(mut s.w, s.sessions[si].pane.key, i) else |_| {}
+        s.sessions[si].pane.write_on = want
+    }
+}
+
+fn u(b: List[byte], at: int, width: int) -> int {
+    var n: int = 0
+    var f: int = 1
+    var i = 0
+    while i < width {
+        n = n + (b[at + i] as int) * f
+        f = f * 256
+        i += 1
+    }
+    n
+}
+
+fn attached_message(mut s: Server, index: int, kind: int, body: List[byte]) {
+    let si = s.conns[index].session
+    if kind == 2 {
+        let mods = u(body, 0, 1)
+        let k = u(body, 1, 1)
+        let code = u(body, 2, 4)
+        // The prefix (Ctrl-Space) and its detach binding are the server's.
+        if s.conns[index].prefix {
+            s.conns[index].prefix = false
+            if k == 0 && code == 100 && mods == 0 {
+                terminal(mut s, index, 135, 1, "detached")
+                return
+            }
+            if !(k == 0 && code == 32 && mods & 4 != 0) { return }
+        } else if k == 0 && code == 32 && mods & 4 != 0 {
+            s.conns[index].prefix = true
+            return
+        }
+        if si >= 0 { to_pane(mut s, index, key_bytes(s.sessions[si].pane.screen, mods, k, code)) }
+    } else if kind == 3 {
+        if si >= 0 {
+            let col = u(body, 3, 2)
+            let row = u(body, 5, 2)
+            if col <= s.sessions[si].cols && row <= s.sessions[si].rows {
+                to_pane(mut s, index, mouse_bytes(s.sessions[si].pane.screen, u(body, 0, 1), u(body, 1, 1), u(body, 2, 1), col, row))
+            }
+        }
+    } else if kind == 4 {
+        if si >= 0 { to_pane(mut s, index, paste_bytes(s.sessions[si].pane.screen, body[4..body.len])) }
+    } else if kind == 5 {
+        if si >= 0 { to_pane(mut s, index, focus_bytes(s.sessions[si].pane.screen, u(body, 0, 1) == 1)) }
+    } else if kind == 6 {
+        let cols = u(body, 0, 2)
+        let rows = u(body, 2, 2)
+        if cols < MIN_COLS || rows < MIN_ROWS {
+            terminal(mut s, index, 135, 7, "too small")
+            return
+        }
+        s.conns[index].cols = cols
+        s.conns[index].rows = rows
+        s.conns[index].force_full = true
+        mark_stale(mut s.conns[index], now_ns())
+        if si >= 0 { recompute_size(mut s, si) }
+    } else if kind == 7 {
+        to_pane(mut s, index, body[4..body.len])
+    } else if kind == 8 {
+        if proto.ack(mut s.conns[index].ack, u(body, 0, 4)) != 0 {
+            protocol_error(mut s, index, "ack of an image not sent")
+        }
+    } else if kind == 9 {
+        s.conns[index].force_full = true
+        mark_stale(mut s.conns[index], now_ns())
+    } else if kind == 10 {
+        terminal(mut s, index, 135, 1, "detached")
+    } else if kind == 12 {
+        if !send(mut s.conns[index], 137, number_payload(u(body, 0, 4))) {
+            terminal(mut s, index, 135, 5, "too slow")
+        }
+    } else {
+        protocol_error(mut s, index, "wrong role")
+    }
+}
+
+fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
+    if kind == 12 {
+        let _p = send(mut s.conns[index], 137, number_payload(u(body, 0, 4)))
+        return
+    }
+    if kind != 11 {
+        protocol_error(mut s, index, "wrong role")
+        return
+    }
+    let id = u(body, 0, 4)
+    let argc = u(body, 4, 2)
+    let first_len = u(body, 6, 2)
+    let verb = str_from_utf8(body[8..8 + first_len]) else ""
+    var status = 2
+    var out = ""
+    var err = "warren: {verb}: not implemented in this version\n"
+    if verb == "kill-server" && argc == 1 {
+        status = 0
+        err = ""
+        s.conns[index].stop_after = true
+    } else if verb == "list-sessions" && argc == 1 {
+        status = 0
+        err = ""
+        for x in s.sessions {
+            if x.live { out = out + "{name_of(x)}: {x.cols}x{x.rows} ({x.members} attached)\n" }
+        }
+    }
+    let ok = send(mut s.conns[index], 136, reply_payload(id, status, out, err))
+    s.conns[index].phase = DRAINING
+    s.conns[index].deadline = now_ns() + DRAIN_MS * 1000000
+    if !ok { close_conn(mut s, index) }
+    if s.conns[index].stop_after || (!ok && verb == "kill-server") { begin_stop(mut s, "kill-server") }
+}
+
+/// One complete logical message from a connection.
+fn message(mut s: Server, index: int, kind: int, body: List[byte]) {
+    let phase = s.conns[index].phase
+    if phase == DRAINING { return }
+    if phase == ACCEPTED {
+        if kind != 1 {
+            close_conn(mut s, index)
+            return
+        }
+        let v = proto.hello_version(body)
+        if v.code != 0 {
+            close_conn(mut s, index)
+            return
+        }
+        if v.minimum > 1 || v.maximum < 1 {
+            terminal(mut s, index, 130, 1, "no common protocol version")
+            return
+        }
+        if proto.validate(1, body) != 0 {
+            close_conn(mut s, index)
+            return
+        }
+        var j = 0
+        for b in body {
+            if j < s.conns[index].hello.len { s.conns[index].hello[j] = b } else { (mut s.conns[index].hello).push(b) }
+            j += 1
+        }
+        s.conns[index].hello_len = body.len
+        s.conns[index].hello_ready = true
+        s.conns[index].read_on = false
+        if s.conns[index].key >= 0 {
+            poll.modify(mut s.w, s.conns[index].key, interest(s.conns[index])) else |_| {}
+        }
+        return
+    }
+    if proto.validate(kind, body) != 0 {
+        protocol_error(mut s, index, "malformed message")
+        return
+    }
+    if kind == 1 {
+        protocol_error(mut s, index, "duplicate hello")
+        return
+    }
+    if phase == ATTACHED {
+        attached_message(mut s, index, kind, body)
+    } else if phase == COMMANDING {
+        command_message(mut s, index, kind, body)
+    }
+}
+
+/// Parse at most PARSE_BUDGET bytes of complete frames already received.
+fn parse(mut s: Server, index: int) {
+    var spent = 0
+    while s.conns[index].live && spent < PARSE_BUDGET && !s.conns[index].hello_ready {
+        if s.conns[index].phase == DRAINING {
+            s.conns[index].rx_off = s.conns[index].rx_len
+            return
+        }
+        let p = next_frame(mut s.conns[index])
+        if p.code == proto.SHORT { return }
+        if p.code != 0 {
+            protocol_error(mut s, index, "bad frame header")
+            return
+        }
+        spent += 6 + p.body.len
+        let paste_active = s.conns[index].paste_active
+        if p.kind == 4 && (p.flags == 1 || paste_active) {
+            // A paste in fragments: same type only, aggregate bounded,
+            // decoded once when the last fragment arrives.
+            if s.conns[index].paste_len + p.body.len > 65540 {
+                protocol_error(mut s, index, "paste too large")
+                return
+            }
+            var j = s.conns[index].paste_len
+            for b in p.body {
+                if j < s.conns[index].paste.len { s.conns[index].paste[j] = b } else { (mut s.conns[index].paste).push(b) }
+                j += 1
+            }
+            s.conns[index].paste_len = j
+            s.conns[index].paste_active = p.flags == 1
+            if p.flags == 0 {
+                let whole = s.conns[index].paste[0..s.conns[index].paste_len]
+                s.conns[index].paste_len = 0
+                message(mut s, index, 4, whole)
+            }
+        } else if paste_active {
+            protocol_error(mut s, index, "a message inside a fragment chain")
+            return
+        } else if p.flags != 0 {
+            protocol_error(mut s, index, "fragment of an unfragmented type")
+            return
+        } else {
+            message(mut s, index, p.kind, p.body)
+        }
+    }
+    if s.conns[index].live && next_complete(s.conns[index]) { s.again = true }
+}
+
+fn next_complete(c: Conn) -> bool {
+    let have = c.rx_len - c.rx_off
+    if have < 6 || c.hello_ready { return false }
+    let n = (c.rx[c.rx_off] as int) + (c.rx[c.rx_off + 1] as int) * 256 + (c.rx[c.rx_off + 2] as int) * 65536 + (c.rx[c.rx_off + 3] as int) * 16777216
+    have >= 6 + n
+}
+
+fn read_conn(mut s: Server, index: int) {
+    var sock = socket_of(s.conns[index])
+    var end = false
+    let got = net.read_bytes(mut sock, READ_BUDGET) else |e| {
+        if "{e}" != "timeout" { end = true }
+        List[byte]()
+    }
+    if end {
+        trace(s, "conn {index} end of input")
+        close_conn(mut s, index)
+        return
+    }
+    if s.conns[index].phase == DRAINING { return }
+    take_bytes(mut s.conns[index], got)
+    parse(mut s, index)
+}
+
+// ---- HELLO, after the frame that carried it ----
+
+fn welcome_conn(mut s: Server, index: int, session: str) -> bool {
+    send(mut s.conns[index], 129, welcome(s.conns[index].id, s.pid, session, s.version))
+}
+
+fn hello(mut s: Server, index: int) {
+    let h = read_hello(s.conns[index].hello[0..s.conns[index].hello_len])
+    if h.duplicate {
+        close_conn(mut s, index)
+        return
+    }
+    if h.role == 2 {
+        s.conns[index].hello_ready = false
+        s.conns[index].read_on = true
+        if !welcome_conn(mut s, index, "") {
+            close_conn(mut s, index)
+            return
+        }
+        s.conns[index].phase = COMMANDING
+        s.conns[index].deadline = 0
+        flush(mut s, index)
+        return
+    }
+    if h.options & 2 != 0 {
+        s.conns[index].hello_ready = false
+        terminal(mut s, index, 130, 3, "read-only attach is not in this version")
+        return
+    }
+    let name = if h.target.len > 0 then h.target else "default"
+    if h.cols < MIN_COLS || h.rows < MIN_ROWS {
+        s.conns[index].hello_ready = false
+        if !welcome_conn(mut s, index, name) {
+            close_conn(mut s, index)
+            return
+        }
+        terminal(mut s, index, 135, 7, "too small")
+        return
+    }
+    var si = find_session(s, name)
+    if si < 0 {
+        if h.options & 1 == 0 {
+            s.conns[index].hello_ready = false
+            terminal(mut s, index, 130, 2, "no session {name}")
+            return
+        }
+        if s.stopping || live_sessions(s) >= MAX_SESSIONS ||
+            projected(s, pane_bytes(h.cols, h.rows) + attached_bytes(h.cols, h.rows) - connection_bytes()) > MEMORY_BUDGET {
+            s.conns[index].hello_ready = false
+            terminal(mut s, index, 130, 7, "resource limit")
+            return
+        }
+        var slot = 0 - 1
+        var i = 0
+        while i < s.sessions.len {
+            if !s.sessions[i].live && slot < 0 { slot = i }
+            i += 1
+        }
+        if slot < 0 {
+            // A new slot (and its emulator) is made between turns.
+            s.need_slot = true
+            return
+        }
+        s.conns[index].hello_ready = false
+        set_name(mut s.sessions[slot], name)
+        s.sessions[slot].cols = h.cols
+        s.sessions[slot].rows = h.rows
+        s.sessions[slot].members = 0
+        fresh_screen(mut s.sessions[slot], h.cols, h.rows)
+        let sp = Spawn { cols: h.cols, rows: h.rows, cwd: h.cwd, names: h.names, values: h.values, pane_id: slot }
+        let why = start_pane(mut s.sessions[slot], sp, shell_argv())
+        if why.len > 0 {
+            trace(s, "spawn failed: {why}")
+            terminal(mut s, index, 130, 6, "the pane's program did not start: {why}")
+            return
+        }
+        let key = poll.add_file(mut s.w, master_file(s.sessions[slot].pane), poll.READ) else |e| {
+            close_master(mut s.sessions[slot].pane)
+            terminal(mut s, index, 130, 7, "readiness set: {e}")
+            return
+        }
+        s.sessions[slot].generation = s.sessions[slot].generation + 1
+        let generation = s.sessions[slot].generation
+        record_key(mut s, key, KEY_MASTER, slot, generation)
+        s.sessions[slot].pane.key = key
+        s.sessions[slot].pane.last_output = now_ns()
+        s.sessions[slot].live = true
+        si = slot
+        trace(s, "session {si} created: {name}")
+    } else if projected(s, attached_bytes(s.sessions[si].cols, s.sessions[si].rows) - connection_bytes()) > MEMORY_BUDGET {
+        s.conns[index].hello_ready = false
+        terminal(mut s, index, 130, 7, "resource limit")
+        return
+    }
+    s.conns[index].hello_ready = false
+    s.conns[index].read_on = true
+    if !welcome_conn(mut s, index, name) {
+        close_conn(mut s, index)
+        return
+    }
+    s.conns[index].phase = ATTACHED
+    s.conns[index].deadline = 0
+    s.conns[index].member = true
+    s.conns[index].session = si
+    s.conns[index].cols = h.cols
+    s.conns[index].rows = h.rows
+    s.conns[index].depth = h.depth
+    s.conns[index].features = h.features
+    s.conns[index].force_full = true
+    s.conns[index].shadow.valid = false
+    s.sessions[si].members = s.sessions[si].members + 1
+    mark_stale(mut s.conns[index], now_ns())
+    recompute_size(mut s, si)
+    flush(mut s, index)
+}
+
+fn shell_argv() -> List[str] {
+    var argv = List[str]()
+    let custom = env.get("WARREN_PANE_COMMAND") else ""
+    if custom.len > 0 {
+        for w in custom.split(" ") {
+            if w.len > 0 { (mut argv).push(w) }
+        }
+    }
+    argv
+}
+
+// ---- panes ----
+
+fn read_master(mut s: Server, si: int, now: int) {
+    var f = master_file(s.sessions[si].pane)
+    var end = false
+    var nothing = false
+    let got = fs.read_chunk(mut f, READ_BUDGET) else |e| {
+        let n = os_error()
+        if "{e}" == "io" && (n == 11 || n == 35) { nothing = true } else { end = true }
+        List[byte]()
+    }
+    if end {
+        trace(s, "session {si} master ended")
+        end_session(mut s, si)
+        return
+    }
+    if nothing || got.len == 0 { return }
+    vt.feed(mut s.sessions[si].pane.screen, got)
+    s.sessions[si].pane.last_output = now
+    let answers = vt.take_answers(mut s.sessions[si].pane.screen)
+    if answers.len > 0 {
+        let _q = queue_input(mut s.sessions[si].pane, answers)
+        write_pane(mut s, si)
+    }
+    let events = vt.take_events(mut s.sessions[si].pane.screen)
+    for ev in events {
+        var i = 0
+        while i < s.conns.len {
+            if s.conns[i].live && s.conns[i].member && s.conns[i].session == si {
+                var ok = true
+                if ev.kind == 1 {
+                    let title = s.sessions[si].pane.screen.title_storage[0..s.sessions[si].pane.screen.title_length]
+                    ok = send(mut s.conns[i], 134, title_payload(title))
+                } else if ev.kind == 2 {
+                    ok = send(mut s.conns[i], 132, List[byte]())
+                } else if ev.kind == 4 && ev.payload.len <= 65536 {
+                    ok = send(mut s.conns[i], 133, bytes_payload(ev.payload))
+                }
+                if !ok { terminal(mut s, i, 135, 5, "too slow") }
+            }
+            i += 1
+        }
+    }
+    if s.sessions[si].pane.screen.mode_values[15] == 1 {
+        if s.sessions[si].pane.sync_since == 0 { s.sessions[si].pane.sync_since = now }
+    } else {
+        s.sessions[si].pane.sync_since = 0
+    }
+    session_changed(mut s, si, now)
+}
+
+fn reap(mut s: Server) {
+    var n = 0
+    while n < 1024 {
+        let c = process.poll() else { return }
+        if !c.changed { return }
+        var i = 0
+        while i < s.sessions.len {
+            if s.sessions[i].pane.child == c.child.slot && s.sessions[i].pane.child_live {
+                if !process.is_stopped(c.status) {
+                    s.sessions[i].pane.child_live = false
+                    s.sessions[i].pane.status = c.status.value
+                    trace(s, "session {i} child ended status {c.status.value}")
+                }
+            }
+            i += 1
+        }
+        n += 1
+    }
+}
+
+// ---- frames ----
+
+fn compose_for(mut s: Server, index: int, now: int) {
+    let due = frame_due(s, index)
+    if due < 0 || due > now { return }
+    let seq = s.conns[index].ack.last_sent + 1
+    if seq > SEQ_MAX {
+        terminal(mut s, index, 135, 4, "sequence space used: reconnect")
+        return
+    }
+    let si = s.conns[index].session
+    let full = s.conns[index].force_full
+    let payload = compose(mut s.conns[index].shadow, s.sessions[si].pane.screen, seq, full)
+    s.conns[index].stale = false
+    if payload.len == 0 { return }
+    let wire = frame_wire(payload)
+    if wire.len == 0 {
+        trace(s, "compose produced an invalid image")
+        protocol_error(mut s, index, "server image invalid")
+        return
+    }
+    let _q = enqueue(mut s.conns[index], wire, true)
+    s.conns[index].image_end = s.conns[index].tx_len
+    s.conns[index].image_seq = seq
+    s.conns[index].force_full = false
+    s.conns[index].last_frame = now
+    flush(mut s, index)
+}
+
+// When the next frame for a client may be composed (monotonic ns), or -1:
+// damage at least 8 ms old or its pane quiet 2 ms, at most one frame per
+// 8 ms, one image outstanding, synchronized output held up to 150 ms.
+fn frame_due(s: Server, index: int) -> int {
+    if !s.conns[index].live || s.conns[index].phase != ATTACHED || s.conns[index].session < 0 { return 0 - 1 }
+    if !s.conns[index].stale && !s.conns[index].force_full { return 0 - 1 }
+    if s.conns[index].image_end >= 0 || s.conns[index].ack.pending != 0 { return 0 - 1 }
+    var at = s.conns[index].last_frame + FRAME_AGE_MS * 1000000
+    if !s.conns[index].force_full {
+        let si = s.conns[index].session
+        let by_age = s.conns[index].stale_since + FRAME_AGE_MS * 1000000
+        let by_quiet = s.sessions[si].pane.last_output + FRAME_QUIET_MS * 1000000
+        var ready = if by_age < by_quiet then by_age else by_quiet
+        let sync_since = s.sessions[si].pane.sync_since
+        if sync_since > 0 {
+            let sync_end = sync_since + SYNC_MS * 1000000
+            if sync_end > ready { ready = sync_end }
+        }
+        if ready > at { at = ready }
+    }
+    at
+}
+
+// ---- the listener ----
+
+fn accept_some(mut s: Server, now: int) {
+    var taken = 0
+    while taken < ACCEPT_BATCH && s.listening {
+        if live_conns(s) >= MAX_CONNECTIONS || pending_conns(s) >= MAX_PENDING { break }
+        var slot = 0 - 1
+        var i = 0
+        while i < s.conns.len {
+            if !s.conns[i].live && slot < 0 { slot = i }
+            i += 1
+        }
+        if slot < 0 { break }
+        var gone = false
+        var sock = net.accept(mut s.place.listener) else |_| {
+            gone = true
+            net.Socket { fd: 0 - 1 }
+        }
+        if gone { break }
+        net.set_deadline(mut sock, 1) else |_| {}
+        s.next_id = s.next_id + 1
+        reset_conn(mut s.conns[slot], sock.fd, s.next_id, now)
+        let key = poll.add_socket(mut s.w, sock, poll.READ) else |_| {
+            net.close(take sock) else |_| {}
+            s.conns[slot].live = false
+            break
+        }
+        s.conns[slot].key = key
+        record_key(mut s, key, KEY_CONN, slot, s.conns[slot].gen)
+        trace(s, "conn {slot} accepted")
+        taken += 1
+        // Only one connection is known to be pending per readiness.
+        break
+    }
+    listener_interest(mut s)
+}
+
+/// The listener is in the readiness set only while another connection
+/// may be accepted; the rest wait in the kernel's backlog.
+fn listener_interest(mut s: Server) {
+    let room = !s.stopping && live_conns(s) < MAX_CONNECTIONS && pending_conns(s) < MAX_PENDING
+    if room && !s.listening {
+        let key = poll.add_listener(mut s.w, s.place.listener) else { return }
+        s.listen_key = key
+        record_key(mut s, key, KEY_LISTENER, 0, 0)
+        s.listening = true
+    } else if !room && s.listening {
+        let key = s.listen_key
+        forget_key(mut s, key)
+        s.listen_key = 0 - 1
+        s.listening = false
+    }
+}
+
+// ---- stopping ----
+
+fn begin_stop(mut s: Server, why: str) {
+    if s.stopping { return }
+    trace(s, "stopping: {why}")
+    s.stopping = true
+    s.stop_deadline = now_ns() + STOPPING_MS * 1000000
+    listener_interest(mut s)
+    var i = 0
+    while i < s.conns.len {
+        if s.conns[i].live && s.conns[i].phase != DRAINING {
+            terminal(mut s, i, 135, 3, "server stopping")
+        }
+        i += 1
+    }
+    i = 0
+    while i < s.sessions.len {
+        if s.sessions[i].live {
+            let key = s.sessions[i].pane.key
+            forget_key(mut s, key)
+            s.sessions[i].pane.key = 0 - 1
+            close_master(mut s.sessions[i].pane)
+            s.sessions[i].live = false
+        }
+        i += 1
+    }
+}
+
+fn children_live(s: Server) -> bool {
+    for x in s.sessions {
+        if x.pane.child_live { return true }
+    }
+    false
+}
+
+fn done(s: Server, now: int) -> bool {
+    if !s.stopping { return false }
+    if now >= s.stop_deadline { return true }
+    live_conns(s) == 0 && !children_live(s)
+}
+
+// ---- timers ----
+
+fn timers(mut s: Server, now: int) {
+    var i = 0
+    while i < s.conns.len {
+        if s.conns[i].live && s.conns[i].deadline > 0 && now >= s.conns[i].deadline {
+            trace(s, "conn {i} deadline in phase {s.conns[i].phase}")
+            close_conn(mut s, i)
+        }
+        i += 1
+    }
+    if s.lifetime > 0 && now - s.started >= s.lifetime { begin_stop(mut s, "lifetime bound") }
+    if !s.stopping && live_sessions(s) == 0 && live_conns(s) == 0 && now - s.idle_since >= IDLE_MS * 1000000 {
+        begin_stop(mut s, "no sessions and no clients")
+    }
+}
+
+/// With no session and no client, the server ends after this long.
+pub const IDLE_MS: int = 10000
+
+fn next_deadline_ms(s: Server, now: int) -> int {
+    if s.again { return 0 }
+    var at = 0 - 1
+    var i = 0
+    while i < s.conns.len {
+        let d = s.conns[i].deadline
+        if s.conns[i].live && d > 0 && (at < 0 || d < at) { at = d }
+        let due = frame_due(s, i)
+        if due >= 0 && (at < 0 || due < at) { at = due }
+        i += 1
+    }
+    if s.stopping && (at < 0 || s.stop_deadline < at) { at = s.stop_deadline }
+    if s.lifetime > 0 {
+        let end = s.started + s.lifetime
+        if at < 0 || end < at { at = end }
+    }
+    if !s.stopping && live_sessions(s) == 0 && live_conns(s) == 0 {
+        let idle = s.idle_since + IDLE_MS * 1000000
+        if at < 0 || idle < at { at = idle }
+    }
+    if s.stopping && children_live(s) {
+        // Reaping is woken by child(); bound the wait anyway.
+        let soon = now + 50000000
+        if at < 0 || soon < at { at = soon }
+    }
+    if at < 0 { return 0 - 1 }
+    if at <= now { return 0 }
+    (at - now + 999999) / 1000000
+}
+
+// ---- the turn ----
+
+fn turn(mut s: Server) -> bool {
+    let start = now_ns()
+    let deadline = next_deadline_ms(s, start)
+    s.again = false
+    let ev = poll.wait(mut s.w, listened(), deadline) else |e| {
+        trace(s, "wait failed: {e}")
+        begin_stop(mut s, "wait failed")
+        return !done(s, now_ns())
+    }
+    let now = now_ns()
+    if s.trace && (s.turns < 30 || s.turns % 50000 == 0) {
+        var seen = ""
+        for r in ev.ready { seen = seen + " {r.key}:{r.facts}" }
+        trace(s, "turn {s.turns} deadline {deadline} meaning {ev.meaning} ready{seen}")
+    }
+    if ev.meaning == signal.child() { reap(mut s) }
+    if ev.meaning == signal.terminate() || ev.meaning == signal.interrupt() { begin_stop(mut s, "signal") }
+    // Snapshot owners and generations, so an event for a key that a
+    // handler in this turn reused is not applied to its new owner.
+    var kinds = List[int]()
+    var owners = List[int]()
+    var gens = List[int]()
+    for r in ev.ready {
+        let k = r.key
+        if k >= 0 && k < s.key_kind.len {
+            (mut kinds).push(s.key_kind[k])
+            (mut owners).push(s.key_owner[k])
+            (mut gens).push(s.key_gen[k])
+        } else {
+            (mut kinds).push(KEY_NONE)
+            (mut owners).push(0 - 1)
+            (mut gens).push(0)
+        }
+    }
+    // Masters first, in rotating order; then connections; then the listener.
+    var pass = 0
+    while pass < 3 {
+        var j = 0
+        while j < ev.ready.len {
+            let at = (j + s.rotate) % ev.ready.len
+            let r = copy ev.ready[at]
+            let kind = kinds[at]
+            let owner = owners[at]
+            if pass == 0 && kind == KEY_MASTER && owner >= 0 && s.sessions[owner].live &&
+                s.sessions[owner].generation == gens[at] && s.sessions[owner].pane.key == r.key {
+                if r.facts & poll.WRITE != 0 { write_pane(mut s, owner) }
+                if r.facts & (poll.READ | poll.HANGUP | poll.ERROR) != 0 && s.sessions[owner].live { read_master(mut s, owner, now) }
+            } else if pass == 1 && kind == KEY_CONN && owner >= 0 && s.conns[owner].live &&
+                s.conns[owner].gen == gens[at] && s.conns[owner].key == r.key {
+                if r.facts & poll.WRITE != 0 { flush(mut s, owner) }
+                if s.conns[owner].live && r.facts & (poll.READ | poll.HANGUP | poll.ERROR) != 0 && s.conns[owner].read_on {
+                    read_conn(mut s, owner)
+                }
+            } else if pass == 2 && kind == KEY_LISTENER && s.listening {
+                accept_some(mut s, now)
+            }
+            j += 1
+        }
+        pass += 1
+    }
+    s.rotate = s.rotate + 1
+    // Messages already buffered, HELLOs, timers, frames, writes.
+    var i = 0
+    while i < s.conns.len {
+        if s.conns[i].live && s.conns[i].hello_ready { hello(mut s, i) }
+        if s.conns[i].live && !s.conns[i].hello_ready && next_complete(s.conns[i]) { parse(mut s, i) }
+        i += 1
+    }
+    timers(mut s, now)
+    i = 0
+    while i < s.conns.len {
+        compose_for(mut s, i, now_ns())
+        if s.conns[i].live && queued(s.conns[i]) > 0 && !s.conns[i].write_on { flush(mut s, i) }
+        i += 1
+    }
+    i = 0
+    while i < s.sessions.len {
+        if s.sessions[i].live && s.sessions[i].pane.in_len > s.sessions[i].pane.in_off && !s.sessions[i].pane.write_on {
+            write_pane(mut s, i)
+        }
+        i += 1
+    }
+    if live_sessions(s) > 0 || live_conns(s) > 0 { s.idle_since = now }
+    listener_interest(mut s)
+    s.turns = s.turns + 1
+    !done(s, now_ns())
+}
+
+/// Run a server in the foreground until it stops. Exit codes: 0 stopped,
+/// 1 a named refusal at start, 0 when another server answers already.
+pub fn serve() -> int {
+    let dir = runtime_dir()
+    let place = start(dir)
+    if place.code == 2 {
+        eprint("warren server: {place.reason}")
+        return 0
+    }
+    if place.code != 0 {
+        eprint("warren server: cannot start: {place.reason}")
+        return 1
+    }
+    signal.ignore(signal.reload()) else |_| {}
+    signal.listen(listened()) else |e| {
+        eprint("warren server: cannot listen for signals: {e}")
+        finish(take place)
+        return 1
+    }
+    let lifetime_ms = (env.get("WARREN_LIFETIME_MS") else "0").to_int() else 0
+    var conns = List[Conn]()
+    var i = 0
+    while i < MAX_CONNECTIONS {
+        (mut conns).push(new_conn())
+        i += 1
+    }
+    let waiter = poll.open() else |e| {
+        eprint("warren server: no readiness set: {e}")
+        finish(take place)
+        return 1
+    }
+    var s = Server {
+        place: place, w: waiter, listen_key: 0 - 1, listening: false,
+        conns: conns, sessions: List[Session](), key_kind: List[int](), key_owner: List[int](),
+        key_gen: List[int](), next_id: 0, stopping: false, stop_deadline: 0, started: now_ns(),
+        idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
+        version: vt.package_version(), again: false, need_slot: false, rotate: 0,
+        trace: env.has("WARREN_TRACE"), turns: 0,
+    }
+    net.set_listener_deadline(mut s.place.listener, 1) else |_| {}
+    listener_interest(mut s)
+    trace(s, "listening at {s.place.socket}")
+    var running = true
+    while running {
+        region scratch {
+            running = turn(mut s)
+        }
+        if s.need_slot && s.sessions.len < MAX_SESSIONS {
+            (mut s.sessions).push(idle_session())
+            s.again = true
+        }
+        s.need_slot = false
+    }
+    trace(s, "stopped after {s.turns} turns")
+    var k = 0
+    while k < s.conns.len {
+        close_conn(mut s, k)
+        k += 1
+    }
+    poll.close(take s.w) else |_| {}
+    finish(take s.place)
+    0
+}
