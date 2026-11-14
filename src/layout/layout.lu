@@ -1,8 +1,9 @@
 //! member: true
 //! The layout: tabs, and a split tree of panes inside each.
 //!
-//! Stub. Nothing here is implemented; the module exists so that the tree,
-//! the build and the tests have their final shape from the first commit.
+//! Pure: no I/O, no clock, no process. It knows pane ids, never ptys,
+//! emulators or clients. docs/LAYOUT.md is the contract: the data, the
+//! geometry, every operation and its named refusals, and the canonical dump.
 
 /// The milestone that fills this module in.
 pub fn milestone() -> str {
@@ -13,4 +14,86 @@ pub fn milestone() -> str {
 /// the reference interpreter.
 pub fn pure() -> bool {
     true
+}
+
+/// A split's axis: children side by side, the border a column of cells.
+pub const COLS: int = 0
+/// A split's axis: children stacked, the border a row of cells.
+pub const ROWS: int = 1
+
+/// A direction for focus and resize: toward column 1.
+pub const LEFT: int = 0
+/// A direction for focus and resize: toward the last column.
+pub const RIGHT: int = 1
+/// A direction for focus and resize: toward row 1.
+pub const UP: int = 2
+/// A direction for focus and resize: toward the last row.
+pub const DOWN: int = 3
+
+/// A whole split in share units: shares are the first child's part of a
+/// split, in 1/10000.
+pub const SHARE_ONE: int = 10000
+/// A new split's share: half each.
+pub const SHARE_HALF: int = 5000
+
+/// The fewest columns a pane gets in a `COLS` split that shows both children.
+pub const MIN_COLS: int = 2
+/// The fewest rows a pane gets in a `ROWS` split that shows both children.
+pub const MIN_ROWS: int = 1
+
+/// A node kind: a leaf holding one pane.
+pub const LEAF: int = 0
+/// A node kind: a split with two children.
+pub const SPLIT: int = 1
+/// A node kind: a free arena slot, waiting for reuse.
+pub const FREE: int = -1
+
+/// One arena slot: a leaf holding `pane`, or a split along `axis` with two
+/// children and the first child's `share`. `parent` is -1 for the root.
+pub struct Node {
+    kind: int,
+    pane: int,
+    axis: int,
+    first: int,
+    second: int,
+    share: int,
+    parent: int,
+}
+
+/// A tab: its id, its name's bytes, the arena and root of its split tree,
+/// the focused pane, the zoom flag, and every pane most recently focused
+/// first.
+pub struct Tab {
+    id: int,
+    name: List[byte],
+    nodes: List[Node],
+    root: int,
+    focus: int,
+    zoomed: bool,
+    focus_order: List[int],
+}
+
+/// A session's tabs, the active tab's id and the next tab id to hand out.
+pub struct Layout {
+    tabs: List[Tab],
+    active: int,
+    next_id: int,
+}
+
+/// A pane's cells in the tab area, 1-based; all zero when it is hidden.
+pub struct Rect {
+    pane: int,
+    col: int,
+    row: int,
+    cols: int,
+    rows: int,
+}
+
+/// A border: its first cell and its length, running down from that cell
+/// for a `COLS` split and right for a `ROWS` split.
+pub struct Border {
+    col: int,
+    row: int,
+    length: int,
+    axis: int,
 }
