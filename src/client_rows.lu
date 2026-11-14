@@ -223,6 +223,12 @@ fn row_detach_reattach(warren: str) -> str {
     if !until_screen(mut r, "$", 10000) { return "no prompt: " + screen_text(r.screen) }
     type_text(mut r, "echo hi-$((40+2))\r")
     if !until_screen(mut r, "hi-42", 5000) { return "the echo was not drawn" }
+    let rss = fs.read_text("/proc/{r.pid}/status") else ""
+    for line in rss.lines() {
+        if line.starts_with("VmRSS") || line.starts_with("VmHWM") {
+            print("MEASURE client 80x24 " + line.replace("\t", " "))
+        }
+    }
     type_text(mut r, "\u{0}d")
     let why = ends_with(mut r, 0, "[detached")
     if why.len > 0 {
