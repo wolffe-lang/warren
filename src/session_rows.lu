@@ -749,6 +749,61 @@ fn row_max_sessions(mut r: Rig) -> str {
     ""
 }
 
+fn row_resize_crossing(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    p.auto_ack = false
+    if !client.until_kind(mut p, 131, 3000) { return "no first image" }
+    let first = p.image.seq
+    // A RESIZE while the old-size image is outstanding: nothing new until
+    // that image is ACKed; then a full image at the new size, next seq.
+    let _r = client.resize(p, 100, 30)
+    let early = client.next(mut p, 600)
+    if early.kind == 131 { return "an image was sent before the outstanding one was ACKed" }
+    var a = List[byte]()
+    proto.put(mut a, first, 4)
+    let _a = client.send(p, 8, a)
+    p.auto_ack = true
+    if !client.until_kind(mut p, 131, 3000) { return "no image after the ACK" }
+    if p.last_base != 0 { return "the image after a resize was a delta" }
+    if p.image.seq != first + 1 { return "seq {p.image.seq} after {first}: numbering restarted" }
+    if p.image.cols != 100 || p.image.rows != 30 { return "image {p.image.cols}x{p.image.rows}" }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_too_slow(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_line(mut p, "$", 5000) { return "no prompt" }
+    var w = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut w, 129, 3000) { return "watcher: no WELCOME" }
+    // The first client stops reading; the pane sends titles faster than it
+    // could take them. Past its event queue it is closed, alone.
+    let _i = client.input(w, "i=0; t=$(printf '%04000d' 0); while [ $i -lt 200 ]; do printf '\\033]2;%s%s\\007' $i $t; i=$((i+1)); done; echo titles-$((100+100))\r")
+    if !client.until_text(mut w, "titles-200", 20000) { return "the second client stalled: " + client.screen_text(w) }
+    // The stalled client finds its connection closed, without a BYE that
+    // could not fit.
+    var closed = false
+    var n = 0
+    while n < 2000 && !closed {
+        let k = client.step(mut p, 2000)
+        if k < 0 { closed = true }
+        if k == 0 { n = 2000 }
+        n = n + 1
+    }
+    if !closed { return "the stalled client was never closed" }
+    client.hang_up(mut p)
+    client.hang_up(mut w)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
 fn run_row(warren: str, name: str) -> str {
     var r = rig(warren, name)
     var why = "no such row"
@@ -775,13 +830,15 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "threads" { why = row_threads(mut r) }
     else if name == "max-pending" { why = row_max_pending(mut r) }
     else if name == "max-sessions" { why = row_max_sessions(mut r) }
+    else if name == "resize-crossing-image" { why = row_resize_crossing(mut r) }
+    else if name == "too-slow" { why = row_too_slow(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions resize-crossing-image too-slow".split(" ") {
         (mut x).push(n)
     }
     x
