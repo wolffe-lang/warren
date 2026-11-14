@@ -1,68 +1,62 @@
 # Server state machine
 
-This is an implementation contract, not an I/O implementation. Wire bytes
+This is the server's contract, and `src/server` implements it. Wire bytes
 and numbered image rules are in PROTOCOL.md. The server owns one event
 loop, every pty master, every emulator/grid, layout/session state, accepted
 sockets, their bounded queues, child handles and the readiness set. The
 client alone owns its terminal; the server never writes to it. No helper
 process or server thread is part of v1.
 
-## 1. The real wait surface and blocking dependencies
+## 1. The wait surface, the pins, and the limits
 
-The standard-library surface examined is wolf-std `be1d10fa`:
-`poll.open`, `poll.add_file(mut w, master, poll.READ)`,
-`poll.add_listener(mut w, listener)`,
-`poll.add_socket(mut w, client, poll.READ)`,
-`poll.modify(mut w, key, poll.READ | poll.WRITE)`,
-`poll.remove(mut w, key)`,
-`poll.wait(mut w, meanings, deadline_ms)`, `poll.close(take w)`.
-Ready entries carry `key` and `facts`; the returned `meaning` is one signal
-or zero. `READ=1`, `WRITE=2`, `HANGUP=4`, `ERROR=8`. Remove before closing a
-handle. Keys can be reused, so route a returned batch through a snapshot of
-key-to-owner generations: never apply an old event to a newly accepted
-client that reused its key later in the same turn.
+The server is built at wolf 0.2.40 with wolf-std `c339a471`
+(`wolf-toolchain.toml`). That standard library serves the one wait this
+loop needs: `poll.open`, `poll.add_file(mut w, master, poll.READ)`,
+`poll.add_listener(mut w, listener)`, `poll.add_socket(mut w, client, interest)`,
+`poll.modify`, `poll.remove`, `poll.wait(mut w, meanings, deadline_ms)` and
+`poll.close`, over pseudo-terminal masters, the listener, client sockets
+(READ and WRITE) and listened signals together, answering every ready entry
+once with the signal meaning beside them. Ready entries carry `key` and
+`facts` (`READ=1`, `WRITE=2`, `HANGUP=4`, `ERROR=8`). Keys are reused, so a
+returned batch is routed through a snapshot of key-to-owner generations: an
+event taken for an earlier owner of a key is discarded.
 
-**The W2 wait is not implemented at that revision.** A waiter holding both
-`add_file` and `add_socket`/`add_listener` entries returns `unsupported` from
-`poll.wait(mut w, signal.child(), deadline_ms)`. A sockets-only waiter with
-nonzero meanings also returns `unsupported`. A socket registered with WRITE
-returns `unsupported` even with meanings zero. Files with meanings zero are
-also unsupported. These decisions precede any host call and hold on every
-host/tier; they are not missing PAX epoll support. `tests/poll/waiter_rows.lu`
-names each refusal; `mixed_refused.lu` holds the actual six-entry combination
-on checked/native. The sc82 note reports checked/native Linux measurements;
-this lane inspected the tests and documented implementation, not reran I/O.
+Each dependency is held by a row in `tests/deps/`, run natively and on the
+checked machine on Linux and macOS and natively on PAX under QEMU (lupin
+refuses each host call by name): `one_wait` (the whole set in one wait, a
+signal beside the entries, a deadline never early, a hung-up master),
+`partial_write` (`net.write_some` takes a prefix and answers busy; 4096 bytes
+on PAX), `start_lock` (an exclusive `fs.lock`, a taken path, a stale dial),
+`peer_cred` (`unix.peer_credentials`; on PAX, as the super-user, a second uid
+is refused a socket inside a 0700 directory) and `daemon` (a server started
+by fork and a new session outlives its starter). `src/vt_api_test.lu` holds
+the emulator surface the server reads.
 
-The supported halves are files plus signals and sockets/listeners with READ
-alone. The files path needs k+1 narrow waits for k ready entries and can end
-its sweep when a signal arrives before returning every ready file. HANGUP
-and ERROR are declared but never set at this revision: a hung-up handle is
-READ and the following read names eof/io/closed. A real persistent kernel
-readiness set must replace those halves; do not hide a polling time-slice
-or helper thread underneath a claim of one wait. The runtime contract is
-M1 in wolf-std's `docs/sc82-one-wait.md`, related to wolf-std#144.
+**Admission limits** (`src/server/limits.lu`, each a named constant):
 
-A second blocker is independent: `net.write_some` is only a contract in
-`std.net`, not a callable nonblocking partial write. Whole `net.write` or
-`net.write_bytes` cannot serve this loop. Needed is one send of a byte list,
-returning a count or `busy`, with `closed`, `invalid`, `io` as named failures,
-never parking, and no SIGPIPE. The runtime contract is M2 in the same note.
-PAX's socket buffer is 4096 bytes, smaller than ordinary repaints. WRITE
-readiness alone does not make a whole-write API safe. The pty side already
-has `fs.set_nonblock` and `fs.write_some`.
+| Limit | Value | What happens past it |
+|---|---|---|
+| sessions | 16 (one pane each in this version) | REFUSE resource-limit (7) |
+| connections, every phase | 32 | the listener leaves the readiness set; dials wait in the backlog |
+| connections before HELLO | 4 | the same |
+| history per pane | 8 MiB | the oldest lines go |
+| projected memory | 512 MiB | REFUSE resource-limit (7) |
 
-A third gap is defense in depth, not the wait blocker: Unix peer credentials
-are only the M3 contract (`unix.peer_credentials`), not a callable API at
-this revision. The 0700 runtime directory is the available user boundary.
-If credentials become available, require the connecting uid to equal the
-server uid before interpreting session creation/environment data.
+The projection counts each session's pane (its history, both screens at its
+size, 1 MiB of fixed buffers) and each connection (one physical frame's
+receive buffer, a paste assembly, the 256 KiB event queue, and, when
+attached, one worst-case image and a 64-byte-a-cell shadow of what its
+client holds). These counts are revisited when one session holds many
+panes.
 
-The repository's pinned standard library is older (`77cf3210`), and its wolf
-pin is 0.2.39. This document does not silently move either pin or claim that
-the existing binary can import the new poll module. W2 must pin a release
-that actually serves M1/M2, test it on checked/native and PAX, then implement
-the calls named here. Fail startup by name if the required wait is
-unsupported; no spin loop or alternate thread design is implied.
+**On PAX**, a server takes three of the machine's 64 thread slots (its main
+thread and two the runtime starts for signals and children; measured under
+QEMU), and every wolf program inside a pane takes two (pax#354 is the
+machine-wide limit). A Unix stream holds 4096 bytes in each direction, so a
+repaint always spans several writes. Surviving a console logout depends on
+pid 1 staying (pax#358, not merged): until an image with it proves the
+logout case, the server's promise on PAX is that it outlives the client
+process that started it.
 
 ## 2. One turn
 
@@ -285,8 +279,21 @@ Action bits: 1 unregister/close/free, 2 REFUSE, 4 WELCOME, 8 join membership,
 full action sets a flag, not a second outstanding image. REFUSE/BYE reason
 selection and actual resources stay in the event dispatcher, not this model.
 
-The pane/server tables remain paper, not a second complete server. W2 must
-exercise each transition through the real event dispatcher and must run live
-socketpair, pty, child-exit, catchable-signal and terminal-restoration rows on
-Linux and macOS, then the static server/client on PAX under QEMU. No I/O rows
-are claimed by this lane.
+The transitions are exercised through the real event dispatcher by the
+session rows (`src/session_rows.lu`): a scripted client, itself wolf so that
+PAX runs it too, drives a real server over its socket. Each row starts its own
+server in its own runtime directory with a lifetime bound and stops it with
+`kill-server`. They cover HELLO split at every byte, a bad first frame and bad
+magic (closed silently), the version, no-session and read-only refusals, a
+too-small attach (WELCOME then BYE, no session created), the HELLO deadline,
+stale and future ACKs, a message inside a paste's fragment chain, two client
+sizes converging to their minima and back, a client that never ACKs beside an
+active one, detach by the prefix binding and by DETACH, Ctrl-C as the byte 03,
+the last session ending the server, the command role, and a second server
+meeting the start lock. `src/compose_rows.lu` holds every composed image,
+applied by the client's applier, to the emulator's stored cells.
+
+This version answers a command connection's COMMAND for `kill-server` and
+`list-sessions` only; every other verb replies status 2 and names itself as
+not implemented. A pane whose program does not start is refused (REFUSE
+invalid-request, with the reason) rather than shown as an error pane.
