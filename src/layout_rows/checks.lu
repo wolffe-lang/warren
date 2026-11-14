@@ -65,6 +65,17 @@ pub fn tiling(l: layout.Layout, tab: int, cols: int, rows: int) -> str {
         i += 1
     }
     if area != cols * rows { return "pieces cover {area} cells of {cols * rows}" }
+    for r in rs {
+        if !hidden(r) {
+            let a = layout.pane_at(l, tab, cols, rows, r.col, r.row)
+            let z = layout.pane_at(l, tab, cols, rows, r.col + r.cols - 1, r.row + r.rows - 1)
+            if a != r.pane || z != r.pane { return "pane_at answers {a} and {z} inside pane {r.pane}" }
+        }
+    }
+    for b in bs {
+        let p = layout.pane_at(l, tab, cols, rows, b.col, b.row)
+        if p != -1 { return "pane_at answers {p} on a border at {b.col},{b.row}" }
+    }
     ""
 }
 
