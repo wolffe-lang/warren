@@ -7,13 +7,15 @@ import re
 ROOT = Path(__file__).resolve().parents[2]
 RIG = ROOT / 'tests/vt/rig'
 SESSION_RIG = ROOT / 'tests/session/rig'
+CLIENT_RIG = ROOT / 'tests/client/rig'
 
 
 def main():
     for rig, filename, expected in (
         (RIG, 'w1-linux.manifest', ['w1-linux-gate', 'w1-resource', 'w1-widths', 'w1-recordings-lupin']),
         (RIG, 'w1-plant.manifest', ['w1-plant-build', 'vt-scalar-value']),
-        (SESSION_RIG, 'w2-plant.manifest', ['w2-plant-build', 'one-image'])):
+        (SESSION_RIG, 'w2-plant.manifest', ['w2-plant-build', 'one-image']),
+        (CLIENT_RIG, 'w2-client-plant.manifest', ['w2-client-plant-build', 'console-policy'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
@@ -27,6 +29,8 @@ def main():
     assert '[ "$rc" -eq 134 ]' in plant
     server_plant = (SESSION_RIG / 'w2-plant-step.sh').read_text()
     assert 'never-ack-beside-active resize-crossing-image' in server_plant
+    client_plant = (CLIENT_RIG / 'w2-client-plant-step.sh').read_text()
+    assert 'FAIL console-policy ' in client_plant and 'client_render_test.lu' in client_plant
     linux = (RIG / 'w1-step.sh').read_text()
     assert 'tools/gate linux' in linux and 'vt_resource_bench.lu' in linux
     assert 'width_sweep.py' in linux and '--suite recordings' in linux
