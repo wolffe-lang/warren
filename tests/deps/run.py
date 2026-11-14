@@ -145,6 +145,8 @@ def checked(args, row, out):
     if record.get('diagnostics') or record.get('warnings'):
         return None, 'checked observation has diagnostics or warnings'
     text = record.get('stdout_inline')
+    if text is None and record.get('stdout_sha256') is None:
+        return '', None  # the machine records no stdout for a silent program
     if not isinstance(text, str):
         return None, 'checked record has no inline stdout'
     if hashlib.sha256(text.encode()).hexdigest() != record.get('stdout_sha256'):
