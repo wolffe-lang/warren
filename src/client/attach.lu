@@ -78,6 +78,7 @@ fn start_server() -> str {
 /// until it answers (START_MS).
 pub fn dial_or_start(create: bool) -> Peer ! DialErrors {
     let sock = server.socket_path(server.runtime_dir())
+    if server.socket_path_problem(sock).len > 0 { return io }
     var why = ""
     var first = dial(sock) else |e| {
         why = "{e}"
@@ -180,6 +181,11 @@ pub fn attach(target: str, create: bool) -> int {
     let termname = env.get("TERM") else ""
     let pol = policy_for(termname, env.get("COLORTERM") else "", console)
     let features = if console then 0 else 7
+    let long = server.socket_path_problem(server.socket_path(server.runtime_dir()))
+    if long.len > 0 {
+        eprint("warren: the {long}")
+        return 1
+    }
     var p = dial_or_start(create) else |e| {
         if "{e}" == "not_found" || "{e}" == "refused" {
             eprint("warren: no server is running")
@@ -315,6 +321,11 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
 /// Run one command on the server (`kill-server`, `list-sessions`) and
 /// print its reply; the exit code is the reply's status.
 pub fn command(argv: List[str]) -> int {
+    let long = server.socket_path_problem(server.socket_path(server.runtime_dir()))
+    if long.len > 0 {
+        eprint("warren: the {long}")
+        return 1
+    }
     var p = dial(server.socket_path(server.runtime_dir())) else |_| {
         eprint("warren: no server is running")
         return 1
