@@ -6,7 +6,7 @@ set -euo pipefail
 root=$PWD
 . "$root/tools/toolchain-env.sh"
 export HOME="$root/target/home" TMPDIR="$root/target/tmp"
-mkdir -p "$HOME" "$TMPDIR"
+mkdir -p "$HOME" "$TMPDIR" target/native
 case "${1:-}" in
  build)
   python3 -I tools/vt/generate_version.py
