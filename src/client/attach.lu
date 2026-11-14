@@ -16,6 +16,15 @@ use server
 /// How long a client waits for a server it started to answer.
 pub const START_MS: int = 5000
 
+// A line to the file WARREN_CLIENT_TRACE names, if any: what a client did
+// on its way out, for rows on hosts where its terminal is gone.
+fn ctrace(text: str) {
+    let path = env.get("WARREN_CLIENT_TRACE") else ""
+    if path.len == 0 { return }
+    let old = fs.read_text(path) else ""
+    fs.write_text(path, old + "{now_ms()} {text}\n") else |_| {}
+}
+
 fn now_ms() -> int {
     time.monotonic_ns() / 1000000
 }
@@ -156,14 +165,15 @@ fn sanitize(t: str) -> str {
 pub struct End {
     code: int,
     line: str,
+    gone: bool,
 }
 
 fn bye_end(code: int, text: str, session: str) -> End {
-    if code == 1 { return End { code: 0, line: "[detached from {session}]" } }
-    if code == 2 { return End { code: 0, line: "[{session} ended]" } }
-    if code == 3 { return End { code: 0, line: "[the server stopped]" } }
-    if code == 7 { return End { code: 1, line: "warren: the terminal is too small ({text})" } }
-    End { code: 1, line: "warren: {text} (BYE {code})" }
+    if code == 1 { return End { code: 0, line: "[detached from {session}]", gone: false } }
+    if code == 2 { return End { code: 0, line: "[{session} ended]", gone: false } }
+    if code == 3 { return End { code: 0, line: "[the server stopped]", gone: false } }
+    if code == 7 { return End { code: 1, line: "warren: the terminal is too small ({text})", gone: false } }
+    End { code: 1, line: "warren: {text} (BYE {code})", gone: false }
 }
 
 const LISTENED: int = 2 + 1 + 4 + 16 + 16384 + 32 + 8192
@@ -204,28 +214,34 @@ pub fn attach(target: str, create: bool) -> int {
         eprint("warren: cannot set up the terminal: {e}")
         return 1
     }
+    ctrace("attached")
     let end = run(mut p, mut t, mut out, size.columns, size.rows, pol, features,
         hello_with(1, size.columns, size.rows, pol.depth, features, termname, target,
             if create then 1 else 0, cwd, names, values))
-    give_back(mut t)
+    ctrace("ended: {end.line}")
+    // A terminal that went away is not written or set again: on some hosts
+    // a gone terminal holds a drain forever.
+    if !end.gone { give_back(mut t) }
+    ctrace("gave back")
     hang_up(mut p)
-    if end.line.len > 0 { eprint(end.line) }
+    if end.line.len > 0 && !end.gone { eprint(end.line) }
+    ctrace("exit {end.code}")
     end.code
 }
 
 fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Policy, features: int,
     hello: List[byte]) -> End {
-    if !send(p, 1, hello) { return End { code: 1, line: "warren: the server closed the connection" } }
+    if !send(p, 1, hello) { return End { code: 1, line: "warren: the server closed the connection", gone: false } }
     // A suspend is the client's to handle (it gives the terminal back
     // first): an inherited ignore of it would hide it from the wait.
-    signal.reset(signal.suspend()) else |_| {}
-    signal.listen(LISTENED) else |e| { return End { code: 1, line: "warren: signals: {e}" } }
-    var w = poll.open() else |e| { return End { code: 1, line: "warren: readiness set: {e}" } }
+    signal.reset(signal.suspend() | signal.reload()) else |_| {}
+    signal.listen(LISTENED) else |e| { return End { code: 1, line: "warren: signals: {e}", gone: false } }
+    var w = poll.open() else |e| { return End { code: 1, line: "warren: readiness set: {e}", gone: false } }
     let tty_key = poll.add_file(mut w, t.file, poll.READ) else |e| {
-        return End { code: 1, line: "warren: readiness set: {e}" }
+        return End { code: 1, line: "warren: readiness set: {e}", gone: false }
     }
     let sock_key = poll.add_socket(mut w, net.Socket { fd: p.fd }, poll.READ) else |e| {
-        return End { code: 1, line: "warren: readiness set: {e}" }
+        return End { code: 1, line: "warren: readiness set: {e}", gone: false }
     }
     var drawn = proto.image()
     var par = parser()
@@ -241,11 +257,18 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
             if wait < 0 { wait = 0 }
         }
         let ev = poll.wait(mut w, LISTENED, wait) else |e| {
-            return End { code: 1, line: "warren: wait failed: {e}" }
+            return End { code: 1, line: "warren: wait failed: {e}", gone: false }
         }
         let m = ev.meaning
-        if m & (signal.terminate() | signal.reload() | signal.quit() | signal.interrupt()) != 0 {
-            return End { code: 1, line: "warren: ended by a signal" }
+        if m & signal.reload() != 0 {
+            // A hangup: the terminal may be gone; it is given back only if
+            // it still answers.
+            let alive = term.mode(t.file) else |_| term.Mode { canonical: false, echo: false, signals: false,
+                flow: false, extended: false, raw_cr: false, raw_output: false, strip8: false, min: 0 - 1, time: 0 }
+            return End { code: 1, line: "warren: ended by a signal", gone: alive.min < 0 }
+        }
+        if m & (signal.terminate() | signal.quit() | signal.interrupt()) != 0 {
+            return End { code: 1, line: "warren: ended by a signal", gone: false }
         }
         if m & signal.suspend() != 0 {
             give_back(mut t)
@@ -275,11 +298,11 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
         for r in ev.ready {
             if r.key == tty_key {
                 let got = fs.read_chunk(mut in_file, 4096) else |_| {
-                    return End { code: 1, line: "warren: the terminal closed" }
+                    return End { code: 1, line: "warren: the terminal closed", gone: true }
                 }
-                if got.len == 0 { return End { code: 1, line: "warren: the terminal closed" } }
+                if got.len == 0 { return End { code: 1, line: "warren: the terminal closed", gone: true } }
                 for e in feed(mut par, got, now_ms()) {
-                    if !send_event(p, e) { return End { code: 1, line: "warren: the server closed the connection" } }
+                    if !send_event(p, e) { return End { code: 1, line: "warren: the server closed the connection", gone: false } }
                 }
             } else if r.key == sock_key {
                 let pulled = pull(mut p)
@@ -287,14 +310,14 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
                     let k = step(mut p, 0)
                     if k == 0 { break }
                     if k == 0 - 2 {
-                        return End { code: 1, line: "warren: the server sent an image that does not apply" }
+                        return End { code: 1, line: "warren: the server sent an image that does not apply", gone: false }
                     }
-                    if k == 0 - 1 { return End { code: 1, line: "warren: the server closed the connection" } }
+                    if k == 0 - 1 { return End { code: 1, line: "warren: the server closed the connection", gone: false } }
                     if k == 129 && p.welcome_session.len > 0 { session = p.welcome_session }
                     if k == 131 {
                         let bytes = render(mut drawn, p.image, pol)
                         fs.write_chunk(mut out, bytes) else |_| {
-                            return End { code: 1, line: "warren: the terminal cannot be written" }
+                            return End { code: 1, line: "warren: the terminal cannot be written", gone: false }
                         }
                         let _a = send(p, 8, number(p.image.seq, 4))
                     } else if k == 132 {
@@ -304,18 +327,18 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
                     } else if k == 135 {
                         return bye_end(p.end_code, p.end_text, session)
                     } else if k == 130 {
-                        return End { code: 1, line: "warren: refused: {p.end_text}" }
+                        return End { code: 1, line: "warren: refused: {p.end_text}", gone: false }
                     }
                 }
-                if pulled == 1 { return End { code: 1, line: "warren: the server closed the connection" } }
-                if pulled == 2 { return End { code: 1, line: "warren: the connection failed" } }
+                if pulled == 1 { return End { code: 1, line: "warren: the server closed the connection", gone: false } }
+                if pulled == 2 { return End { code: 1, line: "warren: the connection failed", gone: false } }
             }
         }
         for e in expire(mut par, now_ms()) {
-            if !send_event(p, e) { return End { code: 1, line: "warren: the server closed the connection" } }
+            if !send_event(p, e) { return End { code: 1, line: "warren: the server closed the connection", gone: false } }
         }
     }
-    End { code: 1, line: "" }
+    End { code: 1, line: "", gone: false }
 }
 
 /// Run one command on the server (`kill-server`, `list-sessions`) and
