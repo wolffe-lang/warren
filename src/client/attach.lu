@@ -243,8 +243,9 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
         }
         if m & signal.suspend() != 0 {
             give_back(mut t)
+            // Stop as the suspend asked: its default action, raised again.
             signal.reset_one(signal.suspend()) else |_| {}
-            signal.raise(signal.stop()) else |_| {}
+            signal.raise(signal.suspend()) else |_| {}
             signal.listen(LISTENED) else |_| {}
             take_again(mut t)
             drawn = proto.image()
