@@ -166,6 +166,19 @@ step compose-build "$WOLF" build --deny-warnings src/compose_rows.lu -o "$root/t
 step compose-native "$root/target/native/compose-rows"
 step session-build "$WOLF" build --deny-warnings src/session_rows.lu -o "$root/target/native/session-rows"
 step session-rows session_rows
+# Panes and tabs: a scripted client drives a real server's splits, tabs,
+# zoom and closes through key events; the frame's borders and bar are held
+# cell for cell.
+pane_rows() (
+  rows=(split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs
+    resize-all-tabs zoom too-small pane-memory pane-limit frame-golden damage-in-rect focus-bytes
+    keys-in-split split-latency)
+  if [ "$mode" = linux ]; then rows+=(split-close-cycles); fi
+  rm -rf target/prows && mkdir -p target/prows && cd target/prows
+  "$root/target/native/pane-rows" "$root/target/native/warren" "${rows[@]}"
+)
+step pane-build "$WOLF" build --deny-warnings src/pane_rows.lu -o "$root/target/native/pane-rows"
+step pane-rows pane_rows
 # The terminal client in a pseudo-terminal: every way it ends gives the
 # terminal back, and nothing a row starts outlives it.
 client_rows() (
