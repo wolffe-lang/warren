@@ -51,7 +51,7 @@ fn main() -> !int {
         return 0
     }
     if process.is_child(a) {
-        fs.close(take r) else |_| {}
+        fs.close(take copy r) else |_| {}
         process.lead_session() else |_| { process.exit(40) }
         let my = env.pid()
         let b = process.fork() else |_| {

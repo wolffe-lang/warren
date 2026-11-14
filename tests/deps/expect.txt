@@ -85,7 +85,7 @@ dial_stale=refused
 rebind_after_lock=ok
 
 [start_lock lupin *]
-refuses=fs_create_dir_mode
+refuses=os_euid
 
 [peer_cred native linux]
 forked_peer=true
@@ -108,7 +108,7 @@ self_peer=true
 other_uid=not-measured
 
 [peer_cred lupin *]
-refuses=fs_create_dir_mode
+refuses=os_euid
 
 [daemon native *]
 starter_status=0
@@ -120,4 +120,4 @@ no_terminal=true
 daemon=unsupported
 
 [daemon lupin *]
-refuses=os_pipe
+refuses=os_fork
