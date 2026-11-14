@@ -18,19 +18,23 @@ pub fn chrome_cell(base: int, flags: int, fg: int) -> vt.Cell {
     vt.Cell { base: base, mark1: 0, mark2: 0, width: 1, flags: flags, foreground: fg, background: 0 - 1, written: true }
 }
 
-/// The frame's cell at row-major index `i`: a bar cell below the tab area,
-/// else the owner map's pane (its active screen at the rect offset) or the
-/// border cell. A wide glyph on a pane's last column (which the emulator
-/// does not make) would cross a border: it is sent one column wide.
+/// The frame's cell at row-major index `i`. `bar` is the client's own
+/// cells over the frame's last rows: the bar's two lines, the whole frame
+/// while its key list is open, or nothing when no bar row is read. Else the
+/// owner map's pane (its active screen at the rect offset) or the border
+/// cell. A wide glyph on a pane's last column (which the emulator does not
+/// make) would cross a border: it is sent one column wide.
 fn frame_cell(panes: List[Pane], ses: Session, bar: List[vt.Cell], i: int) -> vt.Cell {
     let cols = ses.cols
     let area = ses.rows - BAR_LINES
     let r0 = i / cols
-    if r0 >= area {
-        let j = i - area * cols
+    let top = ses.rows - bar.len / cols
+    if r0 >= top {
+        let j = i - top * cols
         if j >= 0 && j < bar.len { return bar[j] }
         return blank_cell()
     }
+    if r0 >= area { return blank_cell() }
     if i >= ses.owner.len { return blank_cell() }
     let o = ses.owner[i]
     if o < 0 || o >= panes.len {
@@ -244,6 +248,8 @@ const CROSS: int = 9532
 pub const FOCUS_COLOUR: int = 2
 /// Rendition flag: inverse.
 pub const INVERSE: int = 64
+/// Rendition flag: bold (the mode field).
+pub const BOLD: int = 1
 
 fn is_border(owner: List[int], cols: int, area: int, c: int, r: int) -> bool {
     if c < 1 || r < 1 || c > cols || r > area { return false }

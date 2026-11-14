@@ -88,5 +88,10 @@ pub const RESIZE_COLS: int = 2
 pub const RESIZE_ROWS: int = 1
 /// A message on the hint line shows this long.
 pub const MESSAGE_MS: int = 2000
+/// A prompt (rename, command) holds at most this many bytes.
+pub const PROMPT_BYTES: int = 256
+/// The bar's mode field: a fixed width, so a mode change never moves
+/// anything beside it.
+pub const MODE_FIELD: int = 9
 /// A connection's sequence numbers reconnect before this.
 pub const SEQ_MAX: int = 4294967295
