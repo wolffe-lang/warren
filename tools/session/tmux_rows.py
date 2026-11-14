@@ -10,6 +10,15 @@ Rows:
                        with the reference emulator's expected screen
   tmux-shared-size     two clients of different sizes on one session: the
                        window's size under each `window-size` value
+  tmux-split-sizes     a left-right split and a top-bottom split of the right
+                       pane: each pane's size (tmux rounds the first half up,
+                       warren down: 40/39 against 39/40 at 80 columns, named)
+  tmux-zoom            the zoomed pane takes the whole window, and back
+  tmux-focus-ring      which border cells tmux colours for the focused pane, with
+                       three panes and with two (half the border), drawn by a
+                       second tmux whose pane runs a client of the first; warren
+                       draws the same cells (its frame-golden row)
+  tmux-kill-pane       a killed pane's program has ended within a second
 
 Each client is a pty of the suite's own. Nothing is signalled: clients are
 detached by tmux's own command and the server is ended with kill-server.
@@ -158,6 +167,137 @@ def row_shared_size(out):
     return 0
 
 
+def panes(tmux):
+    out = tmux.run('list-panes', '-F', '#{pane_id} #{pane_left} #{pane_top} #{pane_width} #{pane_height} '
+                   '#{pane_active} #{pane_pid} #{pane_current_command}')
+    return [line.split() for line in out.splitlines() if line]
+
+
+def row_split_sizes(out):
+    tmux = Tmux(out, 'split')
+    try:
+        tmux.run('new-session', '-d', '-x', '80', '-y', '24', 'sleep 60')
+        tmux.attach(80, 24)
+        tmux.run('split-window', '-h', 'sleep 60')
+        tmux.run('split-window', '-v', 'sleep 60')
+        tmux.drain(0.3)
+        sizes = ['%sx%s@%s,%s' % (p[3], p[4], p[1], p[2]) for p in panes(tmux)]
+    finally:
+        tmux.close()
+    print('  measured: ' + ' '.join(sizes))
+    want = ['40x23@0,0', '39x11@41,0', '39x11@41,12']
+    if sizes != want:
+        print('FAIL tmux-split-sizes: got %s, expected %s' % (sizes, want))
+        return 1
+    print('PASS tmux-split-sizes (warren: 39x22 and 40x22, then 40x10 and 40x11, by its own rule)')
+    return 0
+
+
+def row_zoom(out):
+    tmux = Tmux(out, 'zoom')
+    try:
+        tmux.run('new-session', '-d', '-x', '80', '-y', '24', 'sleep 60')
+        tmux.attach(80, 24)
+        tmux.run('split-window', '-h', 'sleep 60')
+        tmux.run('resize-pane', '-Z')
+        tmux.drain(0.3)
+        zoomed = [p[3] + 'x' + p[4] for p in panes(tmux) if p[5] == '1']
+        tmux.run('resize-pane', '-Z')
+        tmux.drain(0.3)
+        back = [p[3] + 'x' + p[4] for p in panes(tmux) if p[5] == '1']
+    finally:
+        tmux.close()
+    print('  measured: zoomed %s, back %s' % (zoomed, back))
+    if zoomed != ['80x23'] or back != ['39x23']:
+        print('FAIL tmux-zoom: zoomed %s back %s, expected 80x23 then 39x23' % (zoomed, back))
+        return 1
+    print('PASS tmux-zoom')
+    return 0
+
+
+def green_cells(styled_line):
+    """The 1-based columns of a captured line drawn in foreground 32 (green)."""
+    cols, col, fg, i = [], 0, None, 0
+    while i < len(styled_line):
+        ch = styled_line[i]
+        if ch == '\x1b' and i + 1 < len(styled_line) and styled_line[i + 1] == '[':
+            j = i + 2
+            while j < len(styled_line) and not styled_line[j].isalpha():
+                j += 1
+            for part in (styled_line[i + 2:j] or '0').split(';'):
+                if part in ('', '0', '39'):
+                    fg = None
+                elif part.isdigit() and (30 <= int(part) <= 37 or 90 <= int(part) <= 97):
+                    fg = int(part)
+            i = j + 1
+            continue
+        col += 1
+        if fg == 32:
+            cols.append(col)
+        i += 1
+    return cols
+
+
+def ring(out, name, keys):
+    """The green border cells after a layout and focus, as (col, row) pairs."""
+    inner = Tmux(out, 'ring-' + name)
+    outer = Tmux(out, 'outer-' + name)
+    try:
+        inner.run('new-session', '-d', '-s', 'r', '-x', '80', '-y', '24', 'sleep 60')
+        # The client first, so that every split is made at the window it is drawn at.
+        outer.run('new-session', '-d', '-x', '80', '-y', '24', 'tmux -S %s -f /dev/null attach -t r' % inner.socket)
+        outer.run('set-option', '-g', 'status', 'off')
+        time.sleep(0.6)
+        for command in keys:
+            inner.run(*command)
+        time.sleep(0.8)
+        styled = outer.run('capture-pane', '-p', '-e', '-t', '0').split('\n')[:23]
+    finally:
+        outer.close()
+        inner.close()
+    return [(c, r + 1) for r, line in enumerate(styled) for c in green_cells(line)]
+
+
+def row_focus_ring(out):
+    split3 = [('split-window', '-h', 'sleep 60'), ('split-window', '-v', 'sleep 60')]
+    cases = {
+        'three-left': (split3 + [('select-pane', '-t', '0')], [(41, r) for r in range(1, 24)]),
+        'three-bottom-right': (split3, [(41, r) for r in range(12, 24)] + [(c, 12) for c in range(42, 81)]),
+        'two-left': ([('split-window', '-h', 'sleep 60'), ('select-pane', '-t', '0')], [(41, r) for r in range(1, 13)]),
+        'two-right': ([('split-window', '-h', 'sleep 60')], [(41, r) for r in range(13, 24)]),
+    }
+    failed = 0
+    for name, (keys, want) in cases.items():
+        got = ring(out, name, keys)
+        if sorted(got) != sorted(want):
+            print('FAIL tmux-focus-ring %s: green cells %s, expected %s' % (name, sorted(got), sorted(want)))
+            failed += 1
+        else:
+            print('PASS tmux-focus-ring %s (%d cells)' % (name, len(want)))
+    return 1 if failed else 0
+
+
+def row_kill_pane(out):
+    tmux = Tmux(out, 'kill')
+    try:
+        tmux.run('new-session', '-d', '-x', '80', '-y', '24', 'sleep 60')
+        tmux.run('split-window', '-h', 'exec sleep 300')
+        sleeper = [p for p in panes(tmux) if p[7] == 'sleep' and p[5] == '1'][0]
+        pid = int(sleeper[6])
+        tmux.run('kill-pane', '-t', sleeper[0])
+        end = time.monotonic() + 1.0
+        while time.monotonic() < end and Path('/proc/%d' % pid).exists():
+            time.sleep(0.02)
+        alive = Path('/proc/%d' % pid).exists()
+    finally:
+        tmux.close()
+    if alive:
+        print('FAIL tmux-kill-pane: the program %d outlived its pane by a second' % pid)
+        return 1
+    print('PASS tmux-kill-pane (the program ended; warren: close-hangs-up)')
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cases', type=Path, required=True)
@@ -176,6 +316,10 @@ def main():
     for name in TEXT_CASES:
         failed += row_screen(args.out, args.cases, args.expected, name)
     failed += row_shared_size(args.out)
+    failed += row_split_sizes(args.out)
+    failed += row_zoom(args.out)
+    failed += row_focus_ring(args.out)
+    failed += row_kill_pane(args.out)
     return 1 if failed else 0
 
 
