@@ -1,7 +1,8 @@
 //! member: false
 //! warren's host dispatcher. With no arguments: attach to the default
 //! session, starting the server and the session when there are none.
-//! `attach [-t NAME]` attaches to an existing session; `kill-server` and
+//! `attach [-t NAME]` attaches to an existing session; `new [-d] [-s NAME]`
+//! makes one (and attaches unless -d); `kill-server` and
 //! `list-sessions` ask the server; `server` runs one in the foreground;
 //! `vt-dump` works without a server; `modules` lists the modules and their
 //! milestones.
@@ -37,17 +38,43 @@ fn main() -> int {
         if args.len == 3 && args[1] == "-t" { return client.attach(args[2], false) }
         return cmd.usage()
     }
+    if args[0] == "new" { return new_verb(args) }
     if (args[0] == "kill-server" || args[0] == "list-sessions") && args.len == 1 {
         return client.command(args)
     }
     if args[0] == "modules" && args.len == 1 { return modules() }
-    for later in "new detach split close focus resize zoom tab rename source".split(" ") {
+    for later in "detach split close focus resize zoom tab rename source".split(" ") {
         if args[0] == later {
             io.write_err_line("warren: {later} is not implemented in this version")
             return 2
         }
     }
     cmd.usage()
+}
+
+// `new [-d] [-s NAME]`, its flags in any order, each at most once.
+fn new_verb(args: List[str]) -> int {
+    var detached = false
+    var name = ""
+    var named = false
+    var i = 1
+    while i < args.len {
+        if args[i] == "-d" && !detached {
+            detached = true
+        } else if args[i] == "-s" && !named && i + 1 < args.len {
+            name = args[i + 1]
+            named = true
+            i += 1
+        } else {
+            return cmd.usage()
+        }
+        i += 1
+    }
+    if named && name.len == 0 {
+        io.write_err_line("warren: new: a session name may not be empty")
+        return 2
+    }
+    client.new_session(name, detached)
 }
 
 // The modules and the milestone each belongs to.
