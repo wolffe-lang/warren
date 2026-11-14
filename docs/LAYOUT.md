@@ -97,6 +97,11 @@ unzoomed geometry.
 | `next_tab()`, `previous_tab()` | the next or previous tab becomes active, wrapping | none |
 | `rename_tab(tab, name)` | the tab's name becomes `name` | `no_tab` |
 
+- **Regions.** The server applies operations inside its turn's region, so
+  none keeps a value of its caller's region in the layout: a new tab is pushed
+  as a copy made in the layout's own storage, a closed tab's successors move
+  down in place, and a rename writes the bytes into the name the tab already
+  owns (`src/layout_region_test.lu`).
 - **Focus order.** Whenever a pane takes focus (a split's new pane, a new
   tab's pane, any focus operation) it moves to the front of its tab's focus
   order. A closed pane leaves it.
@@ -199,6 +204,7 @@ hold. The layout files of a later milestone build on this form.
 |---|---|---|
 | goldens | 59 operation scripts, each with the expected `dump_at` and every refusal, resize answer and `pane_at` query, computed by hand from this file | `src/layout_rows/goldens.lu` |
 | properties | seeded random sequences of 50 operations at 20x6, 80x24, 81x25, 320x90 and 512x512, the invariants below held after every operation, and grids of every shape up to 4x4 built at each size | `src/layout_rows/properties.lu` |
+| regions | every operation applied inside a region to a layout that outlives it, read back after the region's arena is reused | `src/layout_region_test.lu` |
 
 The entries: `src/layout_native.lu` runs every golden and 2000 sequences
 at each size; `src/layout_slice.lu` runs the goldens, or a slice of
