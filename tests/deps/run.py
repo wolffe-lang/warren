@@ -12,6 +12,12 @@ A row's expected lines live in tests/deps/expect.txt under headers
 specific header wins. `refuses=NAME` expects a named refusal instead of
 output. Lines are compared exactly and in order; a missing header is red.
 
+`--transcript FILE` judges rows that ran elsewhere (PAX under QEMU): FILE
+holds `ROW name`, the row's lines, `END name rc=N` per row, as the image's
+script printed them on the console. A kernel's own narration (`PAX: ` lines,
+a `user: ` tail) is dropped first; a row's stderr lines are those whose key
+its expectation does not name.
+
 Prints `PASS deps <row> <tier>` or `FAIL deps <row> <tier>: <why>` and a
 closing `DEPS rows=N failed=M`; exits 1 when any row is red.
 """
@@ -153,11 +159,66 @@ def lupin(args, row, out, want):
     return p.stdout.decode(errors='replace'), None
 
 
+def transcript_rows(path):
+    rows = {}
+    current = None
+    for raw in Path(path).read_text(errors='replace').replace('\r', '').splitlines():
+        if raw.startswith('PAX: '):
+            continue
+        cut = raw.find('user: ')
+        line = raw if cut < 0 else raw[:cut]
+        if cut == 0 or not line:
+            continue
+        if line.startswith('ROW '):
+            current = line[4:].strip()
+            rows[current] = {'lines': [], 'rc': None}
+        elif line.startswith('END ') and current is not None:
+            parts = line.split()
+            rows[current]['rc'] = parts[2] if len(parts) > 2 else 'rc=?'
+            current = None
+        elif current is not None:
+            rows[current]['lines'].append(line)
+    return rows
+
+
+def judge_transcript(args, table):
+    rows = transcript_rows(args.transcript)
+    failed = total = 0
+    for row in args.rows.split(','):
+        total += 1
+        want = expected(table, row, 'native', args.host)
+        got = rows.get(row)
+        why = None
+        if want is None:
+            why = 'no expectation for host %s' % args.host
+        elif got is None:
+            why = 'not in the transcript'
+        elif got['rc'] != 'rc=0':
+            why = 'ended %s: %r' % (got['rc'], got['lines'][-6:])
+        else:
+            keys = {w.split('=', 1)[0] for w in want}
+            kept = [l for l in got['lines'] if l.split('=', 1)[0] in keys]
+            for l in got['lines']:
+                if l not in kept:
+                    print('  | %s' % l)
+            why = compare('\n'.join(kept), want)
+        if why:
+            failed += 1
+            print('FAIL deps %s native-%s: %s' % (row, args.host, why), flush=True)
+        else:
+            print('PASS deps %s native-%s' % (row, args.host), flush=True)
+            for line in want:
+                print('  %s' % line)
+    print('DEPS rows=%d failed=%d host=%s transcript=%s' % (total, failed, args.host, args.transcript))
+    return 1 if failed else 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--wolf', required=True)
+    parser.add_argument('--wolf')
     parser.add_argument('--lupin')
-    parser.add_argument('--std', required=True)
+    parser.add_argument('--std')
+    parser.add_argument('--transcript', help='judge a console transcript instead of running')
     parser.add_argument('--host', default='darwin' if platform.system() == 'Darwin' else 'linux')
     parser.add_argument('--tiers', default='native,checked,lupin')
     parser.add_argument('--rows', default=','.join(ROWS))
@@ -165,8 +226,12 @@ def main():
     parser.add_argument('--bound', type=int, default=120, help='seconds per run')
     parser.add_argument('--build-only', action='store_true', help='build native binaries, run nothing')
     args = parser.parse_args()
-    args.out.mkdir(parents=True, exist_ok=True)
     table = expectations()
+    if args.transcript:
+        return judge_transcript(args, table)
+    if not args.wolf or not args.std:
+        parser.error('--wolf and --std are required unless --transcript is given')
+    args.out.mkdir(parents=True, exist_ok=True)
     failed = total = 0
     for row in args.rows.split(','):
         for tier in args.tiers.split(','):
