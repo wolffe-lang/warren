@@ -36,28 +36,31 @@ the emulator surface the server reads.
 
 | Limit | Value | What happens past it |
 |---|---|---|
-| sessions | 16 (one pane each in this version) | REFUSE resource-limit (7) |
+| sessions | 16 | REFUSE resource-limit (7) |
+| panes in a session, across its tabs | 32 | the split or new tab is refused, named on the client's hint line |
 | connections, every phase | 32 | the listener leaves the readiness set; dials wait in the backlog |
 | connections before HELLO | 4 | the same |
-| history per pane | 8 MiB | the oldest lines go |
-| projected memory | 512 MiB | REFUSE resource-limit (7) |
+| history per pane | 2 MiB | the oldest lines go |
+| projected memory | 512 MiB | REFUSE resource-limit (7); a split or new tab is refused by name |
 
-The projection counts each session's pane (its history, both screens at its
-size, 1 MiB of fixed buffers) and each connection (one physical frame's
-receive buffer, a paste assembly, the 256 KiB event queue, and, when
-attached, one worst-case image and a 64-byte-a-cell shadow of what its
-client holds). These counts are revisited when one session holds many
-panes.
+The projection counts every pane slot at its measured cost (six times its
+history cap, both screens at its size, 1 MiB of fixed buffers; a free slot
+keeps its emulator and is counted too) and each connection (one physical
+frame's receive buffer, a paste assembly, the 256 KiB event queue, and, when
+attached, one worst-case image and a 64-byte-a-cell shadow of what its client
+holds).
 
-Measured, the projection undercounts a session. A server's resident size is
-about 9 MB at start and grows by about 50 MB for each 80x24 session (PAX under
-QEMU: 9,156 kB, then 67,056 and 116,736 kB; Linux 111,644 kB with two), then
-stays flat (the same before and after 10,000 keystrokes beside a flooding
-pane). Most of it is the emulator's history ring: it is materialized whole
-when the emulator is made (about 17 MB resident for an 8 MiB ring, the copy
-included) and made again when the pane is resized (about 16 MB more). The
-limits stand for this version; a ring that grows as history arrives, and a
-resize that keeps it, are the emulator's to do.
+Most of a pane's resident size is the emulator's history ring: it is made
+whole, with a copy, when the emulator is made (16.4 MB resident for an 8 MiB
+ring) and four times over at the emulator's first resize (32.8 MB more; later
+resizes reuse those buffers), about six times the cap in all (warren#7). So
+the cap is 2 MiB a pane in this version, and the projection counts six times
+it. A ring that grows as history arrives, and a resize that keeps it, are the
+emulator's to do; a larger cap comes back with them. With the 2 MiB cap a
+server's resident size is about 4 MB at start on Linux, 11 MB with one 80x24
+session and its client, and 6 MB more for a second (`MEASURE server-rss`);
+it stays flat over 10,000 keystrokes beside a flooding pane and over 200
+splits and closes (pane slots are reused, never dropped).
 
 **On PAX**, a server takes three of the machine's 64 thread slots (its main
 thread and two the runtime starts for signals and children; measured under
@@ -179,8 +182,7 @@ two: do not launch helpers or threads for relaying, timers or reaping.
 | running | master WRITE with input pending | one bounded partial write; advance only its count; busy keeps suffix | running |
 | running | child exit | nonblocking reap; record status; keep master until its remaining output ends | running or exited |
 | running | EOF or terminal master error | retain all prior bytes; unregister/close master; record terminal end; do not read after EOF | exited |
-| running | close binding/command | unregister, close master; retain child in reap registry; start 3 s deadline | closing |
-| closing | child reaped or 3 s passed | remove visible pane; retain unreaped child in registry until eventual exit/server end | gone |
+| running | close binding/command | remove the pane from the layout; unregister, close master (its program hears the hangup); move the child to the reap registry; the slot is free at once | gone |
 | exited | remaining output consumed | remove pane; empty tab closes; empty session ends; keep unreaped child tracked | gone |
 | dead | key acknowledging failure | remove error pane; empty-session rules apply | gone |
 | gone | late child exit | reap through retained registry, no owner resurrection | gone |
@@ -191,7 +193,9 @@ whose slaves closed commonly reports `io` (EIO), on macOS `eof`; the next
 implementation's host rows must assert this explicitly. Fatal read errors
 also remove that master and surface an error, never busy-spin on READ.
 A vanished pane may still have a child to reap: layout ownership and process
-ownership end at different times. Closing the master is the only way the
+ownership end at different times. A closed pane leaves the screen at once, as
+tmux's does; its child stays in the reap registry, never signalled, until it
+ends or the server stops. Closing the master is the only way the
 server asks a program to end; the server never sends it a signal. In
 particular Ctrl-C is input byte 03 to the pty, not a signal API call. A child
 that ignores hangup can outlive pane removal; show/report this limitation,
@@ -349,3 +353,91 @@ any bytes but `/` and the control bytes 00-1f and 7f, and may not be empty.
 `new-session` refuses any other name with status 1, and an attaching HELLO
 that would create a session under one gets REFUSE invalid-request; an attach
 to such a name finds no session.
+
+## 8. Panes, tabs and the frame
+
+A session holds a layout (`src/layout`, LAYOUT.md): tabs, each a split tree
+whose leaves name panes by id. Pane ids are the server's, from 1, never reused
+while it runs; a pane's program reads its own as `WARREN_PANE`. The server's
+pane table holds every pane of every session in reusable slots: a slot keeps
+its emulator when its pane goes, and the next pane takes it after a full reset
+and a resize. A slot (and its emulator) that does not exist yet is made
+between turns, outside the turn's region, and the key that asked for it is
+taken again on the next turn, which follows at once; the client's later input
+waits behind it. Every layout operation runs inside the turn: the layout keeps
+nothing of the turn's region (tabs are added, removed and renamed in place,
+`src/layout_region_test.lu`).
+
+**Sizes.** The tab area is the session's size less the bar's two lines. After
+every layout operation and every change of the session's size, each pane whose
+rect is not empty, in every tab, is given its rect's size: the emulator first,
+then the terminal, so that the program's redraw after its window change lands
+in an emulator already at the new size. A pane hidden by a small area, or by
+another pane's zoom, keeps its last size and is resized when it shows again.
+A zoomed pane takes the whole area. A split's new pane starts at its rect, in
+the session's working directory, with the session's environment.
+
+**Operations**, behind the prefix (Ctrl-Space, then a key; the table is
+fixed in this version and becomes data with the modes):
+
+| key | operation |
+|---|---|
+| `\|` / `-` | split the focused pane side by side / one above the other; the new pane takes focus |
+| `h j k l`, arrows | focus left, down, up, right |
+| `o` | focus the next pane |
+| `H J K L` | move a border of the focused pane left, down, up, right (its own on that side, else the one on the other side), 2 columns or 1 row |
+| `z` | zoom the focused pane, or unzoom |
+| `=` | every split of the tab back to halves |
+| `x` | close the focused pane |
+| `c` | a new tab |
+| `n` / `p` / `1`-`9` | the next / previous tab, or the tab at that position |
+| `d` | detach |
+| Ctrl-Space | send Ctrl-Space (NUL) to the pane |
+
+A key that is not in the table is dropped. A refused split or new tab (too
+small, the pane limit, the memory budget, a program that did not start) leaves
+everything as it was and is named on that client's hint line for 2 s; a focus
+move with no neighbour does nothing.
+
+**Closing.** A pane closes on `x` or when its program's terminal ends; the
+last pane of the last tab ends the session (as one pane did before). Keys,
+pastes, INPUT, focus reports and mouse events go to the focused pane of the
+active tab; a mouse event outside it is dropped, one inside is made relative to
+its rect. When focus moves, a pane that asked for focus reports hears it lose
+or take focus, and the clients take the new pane's title. A bell from the
+active tab reaches the clients; titles come from the focused pane only.
+
+**The frame** is the session's size: the tab area, then line one of the bar
+(the session's name and the tabs, the active one inverse; tabs that do not fit
+leave out the far side of the active one, marked `<` or `>`), then the hint
+line (a message while one lasts; the key hints come with the modes). Each
+shown pane's grid is drawn in its rect. Border cells are `│` and `─`, with
+`├ ┤ ┬ ┴ ┼` where borders meet. The border cells within one cell of the
+focused pane's rect are drawn in colour 2; when exactly two panes show they
+share one border along its length, so the half beside the focused pane is
+marked instead (tmux 3.4 draws both rules the same way, measured by its
+`tmux-focus-ring` rows). A zoomed tab draws no border.
+
+**Damage.** A client's image is a delta against what it holds, over what may
+have changed: the rects of the shown panes whose grids changed since its last
+image, the bar's rows when they changed, and the whole frame after a layout
+change (a split, a close, focus, a tab, zoom, a size), which is still a delta
+unless the size changed. Output in a tab that is not shown composes nothing.
+Measured on Linux (`MEASURE` in the pane rows): a focus change between two
+panes side by side at 80x24 is a 600-byte image and among three panes 314
+bytes; a keystroke's image holds only the focused pane's cells; a split's new
+prompt is drawn 18 ms after the key; a keystroke in a split is drawn in 2.4 ms
+(p50) and 13.6 ms beside a flooding neighbour in the same tab.
+
+**Rows.** `src/pane_rows.lu` drives a real server through key events: split
+sizes, keys reaching the focused pane, the window change a pane's program hears
+after a split, a border move, zoom and a client resize (`--winch`), the hangup
+a closed pane's program hears and its reaping (`--hup`), a pane's own end,
+tabs, a resize reaching a tab that is not shown, zoom, the too-small, memory and
+pane-count refusals, the frame's borders and bar cell for cell, a keystroke's
+image held to the focused pane's rect, the bytes of a focus change, keystrokes
+in a split and beside a flooding neighbour, the time of a split, and a flat
+resident size over 200 splits and closes. Differences from tmux, by ruling:
+warren's split gives the first pane the smaller half (39 and 40 columns at 80,
+where tmux gives 40 and 39), and a pane under its minimum is hidden where tmux
+keeps 1-row panes.
