@@ -1,0 +1,79 @@
+//! member: true
+//! The outer terminal: its mode saved before raw, the bytes that enter and
+//! leave what the client turns on, and the restore the runtime makes on
+//! every exit it owns. A suspend gives the terminal back and takes it again
+//! on continue.
+use std.fs
+use std.term
+
+/// What the client turns on: the alternate screen always; bracketed
+/// paste, focus reports and SGR mouse when `features` has them (bits 0, 1
+/// and 2, as HELLO names them).
+pub fn enter_bytes(features: int) -> List[byte] {
+    var t = "\u{1b}[?1049h\u{1b}[H\u{1b}[2J"
+    if features & 1 != 0 { t = t + "\u{1b}[?2004h" }
+    if features & 2 != 0 { t = t + "\u{1b}[?1004h" }
+    if features & 4 != 0 { t = t + "\u{1b}[?1000h\u{1b}[?1002h\u{1b}[?1006h" }
+    t.bytes()
+}
+
+/// The reverse of `enter_bytes`, with the pen reset, the cursor shown and
+/// its shape back to the terminal's default.
+pub fn leave_bytes(features: int) -> List[byte] {
+    var t = "\u{1b}[0m"
+    if features & 4 != 0 { t = t + "\u{1b}[?1006l\u{1b}[?1002l\u{1b}[?1000l" }
+    if features & 2 != 0 { t = t + "\u{1b}[?1004l" }
+    if features & 1 != 0 { t = t + "\u{1b}[?2004l" }
+    t = t + "\u{1b}[?25h\u{1b}[0 q\u{1b}[?1049l"
+    t.bytes()
+}
+
+/// What taking the terminal can answer.
+pub error TtyErrors = {unsupported, invalid, io}
+
+/// The terminal as the client found it.
+pub struct Tty {
+    file: fs.File,
+    saved: term.Mode,
+    features: int,
+    raw: bool,
+}
+
+/// The client's raw mode: every byte as typed, both ways, and no signal
+/// keys (Ctrl-C, Ctrl-Z and Ctrl-\\ go to the pane as bytes).
+pub fn client_mode(saved: term.Mode) -> term.Mode {
+    let r = term.raw_bytes(saved)
+    term.Mode { canonical: r.canonical, echo: r.echo, signals: false, flow: r.flow, extended: r.extended,
+        raw_cr: r.raw_cr, raw_output: r.raw_output, strip8: r.strip8, min: r.min, time: r.time }
+}
+
+/// Save the mode, register its restore (with the leave bytes) for every
+/// exit the runtime owns, then go raw and enter. An error leaves the
+/// terminal as it was.
+pub fn take_terminal(file: fs.File, features: int) -> Tty ! TtyErrors {
+    let saved = term.mode(file)?
+    term.restore_at_exit(file, saved, leave_bytes(features))?
+    term.set_mode(file, client_mode(saved))?
+    var f = copy file
+    fs.write_chunk(mut f, enter_bytes(features)) else |_| {}
+    Tty { file: file, saved: saved, features: features, raw: true }
+}
+
+/// Give the terminal back now (before a suspend or a normal end): leave,
+/// then the saved mode.
+pub fn give_back(mut t: Tty) {
+    if !t.raw { return }
+    var f = copy t.file
+    fs.write_chunk(mut f, leave_bytes(t.features)) else |_| {}
+    term.set_mode(t.file, t.saved) else |_| {}
+    t.raw = false
+}
+
+/// Take it again after a continue.
+pub fn take_again(mut t: Tty) {
+    if t.raw { return }
+    term.set_mode(t.file, client_mode(t.saved)) else |_| {}
+    var f = copy t.file
+    fs.write_chunk(mut f, enter_bytes(t.features)) else |_| {}
+    t.raw = true
+}
