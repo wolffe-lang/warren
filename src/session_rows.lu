@@ -619,9 +619,8 @@ fn row_late_child(mut r: Rig) -> str {
     if !client.until_line(mut p, "$", 5000) { return "no prompt" }
     // The master ends while its program lives on: the pane goes, and the
     // program is still reaped when it exits.
-    let _i = client.input(p, "exec sh -c 'trap \"\" HUP; echo closing-$((1+1)); exec 0<&- 1>&- 2>&-; sleep 1'\r")
-    if !client.until_text(mut p, "closing-2", 5000) { return "the program did not start: " + client.screen_text(p) }
     let t0 = now_ms()
+    let _i = client.input(p, "exec sh -c 'trap \"\" HUP; echo closing-$((1+1)); exec 0<&- 1>&- 2>&-; sleep 1'\r")
     if !client.until_kind(mut p, 135, 5000) || p.end_code != 2 { return "BYE {p.end_code}, expected session-ended" }
     let t1 = now_ms()
     client.hang_up(mut p)
@@ -633,11 +632,11 @@ fn row_late_child(mut r: Rig) -> str {
     // Where the pane ends when its program closes the terminal, the server
     // waits for the program after the BYE; where the terminal stays open
     // until the program ends, the BYE itself waits. Either way the server
-    // must not end before the program does (a second after closing-2), and
-    // must reap it when it does.
-    print("MEASURE late-child closing-to-bye-ms={t1 - t0} bye-to-exit-ms={t2 - t1}")
+    // must not end before the program does (a second after the command),
+    // and must reap it when it does.
+    print("MEASURE late-child command-to-bye-ms={t1 - t0} bye-to-exit-ms={t2 - t1}")
     if t2 - t1 > 4500 { return "the server waited {t2 - t1} ms after the BYE: its late child was not reaped when it ended" }
-    if t2 - t0 < 700 { return "the server ended {t2 - t0} ms after closing-2, before its pane's program (which ignores hangup) did" }
+    if t2 - t0 < 900 { return "the server ended {t2 - t0} ms after the command, before its pane's program (which ignores hangup) did" }
     ""
 }
 
