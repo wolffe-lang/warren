@@ -20,7 +20,7 @@ use std.fs
 use std.process
 use std.time
 
-fn report(mut w: fs.File, a_pid: int) {
+fn report(take w: fs.File, a_pid: int) {
     var n = 0
     while (env.ppid() else 0) == a_pid && n < 400 {
         time.sleep(time.millis(5))
@@ -37,8 +37,9 @@ fn report(mut w: fs.File, a_pid: int) {
         tty = "opened"
         fs.close(take t) else |_| {}
     }
-    fs.write(mut w, "{ppid} {sid} {tty}\n") else |_| {}
-    fs.close(take w) else |_| {}
+    var out = w
+    fs.write(mut out, "{ppid} {sid} {tty}\n") else |_| {}
+    fs.close(take out) else |_| {}
     process.exit(0)
 }
 
@@ -59,7 +60,7 @@ fn main() -> !int {
             return 1
         }
         if process.is_child(b) {
-            report(mut w, my)
+            report(take copy w, my)
         }
         process.exit(0)
     }
