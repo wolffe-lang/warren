@@ -672,6 +672,11 @@ fn row_pane_proc(mut r: Rig) -> str {
     r.started = false
     let _st = process.wait_status(take ch) else 0 - 1
     if screen.contains("proc=absent") { return "no /proc on this host" }
+    // The helper's lines must have reached the client before any mask is
+    // judged; an empty screen is named as such, never read as a mask.
+    if !screen.contains("SigBlk:") || !screen.contains("unresettable=") {
+        return "the helper's output never reached the client (screen: '" + screen.trim() + "')"
+    }
     if !screen.contains("SigBlk:0000000000000000") { return "blocked signals inherited: " + screen }
     // Every signal the runtime can reset must be at its default; one it
     // refuses (the C library's own, glibc's 32 and 33) keeps what the server
