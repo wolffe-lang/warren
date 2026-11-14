@@ -103,11 +103,14 @@ fn main() -> !int {
     var held = fs.open_mode(lock_path, 3 + fs.NOFOLLOW)?
     fs.lock(mut held, fs.LOCK_EXCLUSIVE)?
     var second = fs.open_mode(lock_path, 3 + fs.NOFOLLOW)?
-    print("lock_second_open={lock_row(mut second)}")
+    let second_row = lock_row(mut second)
+    print("lock_second_open={second_row}")
     fs.close(take second)?
-    print("lock_from_child={from_child(lock_path)?}")
+    let child_row = from_child(lock_path)?
+    print("lock_from_child={child_row}")
     fs.unlock(mut held)?
-    print("lock_after_holder_exit={after_holder_exit(lock_path)?}")
+    let exit_row = after_holder_exit(lock_path)?
+    print("lock_after_holder_exit={exit_row}")
 
     let link_path = dir + "/link.lock"
     fs.symlink("start.lock", link_path)?

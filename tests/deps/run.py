@@ -16,6 +16,7 @@ Prints `PASS deps <row> <tier>` or `FAIL deps <row> <tier>: <why>` and a
 closing `DEPS rows=N failed=M`; exits 1 when any row is red.
 """
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -116,10 +117,19 @@ def checked(args, row, out):
         record = json.loads(p.stdout)
     except ValueError:
         return None, 'not json: %r %r' % (p.stdout[-300:], p.stderr[-300:])
+    if record.get('protocol') != 1 or record.get('impl') != 'wolfgang':
+        return None, 'not the checked machine: %r' % {k: record.get(k) for k in ('protocol', 'impl')}
     if record.get('phase_reached') != 'run' or record.get('verdict') != 'exit(0)':
         return None, 'checked verdict=%r phase=%r unsupported=%r' % (
             record.get('verdict'), record.get('phase_reached'), record.get('x-unsupported-at', record.get('unsupported')))
-    return record.get('stdout', ''), None
+    if record.get('diagnostics') or record.get('warnings'):
+        return None, 'checked observation has diagnostics or warnings'
+    text = record.get('stdout_inline')
+    if not isinstance(text, str):
+        return None, 'checked record has no inline stdout'
+    if hashlib.sha256(text.encode()).hexdigest() != record.get('stdout_sha256'):
+        return None, 'checked stdout digest differs from its record'
+    return text, None
 
 
 def lupin(args, row, out, want):
