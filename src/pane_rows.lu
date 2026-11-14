@@ -1,6 +1,7 @@
 //! member: false
 //! Pane rows: a scripted client drives a real server's panes and tabs over
-//! its socket, through key events (the prefix, Ctrl-Space, then a key).
+//! its socket, through key events (the prefix, Ctrl-Space, then a key; the
+//! modes behind it; the prompts and the key list).
 //! Each row starts its own server in its own runtime directory with a
 //! lifetime bound and ends it with kill-server; a row's pane programs are
 //! /bin/sh (or /bin/cat) and this program's own helper modes.
@@ -16,6 +17,8 @@
 //!                       at every window change, until its terminal hangs up
 //!   --hup FILE          appends `ready PID`, then `hangup PID` when its
 //!                       terminal hangs up, and exits
+//!   --read-bytes FILE N appends `ready`, reads N bytes from its terminal in
+//!                       raw mode, appends `bytes HEX...`, and exits
 //! No row sends a signal: a helper reports what reached it.
 use std.env
 use std.fs
@@ -42,6 +45,12 @@ const AREA: int = 22
 /// Wire colours as images carry them.
 const GREEN: int = 16777218
 const INVERSE: int = 64
+/// The bar's mode field: inverse and bold, nine columns at the right end.
+const FIELD: int = 65
+/// The normal (and prefix) mode's hint line at 80 columns, and its keys'
+/// columns (first, last), drawn inverse.
+const NORMAL_HINTS: str = " C-Space prefix  ? keys  |- split  hjkl focus  x close  c new tab  np tabs  +13"
+const PANE_HINTS: str = " |- split  hjkl focus  x close  z zoom  o next pane  = equalize  Esc back"
 
 fn now_ms() -> int {
     time.monotonic_ns() / 1000000
@@ -471,6 +480,7 @@ fn row_close_hangs_up(mut r: Rig) -> str {
     if !until_rect(mut p, "hup-waiting", 41, 1, 40, AREA, 5000) { return "the helper is not drawn:\n" + client.screen_text(p) }
     let t0 = now_ms()
     let _c = prefix(p, 120)
+    let _y = client.key(p, 0, 0, 121)
     if !until_file(f, "hangup {pid}", 5000) { return "the closed pane's program heard no hangup in 5 s: " + (fs.read_text(f) else "") }
     print("MEASURE close-hangup-ms={now_ms() - t0}")
     if has_proc() {
@@ -701,7 +711,8 @@ fn golden_three(img: proto.Image, focus: int, name: str) -> str {
         }
         row += 1
     }
-    // Line one: " NAME " and " 1 ", both inverse (the one tab is active).
+    // Line one: " NAME " and " 1 ", both inverse (the one tab is active),
+    // blanks, and the mode field " NORMAL  " at columns 72-80.
     let bar = " {name}  1 "
     var k = 0
     for b in bar.bytes() {
@@ -710,20 +721,43 @@ fn golden_three(img: proto.Image, focus: int, name: str) -> str {
         k += 1
     }
     c = k + 1
-    while c <= 80 {
+    while c <= 71 {
         let w = cell_is(img, c, 23, 32, 0, 0)
         if w.len > 0 { return "bar " + w }
         c += 1
     }
-    c = 1
-    while c <= 80 {
-        let w = cell_is(img, c, 24, 32, 0, 0)
-        if w.len > 0 { return "hint line " + w }
-        c += 1
+    k = 72
+    for b in " NORMAL  ".bytes() {
+        let w = cell_is(img, k, 23, b as int, FIELD, 0)
+        if w.len > 0 { return "mode field " + w }
+        k += 1
     }
+    let hw = hint_cells_are(img, 24, NORMAL_HINTS, [2, 8, 18, 18, 26, 27, 36, 39, 48, 48, 57, 57, 68, 69])
+    if hw.len > 0 { return "hint line " + hw }
     let at_col = if focus == 1 then 1 else 41
     let at_row = if focus == 1 then 1 else 12
     if img.cursor_col != at_col || img.cursor_row != at_row { return "cursor {img.cursor_col},{img.cursor_row}, expected {at_col},{at_row}" }
+    ""
+}
+
+/// "" when a row reads the text from column 1, blanks after it, with the
+/// cells of the (first, last) column pairs in `keys` inverse and the rest
+/// plain.
+fn hint_cells_are(img: proto.Image, row: int, text: str, keys: List[int]) -> str {
+    var col = 1
+    let bytes = text.bytes()
+    while col <= img.cols {
+        let base = if col <= bytes.len then bytes[col - 1] as int else 32
+        var flags = 0
+        var q = 0
+        while q + 1 < keys.len {
+            if col >= keys[q] && col <= keys[q + 1] { flags = INVERSE }
+            q += 2
+        }
+        let w = cell_is(img, col, row, base, flags, 0)
+        if w.len > 0 { return w }
+        col += 1
+    }
     ""
 }
 
@@ -823,7 +857,32 @@ fn row_damage_in_rect(mut r: Rig) -> str {
     ""
 }
 
-// The bytes of the image a focus change makes, two and three panes.
+// The wire bytes of the images up to the one that holds the golden.
+fn bytes_until_golden_two(mut p: client.Peer, left: bool, ms: int) -> int {
+    let until = now_ms() + ms
+    var total = 0
+    while now_ms() < until {
+        let body = next_image(mut p, until - now_ms())
+        if body.len == 0 { return 0 - 1 }
+        total += 6 + body.len
+        if golden_two(p.image, left).len == 0 { return total }
+    }
+    0 - 1
+}
+
+fn bytes_until_golden_three(mut p: client.Peer, focus: int, name: str, ms: int) -> int {
+    let until = now_ms() + ms
+    var total = 0
+    while now_ms() < until {
+        let body = next_image(mut p, until - now_ms())
+        if body.len == 0 { return 0 - 1 }
+        total += 6 + body.len
+        if golden_three(p.image, focus, name).len == 0 { return total }
+    }
+    0 - 1
+}
+
+// The bytes of the images a focus change makes, two and three panes.
 fn row_focus_bytes(mut r: Rig) -> str {
     let why = start_server(mut r, "/bin/cat")
     if why.len > 0 { return why }
@@ -835,9 +894,8 @@ fn row_focus_bytes(mut r: Rig) -> str {
     drain(mut p, 300)
     p.auto_ack = false
     let _h = prefix(p, 104)
-    let two = next_image(mut p, 3000)
-    if two.len == 0 { return "no image for the focus change" }
-    let two_bytes = 6 + two.len
+    let two_bytes = bytes_until_golden_two(mut p, true, 3000)
+    if two_bytes < 0 { return "no image completed the focus change" }
     p.auto_ack = true
     let _l = prefix(p, 108)
     let _d = prefix(p, 45)
@@ -846,16 +904,16 @@ fn row_focus_bytes(mut r: Rig) -> str {
     drain(mut p, 300)
     p.auto_ack = false
     let _b = prefix(p, 104)
-    let three = next_image(mut p, 3000)
-    if three.len == 0 { return "no image for the second focus change" }
-    let three_bytes = 6 + three.len
+    let three_bytes = bytes_until_golden_three(mut p, 1, "default", 3000)
+    if three_bytes < 0 { return "no image completed the second focus change" }
     p.auto_ack = true
     print("MEASURE focus-change 80x24 two-panes-wire-bytes={two_bytes} three-panes-wire-bytes={three_bytes}")
     client.hang_up(mut p)
     let st = stop_server(mut r)
     if st != 0 { return "server exit {st}" }
-    if two_bytes > 750 { return "a focus change between two panes took {two_bytes} bytes (predicted 600, bound 750)" }
-    if three_bytes > 425 { return "a focus change among three panes took {three_bytes} bytes (predicted 314, bound 425)" }
+    // The prefix's own image (its mode field) may come first: 94 bytes.
+    if two_bytes > 800 { return "a focus change between two panes took {two_bytes} bytes (predicted 600, or 94 + 666, bound 800)" }
+    if three_bytes > 500 { return "a focus change among three panes took {three_bytes} bytes (predicted 314, or 94 + 380, bound 500)" }
     ""
 }
 
@@ -956,6 +1014,7 @@ fn row_split_close_cycles(mut r: Rig) -> str {
         let a = until_golden_two(mut p, false, 3000)
         if a.len > 0 { return "cycle {n}: no split: " + a }
         let _x = prefix(p, 120)
+        let _y = client.key(p, 0, 0, 121)
         let until = now_ms() + 3000
         while border_cells(p.image) != 0 && now_ms() < until { let _k = client.step(mut p, 100) }
         if border_cells(p.image) != 0 { return "cycle {n}: the split did not close" }
@@ -974,6 +1033,493 @@ fn row_split_close_cycles(mut r: Rig) -> str {
     if after - before > 1024 { return "server RSS grew {after - before} kB over 200 split/close cycles" }
     if st != 0 { return "server exit {st}" }
     ""
+}
+
+// ---------------- modes, hints, prompts, the key list ----------------
+
+fn ctrl_space(p: client.Peer) -> bool {
+    client.key(p, 4, 0, 32)
+}
+
+fn esc(p: client.Peer) -> bool {
+    client.key(p, 0, 1, 14)
+}
+
+fn enter(p: client.Peer) -> bool {
+    client.key(p, 0, 1, 13)
+}
+
+// Each byte of an ASCII text as a KEY.
+fn type_keys(p: client.Peer, text: str) -> bool {
+    for b in text.bytes() {
+        if !client.key(p, 0, 0, b as int) { return false }
+    }
+    true
+}
+
+/// The bar's mode field, trimmed.
+fn mode_of(img: proto.Image) -> str {
+    if !img.valid || img.cols < 9 { return "" }
+    cells(img, img.rows - 1, img.cols - 7, 8)
+}
+
+fn until_mode(mut p: client.Peer, name: str, ms: int) -> bool {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        if mode_of(p.image) == name { return true }
+        let k = client.step(mut p, until - now_ms())
+        if k < 0 { return false }
+    }
+    mode_of(p.image) == name
+}
+
+/// The hint line (the last row), trailing blanks trimmed.
+fn hint_of(img: proto.Image) -> str {
+    cells(img, img.rows, 1, img.cols)
+}
+
+fn until_hint(mut p: client.Peer, text: str, ms: int) -> bool {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        if hint_of(p.image) == text { return true }
+        let k = client.step(mut p, until - now_ms())
+        if k < 0 { return false }
+    }
+    hint_of(p.image) == text
+}
+
+fn until_borders(mut p: client.Peer, n: int, ms: int) -> bool {
+    let until = now_ms() + ms
+    while border_cells(p.image) != n && now_ms() < until {
+        let k = client.step(mut p, 100)
+        if k < 0 { return false }
+    }
+    border_cells(p.image) == n
+}
+
+/// The text of line one's inverse cells after the session's name: the
+/// active tab's label, trimmed.
+fn active_label(img: proto.Image, name: str) -> str {
+    if !img.valid { return "" }
+    let row = img.rows - 1
+    var out = List[byte]()
+    var c = name.len + 3
+    while c <= img.cols - 9 {
+        let i = (row - 1) * img.cols + c - 1
+        if img.flags[i] == INVERSE { push_utf8(mut out, img.base[i]) }
+        c += 1
+    }
+    (str_from_utf8(out) else "").trim()
+}
+
+fn until_active(mut p: client.Peer, name: str, label: str, ms: int) -> bool {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        if active_label(p.image, name) == label { return true }
+        let k = client.step(mut p, until - now_ms())
+        if k < 0 { return false }
+    }
+    active_label(p.image, name) == label
+}
+
+fn finish(mut r: Rig, mut p: client.Peer) -> str {
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+// The mode field at the right end of line one: inverse and bold, its
+// place fixed; it follows the prefix, every mode key and every way out.
+// Measures the wire bytes of the prefix's image (the field alone) and of
+// pane mode's (the field and the hint line).
+fn row_mode_field(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/cat")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "f", 1) else |e| { return "dial-{e}" }
+    if !until_mode(mut p, "NORMAL", 5000) { return "no NORMAL field: '" + cells(p.image, 23, 1, 80) + "'" }
+    var k = 72
+    for b in " NORMAL  ".bytes() {
+        let w = cell_is(p.image, k, 23, b as int, FIELD, 0)
+        if w.len > 0 { return "the field: " + w }
+        k += 1
+    }
+    drain(mut p, 300)
+    p.auto_ack = false
+    let _a = ctrl_space(p)
+    let one = next_image(mut p, 3000)
+    if one.len == 0 || mode_of(p.image) != "PREFIX" { return "the prefix's image: '" + mode_of(p.image) + "'" }
+    let _w = client.key(p, 0, 0, 119)
+    let two = next_image(mut p, 3000)
+    if two.len == 0 || mode_of(p.image) != "PANE" { return "pane mode's image: '" + mode_of(p.image) + "'" }
+    p.auto_ack = true
+    print("MEASURE mode-change 80x24 prefix-wire-bytes={6 + one.len} pane-mode-wire-bytes={6 + two.len}")
+    if 6 + one.len > 120 { return "the prefix's image took {6 + one.len} bytes (predicted 94, bound 120)" }
+    if 6 + two.len > 1300 { return "pane mode's image took {6 + two.len} bytes (predicted about 1 KB, bound 1300)" }
+    let steps = [
+        "esc", "NORMAL", "prefix", "PREFIX", "t", "TAB", "enter", "NORMAL", "prefix", "PREFIX", "r", "RESIZE",
+        "prefix", "PREFIX", "s", "SESSION", "esc", "NORMAL", "prefix", "PREFIX", "q", "NORMAL", "prefix", "PREFIX",
+        "g", "LOCKED", "esc", "LOCKED", "prefix", "LOCKED", "C-g", "NORMAL"]
+    var i = 0
+    while i + 1 < steps.len {
+        let key = steps[i]
+        if key == "esc" { let _e = esc(p) }
+        else if key == "enter" { let _n = enter(p) }
+        else if key == "prefix" { let _c = ctrl_space(p) }
+        else if key == "C-g" { let _g = client.key(p, 4, 0, 103) }
+        else { let _t = type_keys(p, key) }
+        if !until_mode(mut p, steps[i + 1], 3000) { return "after {key}: '" + mode_of(p.image) + "', expected " + steps[i + 1] }
+        if cells(p.image, 23, 72, 1) != "" || p.image.flags[22 * 80 + 71] != FIELD { return "the field moved after {key}" }
+        i += 2
+    }
+    finish(mut r, mut p)
+}
+
+// The hint line is the mode's rows of the key table: the same line for
+// normal and prefix mode, pane mode's own, locked mode's one key, and the
+// line at 40 columns with the rest counted.
+fn row_hint_line(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/cat")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !until_hint(mut p, NORMAL_HINTS, 5000) { return "normal: '" + hint_of(p.image) + "'" }
+    let w = hint_cells_are(p.image, 24, NORMAL_HINTS, [2, 8, 18, 18, 26, 27, 36, 39, 48, 48, 57, 57, 68, 69])
+    if w.len > 0 { return "normal's cells: " + w }
+    let _a = ctrl_space(p)
+    if !until_mode(mut p, "PREFIX", 3000) { return "no prefix mode" }
+    if hint_of(p.image) != NORMAL_HINTS { return "prefix: '" + hint_of(p.image) + "'" }
+    let _w = client.key(p, 0, 0, 119)
+    if !until_hint(mut p, PANE_HINTS, 3000) { return "pane: '" + hint_of(p.image) + "'" }
+    let _e = esc(p)
+    if !until_hint(mut p, NORMAL_HINTS, 3000) { return "back to normal: '" + hint_of(p.image) + "'" }
+    let _g = prefix(p, 103)
+    if !until_hint(mut p, " C-g unlock", 3000) { return "locked: '" + hint_of(p.image) + "'" }
+    let _u = client.key(p, 4, 0, 103)
+    if !until_hint(mut p, NORMAL_HINTS, 3000) { return "unlocked: '" + hint_of(p.image) + "'" }
+    let _z = client.resize(p, 40, 24)
+    if !until_hint(mut p, " C-Space prefix  ? keys  |- split  +17", 3000) { return "at 40 columns: '" + hint_of(p.image) + "'" }
+    finish(mut r, mut p)
+}
+
+// The prefix twice: the pane reads it (NUL), and the mode is normal.
+fn row_prefix_twice(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let f = out_file(r, "bytes.txt")
+    fs.remove(f) else |_| {}
+    let _x = client.input(p, "{self_path()} --read-bytes {f} 1\r")
+    if !until_file(f, "ready", 5000) { return "the helper did not start:\n" + client.screen_text(p) }
+    let _a = ctrl_space(p)
+    let _b = ctrl_space(p)
+    if !until_file(f, "bytes 00", 5000) { return "the pane did not read NUL: " + (fs.read_text(f) else "") }
+    if !until_mode(mut p, "NORMAL", 3000) { return "not back to normal: " + mode_of(p.image) }
+    finish(mut r, mut p)
+}
+
+// Locked: every key reaches the pane, the prefix included; only C-g is
+// taken, and leaves.
+fn row_locked(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let f = out_file(r, "bytes.txt")
+    fs.remove(f) else |_| {}
+    let _x = client.input(p, "{self_path()} --read-bytes {f} 4\r")
+    if !until_file(f, "ready", 5000) { return "the helper did not start:\n" + client.screen_text(p) }
+    let _g = prefix(p, 103)
+    if !until_mode(mut p, "LOCKED", 3000) { return "not locked: " + mode_of(p.image) }
+    let _a = ctrl_space(p)
+    let _b = client.key(p, 0, 0, 124)
+    let _c = client.key(p, 0, 0, 120)
+    let _d = esc(p)
+    if !until_file(f, "bytes 00 7c 78 1b", 5000) { return "the pane did not read every key: " + (fs.read_text(f) else "") }
+    if border_cells(p.image) != 0 { return "a locked | split the pane" }
+    if mode_of(p.image) != "LOCKED" { return "left locked mode: " + mode_of(p.image) }
+    let _u = client.key(p, 4, 0, 103)
+    if !until_mode(mut p, "NORMAL", 3000) { return "C-g did not unlock: " + mode_of(p.image) }
+    let _s = prefix(p, 124)
+    if !until_borders(mut p, AREA, 3000) { return "the prefix table after unlocking: {border_cells(p.image)} border cells" }
+    finish(mut r, mut p)
+}
+
+// Pane mode is sticky: splits, focus, a confirm answered no, zoom; Esc
+// leaves, and keys reach the focused pane again.
+fn row_pane_mode(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let _w = prefix(p, 119)
+    if !until_mode(mut p, "PANE", 3000) { return "no pane mode" }
+    let _s = client.key(p, 0, 0, 124)
+    if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "| in pane mode did not split:\n" + client.screen_text(p) }
+    let _d = client.key(p, 0, 0, 45)
+    if !until_rect_line(mut p, "$", 41, 12, 40, 11, 5000) { return "- in pane mode did not split:\n" + client.screen_text(p) }
+    let _h = client.key(p, 0, 0, 104)
+    let until = now_ms() + 3000
+    while p.image.cursor_col > 39 && now_ms() < until { let _k = client.step(mut p, 100) }
+    if p.image.cursor_col > 39 { return "h in pane mode did not focus left: cursor {p.image.cursor_col},{p.image.cursor_row}" }
+    if mode_of(p.image) != "PANE" { return "pane mode was left: " + mode_of(p.image) }
+    let borders = border_cells(p.image)
+    let _x = client.key(p, 0, 0, 120)
+    if !until_mode(mut p, "CONFIRM", 3000) { return "x did not ask: " + mode_of(p.image) }
+    if !hint_of(p.image).contains("close this pane?") { return "no question: '" + hint_of(p.image) + "'" }
+    let _n = client.key(p, 0, 0, 110)
+    if !until_mode(mut p, "PANE", 3000) { return "n did not go back to pane mode: " + mode_of(p.image) }
+    if border_cells(p.image) != borders { return "n closed a pane" }
+    let _z = client.key(p, 0, 0, 122)
+    if !until_borders(mut p, 0, 3000) { return "z in pane mode did not zoom" }
+    let _u = client.key(p, 0, 0, 122)
+    if !until_borders(mut p, borders, 3000) { return "z again did not unzoom" }
+    let _e = esc(p)
+    if !until_mode(mut p, "NORMAL", 3000) { return "Esc did not leave: " + mode_of(p.image) }
+    let _t = client.input(p, "echo P-$((1+1))\r")
+    if !until_rect(mut p, "P-2", 1, 1, 39, AREA, 5000) { return "keys after pane mode did not reach the left pane:\n" + client.screen_text(p) }
+    finish(mut r, mut p)
+}
+
+// Tab mode is sticky: new tabs, previous and next, a number, a rename
+// typed at its prompt (back to tab mode), a close confirmed with y.
+fn row_tab_mode(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "t") else |e| { return "dial-{e}" }
+    let _t = prefix(p, 116)
+    if !until_mode(mut p, "TAB", 3000) { return "no tab mode" }
+    let _c = client.key(p, 0, 0, 99)
+    if !until_active(mut p, "t", "2", 5000) { return "c: active '" + active_label(p.image, "t") + "'" }
+    let _d = client.key(p, 0, 0, 99)
+    if !until_active(mut p, "t", "3", 5000) { return "c again: active '" + active_label(p.image, "t") + "'" }
+    let _h = client.key(p, 0, 0, 104)
+    if !until_active(mut p, "t", "2", 3000) { return "h: active '" + active_label(p.image, "t") + "'" }
+    let _l = client.key(p, 0, 0, 108)
+    if !until_active(mut p, "t", "3", 3000) { return "l: active '" + active_label(p.image, "t") + "'" }
+    let _one = client.key(p, 0, 0, 49)
+    if !until_active(mut p, "t", "1", 3000) { return "1: active '" + active_label(p.image, "t") + "'" }
+    let _r = client.key(p, 0, 0, 114)
+    if !until_mode(mut p, "RENAME", 3000) { return "r did not prompt: " + mode_of(p.image) }
+    let _w = type_keys(p, "work")
+    let _n = enter(p)
+    if !until_active(mut p, "t", "1:work", 3000) { return "the rename: active '" + active_label(p.image, "t") + "'" }
+    if mode_of(p.image) != "TAB" { return "the rename did not go back to tab mode: " + mode_of(p.image) }
+    let _x = client.key(p, 0, 0, 120)
+    if !until_mode(mut p, "CONFIRM", 3000) { return "x did not ask" }
+    if !hint_of(p.image).contains("close this tab and its panes?") { return "no question: '" + hint_of(p.image) + "'" }
+    let _y = client.key(p, 0, 0, 121)
+    if !until_rect(mut p, "1  2", 1, 23, 70, 1, 3000) || rect_has(p.image, "work", 1, 23, 70, 1) || rect_has(p.image, "3", 4, 23, 67, 1) {
+        return "y did not close the tab: '" + cells(p.image, 23, 1, 80) + "'"
+    }
+    if mode_of(p.image) != "TAB" { return "the close did not go back to tab mode: " + mode_of(p.image) }
+    let _e = esc(p)
+    if !until_mode(mut p, "NORMAL", 3000) { return "Esc did not leave" }
+    finish(mut r, mut p)
+}
+
+// Resize mode: each l moves the border two columns, h back.
+fn row_resize_mode(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let f = out_file(r, "winch.txt")
+    fs.remove(f) else |_| {}
+    let _x = client.input(p, "exec {self_path()} --winch {f} w\r")
+    if !until_file(f, "w start 22 80", 5000) { return "the helper did not start:\n" + client.screen_text(p) }
+    var want = List[str]()
+    (mut want).push("w start 22 80")
+    let _s = prefix(p, 124)
+    (mut want).push("w winch 22 39")
+    if !until_in_order(f, want, 5000) { return "after the split: " + (fs.read_text(f) else "") }
+    let _h = prefix(p, 104)
+    let _r = prefix(p, 114)
+    if !until_mode(mut p, "RESIZE", 3000) { return "no resize mode" }
+    for cols in [41, 43, 45] {
+        let _l = client.key(p, 0, 0, 108)
+        (mut want).push("w winch 22 {cols}")
+        if !until_in_order(f, want, 5000) { return "after l: " + (fs.read_text(f) else "") }
+    }
+    let _b = client.key(p, 0, 0, 104)
+    (mut want).push("w winch 22 43")
+    if !until_in_order(f, want, 5000) { return "after h: " + (fs.read_text(f) else "") }
+    if mode_of(p.image) != "RESIZE" { return "resize mode was left: " + mode_of(p.image) }
+    let _e = esc(p)
+    if !until_mode(mut p, "NORMAL", 3000) { return "Esc did not leave" }
+    finish(mut r, mut p)
+}
+
+// Session mode: d detaches this client.
+fn row_session_mode(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let _s = prefix(p, 115)
+    if !until_mode(mut p, "SESSION", 3000) { return "no session mode" }
+    if !until_hint(mut p, " d detach  Esc back", 3000) { return "session hints: '" + hint_of(p.image) + "'" }
+    let _d = client.key(p, 0, 0, 100)
+    if !client.until_kind(mut p, 135, 5000) || p.end_code != 1 { return "d: BYE {p.end_code}, expected detached" }
+    finish(mut r, mut p)
+}
+
+// A close asks first: Esc and any other key keep the pane; y closes it.
+fn row_confirm_close(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let _s = prefix(p, 124)
+    if !until_borders(mut p, AREA, 5000) { return "no split" }
+    let _x = prefix(p, 120)
+    if !until_hint(mut p, " close this pane? y yes  n no", 3000) { return "the question: '" + hint_of(p.image) + "'" }
+    let _e = esc(p)
+    if !until_mode(mut p, "NORMAL", 3000) { return "Esc did not cancel: " + mode_of(p.image) }
+    let _y = prefix(p, 120)
+    if !until_mode(mut p, "CONFIRM", 3000) { return "x did not ask again" }
+    let _q = client.key(p, 0, 0, 113)
+    if !until_mode(mut p, "NORMAL", 3000) { return "q did not cancel: " + mode_of(p.image) }
+    time.sleep(time.millis(200))
+    let _k = client.step(mut p, 100)
+    if border_cells(p.image) != AREA { return "a cancelled close closed the pane" }
+    let _z = prefix(p, 120)
+    let _a = client.key(p, 0, 0, 121)
+    if !until_borders(mut p, 0, 3000) { return "y did not close the pane" }
+    finish(mut r, mut p)
+}
+
+// The rename prompt: typed, erased, cleared, cancelled; it starts with the
+// tab's name, and its cursor follows the text.
+fn row_rename_tab(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "r") else |e| { return "dial-{e}" }
+    let _c = prefix(p, 44)
+    if !until_hint(mut p, " rename tab:", 3000) { return "no prompt: '" + hint_of(p.image) + "'" }
+    let _t = type_keys(p, "logx")
+    let _b = client.key(p, 0, 1, 11)
+    let _s = type_keys(p, "s")
+    if !until_hint(mut p, " rename tab: logs", 3000) { return "typed: '" + hint_of(p.image) + "'" }
+    if p.image.cursor_row != 24 || p.image.cursor_col != 18 { return "the cursor at {p.image.cursor_col},{p.image.cursor_row}, expected 18,24" }
+    let _n = enter(p)
+    if !until_active(mut p, "r", "1:logs", 3000) { return "renamed: '" + cells(p.image, 23, 1, 80) + "'" }
+    if mode_of(p.image) != "NORMAL" { return "not back to normal: " + mode_of(p.image) }
+    let _again = prefix(p, 44)
+    if !until_hint(mut p, " rename tab: logs", 3000) { return "the prompt did not start with the name: '" + hint_of(p.image) + "'" }
+    let _u = client.key(p, 4, 0, 117)
+    if !until_hint(mut p, " rename tab:", 3000) { return "C-u: '" + hint_of(p.image) + "'" }
+    let _w = type_keys(p, "w")
+    let _e = esc(p)
+    if !until_mode(mut p, "NORMAL", 3000) { return "Esc did not cancel" }
+    if active_label(p.image, "r") != "1:logs" { return "a cancelled rename renamed: '" + cells(p.image, 23, 1, 80) + "'" }
+    finish(mut r, mut p)
+}
+
+// The command line takes the key table's action names and arguments; an
+// unknown verb is answered on the hint line.
+fn row_command_mode(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "c") else |e| { return "dial-{e}" }
+    let _a = prefix(p, 58)
+    if !until_hint(mut p, " :", 3000) { return "no prompt: '" + hint_of(p.image) + "'" }
+    let _t = type_keys(p, "split-down")
+    if !until_hint(mut p, " :split-down", 3000) { return "typed: '" + hint_of(p.image) + "'" }
+    let _n = enter(p)
+    if !until_rect_line(mut p, "$", 1, 12, 80, 11, 5000) { return "split-down did not split:\n" + client.screen_text(p) }
+    if p.image.base[10 * 80] != 9472 { return "the border is not on row 11" }
+    let _b = prefix(p, 58)
+    let _u = type_keys(p, "resize up 3")
+    let _m = enter(p)
+    let until = now_ms() + 3000
+    while p.image.base[7 * 80] != 9472 && now_ms() < until { let _k = client.step(mut p, 100) }
+    if p.image.base[7 * 80] != 9472 { return "resize up 3 did not move the border to row 8:\n" + client.screen_text(p) }
+    let _c = prefix(p, 58)
+    let _v = type_keys(p, "bogus")
+    let _o = enter(p)
+    if !until_hint(mut p, "unknown command: bogus", 3000) { return "no answer: '" + hint_of(p.image) + "'" }
+    let _d = prefix(p, 58)
+    let _w = type_keys(p, "rename-tab work notes")
+    let _e = enter(p)
+    if !until_active(mut p, "c", "1:work notes", 3000) { return "rename-tab: '" + cells(p.image, 23, 1, 80) + "'" }
+    let _f = prefix(p, 58)
+    let _l = type_keys(p, "lock")
+    let _g = enter(p)
+    if !until_mode(mut p, "LOCKED", 3000) { return "lock: " + mode_of(p.image) }
+    let _h = client.key(p, 4, 0, 103)
+    if !until_mode(mut p, "NORMAL", 3000) { return "C-g after lock" }
+    finish(mut r, mut p)
+}
+
+// Modes are a client's own: one client in pane mode, the other's keys
+// still reach the pane and its bar says NORMAL; the layout is shared.
+fn row_modes_per_client(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = session(r, 80, 24, "m") else |e| { return "dial-{e}" }
+    var b = attach(r, 80, 24, "m", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut b, "$", 5000) { return "the second client has no image" }
+    let _w = prefix(a, 119)
+    if !until_mode(mut a, "PANE", 3000) { return "no pane mode" }
+    drain(mut b, 300)
+    if mode_of(b.image) != "NORMAL" { return "the other client's mode: " + mode_of(b.image) }
+    let _t = client.input(b, "echo B-$((1+1))\r")
+    if !until_text(mut b, "B-2", 5000) { return "the other client's keys did not reach the pane" }
+    let _s = client.key(a, 0, 0, 124)
+    if !until_borders(mut b, AREA, 5000) { return "the split did not reach the other client" }
+    if mode_of(a.image) != "PANE" { return "the split left pane mode" }
+    client.hang_up(mut b)
+    finish(mut r, mut a)
+}
+
+// INPUT and PASTE are dropped outside normal and locked mode.
+fn row_input_in_modes(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let _w = prefix(p, 119)
+    if !until_mode(mut p, "PANE", 3000) { return "no pane mode" }
+    let _i = client.input(p, "echo IN-$((1+1))\r")
+    var paste = List[byte]()
+    let text = "echo PA-$((2+2))\r"
+    proto.put(mut paste, text.len, 4)
+    for c in text.bytes() { (mut paste).push(c) }
+    let _p = client.send(p, 4, paste)
+    let _e = esc(p)
+    if !until_mode(mut p, "NORMAL", 3000) { return "Esc did not leave" }
+    let _o = client.input(p, "echo OK-$((3+3))\r")
+    if !until_text(mut p, "OK-6", 5000) { return "input after the mode did not arrive" }
+    let screen = client.screen_text(p)
+    if screen.contains("IN-") || screen.contains("PA-") { return "input in pane mode reached the pane:\n" + screen }
+    finish(mut r, mut p)
+}
+
+// The key list is drawn for one client only, over the tab area, scrolls
+// with j and k, and closes back to the exact frame it covered.
+fn row_help_overlay(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/cat")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "h", 1) else |e| { return "dial-{e}" }
+    var b = attach(r, 80, 24, "h", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut a, 131, 5000) || !client.until_kind(mut b, 131, 5000) { return "no images" }
+    let _s = prefix(a, 124)
+    if !until_borders(mut a, AREA, 3000) { return "no split" }
+    drain(mut a, 300)
+    drain(mut b, 300)
+    let before = copy a.image
+    let _q = prefix(a, 63)
+    if !until_mode(mut a, "HELP", 3000) { return "no help mode" }
+    let first = "  NORMAL   C-Space    prefix mode"
+    if !until_rect_line(mut a, first, 1, 1, 80, 1, 3000) { return "row 1: '" + cells(a.image, 1, 1, 80) + "'" }
+    if !until_hint(mut a, " jk scroll  Esc close", 3000) { return "help hints: '" + hint_of(a.image) + "'" }
+    drain(mut b, 300)
+    if rect_has(b.image, "C-Space", 1, 1, 80, AREA) { return "the key list reached the other client" }
+    let _j = client.key(a, 0, 0, 106)
+    if !until_rect_line(mut a, "  PREFIX   ?          the key list", 1, 1, 80, 1, 3000) { return "j: '" + cells(a.image, 1, 1, 80) + "'" }
+    let _k = client.key(a, 0, 0, 107)
+    if !until_rect_line(mut a, first, 1, 1, 80, 1, 3000) { return "k: '" + cells(a.image, 1, 1, 80) + "'" }
+    let _e = esc(a)
+    if !until_mode(mut a, "NORMAL", 3000) { return "Esc did not close" }
+    drain(mut a, 300)
+    let d = proto.differing(before, a.image)
+    if d != 0 { return "{d} cells differ from the frame before the key list" }
+    client.hang_up(mut b)
+    finish(mut r, mut a)
 }
 
 fn run_row(warren: str, name: str) -> str {
@@ -996,13 +1542,27 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "keys-in-split" { why = row_keys_in_split(mut r) }
     else if name == "split-latency" { why = row_split_latency(mut r) }
     else if name == "split-close-cycles" { why = row_split_close_cycles(mut r) }
+    else if name == "mode-field" { why = row_mode_field(mut r) }
+    else if name == "hint-line" { why = row_hint_line(mut r) }
+    else if name == "prefix-twice" { why = row_prefix_twice(mut r) }
+    else if name == "locked" { why = row_locked(mut r) }
+    else if name == "pane-mode" { why = row_pane_mode(mut r) }
+    else if name == "tab-mode" { why = row_tab_mode(mut r) }
+    else if name == "resize-mode" { why = row_resize_mode(mut r) }
+    else if name == "session-mode" { why = row_session_mode(mut r) }
+    else if name == "confirm-close" { why = row_confirm_close(mut r) }
+    else if name == "rename-tab" { why = row_rename_tab(mut r) }
+    else if name == "command-mode" { why = row_command_mode(mut r) }
+    else if name == "modes-per-client" { why = row_modes_per_client(mut r) }
+    else if name == "input-in-modes" { why = row_input_in_modes(mut r) }
+    else if name == "help-overlay" { why = row_help_overlay(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes keys-in-split split-latency".split(" ") {
+    for n in "split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay".split(" ") {
         (mut x).push(n)
     }
     x
@@ -1058,8 +1618,38 @@ fn hup_helper(path: str) -> int {
     0
 }
 
+// Raw mode on its terminal, N bytes read, their hex appended; the mode put
+// back.
+fn read_bytes_helper(path: str, count: int) -> int {
+    let was = term.mode(fs.stdin()) else |e| {
+        print("mode-{e}")
+        return 1
+    }
+    term.set_mode(fs.stdin(), term.raw_bytes(was)) else |e| {
+        print("raw-{e}")
+        return 1
+    }
+    fs.append_text(path, "ready\n") else |_| {}
+    var hex = ""
+    var n = 0
+    var tty = fs.stdin()
+    while n < count {
+        let got = fs.read_chunk(mut tty, count - n) else { break }
+        for b in got {
+            let v = b as int
+            let digits = "0123456789abcdef"
+            hex = hex + " " + digits[v / 16..v / 16 + 1] + digits[v % 16..v % 16 + 1]
+            n += 1
+        }
+    }
+    term.set_mode(fs.stdin(), was) else |_| {}
+    fs.append_text(path, "bytes{hex}\n") else |_| {}
+    0
+}
+
 fn main() -> int {
     let args = env.args()
+    if args.len == 3 && args[0] == "--read-bytes" { return read_bytes_helper(args[1], args[2].to_int() else 1) }
     if args.len == 2 && args[0] == "--print-size" { return print_size(args[1]) }
     if args.len == 3 && args[0] == "--winch" { return winch_helper(args[1], args[2]) }
     if args.len == 2 && args[0] == "--hup" { return hup_helper(args[1]) }
