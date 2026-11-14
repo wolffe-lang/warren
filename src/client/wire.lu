@@ -233,6 +233,23 @@ pub fn until_text(mut p: Peer, text: str, deadline_ms: int) -> bool {
     false
 }
 
+/// Step until some row of the image reads exactly text, or the deadline.
+pub fn until_line(mut p: Peer, text: str, deadline_ms: int) -> bool {
+    let until = time.monotonic_ns() + deadline_ms * 1000000
+    while time.monotonic_ns() < until {
+        var row = 1
+        while row <= p.image.rows {
+            if proto.row_text(p.image, row) == text { return true }
+            row = row + 1
+        }
+        let left = (until - time.monotonic_ns()) / 1000000
+        if left <= 0 { return false }
+        let k = step(mut p, left)
+        if k < 0 { return false }
+    }
+    false
+}
+
 /// Step until a message of this kind arrives (applying the rest).
 pub fn until_kind(mut p: Peer, kind: int, deadline_ms: int) -> bool {
     let until = time.monotonic_ns() + deadline_ms * 1000000
