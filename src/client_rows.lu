@@ -510,6 +510,34 @@ fn self_path() -> str {
     here + "/" + a0
 }
 
+// The server serving the row's runtime directory (Linux and PAX, from
+// /proc), or 0 where it cannot be read.
+fn server_pid(dir: str) -> int {
+    let names = fs.read_dir("/proc") else { return 0 }
+    let marker = "WARREN_RUNTIME_DIR=" + dir + "\u{0}"
+    for n in names {
+        let pid = n.to_int() else 0
+        if pid <= 0 { continue }
+        let cmd = fs.read_text("/proc/{pid}/cmdline") else { continue }
+        if !cmd.ends_with("\u{0}server\u{0}") && !cmd.ends_with("\u{0}server") { continue }
+        let raw = fs.read_bytes("/proc/{pid}/environ") else { continue }
+        let text = str_from_utf8(raw) else ""
+        if text.contains(marker) { return pid }
+    }
+    0
+}
+
+fn rss_kb(pid: int) -> int {
+    let text = fs.read_text("/proc/{pid}/status") else { return 0 }
+    for line in text.lines() {
+        if line.starts_with("VmRSS:") {
+            let parts = words(line.replace("\t", " "))
+            if parts.len >= 2 { return parts[1].to_int() else 0 }
+        }
+    }
+    0
+}
+
 // Pump two clients until both screens show `text`.
 fn until_both(mut a: Run, mut b: Run, text: str, ms: int) -> bool {
     let until = now_ms() + ms
@@ -626,6 +654,31 @@ fn row_second_client(warren: str) -> str {
     if !until_screen(mut a, "$", 10000) {
         close_run(a)
         return "no prompt in the first client"
+    }
+    // The server's resident size with one terminal client, then two at the
+    // same size (no resize), where /proc can be read.
+    let spid = server_pid(a.dir)
+    if spid > 0 {
+        let one = rss_kb(spid)
+        var m = launch_as(warren, "second", "m", words("attach"), 80, 24) else |e| {
+            close_run(a)
+            return "launch: {e}"
+        }
+        if !until_screen(mut m, "$", 10000) {
+            close_quiet(m)
+            close_run(a)
+            return "no prompt in the measuring client"
+        }
+        pump(mut a, 200)
+        let two = rss_kb(spid)
+        print("MEASURE second-client server-rss one-client-kb={one} two-clients-kb={two} (80x24 each)")
+        type_text(mut m, "\u{0}d")
+        let whym = ends_with(mut m, 0, "[detached")
+        close_quiet(m)
+        if whym.len > 0 {
+            close_run(a)
+            return "the measuring client's detach: " + whym
+        }
     }
     var b = launch_as(warren, "second", "b", words("attach"), 60, 20) else |e| {
         close_run(a)
