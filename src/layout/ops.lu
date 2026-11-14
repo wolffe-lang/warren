@@ -1,0 +1,311 @@
+//! member: true
+//! The operations. Each changes the layout in place, or answers a
+//! refusal and leaves it exactly as it was (docs/LAYOUT.md, Operations).
+//! A direction or an axis outside its constants is a caller's bug and
+//! traps; every other bad argument is a named refusal.
+
+/// Why `split` refused: the new id is below 1 (`bad_id`); the pane is not
+/// in that tab, or there is no such tab (`no_pane`); the new id is already
+/// a live pane (`duplicate_id`); the pane is hidden or too small to halve
+/// along the axis (`too_small`).
+pub error SplitRefusal = {bad_id, no_pane, duplicate_id, too_small}
+
+/// Why `close` refused: no such pane (`no_pane`); it is the last pane of
+/// the last tab, and the server ends the session instead (`session_empty`).
+pub error CloseRefusal = {no_pane, session_empty}
+
+/// Why `focus` refused: no such tab (`no_tab`); nothing past the border on
+/// that side, or the focused pane is hidden (`no_neighbour`).
+pub error FocusRefusal = {no_tab, no_neighbour}
+
+/// Why `resize` refused: no such pane (`no_pane`); no border on that side,
+/// or it is not drawn at this size (`no_border`).
+pub error ResizeRefusal = {no_pane, no_border}
+
+/// Why `new_tab` refused: the new id is below 1 (`bad_id`) or already a
+/// live pane (`duplicate_id`).
+pub error NewTabRefusal = {bad_id, duplicate_id}
+
+/// Why `close_tab` refused: no such tab (`no_tab`); it is the last tab, and
+/// the server ends the session instead (`last_tab`).
+pub error CloseTabRefusal = {no_tab, last_tab}
+
+/// A layout of one tab (id 1) holding one pane.
+pub fn new(pane: int, name: str) -> Layout ! {bad_id} {
+    if pane < 1 { return bad_id }
+    var tabs = List[Tab]()
+    (mut tabs).push(one_pane_tab(1, pane, name))
+    Layout { tabs: tabs, active: 1, next_id: 2 }
+}
+
+/// Split `pane` of tab `tab` along `axis` at share 5000; the new pane goes
+/// second when `after`, and takes focus.
+pub fn split(mut l: Layout, tab: int, pane: int, axis: int, new_pane: int, after: bool, cols: int,
+    rows: int) -> () ! SplitRefusal {
+    assert(axis == COLS || axis == ROWS, "layout-split-axis")
+    if new_pane < 1 { return bad_id }
+    let ti = tab_index(l, tab)
+    if ti < 0 { return no_pane }
+    let leaf = leaf_of(l.tabs[ti], pane)
+    if leaf < 0 { return no_pane }
+    if locate(l, new_pane).tab >= 0 { return duplicate_id }
+    let b = node_box(l.tabs[ti], leaf, cols, rows)
+    let extent = if axis == COLS then b.cols else b.rows
+    if extent < 2 * minimum(axis) + 1 { return too_small }
+    l.tabs[ti].zoomed = false
+    let parent = l.tabs[ti].nodes[leaf].parent
+    let s = alloc(mut l.tabs[ti], take Node {
+        kind: SPLIT, pane: 0, axis: axis, first: -1, second: -1, share: SHARE_HALF, parent: parent,
+    })
+    let n = alloc(mut l.tabs[ti], take Node {
+        kind: LEAF, pane: new_pane, axis: COLS, first: -1, second: -1, share: 0, parent: s,
+    })
+    if after {
+        l.tabs[ti].nodes[s].first = leaf
+        l.tabs[ti].nodes[s].second = n
+    } else {
+        l.tabs[ti].nodes[s].first = n
+        l.tabs[ti].nodes[s].second = leaf
+    }
+    replace_child(mut l.tabs[ti], parent, leaf, s)
+    l.tabs[ti].nodes[leaf].parent = s
+    l.tabs[ti].focus = new_pane
+    to_front(mut l.tabs[ti].focus_order, new_pane)
+}
+
+fn remove_tab(mut l: Layout, ti: int) {
+    if l.tabs[ti].id == l.active {
+        if ti + 1 < l.tabs.len { l.active = l.tabs[ti + 1].id } else { l.active = l.tabs[ti - 1].id }
+    }
+    var kept = List[Tab]()
+    var i = 0
+    while i < l.tabs.len {
+        if i != ti { (mut kept).push(copy l.tabs[i]) }
+        i += 1
+    }
+    l.tabs = kept
+}
+
+/// Close a pane: its sibling subtree takes its parent's place; the last
+/// pane of a tab closes the tab.
+pub fn close(mut l: Layout, pane: int) -> () ! CloseRefusal {
+    let w = locate(l, pane)
+    if w.tab < 0 { return no_pane }
+    let ti = w.tab
+    let s = l.tabs[ti].nodes[w.leaf].parent
+    if s < 0 {
+        if l.tabs.len == 1 { return session_empty }
+        remove_tab(mut l, ti)
+        return
+    }
+    l.tabs[ti].zoomed = false
+    let sibling = if l.tabs[ti].nodes[s].first == w.leaf then l.tabs[ti].nodes[s].second else l.tabs[ti].nodes[s].first
+    replace_child(mut l.tabs[ti], l.tabs[ti].nodes[s].parent, s, sibling)
+    release(mut l.tabs[ti], s)
+    release(mut l.tabs[ti], w.leaf)
+    drop_from(mut l.tabs[ti].focus_order, pane)
+    l.tabs[ti].focus = l.tabs[ti].focus_order[0]
+}
+
+fn take_focus(mut t: Tab, pane: int) {
+    t.focus = pane
+    to_front(mut t.focus_order, pane)
+}
+
+/// The rank of a pane in a focus order: 0 for the most recent.
+fn rank(order: List[int], pane: int) -> int {
+    var i = 0
+    while i < order.len {
+        if order[i] == pane { return i }
+        i += 1
+    }
+    order.len
+}
+
+/// Whether `c` is just past the border on `direction`'s side of `f`, and
+/// its span across the direction, widened by half a cell at each end,
+/// holds `f`'s centre line (all in half cells).
+fn neighbour(f: Rect, c: Rect, direction: int) -> bool {
+    if direction == LEFT || direction == RIGHT {
+        if direction == RIGHT && c.col != f.col + f.cols + 1 { return false }
+        if direction == LEFT && c.col + c.cols != f.col - 1 { return false }
+        let centre = 2 * f.row + f.rows
+        return 2 * c.row - 1 <= centre && centre <= 2 * (c.row + c.rows) + 1
+    }
+    if direction == DOWN && c.row != f.row + f.rows + 1 { return false }
+    if direction == UP && c.row + c.rows != f.row - 1 { return false }
+    let centre = 2 * f.col + f.cols
+    2 * c.col - 1 <= centre && centre <= 2 * (c.col + c.cols) + 1
+}
+
+/// Move focus to the neighbour in `direction`, by the unzoomed geometry;
+/// between two, the more recently focused.
+pub fn focus(mut l: Layout, tab: int, direction: int, cols: int, rows: int) -> () ! FocusRefusal {
+    assert(direction >= LEFT && direction <= DOWN, "layout-focus-direction")
+    let ti = tab_index(l, tab)
+    if ti < 0 { return no_tab }
+    let rs = tab_rects(l.tabs[ti], cols, rows, false)
+    var f = rect(0, nothing())
+    for r in rs {
+        if r.pane == l.tabs[ti].focus { f = copy r }
+    }
+    if f.cols == 0 { return no_neighbour }
+    var best = -1
+    var best_rank = 0
+    for c in rs {
+        if c.cols > 0 && c.pane != f.pane && neighbour(f, c, direction) {
+            let r = rank(l.tabs[ti].focus_order, c.pane)
+            if best < 0 || r < best_rank {
+                best = c.pane
+                best_rank = r
+            }
+        }
+    }
+    if best < 0 { return no_neighbour }
+    take_focus(mut l.tabs[ti], best)
+}
+
+/// Focus a pane by id; its tab becomes active.
+pub fn focus_pane(mut l: Layout, pane: int) -> () ! {no_pane} {
+    let w = locate(l, pane)
+    if w.tab < 0 { return no_pane }
+    l.active = l.tabs[w.tab].id
+    take_focus(mut l.tabs[w.tab], pane)
+}
+
+fn step_focus(mut l: Layout, tab: int, forward: bool) -> () ! {no_tab} {
+    let ti = tab_index(l, tab)
+    if ti < 0 { return no_tab }
+    var ps = List[int]()
+    leaves(l.tabs[ti], l.tabs[ti].root, mut ps)
+    let at = rank(ps, l.tabs[ti].focus)
+    let next = if forward then (at + 1) % ps.len else (at + ps.len - 1) % ps.len
+    take_focus(mut l.tabs[ti], ps[next])
+}
+
+/// Focus the next pane in tree order, wrapping.
+pub fn focus_next(mut l: Layout, tab: int) -> () ! {no_tab} {
+    step_focus(mut l, tab, true)?
+}
+
+/// Focus the previous pane in tree order, wrapping.
+pub fn focus_previous(mut l: Layout, tab: int) -> () ! {no_tab} {
+    step_focus(mut l, tab, false)?
+}
+
+/// Move the border on `direction`'s side of a pane by `cells` that way;
+/// answers how many cells the pane grew.
+pub fn resize(mut l: Layout, pane: int, direction: int, cells: int, cols: int, rows: int) -> int ! ResizeRefusal {
+    assert(direction >= LEFT && direction <= DOWN, "layout-resize-direction")
+    let w = locate(l, pane)
+    if w.tab < 0 { return no_pane }
+    let ti = w.tab
+    let axis = if direction == LEFT || direction == RIGHT then COLS else ROWS
+    let near_first = direction == RIGHT || direction == DOWN
+    var child = w.leaf
+    var s = l.tabs[ti].nodes[child].parent
+    while s >= 0 {
+        let n = copy l.tabs[ti].nodes[s]
+        if n.axis == axis && ((near_first && n.first == child) || (!near_first && n.second == child)) { break }
+        child = s
+        s = n.parent
+    }
+    if s < 0 { return no_border }
+    let b = node_box(l.tabs[ti], s, cols, rows)
+    let extent = if axis == COLS then b.cols else b.rows
+    let m = minimum(axis)
+    if extent < 2 * m + 1 { return no_border }
+    let a = first_extent(extent, l.tabs[ti].nodes[s].share, m)
+    let lo = least(l.tabs[ti], l.tabs[ti].nodes[s].first, axis)
+    let hi = extent - 1 - least(l.tabs[ti], l.tabs[ti].nodes[s].second, axis)
+    let delta = if near_first then cells else 0 - cells
+    var target = a + delta
+    if delta > 0 {
+        let top = if a > hi then a else hi
+        if target > top { target = top }
+    }
+    if delta < 0 {
+        let bottom = if a < lo then a else lo
+        if target < bottom { target = bottom }
+    }
+    if target < m { target = m }
+    if target > extent - 1 - m { target = extent - 1 - m }
+    l.tabs[ti].zoomed = false
+    if target == a { return 0 }
+    var share = (target * SHARE_ONE + extent - 2) / (extent - 1)
+    if share < 1 { share = 1 }
+    if share > SHARE_ONE - 1 { share = SHARE_ONE - 1 }
+    l.tabs[ti].nodes[s].share = share
+    let now = first_extent(extent, share, m)
+    if near_first { return now - a }
+    a - now
+}
+
+/// Toggle a tab's zoom.
+pub fn zoom(mut l: Layout, tab: int) -> () ! {no_tab} {
+    let ti = tab_index(l, tab)
+    if ti < 0 { return no_tab }
+    l.tabs[ti].zoomed = !l.tabs[ti].zoomed
+}
+
+/// Every split of a tab back to share 5000.
+pub fn equalize(mut l: Layout, tab: int) -> () ! {no_tab} {
+    let ti = tab_index(l, tab)
+    if ti < 0 { return no_tab }
+    l.tabs[ti].zoomed = false
+    var i = 0
+    while i < l.tabs[ti].nodes.len {
+        if l.tabs[ti].nodes[i].kind == SPLIT { l.tabs[ti].nodes[i].share = SHARE_HALF }
+        i += 1
+    }
+}
+
+/// A new last tab holding one pane; it becomes active. Answers its id.
+pub fn new_tab(mut l: Layout, new_pane: int, name: str) -> int ! NewTabRefusal {
+    if new_pane < 1 { return bad_id }
+    if locate(l, new_pane).tab >= 0 { return duplicate_id }
+    let id = l.next_id
+    l.next_id += 1
+    (mut l.tabs).push(one_pane_tab(id, new_pane, name))
+    l.active = id
+    id
+}
+
+/// Close a tab and its panes; never the last.
+pub fn close_tab(mut l: Layout, tab: int) -> () ! CloseTabRefusal {
+    let ti = tab_index(l, tab)
+    if ti < 0 { return no_tab }
+    if l.tabs.len == 1 { return last_tab }
+    remove_tab(mut l, ti)
+}
+
+/// Activate the tab at 1-based position `n`.
+pub fn select_tab(mut l: Layout, n: int) -> () ! {no_tab} {
+    if n < 1 || n > l.tabs.len { return no_tab }
+    l.active = l.tabs[n - 1].id
+}
+
+/// Activate a tab by id.
+pub fn select_tab_id(mut l: Layout, tab: int) -> () ! {no_tab} {
+    if tab_index(l, tab) < 0 { return no_tab }
+    l.active = tab
+}
+
+/// Activate the next tab, wrapping.
+pub fn next_tab(mut l: Layout) {
+    let at = tab_index(l, l.active)
+    l.active = l.tabs[(at + 1) % l.tabs.len].id
+}
+
+/// Activate the previous tab, wrapping.
+pub fn previous_tab(mut l: Layout) {
+    let at = tab_index(l, l.active)
+    l.active = l.tabs[(at + l.tabs.len - 1) % l.tabs.len].id
+}
+
+/// Rename a tab.
+pub fn rename_tab(mut l: Layout, tab: int, name: str) -> () ! {no_tab} {
+    let ti = tab_index(l, tab)
+    if ti < 0 { return no_tab }
+    l.tabs[ti].name = name_bytes(name)
+}
