@@ -1,0 +1,266 @@
+//! member: true
+//! The client's image to the outer terminal's bytes. Pure: what the
+//! terminal shows (`drawn`) and the image to show give the bytes that
+//! change one into the other, under a renderer policy. Widths come from
+//! the image, never from a Unicode table: after a wide glyph the next cell
+//! is placed explicitly.
+use proto
+
+/// What the outer terminal can be sent. `depth` is the colour depth
+/// (0 none, 1 sixteen, 2 indexed 256, 3 RGB); `explicit_wide` draws a wide
+/// glyph's continuation as a blank (a console that draws one cell per
+/// code point); `marks` sends combining marks; `sync` brackets a repaint
+/// in synchronized-update mode 2026; `shape` sends the cursor shape.
+pub struct Policy {
+    depth: int,
+    explicit_wide: bool,
+    marks: bool,
+    sync: bool,
+    shape: bool,
+}
+
+/// The documented policies: a terminal emulator by its TERM and
+/// COLORTERM, and PAX's console (sixteen colours, one cell a code point,
+/// no marks, nothing it would not answer).
+pub fn policy_for(term: str, colorterm: str, console: bool) -> Policy {
+    if console { return Policy { depth: 1, explicit_wide: true, marks: false, sync: false, shape: false } }
+    var depth = 1
+    if term.contains("256color") { depth = 2 }
+    if colorterm == "truecolor" || colorterm == "24bit" { depth = 3 }
+    if term == "dumb" || term.len == 0 { depth = 0 }
+    Policy { depth: depth, explicit_wide: false, marks: true, sync: depth > 0, shape: depth > 0 }
+}
+
+fn text(mut out: List[byte], t: str) {
+    for b in t.bytes() { (mut out).push(b) }
+}
+
+/// UTF-8 of one scalar.
+pub fn utf8(mut out: List[byte], cp: int) {
+    if cp < 128 {
+        (mut out).push(cp as byte)
+    } else if cp < 2048 {
+        (mut out).push((192 + cp / 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else if cp < 65536 {
+        (mut out).push((224 + cp / 4096) as byte)
+        (mut out).push((128 + cp / 64 % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else {
+        (mut out).push((240 + cp / 262144) as byte)
+        (mut out).push((128 + cp / 4096 % 64) as byte)
+        (mut out).push((128 + cp / 64 % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    }
+}
+
+// The sixteen colours' values, as xterm's default palette has them.
+fn basic_rgb(i: int) -> int {
+    return match i {
+        0 => 0,
+        1 => 13434880,
+        2 => 52224,
+        3 => 13421568,
+        4 => 238,
+        5 => 13435085,
+        6 => 52429,
+        7 => 15066597,
+        8 => 8355711,
+        9 => 16711680,
+        10 => 65280,
+        11 => 16776960,
+        12 => 6064383,
+        13 => 16711935,
+        14 => 65535,
+        _ => 16777215,
+    }
+}
+
+fn cube_level(v: int) -> int {
+    if v < 48 { return 0 }
+    if v < 115 { return 1 }
+    (v - 35) / 40
+}
+
+fn cube_value(l: int) -> int {
+    if l == 0 { return 0 }
+    55 + l * 40
+}
+
+/// The RGB of an indexed colour (0..255).
+pub fn index_rgb(i: int) -> int {
+    if i < 16 { return basic_rgb(i) }
+    if i < 232 {
+        let n = i - 16
+        return cube_value(n / 36) * 65536 + cube_value(n / 6 % 6) * 256 + cube_value(n % 6)
+    }
+    let g = 8 + (i - 232) * 10
+    g * 65536 + g * 256 + g
+}
+
+fn distance(a: int, b: int) -> int {
+    let dr = a / 65536 - b / 65536
+    let dg = a / 256 % 256 - b / 256 % 256
+    let db = a % 256 - b % 256
+    dr * dr + dg * dg + db * db
+}
+
+/// The nearest of the sixteen colours to an RGB value.
+pub fn nearest16(rgb: int) -> int {
+    var best = 0
+    var i = 1
+    while i < 16 {
+        if distance(basic_rgb(i), rgb) < distance(basic_rgb(best), rgb) { best = i }
+        i += 1
+    }
+    best
+}
+
+/// The nearest indexed colour (cube or grey) to an RGB value.
+pub fn nearest256(rgb: int) -> int {
+    let cube = 16 + 36 * cube_level(rgb / 65536) + 6 * cube_level(rgb / 256 % 256) + cube_level(rgb % 256)
+    let avg = (rgb / 65536 + rgb / 256 % 256 + rgb % 256) / 3
+    var grey = 232 + (avg - 8) / 10
+    if avg < 8 { grey = 232 }
+    if grey > 255 { grey = 255 }
+    if distance(index_rgb(grey), rgb) < distance(index_rgb(cube), rgb) { return grey }
+    cube
+}
+
+/// A wire colour (0 default, 0x01000000|index, 0x02000000|RGB) as the
+/// policy's depth can show it, in the same encoding.
+pub fn downsample(c: int, depth: int) -> int {
+    if c == 0 || depth == 0 { return 0 }
+    let index_tag = 16777216
+    let rgb_tag = 33554432
+    if c >= rgb_tag {
+        let rgb = c - rgb_tag
+        if depth == 3 { return c }
+        if depth == 2 { return index_tag + nearest256(rgb) }
+        return index_tag + nearest16(rgb)
+    }
+    let i = c - index_tag
+    if depth >= 2 || i < 16 { return c }
+    index_tag + nearest16(index_rgb(i))
+}
+
+fn colour_sgr(mut out: List[byte], c: int, background: bool) {
+    let index_tag = 16777216
+    let rgb_tag = 33554432
+    let base = if background then 40 else 30
+    if c == 0 {
+        text(mut out, ";{base + 9}")
+    } else if c >= rgb_tag {
+        let rgb = c - rgb_tag
+        text(mut out, ";{base + 8};2;{rgb / 65536};{rgb / 256 % 256};{rgb % 256}")
+    } else {
+        let i = c - index_tag
+        if i < 8 { text(mut out, ";{base + i}") }
+        else if i < 16 { text(mut out, ";{base + 60 + i - 8}") }
+        else { text(mut out, ";{base + 8};5;{i}") }
+    }
+}
+
+const FLAG_CODES: str = "1,2,3,4,21,5,7,8,9"
+
+// The whole pen in one SGR, from a reset.
+fn pen(mut out: List[byte], flags: int, fg: int, bg: int, pol: Policy) {
+    text(mut out, "\u{1b}[0")
+    let codes = FLAG_CODES.split(",")
+    var bit = 1
+    var k = 0
+    while k < codes.len {
+        if flags & bit != 0 { text(mut out, ";" + codes[k]) }
+        bit = bit * 2
+        k += 1
+    }
+    if pol.depth > 0 {
+        let f = downsample(fg, pol.depth)
+        let b = downsample(bg, pol.depth)
+        if f != 0 { colour_sgr(mut out, f, false) }
+        if b != 0 { colour_sgr(mut out, b, true) }
+    }
+    text(mut out, "m")
+}
+
+fn cell_same(a: proto.Image, b: proto.Image, i: int) -> bool {
+    a.base[i] == b.base[i] && a.mark1[i] == b.mark1[i] && a.mark2[i] == b.mark2[i] &&
+        a.width[i] == b.width[i] && a.flags[i] == b.flags[i] && a.fg[i] == b.fg[i] && a.bg[i] == b.bg[i]
+}
+
+// The pen the renderer last sent, within one render.
+struct Pen {
+    known: bool,
+    flags: int,
+    fg: int,
+    bg: int,
+}
+
+fn draw_cell(mut out: List[byte], mut cur: Pen, img: proto.Image, i: int, pol: Policy) {
+    if !cur.known || cur.flags != img.flags[i] || cur.fg != img.fg[i] || cur.bg != img.bg[i] {
+        pen(mut out, img.flags[i], img.fg[i], img.bg[i], pol)
+        cur.known = true
+        cur.flags = img.flags[i]
+        cur.fg = img.fg[i]
+        cur.bg = img.bg[i]
+    }
+    var base = img.base[i]
+    if base < 32 || (base >= 127 && base < 160) { base = 32 }
+    utf8(mut out, base)
+    if pol.marks {
+        if img.mark1[i] != 0 { utf8(mut out, img.mark1[i]) }
+        if img.mark2[i] != 0 { utf8(mut out, img.mark2[i]) }
+    }
+    if img.width[i] == 2 && pol.explicit_wide { (mut out).push(32 as byte) }
+}
+
+fn cup(mut out: List[byte], row: int, col: int) {
+    text(mut out, "\u{1b}[{row};{col}H")
+}
+
+/// The bytes that turn what the terminal shows (`drawn`, invalid for an
+/// unknown screen) into `img`; `drawn` becomes `img`.
+pub fn render(mut drawn: proto.Image, img: proto.Image, pol: Policy) -> List[byte] {
+    var out = List[byte]()
+    if !img.valid { return out }
+    if pol.sync { text(mut out, "\u{1b}[?2026h") }
+    text(mut out, "\u{1b}[?25l")
+    let full = !drawn.valid || drawn.cols != img.cols || drawn.rows != img.rows
+    if full { text(mut out, "\u{1b}[0m\u{1b}[H\u{1b}[2J") }
+    var cur = Pen { known: false, flags: 0, fg: 0, bg: 0 }
+    var row = 1
+    while row <= img.rows {
+        var col = 1
+        var placed = 0
+        while col <= img.cols {
+            let i = (row - 1) * img.cols + col - 1
+            var lead = i
+            var lead_col = col
+            if img.width[i] == 0 && col > 1 {
+                lead = i - 1
+                lead_col = col - 1
+            }
+            let changed = full || !cell_same(drawn, img, i) || !cell_same(drawn, img, lead)
+            if !changed || img.width[lead] == 0 {
+                col += 1
+                continue
+            }
+            if placed != lead_col { cup(mut out, row, lead_col) }
+            draw_cell(mut out, mut cur, img, lead, pol)
+            let w = if img.width[lead] == 2 then 2 else 1
+            placed = lead_col + w
+            col = lead_col + w
+            // After a wide glyph the next cell is placed explicitly, unless
+            // the policy drew its continuation.
+            if w == 2 && !pol.explicit_wide { placed = 0 }
+        }
+        row += 1
+    }
+    text(mut out, "\u{1b}[0m")
+    cup(mut out, img.cursor_row, img.cursor_col)
+    if pol.shape { text(mut out, "\u{1b}[{img.shape} q") }
+    if img.visible == 1 { text(mut out, "\u{1b}[?25h") }
+    if pol.sync { text(mut out, "\u{1b}[?2026l") }
+    drawn = copy img
+    out
+}
