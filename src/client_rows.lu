@@ -749,6 +749,42 @@ fn row_server_outlives_client(warren: str) -> str {
     why
 }
 
+// Session names are bytes: '/', control bytes and the empty name are
+// refused by name; two spellings differing in case are two sessions.
+fn row_session_names(warren: str) -> str {
+    var r = launch(warren, "names", List[str](), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut r, "$", 10000) {
+        close_run(r)
+        return "no prompt"
+    }
+    var why = ""
+    for pair in "x/y=may not hold '/'|a\u{1}b=control byte|=may not be empty".split("|") {
+        let at = pair.find("=") else 0
+        let name = pair[0..at]
+        let want = pair[at + 1..pair.len]
+        var argv = List[str]()
+        (mut argv).push("new-session")
+        (mut argv).push(name)
+        let reply = client.command_sized(argv, 80, 24, false)
+        let err = str_from_utf8(reply.err) else ""
+        if why.len == 0 && (reply.status != 1 || !err.contains(want)) {
+            why = "new-session '{name}': status {reply.status}, '" + err.trim() + "'"
+        }
+    }
+    for name in "Work work".split(" ") {
+        var argv = List[str]()
+        (mut argv).push("new-session")
+        (mut argv).push(name)
+        let reply = client.command_sized(argv, 80, 24, false)
+        if why.len == 0 && reply.status != 0 { why = "new-session {name}: status {reply.status}" }
+    }
+    let list = reply_out("list-sessions")
+    close_run(r)
+    if why.len > 0 { return why }
+    if !list.contains("Work: 80x24") || !list.contains("work: 80x24") { return "Work and work: " + list.replace("\n", " | ") }
+    ""
+}
+
 // A verb this server does not know (a newer client's) is refused by name
 // with the usage status, and the server goes on.
 fn row_unknown_verb(warren: str) -> str {
@@ -784,6 +820,7 @@ fn run_row(warren: str, name: str) -> str {
     if name == "second-client" { return row_second_client(warren) }
     if name == "server-outlives-client" { return row_server_outlives_client(warren) }
     if name == "unknown-verb" { return row_unknown_verb(warren) }
+    if name == "session-names" { return row_session_names(warren) }
     "no such row"
 }
 
@@ -809,7 +846,7 @@ fn main() -> int {
         i += 1
     }
     if rows.len == 0 {
-        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb")
+        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names")
     }
     if !fs.exists("/proc") { print("NOTE leftovers unchecked here: no /proc to read") }
     // Every row's socket lives in a short directory under this one; a
