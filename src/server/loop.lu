@@ -806,7 +806,6 @@ fn compose_now(mut s: Server, index: int, now: int) {
         return
     }
     let _q = enqueue(mut s.conns[index], wire, true)
-    s.conns[index].image_end = s.conns[index].tx_len
     s.conns[index].image_seq = seq
     s.conns[index].force_full = false
     s.conns[index].last_frame = now

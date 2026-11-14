@@ -27,7 +27,7 @@ pub struct Conn {
     tx: List[byte],
     tx_off: int,
     tx_len: int,
-    events_bytes: int,
+    image_start: int,
     image_end: int,
     image_seq: int,
     ack: proto.AckState,
@@ -70,7 +70,7 @@ pub fn new_conn() -> Conn {
         live: false, fd: 0 - 1, key: 0 - 1, gen: 0, phase: CLOSED, member: false, session: 0 - 1,
         id: 0, deadline: 0,
         rx: List[byte](), rx_off: 0, rx_len: 0, paste: List[byte](), paste_len: 0, paste_active: false,
-        tx: List[byte](), tx_off: 0, tx_len: 0, events_bytes: 0, image_end: 0 - 1, image_seq: 0,
+        tx: List[byte](), tx_off: 0, tx_len: 0, image_start: 0, image_end: 0 - 1, image_seq: 0,
         ack: proto.ack_state(), force_full: true, stale: false, stale_since: 0, last_frame: 0,
         shadow: no_shadow(), cols: 0, rows: 0, depth: 0, features: 0, write_on: false, read_on: false,
         prefix: false, hello: List[byte](), hello_len: 0, hello_ready: false,
@@ -95,7 +95,7 @@ pub fn reset_conn(mut c: Conn, fd: int, id: int, now: int) {
     c.paste_active = false
     c.tx_off = 0
     c.tx_len = 0
-    c.events_bytes = 0
+    c.image_start = 0
     c.image_end = 0 - 1
     c.image_seq = 0
     c.ack.last_sent = 0
@@ -178,15 +178,29 @@ pub fn queued(c: Conn) -> int {
     c.tx_len - c.tx_off
 }
 
+/// Non-FRAME bytes queued and not yet written: the queue less what is
+/// left of the one image in it. A queue that never empties (a small
+/// socket under a steady pane) counts only what its client has yet to
+/// take, never what it took.
+pub fn events_queued(c: Conn) -> int {
+    var image = 0
+    if c.image_end >= 0 && c.image_end > c.tx_off {
+        let from = if c.image_start > c.tx_off then c.image_start else c.tx_off
+        image = c.image_end - from
+    }
+    c.tx_len - c.tx_off - image
+}
+
 /// Append whole wire bytes to the outbound queue. Non-FRAME bytes count
 /// against the event queue's cap; false means the client is too slow
-/// and nothing was appended.
+/// and nothing was appended. A FRAME's wire is the queue's one image
+/// from `image_start` to `image_end`.
 pub fn enqueue(mut c: Conn, wire: List[byte], frame: bool) -> bool {
-    if !frame && c.events_bytes + wire.len > EVENT_QUEUE { return false }
+    if !frame && events_queued(c) + wire.len > EVENT_QUEUE { return false }
     if c.tx_off == c.tx_len {
         c.tx_off = 0
         c.tx_len = 0
-        c.events_bytes = 0
+        c.image_start = 0
         c.image_end = if c.image_end >= 0 then 0 else 0 - 1
     } else if c.tx_off > 0 && c.tx_len + wire.len > c.tx.len {
         var j = 0
@@ -194,15 +208,19 @@ pub fn enqueue(mut c: Conn, wire: List[byte], frame: bool) -> bool {
             c.tx[j] = c.tx[c.tx_off + j]
             j += 1
         }
-        if c.image_end >= 0 { c.image_end = c.image_end - c.tx_off }
+        if c.image_end >= 0 {
+            c.image_end = c.image_end - c.tx_off
+            c.image_start = c.image_start - c.tx_off
+        }
         c.tx_len = c.tx_len - c.tx_off
         c.tx_off = 0
     }
+    if frame { c.image_start = c.tx_len }
     for b in wire {
         place(mut c.tx, c.tx_len, b)
         c.tx_len += 1
     }
-    if !frame { c.events_bytes = c.events_bytes + wire.len }
+    if frame { c.image_end = c.tx_len }
     true
 }
 
