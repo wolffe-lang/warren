@@ -1094,7 +1094,8 @@ fn act(mut s: Server, index: int, action: int, arg: int, count: int) {
 fn rename_active(mut s: Server, index: int, name: str) {
     let si = s.conns[index].session
     if si < 0 || !s.sessions[si].live { return }
-    layout.rename_tab(mut s.sessions[si].layout, s.sessions[si].layout.active, name) else |_| { return }
+    let tab = s.sessions[si].layout.active
+    layout.rename_tab(mut s.sessions[si].layout, tab, name) else |_| { return }
     s.sessions[si].bar_gen = s.sessions[si].bar_gen + 1
     session_changed(mut s, si, now_ns())
 }
@@ -1125,12 +1126,15 @@ fn fill_prompt(mut s: Server, index: int, rename: bool) {
     (mut s.conns[index].prompt).reset()
     let si = s.conns[index].session
     if !rename || si < 0 { return }
+    let tab = s.sessions[si].layout.active
+    var name = List[byte]()
     for t in s.sessions[si].layout.tabs {
-        if t.id == s.sessions[si].layout.active {
-            for b in t.name {
-                if s.conns[index].prompt.len < PROMPT_BYTES { (mut s.conns[index].prompt).push(b) }
-            }
+        if t.id == tab {
+            for b in t.name { (mut name).push(b) }
         }
+    }
+    for b in name {
+        if s.conns[index].prompt.len < PROMPT_BYTES { (mut s.conns[index].prompt).push(b) }
     }
 }
 
