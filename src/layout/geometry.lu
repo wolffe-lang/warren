@@ -1,0 +1,192 @@
+//! member: true
+//! Geometry: how a split divides its rect, and the rects, borders and
+//! hit test the compositor reads. One function, `cut`, divides a rect;
+//! every query and every operation that needs geometry goes through it.
+
+/// Cells: a top-left cell, 1-based, and a size; all zero for nothing.
+struct Box {
+    col: int,
+    row: int,
+    cols: int,
+    rows: int,
+}
+
+fn nothing() -> Box {
+    Box { col: 0, row: 0, cols: 0, rows: 0 }
+}
+
+/// The whole tab area, or nothing for an area without a cell.
+fn area(cols: int, rows: int) -> Box {
+    if cols < 1 || rows < 1 { return nothing() }
+    Box { col: 1, row: 1, cols: cols, rows: rows }
+}
+
+fn minimum(axis: int) -> int {
+    if axis == COLS { return MIN_COLS }
+    MIN_ROWS
+}
+
+/// The first child's cells along the axis when both children show.
+fn first_extent(extent: int, share: int, least: int) -> int {
+    var a = (extent - 1) * share / SHARE_ONE
+    if a < least { a = least }
+    if a > extent - 1 - least { a = extent - 1 - least }
+    a
+}
+
+/// How a split divides its rect: the first child's, the second's, the
+/// border's column (`COLS`) or row (`ROWS`), and whether both show.
+struct Cut {
+    first: Box,
+    second: Box,
+    border: int,
+    both: bool,
+}
+
+fn cut(axis: int, share: int, b: Box) -> Cut {
+    let m = minimum(axis)
+    let extent = if axis == COLS then b.cols else b.rows
+    if extent < 2 * m + 1 {
+        return Cut { first: b, second: nothing(), border: 0, both: false }
+    }
+    let a = first_extent(extent, share, m)
+    // The second child starts one border cell past the first.
+    let next = a + 1
+    if axis == COLS {
+        return Cut {
+            first: Box { col: b.col, row: b.row, cols: a, rows: b.rows },
+            second: Box { col: b.col + next, row: b.row, cols: extent - next, rows: b.rows },
+            border: b.col + a,
+            both: true,
+        }
+    }
+    Cut {
+        first: Box { col: b.col, row: b.row, cols: b.cols, rows: a },
+        second: Box { col: b.col, row: b.row + next, cols: b.cols, rows: extent - next },
+        border: b.row + a,
+        both: true,
+    }
+}
+
+fn rect(pane: int, b: Box) -> Rect {
+    Rect { pane: pane, col: b.col, row: b.row, cols: b.cols, rows: b.rows }
+}
+
+fn place(t: Tab, i: int, b: Box, visible: bool, mut out: List[Rect]) {
+    if t.nodes[i].kind == LEAF {
+        if visible { (mut out).push(rect(t.nodes[i].pane, b)) } else { (mut out).push(rect(t.nodes[i].pane, nothing())) }
+        return
+    }
+    if !visible {
+        place(t, t.nodes[i].first, b, false, mut out)
+        place(t, t.nodes[i].second, b, false, mut out)
+        return
+    }
+    let c = cut(t.nodes[i].axis, t.nodes[i].share, b)
+    place(t, t.nodes[i].first, c.first, true, mut out)
+    place(t, t.nodes[i].second, c.second, c.both, mut out)
+}
+
+/// One rect per pane in tree order; with `zoom`, a zoomed tab shows only
+/// its focused pane.
+fn tab_rects(t: Tab, cols: int, rows: int, zoom: bool) -> List[Rect] {
+    var out = List[Rect]()
+    let whole = area(cols, rows)
+    let visible = whole.cols > 0
+    if zoom && t.zoomed {
+        var ps = List[int]()
+        leaves(t, t.root, mut ps)
+        for p in ps {
+            if p == t.focus && visible { (mut out).push(rect(p, whole)) } else { (mut out).push(rect(p, nothing())) }
+        }
+        return out
+    }
+    place(t, t.root, whole, visible, mut out)
+    out
+}
+
+/// The tab's panes' rects at a size, in tree order, hidden panes as the
+/// zero rect; empty for an unknown tab.
+pub fn rects(l: Layout, tab: int, cols: int, rows: int) -> List[Rect] {
+    let ti = tab_index(l, tab)
+    if ti < 0 { return List[Rect]() }
+    tab_rects(l.tabs[ti], cols, rows, true)
+}
+
+fn edges(t: Tab, i: int, b: Box, mut out: List[Border]) {
+    if t.nodes[i].kind == LEAF { return }
+    let axis = t.nodes[i].axis
+    let c = cut(axis, t.nodes[i].share, b)
+    if c.both {
+        if axis == COLS {
+            (mut out).push(Border { col: c.border, row: b.row, length: b.rows, axis: axis })
+        } else {
+            (mut out).push(Border { col: b.col, row: c.border, length: b.cols, axis: axis })
+        }
+    }
+    edges(t, t.nodes[i].first, c.first, mut out)
+    if c.both { edges(t, t.nodes[i].second, c.second, mut out) }
+}
+
+/// The borders of every split that shows both children, in preorder;
+/// none for a zoomed or unknown tab.
+pub fn borders(l: Layout, tab: int, cols: int, rows: int) -> List[Border] {
+    var out = List[Border]()
+    let ti = tab_index(l, tab)
+    if ti < 0 || l.tabs[ti].zoomed { return out }
+    let whole = area(cols, rows)
+    if whole.cols == 0 { return out }
+    edges(l.tabs[ti], l.tabs[ti].root, whole, mut out)
+    out
+}
+
+/// The pane whose rect holds the cell; -1 for a border, a cell outside
+/// the area or an unknown tab.
+pub fn pane_at(l: Layout, tab: int, cols: int, rows: int, col: int, row: int) -> int {
+    let ti = tab_index(l, tab)
+    if ti < 0 || col < 1 || row < 1 || col > cols || row > rows { return -1 }
+    if l.tabs[ti].zoomed { return l.tabs[ti].focus }
+    var i = l.tabs[ti].root
+    var b = area(cols, rows)
+    loop {
+        let n = copy l.tabs[ti].nodes[i]
+        if n.kind == LEAF { return n.pane }
+        let c = cut(n.axis, n.share, b)
+        let at = if n.axis == COLS then col else row
+        if !c.both || at < c.border {
+            i = n.first
+            b = c.first
+        } else if at == c.border {
+            return -1
+        } else {
+            i = n.second
+            b = c.second
+        }
+    }
+    -1
+}
+
+/// A node's unzoomed rect at a size; nothing when it is hidden.
+fn node_box(t: Tab, target: int, cols: int, rows: int) -> Box {
+    var path = List[int]()
+    var i = target
+    while i >= 0 {
+        (mut path).push(i)
+        i = t.nodes[i].parent
+    }
+    var b = area(cols, rows)
+    if b.cols == 0 { return b }
+    var k = path.len - 1
+    while k > 0 {
+        let s = path[k]
+        let c = cut(t.nodes[s].axis, t.nodes[s].share, b)
+        if t.nodes[s].first == path[k - 1] {
+            b = c.first
+        } else {
+            if !c.both { return nothing() }
+            b = c.second
+        }
+        k -= 1
+    }
+    b
+}
