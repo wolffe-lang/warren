@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 RIG = ROOT / 'tests/vt/rig'
 SESSION_RIG = ROOT / 'tests/session/rig'
 CLIENT_RIG = ROOT / 'tests/client/rig'
+PANE_RIG = ROOT / 'tests/pane/rig'
 
 
 def main():
@@ -16,7 +17,8 @@ def main():
         (RIG, 'w1-plant.manifest', ['w1-plant-build', 'vt-scalar-value']),
         (SESSION_RIG, 'w2-plant.manifest', ['w2-plant-build', 'one-image']),
         (CLIENT_RIG, 'w2-client-plant.manifest', ['w2-client-plant-build', 'console-policy']),
-        (CLIENT_RIG, 'w2-lifecycle-plant.manifest', ['w2-lifecycle-plant-build', 'second-client'])):
+        (CLIENT_RIG, 'w2-lifecycle-plant.manifest', ['w2-lifecycle-plant-build', 'second-client']),
+        (PANE_RIG, 'w3-plant.manifest', ['w3-plant-build', 'keys-reach-focused'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
@@ -34,6 +36,8 @@ def main():
     assert 'FAIL console-policy ' in client_plant and 'client_render_test.lu' in client_plant
     lifecycle_plant = (CLIENT_RIG / 'w2-lifecycle-plant-step.sh').read_text()
     assert 'client-rows" "$root/target/native/warren" second-client' in lifecycle_plant
+    pane_plant = (PANE_RIG / 'w3-plant-step.sh').read_text()
+    assert 'pane-rows" "$root/target/native/warren" keys-reach-focused split-sizes' in pane_plant
     linux = (RIG / 'w1-step.sh').read_text()
     assert 'tools/gate linux' in linux and 'vt_resource_bench.lu' in linux
     assert 'width_sweep.py' in linux and '--suite recordings' in linux
