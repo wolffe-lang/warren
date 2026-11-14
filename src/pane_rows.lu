@@ -1,0 +1,1091 @@
+//! member: false
+//! Pane rows: a scripted client drives a real server's panes and tabs over
+//! its socket, through key events (the prefix, Ctrl-Space, then a key).
+//! Each row starts its own server in its own runtime directory with a
+//! lifetime bound and ends it with kill-server; a row's pane programs are
+//! /bin/sh (or /bin/cat) and this program's own helper modes.
+//!
+//!   pane_rows WARREN [ROW...]
+//!
+//! Prints `PASS <row>` or `FAIL <row> <why>` per row (and `MEASURE` lines),
+//! then `PANE-ROWS rows=N failed=M`; exits 1 when any row is red.
+//!
+//! The helper modes, run inside panes:
+//!   --print-size TAG    prints `TAG ROWS COLS`, its terminal's size
+//!   --winch FILE TAG    appends `TAG start ROWS COLS`, then `TAG winch ROWS COLS`
+//!                       at every window change, until its terminal hangs up
+//!   --hup FILE          appends `ready PID`, then `hangup PID` when its
+//!                       terminal hangs up, and exits
+//! No row sends a signal: a helper reports what reached it.
+use std.env
+use std.fs
+use std.net
+use std.net.unix
+use std.process
+use std.signal
+use std.sort
+use std.term
+use std.time
+use client
+use proto
+use server
+
+struct Rig {
+    warren: str,
+    dir: str,
+    server: int,
+    started: bool,
+}
+
+/// The tab area of an 80x24 client: two bar lines below it.
+const AREA: int = 22
+/// Wire colours as images carry them.
+const GREEN: int = 16777218
+const INVERSE: int = 64
+
+fn now_ms() -> int {
+    time.monotonic_ns() / 1000000
+}
+
+fn rig(warren: str, row: str) -> Rig {
+    Rig { warren: warren, dir: "rt-" + row, server: 0 - 1, started: false }
+}
+
+fn socket(r: Rig) -> str {
+    r.dir + "/default"
+}
+
+fn here() -> str {
+    env.cwd() else "."
+}
+
+fn self_path() -> str {
+    let a0 = env.arg0()
+    if a0.starts_with("/") { return a0 }
+    here() + "/" + a0
+}
+
+/// A file beside the row's runtime directory, by its absolute path.
+fn out_file(r: Rig, name: str) -> str {
+    here() + "/" + r.dir + "-" + name
+}
+
+fn start_with(mut r: Rig, pane_command: str, lifetime_ms: int) -> str {
+    fs.remove_dir_all(r.dir) else |_| {}
+    env.set("WARREN_RUNTIME_DIR", r.dir) else { return "env" }
+    env.set("WARREN_LIFETIME_MS", "{lifetime_ms}") else { return "env" }
+    env.set("WARREN_PANE_COMMAND", pane_command) else { return "env" }
+    var c = process.command(r.warren)
+    process.push_arg(mut c, "server")
+    let ch = process.start(c) else |e| { return "server-start-{e}" }
+    r.server = ch.slot
+    r.started = true
+    let until = now_ms() + 5000
+    while now_ms() < until {
+        var s = unix.connect(socket(r)) else |_| {
+            time.sleep(time.millis(10))
+            continue
+        }
+        net.close(take s) else |_| {}
+        return ""
+    }
+    "server-never-answered"
+}
+
+fn start_server(mut r: Rig, pane_command: str) -> str {
+    start_with(mut r, pane_command, 120000)
+}
+
+fn stop_server(mut r: Rig) -> int {
+    if !r.started { return 0 - 1 }
+    var p = client.dial(socket(r)) else |_| {
+        var ch = process.Child { slot: r.server }
+        r.started = false
+        return process.wait_status(take ch) else 0 - 1
+    }
+    var argv = List[str]()
+    let _h = client.send(p, 1, client.hello_payload(2, 0, 0, "", 0, "", argv, argv))
+    let _w = client.until_kind(mut p, 129, 2000)
+    var b = List[byte]()
+    proto.put(mut b, 1, 4)
+    proto.put(mut b, 1, 2)
+    proto.put_text(mut b, "kill-server")
+    proto.put_text(mut b, "")
+    proto.put_text(mut b, "")
+    let _c = client.send(p, 11, b)
+    let _r = client.until_kind(mut p, 136, 2000)
+    client.hang_up(mut p)
+    var ch = process.Child { slot: r.server }
+    r.started = false
+    process.wait_status(take ch) else 0 - 1
+}
+
+fn server_pid(r: Rig) -> int {
+    process.pid(process.Child { slot: r.server }) else 0 - 1
+}
+
+fn env_names() -> List[str] {
+    var n = List[str]()
+    (mut n).push("PS1")
+    (mut n).push("PATH")
+    (mut n).push("HOME")
+    (mut n).push("SHELL")
+    n
+}
+
+fn env_values() -> List[str] {
+    var v = List[str]()
+    (mut v).push("$ ")
+    (mut v).push(env.get("PATH") else "/bin:/usr/bin")
+    (mut v).push(env.get("HOME") else "/")
+    (mut v).push("/bin/sh")
+    v
+}
+
+fn attach(r: Rig, cols: int, rows: int, target: str, options: int) -> client.Peer ! client.DialErrors {
+    var p = client.dial(socket(r))?
+    let _h = client.send(p, 1, client.hello_payload(1, cols, rows, target, options, here(), env_names(), env_values()))
+    p
+}
+
+/// The prefix (Ctrl-Space) then a key: a scalar, or a named key (kind 1).
+fn prefix(p: client.Peer, code: int) -> bool {
+    client.key(p, 4, 0, 32) && client.key(p, 0, 0, code)
+}
+
+fn prefix_named(p: client.Peer, code: int) -> bool {
+    client.key(p, 4, 0, 32) && client.key(p, 0, 1, code)
+}
+
+fn push_utf8(mut out: List[byte], cp: int) {
+    if cp < 128 {
+        (mut out).push(cp as byte)
+    } else if cp < 2048 {
+        (mut out).push((192 + cp / 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else if cp < 65536 {
+        (mut out).push((224 + cp / 4096) as byte)
+        (mut out).push((128 + cp / 64 % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else {
+        (mut out).push((240 + cp / 262144) as byte)
+        (mut out).push((128 + cp / 4096 % 64) as byte)
+        (mut out).push((128 + cp / 64 % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    }
+}
+
+/// The text of cells `col .. col+cols-1` of one row, trailing blanks trimmed.
+fn cells(img: proto.Image, row: int, col: int, cols: int) -> str {
+    if !img.valid || row < 1 || row > img.rows { return "" }
+    var out = List[byte]()
+    var c = col
+    while c < col + cols && c <= img.cols {
+        let i = (row - 1) * img.cols + c - 1
+        if img.width[i] != 0 { push_utf8(mut out, if img.base[i] == 0 then 32 else img.base[i]) }
+        c += 1
+    }
+    var end = out.len
+    while end > 0 && out[end - 1] == 32 as byte { end -= 1 }
+    str_from_utf8(out[0..end]) else ""
+}
+
+/// Whether a rect of the image holds the text on one of its rows.
+fn rect_has(img: proto.Image, text: str, col: int, row: int, cols: int, rows: int) -> bool {
+    var r = row
+    while r < row + rows {
+        if cells(img, r, col, cols).contains(text) { return true }
+        r += 1
+    }
+    false
+}
+
+/// Step until the rect holds the text, or the deadline.
+fn until_rect(mut p: client.Peer, text: str, col: int, row: int, cols: int, rows: int, ms: int) -> bool {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        if rect_has(p.image, text, col, row, cols, rows) { return true }
+        let k = client.step(mut p, until - now_ms())
+        if k < 0 { return false }
+    }
+    rect_has(p.image, text, col, row, cols, rows)
+}
+
+/// Step until some row of the rect reads exactly the text.
+fn until_rect_line(mut p: client.Peer, text: str, col: int, row: int, cols: int, rows: int, ms: int) -> bool {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        var r = row
+        while r < row + rows {
+            if cells(p.image, r, col, cols) == text { return true }
+            r += 1
+        }
+        let k = client.step(mut p, until - now_ms())
+        if k < 0 { return false }
+    }
+    false
+}
+
+/// Take messages until none comes for `quiet_ms`.
+fn drain(mut p: client.Peer, quiet_ms: int) {
+    var n = 0
+    while n < 1000 {
+        let k = client.step(mut p, quiet_ms)
+        if k <= 0 { return }
+        n += 1
+    }
+}
+
+fn file_has(path: str, text: str) -> bool {
+    let t = fs.read_text(path) else { return false }
+    t.contains(text)
+}
+
+fn until_file(path: str, text: str, ms: int) -> bool {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        if file_has(path, text) { return true }
+        time.sleep(time.millis(10))
+    }
+    file_has(path, text)
+}
+
+/// The number after `word ` on a line of the file, -1 if none.
+fn number_after(path: str, word: str) -> int {
+    let t = fs.read_text(path) else { return 0 - 1 }
+    for line in t.lines() {
+        let w = line.words()
+        if w.len >= 2 && w[0] == word { return w[1].to_int() else 0 - 1 }
+    }
+    0 - 1
+}
+
+/// Whether the lines of a file hold `want` in order (others between).
+fn in_order(path: str, want: List[str]) -> bool {
+    let t = fs.read_text(path) else { return false }
+    var k = 0
+    for line in t.lines() {
+        if k < want.len && line.trim() == want[k] { k += 1 }
+    }
+    k == want.len
+}
+
+fn until_in_order(path: str, want: List[str], ms: int) -> bool {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        if in_order(path, want) { return true }
+        time.sleep(time.millis(10))
+    }
+    in_order(path, want)
+}
+
+/// The next FRAME's payload, applied to the image and ACKed; empty when
+/// none came before the deadline. Other messages are applied on the way.
+fn next_image(mut p: client.Peer, ms: int) -> List[byte] {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        let m = client.next(mut p, until - now_ms())
+        if m.kind == 0 { return List[byte]() }
+        if m.kind == 131 {
+            if proto.apply(mut p.image, m.body) != 0 { return List[byte]() }
+            p.frames += 1
+            var a = List[byte]()
+            proto.put(mut a, p.image.seq, 4)
+            let _ok = client.send(p, 8, a)
+            return m.body
+        }
+        if m.kind == 135 || m.kind == 130 {
+            p.ended = true
+            return List[byte]()
+        }
+    }
+    List[byte]()
+}
+
+fn le(b: List[byte], at: int, width: int) -> int {
+    var n: int = 0
+    var f: int = 1
+    var i = 0
+    while i < width {
+        n = n + (b[at + i] as int) * f
+        f = f * 256
+        i += 1
+    }
+    n
+}
+
+/// A FRAME payload's runs as (row, col, columns) triples.
+fn runs_of(body: List[byte]) -> List[int] {
+    var out = List[int]()
+    let count = le(body, 18, 4)
+    var at = 22
+    var k = 0
+    while k < count && at + 18 <= body.len {
+        (mut out).push(le(body, at, 2))
+        (mut out).push(le(body, at + 2, 2))
+        (mut out).push(le(body, at + 14, 2))
+        let records = le(body, at + 16, 2)
+        at += 18
+        var j = 0
+        while j < records {
+            let n = le(body, at + 3, 1)
+            at += 4 + 4 * n
+            j += 1
+        }
+        k += 1
+    }
+    out
+}
+
+fn proc_gone(pid: int) -> bool {
+    !fs.exists("/proc/{pid}")
+}
+
+fn has_proc() -> bool {
+    fs.exists("/proc/self/status")
+}
+
+fn rss_kb(pid: int) -> int {
+    let text = fs.read_text("/proc/{pid}/status") else { return 0 - 1 }
+    for line in text.lines() {
+        if line.starts_with("VmRSS:") {
+            let parts = line.words()
+            if parts.len >= 2 { return parts[1].to_int() else 0 - 1 }
+        }
+    }
+    0 - 1
+}
+
+/// The server's children, where the host lists them (Linux), else -1.
+fn children_of(pid: int) -> int {
+    let t = fs.read_text("/proc/{pid}/task/{pid}/children") else { return 0 - 1 }
+    t.words().len
+}
+
+/// Open a session at cols x rows with a prompt drawn.
+fn session(r: Rig, cols: int, rows: int, target: str) -> client.Peer ! client.DialErrors {
+    var p = attach(r, cols, rows, target, 1)?
+    let _w = client.until_text(mut p, "$", 5000)
+    p
+}
+
+// ---------------- rows ----------------
+
+// 80x24: a left-right split gives 39 and 40 columns of 22 rows (LAYOUT.md;
+// tmux gives 40 and 39); the right pane split top-bottom gives 10 and 11.
+fn row_split_sizes(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let me = self_path()
+    let _s = prefix(p, 124)
+    if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "no prompt in the new right pane:\n" + client.screen_text(p) }
+    let _a = client.input(p, "{me} --print-size R\r")
+    if !until_rect(mut p, "R 22 40", 41, 1, 40, AREA, 5000) { return "right pane:\n" + client.screen_text(p) }
+    let _h = prefix(p, 104)
+    let _b = client.input(p, "{me} --print-size L\r")
+    if !until_rect(mut p, "L 22 39", 1, 1, 39, AREA, 5000) { return "left pane:\n" + client.screen_text(p) }
+    let _l = prefix(p, 108)
+    let _d = prefix(p, 45)
+    if !until_rect_line(mut p, "$", 41, 12, 40, 11, 5000) { return "no prompt in the new bottom pane:\n" + client.screen_text(p) }
+    let _c = client.input(p, "{me} --print-size B\r")
+    if !until_rect(mut p, "B 11 40", 41, 12, 40, 11, 5000) { return "bottom right pane:\n" + client.screen_text(p) }
+    let _k = prefix(p, 107)
+    let _e = client.input(p, "clear; {me} --print-size T\r")
+    if !until_rect(mut p, "T 10 40", 41, 1, 40, 10, 5000) { return "top right pane:\n" + client.screen_text(p) }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_keys_reach_focused(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let _s = prefix(p, 124)
+    if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "no prompt in the new pane:\n" + client.screen_text(p) }
+    let _a = client.input(p, "echo A-$((40+2))\r")
+    if !until_rect(mut p, "A-42", 41, 1, 40, AREA, 5000) { return "typed into the new pane, not shown there:\n" + client.screen_text(p) }
+    if rect_has(p.image, "A-", 1, 1, 39, AREA) { return "the new pane's keys reached the left pane:\n" + client.screen_text(p) }
+    let _h = prefix(p, 104)
+    let _b = client.input(p, "echo B-$((40+3))\r")
+    if !until_rect(mut p, "B-43", 1, 1, 39, AREA, 5000) { return "typed after focus left, not shown there:\n" + client.screen_text(p) }
+    if rect_has(p.image, "B-", 41, 1, 40, AREA) { return "the left pane's keys reached the right pane:\n" + client.screen_text(p) }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+// The helper is the pane's program (exec): it reports every window change
+// it hears, with the size it then reads.
+fn row_sigwinch(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let f = out_file(r, "winch.txt")
+    fs.remove(f) else |_| {}
+    let _x = client.input(p, "exec {self_path()} --winch {f} w\r")
+    if !until_file(f, "w start 22 80", 5000) { return "the helper did not start at 22 80:\n" + client.screen_text(p) }
+    var want = List[str]()
+    (mut want).push("w start 22 80")
+    // A split: the helper's pane keeps the left 39 columns.
+    let _s = prefix(p, 124)
+    (mut want).push("w winch 22 39")
+    if !until_in_order(f, want, 5000) { return "after the split: " + (fs.read_text(f) else "") }
+    // Back to it, then its right border moves two columns right.
+    let _h = prefix(p, 104)
+    let _l = prefix(p, 76)
+    (mut want).push("w winch 22 41")
+    if !until_in_order(f, want, 5000) { return "after the border moved: " + (fs.read_text(f) else "") }
+    let _z = prefix(p, 122)
+    (mut want).push("w winch 22 80")
+    if !until_in_order(f, want, 5000) { return "after zoom: " + (fs.read_text(f) else "") }
+    let _u = prefix(p, 122)
+    (mut want).push("w winch 22 41")
+    if !until_in_order(f, want, 5000) { return "after unzoom: " + (fs.read_text(f) else "") }
+    // The client's terminal grows: share 5190 of 99 columns is 51.
+    let _r = client.resize(p, 100, 30)
+    (mut want).push("w winch 28 51")
+    if !until_in_order(f, want, 5000) { return "after the client resized: " + (fs.read_text(f) else "") }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+// Closing a pane closes its terminal: its program hears the hangup, ends,
+// and is reaped; the sibling takes the whole area.
+fn row_close_hangs_up(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let f = out_file(r, "hup.txt")
+    fs.remove(f) else |_| {}
+    let _s = prefix(p, 124)
+    if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "no prompt in the new pane:\n" + client.screen_text(p) }
+    let _x = client.input(p, "exec {self_path()} --hup {f}\r")
+    if !until_file(f, "ready", 5000) { return "the helper did not start:\n" + client.screen_text(p) }
+    let pid = number_after(f, "ready")
+    if !until_rect(mut p, "hup-waiting", 41, 1, 40, AREA, 5000) { return "the helper is not drawn:\n" + client.screen_text(p) }
+    let t0 = now_ms()
+    let _c = prefix(p, 120)
+    if !until_file(f, "hangup {pid}", 5000) { return "the closed pane's program heard no hangup in 5 s: " + (fs.read_text(f) else "") }
+    print("MEASURE close-hangup-ms={now_ms() - t0}")
+    if has_proc() {
+        let until = now_ms() + 3000
+        while now_ms() < until && !proc_gone(pid) { time.sleep(time.millis(20)) }
+        if !proc_gone(pid) { return "the closed pane's program {pid} was not reaped" }
+    }
+    let _a = client.input(p, "{self_path()} --print-size C\r")
+    if !until_text(mut p, "C 22 80", 5000) { return "the survivor did not take the area:\n" + client.screen_text(p) }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn until_text(mut p: client.Peer, text: str, ms: int) -> bool {
+    client.until_text(mut p, text, ms)
+}
+
+fn row_exit_closes_pane(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let _s = prefix(p, 124)
+    if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "no prompt in the new pane:\n" + client.screen_text(p) }
+    let _x = client.input(p, "exit\r")
+    let _a = client.input(p, "{self_path()} --print-size E\r")
+    if !until_text(mut p, "E 22 80", 5000) { return "the remaining pane did not take the area:\n" + client.screen_text(p) }
+    let _e = client.input(p, "exit\r")
+    if !client.until_kind(mut p, 135, 5000) || p.end_code != 2 { return "the last pane's exit: BYE {p.end_code}, expected session-ended" }
+    client.hang_up(mut p)
+    var ch = process.Child { slot: r.server }
+    r.started = false
+    let st = process.wait_status(take ch) else 0 - 1
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_tabs(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "t") else |e| { return "dial-{e}" }
+    let _a = client.input(p, "echo T1-$((0+1))\r")
+    if !until_text(mut p, "T1-1", 5000) { return "no echo in tab 1" }
+    let _c = prefix(p, 99)
+    if !client.until_line(mut p, "$", 5000) { return "no prompt in tab 2:\n" + client.screen_text(p) }
+    if rect_has(p.image, "T1-1", 1, 1, 80, AREA) { return "tab 1's pane is still drawn in tab 2" }
+    if !until_rect(mut p, "1  2", 1, 23, 80, 1, 2000) { return "the bar does not list two tabs: '" + cells(p.image, 23, 1, 80) + "'" }
+    let _b = client.input(p, "sleep 1; echo LATE-$((5+5))\r")
+    time.sleep(time.millis(200))
+    let _p = prefix(p, 112)
+    if !until_text(mut p, "T1-1", 5000) { return "tab 1 not shown after p" }
+    time.sleep(time.millis(1500))
+    if rect_has(p.image, "LATE-10", 1, 1, 80, AREA) { return "tab 2's output was drawn over tab 1" }
+    let _two = prefix(p, 50)
+    if !until_text(mut p, "LATE-10", 5000) { return "tab 2's output while hidden is not there:\n" + client.screen_text(p) }
+    let _n = prefix(p, 110)
+    if !until_text(mut p, "T1-1", 5000) { return "n did not wrap to tab 1" }
+    let _d = client.input(p, "echo T1-$((1+1))\r")
+    if !until_text(mut p, "T1-2", 5000) { return "keys did not reach tab 1's pane" }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+// A client resize reaches the pane of a tab that is not shown.
+fn row_resize_all_tabs(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let f = out_file(r, "winch.txt")
+    fs.remove(f) else |_| {}
+    let _c = prefix(p, 99)
+    if !client.until_line(mut p, "$", 5000) { return "no prompt in tab 2" }
+    let _x = client.input(p, "exec {self_path()} --winch {f} t2\r")
+    if !until_file(f, "t2 start 22 80", 5000) { return "the helper did not start" }
+    let _p = prefix(p, 112)
+    time.sleep(time.millis(200))
+    let _r = client.resize(p, 100, 30)
+    if !until_file(f, "t2 winch 28 100", 5000) { return "the hidden tab's pane was not resized: " + (fs.read_text(f) else "") }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn border_cells(img: proto.Image) -> int {
+    var n = 0
+    var row = 1
+    while row <= AREA {
+        var c = 1
+        while c <= img.cols {
+            let b = img.base[(row - 1) * img.cols + c - 1]
+            if b >= 9472 && b <= 9599 { n += 1 }
+            c += 1
+        }
+        row += 1
+    }
+    n
+}
+
+fn row_zoom(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let me = self_path()
+    let _s = prefix(p, 124)
+    if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "no prompt in the new pane" }
+    let _z = prefix(p, 122)
+    let _a = client.input(p, "clear; {me} --print-size Z\r")
+    if !until_text(mut p, "Z 22 80", 5000) { return "zoomed:\n" + client.screen_text(p) }
+    if border_cells(p.image) != 0 { return "borders drawn while zoomed:\n" + client.screen_text(p) }
+    let _u = prefix(p, 122)
+    let _b = client.input(p, "clear; {me} --print-size U\r")
+    if !until_rect(mut p, "U 22 40", 41, 1, 40, AREA, 5000) { return "unzoomed:\n" + client.screen_text(p) }
+    if border_cells(p.image) != AREA { return "{border_cells(p.image)} border cells after unzoom, expected {AREA}" }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+// At 20x6 (a tab area of 20x4) a split that would leave a pane under its
+// minimum is refused by name, and nothing is started.
+fn row_too_small(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 20, 6, "") else |e| { return "dial-{e}" }
+    let pid = server_pid(r)
+    let _d = prefix(p, 45)
+    if !until_rect(mut p, "$", 1, 3, 20, 2, 5000) { return "no prompt in the bottom pane:\n" + client.screen_text(p) }
+    let before = children_of(pid)
+    let _e = prefix(p, 45)
+    if !until_rect(mut p, "too small", 1, 6, 20, 1, 3000) { return "no refusal on the hint line: '" + cells(p.image, 6, 1, 20) + "'" }
+    let after = children_of(pid)
+    if before >= 0 && after != before { return "a program was started for a refused split ({before} -> {after})" }
+    if border_cells(p.image) != 20 { return "the layout changed: {border_cells(p.image)} border cells" }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+// The memory budget, lowered below a second pane: the split is refused by
+// name, nothing starts, and the pane goes on.
+fn row_pane_memory(mut r: Rig) -> str {
+    let one = server.pane_bytes(80, 22) + server.attached_bytes(80, 24) + server.connection_bytes()
+    env.set("WARREN_MEMORY_BUDGET", "{one}") else { return "env" }
+    let why = start_server(mut r, "/bin/sh")
+    env.set("WARREN_MEMORY_BUDGET", "0") else { return "env" }
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let _s = prefix(p, 124)
+    if !until_rect(mut p, "refused", 1, 24, 80, 1, 3000) { return "no refusal on the hint line: '" + cells(p.image, 24, 1, 80) + "'" }
+    if border_cells(p.image) != 0 { return "a split was drawn past the budget" }
+    let _a = client.input(p, "echo still-$((40+2))\r")
+    if !until_text(mut p, "still-42", 5000) { return "the pane stopped answering" }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+// 32 panes a session (tabs here): the 33rd is refused by name.
+fn row_pane_limit(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/cat")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut p, 131, 5000) { return "no image" }
+    var n = 1
+    while n < 32 {
+        let _c = prefix(p, 99)
+        n += 1
+        let label = " {n} "
+        if !until_rect(mut p, "{n}", 1, 23, 80, 1, 5000) { return "tab {n} not listed: '" + cells(p.image, 23, 1, 80) + "' ({label})" }
+    }
+    let _c = prefix(p, 99)
+    if !until_rect(mut p, "32 panes", 1, 24, 80, 1, 3000) { return "the 33rd pane was not refused by name: '" + cells(p.image, 24, 1, 80) + "'" }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+/// "" when the image's cell holds the scalar, flags and foreground.
+fn cell_is(img: proto.Image, col: int, row: int, base: int, flags: int, fg: int) -> str {
+    let i = (row - 1) * img.cols + col - 1
+    if img.base[i] != base || img.flags[i] != flags || img.fg[i] != fg || img.bg[i] != 0 || img.width[i] != 1 {
+        return "cell {col},{row}: U+{img.base[i]} flags {img.flags[i]} fg {img.fg[i]} bg {img.bg[i]} width {img.width[i]}; expected U+{base} flags {flags} fg {fg}"
+    }
+    ""
+}
+
+// Three panes at 80x24 (left; right top and bottom), cat in each: the
+// border column 40 with its junction at row 11, the right column's border
+// along row 11, the focus ring in colour 2, the bar's two lines, blanks in
+// every pane. `focus` is 1 for the left pane, 3 for the bottom right.
+fn golden_three(img: proto.Image, focus: int, name: str) -> str {
+    if !img.valid || img.cols != 80 || img.rows != 24 { return "image {img.cols}x{img.rows}" }
+    var row = 1
+    while row <= AREA {
+        let glyph = if row == 11 then 9500 else 9474
+        let lit = focus == 1 || row >= 11
+        let w = cell_is(img, 40, row, glyph, 0, if lit then GREEN else 0)
+        if w.len > 0 { return w }
+        row += 1
+    }
+    var c = 41
+    while c <= 80 {
+        let w = cell_is(img, c, 11, 9472, 0, if focus == 3 then GREEN else 0)
+        if w.len > 0 { return w }
+        c += 1
+    }
+    row = 1
+    while row <= AREA {
+        c = 1
+        while c <= 80 {
+            if c != 40 && !(row == 11 && c > 40) {
+                let w = cell_is(img, c, row, 32, 0, 0)
+                if w.len > 0 { return "pane " + w }
+            }
+            c += 1
+        }
+        row += 1
+    }
+    // Line one: " NAME " and " 1 ", both inverse (the one tab is active).
+    let bar = " {name}  1 "
+    var k = 0
+    for b in bar.bytes() {
+        let w = cell_is(img, k + 1, 23, b as int, INVERSE, 0)
+        if w.len > 0 { return "bar " + w }
+        k += 1
+    }
+    c = k + 1
+    while c <= 80 {
+        let w = cell_is(img, c, 23, 32, 0, 0)
+        if w.len > 0 { return "bar " + w }
+        c += 1
+    }
+    c = 1
+    while c <= 80 {
+        let w = cell_is(img, c, 24, 32, 0, 0)
+        if w.len > 0 { return "hint line " + w }
+        c += 1
+    }
+    let at_col = if focus == 1 then 1 else 41
+    let at_row = if focus == 1 then 1 else 12
+    if img.cursor_col != at_col || img.cursor_row != at_row { return "cursor {img.cursor_col},{img.cursor_row}, expected {at_col},{at_row}" }
+    ""
+}
+
+// Two panes side by side: one border; the half of it beside the focused
+// pane is marked (rows 1-11 for the left, 12-22 for the right).
+fn golden_two(img: proto.Image, left: bool) -> str {
+    if !img.valid || img.cols != 80 { return "image {img.cols}x{img.rows}" }
+    var row = 1
+    while row <= AREA {
+        let lit = if left then row <= 11 else row >= 12
+        let w = cell_is(img, 40, row, 9474, 0, if lit then GREEN else 0)
+        if w.len > 0 { return w }
+        row += 1
+    }
+    ""
+}
+
+fn until_golden_three(mut p: client.Peer, focus: int, name: str, ms: int) -> str {
+    let until = now_ms() + ms
+    var w = golden_three(p.image, focus, name)
+    while w.len > 0 && now_ms() < until {
+        let k = client.step(mut p, 100)
+        if k < 0 { return "connection ended: " + w }
+        w = golden_three(p.image, focus, name)
+    }
+    w
+}
+
+fn until_golden_two(mut p: client.Peer, left: bool, ms: int) -> str {
+    let until = now_ms() + ms
+    var w = golden_two(p.image, left)
+    while w.len > 0 && now_ms() < until {
+        let k = client.step(mut p, 100)
+        if k < 0 { return "connection ended: " + w }
+        w = golden_two(p.image, left)
+    }
+    w
+}
+
+fn row_frame_golden(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/cat")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "g", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut p, 131, 5000) { return "no image" }
+    let _s = prefix(p, 124)
+    var w = until_golden_two(mut p, false, 3000)
+    if w.len > 0 { return "two panes, the right focused: " + w }
+    let _h = prefix(p, 104)
+    w = until_golden_two(mut p, true, 3000)
+    if w.len > 0 { return "two panes, the left focused: " + w }
+    let _l = prefix(p, 108)
+    let _d = prefix(p, 45)
+    let _b = prefix(p, 104)
+    w = until_golden_three(mut p, 1, "g", 3000)
+    if w.len > 0 { return "three panes, the left focused: " + w }
+    let _r = prefix(p, 108)
+    w = until_golden_three(mut p, 3, "g", 3000)
+    if w.len > 0 { return "three panes, the bottom right focused: " + w }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+// A keystroke's image holds only the focused pane's cells.
+fn row_damage_in_rect(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let _s = prefix(p, 124)
+    if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "no prompt in the new pane" }
+    drain(mut p, 300)
+    p.auto_ack = false
+    var n = 0
+    while n < 5 {
+        let _k = client.key(p, 0, 0, 113)
+        let body = next_image(mut p, 3000)
+        if body.len == 0 { return "no image for keystroke {n}" }
+        let rs = runs_of(body)
+        var k = 0
+        while k < rs.len {
+            let row = rs[k]
+            let col = rs[k + 1]
+            let width = rs[k + 2]
+            if row < 1 || row > AREA || col < 41 || col + width - 1 > 80 {
+                return "keystroke {n}: a run at {col},{row} x{width} outside the focused pane (41,1 40x22)"
+            }
+            k += 3
+        }
+        if rs.len == 0 { return "keystroke {n}: an image without the echo" }
+        n += 1
+    }
+    p.auto_ack = true
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+// The bytes of the image a focus change makes, two and three panes.
+fn row_focus_bytes(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/cat")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut p, 131, 5000) { return "no image" }
+    let _s = prefix(p, 124)
+    let w2 = until_golden_two(mut p, false, 3000)
+    if w2.len > 0 { return "two panes: " + w2 }
+    drain(mut p, 300)
+    p.auto_ack = false
+    let _h = prefix(p, 104)
+    let two = next_image(mut p, 3000)
+    if two.len == 0 { return "no image for the focus change" }
+    let two_bytes = 6 + two.len
+    p.auto_ack = true
+    let _l = prefix(p, 108)
+    let _d = prefix(p, 45)
+    let w3 = until_golden_three(mut p, 3, "default", 3000)
+    if w3.len > 0 { return "three panes: " + w3 }
+    drain(mut p, 300)
+    p.auto_ack = false
+    let _b = prefix(p, 104)
+    let three = next_image(mut p, 3000)
+    if three.len == 0 { return "no image for the second focus change" }
+    let three_bytes = 6 + three.len
+    p.auto_ack = true
+    print("MEASURE focus-change 80x24 two-panes-wire-bytes={two_bytes} three-panes-wire-bytes={three_bytes}")
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    if two_bytes > 750 { return "a focus change between two panes took {two_bytes} bytes (predicted 600, bound 750)" }
+    if three_bytes > 425 { return "a focus change among three panes took {three_bytes} bytes (predicted 314, bound 425)" }
+    ""
+}
+
+fn percentile(sorted: List[int], pct: int) -> int {
+    if sorted.len == 0 { return 0 - 1 }
+    var i = sorted.len * pct / 100
+    if i >= sorted.len { i = sorted.len - 1 }
+    sorted[i]
+}
+
+// Type count characters at the right pane's prompt, each timed from the
+// KEY's send to the image showing it; Ctrl-U every 30.
+fn keystrokes(mut q: client.Peer, count: int, gap_ms: int) -> List[int] {
+    var times = List[int]()
+    var typed = ""
+    var n = 0
+    while n < count {
+        if gap_ms > 0 { time.sleep(time.millis(gap_ms)) }
+        let ch = "abcdefghijklmnopqrstuvwxyz"[n % 26..n % 26 + 1]
+        let t0 = time.monotonic_ns()
+        let _k = client.key(q, 0, 0, 97 + n % 26)
+        typed = typed + ch
+        if !until_rect_line(mut q, "$ " + typed, 41, 1, 40, AREA, 10000) {
+            eprint("keystroke {n} not shown:\n" + client.screen_text(q))
+            return List[int]()
+        }
+        (mut times).push((time.monotonic_ns() - t0) / 1000)
+        if typed.len == 30 {
+            let _u = client.key(q, 4, 0, 117)
+            if !until_rect_line(mut q, "$", 41, 1, 40, AREA, 10000) { return List[int]() }
+            typed = ""
+        }
+        n += 1
+    }
+    times
+}
+
+fn report(label: str, times: List[int]) -> int {
+    var sorted = copy times
+    sort.sort_ints(mut sorted)
+    let worst = percentile(sorted, 100)
+    print("MEASURE {label} keys={times.len} p50-us={percentile(sorted, 50)} p90-us={percentile(sorted, 90)} p99-us={percentile(sorted, 99)} max-us={worst}")
+    worst
+}
+
+fn row_keys_in_split(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let _s = prefix(p, 124)
+    if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "no prompt in the new pane" }
+    let _c = client.input(p, "clear\r")
+    if !until_rect_line(mut p, "$", 41, 1, 40, 1, 5000) { return "no prompt on the right pane's first row" }
+    let quiet = keystrokes(mut p, 120, 25)
+    if quiet.len == 0 { return "a keystroke in the split was not shown" }
+    let _q = report("keys-quiet-split gap-ms=25", quiet)
+    let _h = prefix(p, 104)
+    let _f = client.input(p, "while :; do echo 0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopq; done\r")
+    let _l = prefix(p, 108)
+    let _u = client.key(p, 4, 0, 117)
+    time.sleep(time.millis(200))
+    let flooded = keystrokes(mut p, 120, 25)
+    if flooded.len == 0 { return "a keystroke beside the flooding pane was not shown" }
+    let worst = report("keys-beside-split-flood gap-ms=25", flooded)
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    if worst > 2000000 { return "a keystroke beside the flood took {worst} us (bound 2 s)" }
+    ""
+}
+
+fn row_split_latency(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    drain(mut p, 300)
+    let t0 = now_ms()
+    let _s = prefix(p, 124)
+    if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "no prompt in the new pane" }
+    print("MEASURE split-ms={now_ms() - t0} (the prefix and | to the new pane's prompt drawn)")
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+// Split and close 200 times: the server's resident size stays within 1 MiB
+// after the first cycle (pane slots are reused, layout work dies with its
+// turn).
+fn row_split_close_cycles(mut r: Rig) -> str {
+    let why = start_with(mut r, "/bin/cat", 600000)
+    if why.len > 0 { return why }
+    let pid = server_pid(r)
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut p, 131, 5000) { return "no image" }
+    var before = 0
+    var n = 0
+    while n < 201 {
+        let _s = prefix(p, 124)
+        let a = until_golden_two(mut p, false, 3000)
+        if a.len > 0 { return "cycle {n}: no split: " + a }
+        let _x = prefix(p, 120)
+        let until = now_ms() + 3000
+        while border_cells(p.image) != 0 && now_ms() < until { let _k = client.step(mut p, 100) }
+        if border_cells(p.image) != 0 { return "cycle {n}: the split did not close" }
+        if n == 0 {
+            time.sleep(time.millis(300))
+            before = rss_kb(pid)
+        }
+        n += 1
+    }
+    time.sleep(time.millis(300))
+    let after = rss_kb(pid)
+    print("MEASURE split-close-cycles=200 server-rss-before-kb={before} after-kb={after}")
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if before < 0 || after < 0 { return "no /proc status for the server" }
+    if after - before > 1024 { return "server RSS grew {after - before} kB over 200 split/close cycles" }
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn run_row(warren: str, name: str) -> str {
+    var r = rig(warren, name)
+    var why = "no such row"
+    if name == "split-sizes" { why = row_split_sizes(mut r) }
+    else if name == "keys-reach-focused" { why = row_keys_reach_focused(mut r) }
+    else if name == "sigwinch-on-change" { why = row_sigwinch(mut r) }
+    else if name == "close-hangs-up" { why = row_close_hangs_up(mut r) }
+    else if name == "exit-closes-pane" { why = row_exit_closes_pane(mut r) }
+    else if name == "tabs" { why = row_tabs(mut r) }
+    else if name == "resize-all-tabs" { why = row_resize_all_tabs(mut r) }
+    else if name == "zoom" { why = row_zoom(mut r) }
+    else if name == "too-small" { why = row_too_small(mut r) }
+    else if name == "pane-memory" { why = row_pane_memory(mut r) }
+    else if name == "pane-limit" { why = row_pane_limit(mut r) }
+    else if name == "frame-golden" { why = row_frame_golden(mut r) }
+    else if name == "damage-in-rect" { why = row_damage_in_rect(mut r) }
+    else if name == "focus-bytes" { why = row_focus_bytes(mut r) }
+    else if name == "keys-in-split" { why = row_keys_in_split(mut r) }
+    else if name == "split-latency" { why = row_split_latency(mut r) }
+    else if name == "split-close-cycles" { why = row_split_close_cycles(mut r) }
+    if r.started { let _s = stop_server(mut r) }
+    why
+}
+
+fn all_rows() -> List[str] {
+    var x = List[str]()
+    for n in "split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes keys-in-split split-latency".split(" ") {
+        (mut x).push(n)
+    }
+    x
+}
+
+// ---------------- helpers run inside panes ----------------
+
+fn print_size(tag: str) -> int {
+    let size = term.size(fs.stdin()) else |e| {
+        print("size-{e}")
+        return 1
+    }
+    print("{tag} {size.rows} {size.columns}")
+    0
+}
+
+fn winch_helper(path: str, tag: str) -> int {
+    let set = signal.resize() | signal.reload()
+    signal.listen(set) else |e| {
+        print("winch-listen-{e}")
+        return 1
+    }
+    let s0 = term.size(fs.stdin()) else |e| {
+        print("size-{e}")
+        return 1
+    }
+    fs.append_text(path, "{tag} start {s0.rows} {s0.columns}\n") else |_| {}
+    print("{tag} watching")
+    var n = 0
+    while n < 100000 {
+        let m = signal.wait(set) else { return 1 }
+        if m & signal.reload() != 0 { return 0 }
+        if m & signal.resize() != 0 {
+            let s = term.size(fs.stdin()) else { return 1 }
+            fs.append_text(path, "{tag} winch {s.rows} {s.columns}\n") else |_| {}
+        }
+        n += 1
+    }
+    0
+}
+
+fn hup_helper(path: str) -> int {
+    let set = signal.reload()
+    signal.listen(set) else |e| {
+        print("hup-listen-{e}")
+        return 1
+    }
+    let pid = env.pid()
+    fs.append_text(path, "ready {pid}\n") else |_| {}
+    print("hup-waiting")
+    let m = signal.wait(set) else { return 1 }
+    if m & signal.reload() != 0 { fs.append_text(path, "hangup {pid}\n") else |_| {} }
+    0
+}
+
+fn main() -> int {
+    let args = env.args()
+    if args.len == 2 && args[0] == "--print-size" { return print_size(args[1]) }
+    if args.len == 3 && args[0] == "--winch" { return winch_helper(args[1], args[2]) }
+    if args.len == 2 && args[0] == "--hup" { return hup_helper(args[1]) }
+    if args.len < 1 {
+        eprint("usage: pane_rows WARREN [ROW...]")
+        return 2
+    }
+    let warren = args[0]
+    var rows = List[str]()
+    var i = 1
+    while i < args.len {
+        (mut rows).push(args[i])
+        i += 1
+    }
+    if rows.len == 0 { rows = all_rows() }
+    var failed = 0
+    for name in rows {
+        let t0 = now_ms()
+        let why = run_row(warren, name)
+        let t = now_ms() - t0
+        if why.len == 0 {
+            print("PASS {name} ms={t}")
+        } else {
+            failed += 1
+            print("FAIL {name} {why}")
+        }
+    }
+    print("PANE-ROWS rows={rows.len} failed={failed}")
+    if failed > 0 { return 1 }
+    0
+}

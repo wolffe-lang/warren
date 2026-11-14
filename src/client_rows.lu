@@ -692,12 +692,12 @@ fn row_second_client(warren: str) -> str {
     }
     let t0 = now_ms()
     type_text(mut a, "{me} --print-size s1\r")
-    let both = until_both(mut a, mut b, "s1 20 60", 5000)
+    let both = until_both(mut a, mut b, "s1 18 60", 5000)
     let took = now_ms() - t0
     if !both {
         close_quiet(b)
         close_run(a)
-        return "with a 60x20 client beside an 80x24 one the pane did not read 20 60 in both: " +
+        return "with a 60x20 client beside an 80x24 one the pane did not read 18 60 in both (two bar lines below it): " +
             screen_text(a.screen).trim().replace("\n", " | ")
     }
     print("MEASURE second-client typed-to-both-ms={took}")
@@ -710,9 +710,9 @@ fn row_second_client(warren: str) -> str {
         return "the second client's detach: " + why
     }
     type_text(mut a, "{me} --print-size s2\r")
-    if !until_screen(mut a, "s2 24 80", 5000) {
+    if !until_screen(mut a, "s2 22 80", 5000) {
         close_run(a)
-        return "after the second detached the pane did not read 24 80"
+        return "after the second detached the pane did not read 22 80"
     }
     // A third client's terminal goes away: the first and the pane go on.
     var c = launch_as(warren, "second", "c", words("attach"), 60, 20) else |e| {
@@ -738,7 +738,7 @@ fn row_second_client(warren: str) -> str {
         return "the third client did not end when its terminal went away"
     }
     type_text(mut a, "{me} --print-size s3\r")
-    if !until_screen(mut a, "s3 24 80", 5000) {
+    if !until_screen(mut a, "s3 22 80", 5000) {
         close_run(a)
         return "after a client's terminal went away the first did not go on: " +
             screen_text(a.screen).trim().replace("\n", " | ")

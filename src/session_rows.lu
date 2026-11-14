@@ -342,7 +342,7 @@ fn row_two_sizes(mut r: Rig) -> str {
     // The pane's program reads its size with this program's own helper
     // mode (a host's stty may not report one).
     let _i = client.input(a, "{self_path()} --print-size\r")
-    if !client.until_text(mut a, "30 100", 5000) { return "the pane did not hear its size: " + client.screen_text(a) }
+    if !client.until_text(mut a, "28 100", 5000) { return "the pane did not hear its size (30 rows less the two bar lines): " + client.screen_text(a) }
     client.hang_up(mut a)
     let st = stop_server(mut r)
     if st != 0 { return "server exit {st}" }
