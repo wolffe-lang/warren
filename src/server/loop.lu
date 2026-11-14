@@ -6,6 +6,7 @@
 use std.env
 use std.fs
 use std.net
+use std.net.unix
 use std.poll
 use std.process
 use std.signal
@@ -43,6 +44,7 @@ pub struct Server {
     trace: bool,
     turns: int,
     master_read: int,
+    uid: int,
 }
 
 fn now_ns() -> int {
@@ -576,6 +578,16 @@ fn hello(mut s: Server, index: int) {
         close_conn(mut s, index)
         return
     }
+    // Defence in depth beside the 0700 directory: a peer of another user
+    // is closed silently before anything it sent is used.
+    let peer = unix.peer_credentials(net.Socket { fd: s.conns[index].fd }) else |_| {
+        unix.Credentials { pid: 0 - 1, uid: s.uid, gid: 0 - 1 }
+    }
+    if peer.uid != s.uid {
+        trace(s, "conn {index} from uid {peer.uid}: closed")
+        close_conn(mut s, index)
+        return
+    }
     if h.role == 2 {
         s.conns[index].hello_ready = false
         s.conns[index].read_on = true
@@ -1090,7 +1102,7 @@ pub fn serve() -> int {
         key_gen: List[int](), next_id: 0, stopping: false, stop_deadline: 0, started: now_ns(),
         idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
         version: vt.package_version(), again: false, need_slot: false, rotate: 0,
-        trace: env.has("WARREN_TRACE"), turns: 0, master_read: master_read,
+        trace: env.has("WARREN_TRACE"), turns: 0, master_read: master_read, uid: env.euid() else 0 - 1,
     }
     net.set_listener_deadline(mut s.place.listener, 1) else |_| {}
     listener_interest(mut s)
