@@ -54,6 +54,12 @@ instead prepares an ignored version member from the single manifest field.
   The generator uses Mn/Me, default-ignorable Cf, W/F and Emoji_Presentation,
   with zero width taking precedence, then applies the five stated exception
   classes in `tests/vt/width-exceptions.json`. It imports no code from input folders.
+- Print-cluster classification also uses that exact pinned `UnicodeData.txt`:
+  `tools/vt/generate_combining.py` produces `tests/vt/combining-ranges.json`
+  for Mn/Me or nonzero canonical combining class. The oracle reads those
+  versioned ranges, not Python's host-dependent `unicodedata`. U+13440 is Mn
+  in Unicode 15.1 and width 0 in warren's generated width table; an older host
+  Unicode database cannot turn it into an unassigned negative control.
 - Unicode's 15.1 ReadMe identifies the final 2023-08-28 data;
   SHA-256 `0d2da782ead4e85630d510f50808355e8c3355e670841d257dd1e6fbd40db9fa`.
   Unicode License V3 is included as `LICENSE-UNICODE`, SHA-256

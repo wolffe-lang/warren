@@ -122,6 +122,11 @@ fn test_zero_width_exception_attachment() {
     vt.feed(mut format, "a\u{13430}\u{13431}".bytes())
     assert(format.cursor_col == 2 && format.primary.cells[0].mark1 == 0x13430 &&
         format.primary.cells[0].mark2 == 0x13431, "zero-width-format-attach-to-base")
+    var normative = vt.new(12, 4, 0)
+    vt.feed(mut normative, "a\u{13440}".bytes())
+    assert(vt.scalar_width(0x13440) == 0 && normative.cursor_col == 2 &&
+        normative.primary.cells[0].base == 97 && normative.primary.cells[0].mark1 == 0x13440 &&
+        normative.primary.extents[0] == 1, "unicode15-normative-Egyptian-Mn-attaches-without-advance")
     var blank = vt.new(12, 4, 0)
     vt.feed(mut blank, "\u{1b}[1;5H\u{1161}".bytes())
     assert(blank.primary.cells[4].written && blank.primary.extents[0] == 5 &&
