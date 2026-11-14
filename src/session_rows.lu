@@ -20,6 +20,7 @@ use std.term
 use std.time
 use client
 use proto
+use server
 
 struct Rig {
     warren: str,
@@ -755,6 +756,65 @@ fn row_max_sessions(mut r: Rig) -> str {
     ""
 }
 
+fn row_max_connections(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    // MAX_CONNECTIONS (32) attached clients; a 33rd waits in the backlog
+    // until one of them goes.
+    var held = List[client.Peer]()
+    var i = 0
+    while i < 32 {
+        var p = attach(r, 20, 6, "", 1) else |e| { return "dial-{e}" }
+        if !client.until_kind(mut p, 129, 3000) { return "client {i}: no WELCOME ({p.end_code})" }
+        (mut held).push(p)
+        i = i + 1
+    }
+    var extra = attach(r, 20, 6, "", 1) else |e| { return "dial-{e}" }
+    let early = client.next(mut extra, 700)
+    if early.kind != 0 { return "a 33rd connection was served beside 32 ({early.kind})" }
+    client.hang_up(mut held[0])
+    if !client.until_kind(mut extra, 129, 3000) { return "the 33rd connection was not served after one went" }
+    client.hang_up(mut extra)
+    i = 1
+    while i < 32 {
+        client.hang_up(mut held[i])
+        i = i + 1
+    }
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_memory_budget(mut r: Rig) -> str {
+    // A lowered budget (the server never raises its own) that one 80x24
+    // session with one client fits, with room for one connection not yet
+    // past HELLO (the start probe's, if not yet closed): a second session
+    // and a second client of the first are refused resource-limit; the
+    // first still works.
+    let one = server.pane_bytes(80, 24) + server.attached_bytes(80, 24) + server.connection_bytes()
+    env.set("WARREN_MEMORY_BUDGET", "{one}") else { return "env" }
+    let why = start_server(mut r, "/bin/sh")
+    env.set("WARREN_MEMORY_BUDGET", "0") else { return "env" }
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "a", 1) else |e| { return "dial-{e}" }
+    if !client.until_line(mut p, "$", 5000) { return "the first session did not start ({p.end_code})" }
+    var b = attach(r, 80, 24, "b", 1) else |e| { return "dial-{e}" }
+    let code_b = refusal(mut b)
+    client.hang_up(mut b)
+    var c = attach(r, 80, 24, "a", 0) else |e| { return "dial-{e}" }
+    let code_c = refusal(mut c)
+    client.hang_up(mut c)
+    let _i = client.input(p, "echo still-$((20+22))\r")
+    let alive = client.until_text(mut p, "still-42", 5000)
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if code_b != 7 { return "a second session: refusal {code_b}, expected resource-limit" }
+    if code_c != 7 { return "a second client: refusal {code_c}, expected resource-limit" }
+    if !alive { return "the first session stopped answering" }
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
 fn row_resize_crossing(mut r: Rig) -> str {
     let why = start_server(mut r, "/bin/sh")
     if why.len > 0 { return why }
@@ -838,6 +898,8 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "threads" { why = row_threads(mut r) }
     else if name == "max-pending" { why = row_max_pending(mut r) }
     else if name == "max-sessions" { why = row_max_sessions(mut r) }
+    else if name == "max-connections" { why = row_max_connections(mut r) }
+    else if name == "memory-budget" { why = row_memory_budget(mut r) }
     else if name == "resize-crossing-image" { why = row_resize_crossing(mut r) }
     else if name == "too-slow" { why = row_too_slow(mut r) }
     if r.started { let _s = stop_server(mut r) }
@@ -846,7 +908,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions resize-crossing-image too-slow".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow".split(" ") {
         (mut x).push(n)
     }
     x
