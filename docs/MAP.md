@@ -96,10 +96,11 @@ No row sends a signal from a script.
   boundaries. `warren vt-dump` is a diagnostic; `warren modules` lists the
   modules and their milestones.
 - The server and client rows run natively on Linux and macOS; the session rows
-  also run on PAX under QEMU from a console transcript (docs/SERVER.md).
+  and the client rows also run on PAX under QEMU from a console transcript
+  (docs/SERVER.md, docs/CLIENT.md).
 - The oracle rows run on Linux only. macOS runs the unit gate, the build and
   the tests.
 - Recorded digests bind the dumps to this image. A new reference version is
   a new set of digests and a reviewed diff, never an edit in passing.
-- PAX statements are the ones docs/SERVER.md marks measured under QEMU; none is
-  measured on real hardware.
+- PAX statements are the ones docs/SERVER.md and docs/CLIENT.md mark measured
+  under QEMU; none is measured on real hardware.

@@ -67,3 +67,12 @@ policy sends only CSI sequences: no OSC, DCS or APC. Rows render images into
 warren's own emulator as the outer terminal and compare every cell, at every
 depth, for full repaints and deltas over a seeded soak; a model of a
 one-cell-a-code-point console holds the console policy.
+
+## Measured
+
+The client rows run natively on Linux and macOS, and on PAX under QEMU from a
+console transcript, with the client in a pseudo-terminal of the rows' own.
+Attached to one 80x24 session, the client's resident size peaks at 4-5.2 MB
+on Linux and 10.3 MB on PAX (`MEASURE client`). Rendering a full 80x24 image
+takes about 0.8 ms on Linux and a one-cell delta about 0.08 ms
+(`MEASURE render` in the compose rows).
