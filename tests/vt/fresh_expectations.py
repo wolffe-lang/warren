@@ -79,8 +79,10 @@ def legacy_pair(data, original, repaired):
     assert original['size'] == repaired['size']
     for r, row in enumerate(original['rows']):
         for c, cell in enumerate(row):
-            before = parts(cell[2])
-            after = parts(repaired['rows'][r][c][2])
+            # Apply existing N1 before bounding observable foreground changes,
+            # just as recompose_no_bold does. Keep unobservable raw cells intact.
+            before = parts(screen.normalise(cell)[2])
+            after = parts(screen.normalise(repaired['rows'][r][c])[2])
             old, new = foreground(before), foreground(after)
             if old != new:
                 assert edits, 'D13 correction without a source legacy30 setter'
