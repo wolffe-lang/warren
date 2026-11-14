@@ -1,0 +1,257 @@
+//! member: true
+//! The invariants of docs/LAYOUT.md as checks. Each answers "" when the
+//! invariant holds, or what broke.
+use layout
+
+fn hidden(r: layout.Rect) -> bool {
+    r.col == 0 && r.row == 0 && r.cols == 0 && r.rows == 0
+}
+
+fn overlap(a0: int, a1: int, b0: int, b1: int) -> bool {
+    a0 < b1 && b0 < a1
+}
+
+/// Invariant 1, one tab at a size: `rects` names every pane once in tree
+/// order, and the visible rects with the border cells tile the area.
+pub fn tiling(l: layout.Layout, tab: int, cols: int, rows: int) -> str {
+    let rs = layout.rects(l, tab, cols, rows)
+    let bs = layout.borders(l, tab, cols, rows)
+    let ps = layout.panes(l, tab)
+    if ps.len == 0 { return "tab {tab} has no panes" }
+    if rs.len != ps.len { return "rects names {rs.len} panes; the tab has {ps.len}" }
+    var c0 = List[int]()
+    var r0 = List[int]()
+    var c1 = List[int]()
+    var r1 = List[int]()
+    var i = 0
+    while i < rs.len {
+        let r = rs[i]
+        if r.pane != ps[i] { return "rect {i} is pane {r.pane}; tree order has {ps[i]}" }
+        if !hidden(r) {
+            if r.cols < 1 || r.rows < 1 { return "pane {r.pane} has a degenerate rect {r.cols}x{r.rows}" }
+            (mut c0).push(r.col)
+            (mut r0).push(r.row)
+            (mut c1).push(r.col + r.cols)
+            (mut r1).push(r.row + r.rows)
+        }
+        i += 1
+    }
+    for b in bs {
+        if b.length < 1 { return "a border of length {b.length}" }
+        (mut c0).push(b.col)
+        (mut r0).push(b.row)
+        if b.axis == layout.COLS {
+            (mut c1).push(b.col + 1)
+            (mut r1).push(b.row + b.length)
+        } else {
+            (mut c1).push(b.col + b.length)
+            (mut r1).push(b.row + 1)
+        }
+    }
+    var area: int = 0
+    i = 0
+    while i < c0.len {
+        if c0[i] < 1 || r0[i] < 1 || c1[i] > cols + 1 || r1[i] > rows + 1 {
+            return "piece {i} at {c0[i]},{r0[i]} to {c1[i]},{r1[i]} leaves the {cols}x{rows} area"
+        }
+        area += (c1[i] - c0[i]) * (r1[i] - r0[i])
+        var j = i + 1
+        while j < c0.len {
+            if overlap(c0[i], c1[i], c0[j], c1[j]) && overlap(r0[i], r1[i], r0[j], r1[j]) {
+                return "pieces {i} and {j} overlap at {c0[j]},{r0[j]}"
+            }
+            j += 1
+        }
+        i += 1
+    }
+    if area != cols * rows { return "pieces cover {area} cells of {cols * rows}" }
+    ""
+}
+
+fn child(t: layout.Tab, i: int, c: int) -> str {
+    if c < 0 || c >= t.nodes.len { return "split {i} child {c} outside the arena" }
+    if t.nodes[c].parent != i { return "node {c} names parent {t.nodes[c].parent}, not {i}" }
+    ""
+}
+
+/// Invariants 2 and the share range of 3: ids, focus, the active tab and
+/// the arena's links.
+pub fn structure(l: layout.Layout) -> str {
+    if l.tabs.len == 0 { return "no tabs" }
+    var seen = Map[int, int]()
+    var tab_ids = Map[int, int]()
+    var active = false
+    for t in l.tabs {
+        if t.id < 1 || t.id >= l.next_id { return "tab id {t.id} outside 1..{l.next_id - 1}" }
+        if (tab_ids[t.id] else 0) == 1 { return "tab id {t.id} twice" }
+        tab_ids[t.id] = 1
+        if t.id == l.active { active = true }
+        if t.root < 0 || t.root >= t.nodes.len { return "tab {t.id} root {t.root} outside its arena" }
+        if t.nodes[t.root].parent != -1 { return "tab {t.id} root has a parent" }
+        var stack = List[int]()
+        (mut stack).push(t.root)
+        var visited = 0
+        var panes = List[int]()
+        while stack.len > 0 {
+            let i = (mut stack).pop() else -1
+            visited += 1
+            if visited > t.nodes.len { return "tab {t.id} arena has a cycle" }
+            let n = t.nodes[i]
+            if n.kind == layout.LEAF {
+                if n.pane < 1 { return "pane id {n.pane} below 1" }
+                if (seen[n.pane] else 0) == 1 { return "pane {n.pane} appears twice" }
+                seen[n.pane] = 1
+                (mut panes).push(n.pane)
+            } else if n.kind == layout.SPLIT {
+                if n.axis != layout.COLS && n.axis != layout.ROWS { return "split {i} axis {n.axis}" }
+                if n.share < 1 || n.share > 9999 { return "split {i} share {n.share} outside 1..9999" }
+                let why = child(t, i, n.first) + child(t, i, n.second)
+                if why.len > 0 { return why }
+                (mut stack).push(n.first)
+                (mut stack).push(n.second)
+            } else {
+                return "tab {t.id} reaches free node {i}"
+            }
+        }
+        var live = 0
+        for n in t.nodes {
+            if n.kind != layout.FREE { live += 1 }
+        }
+        if live != visited { return "tab {t.id} arena holds {live} nodes, {visited} reachable" }
+        if t.focus_order.len != panes.len { return "tab {t.id} focus order has {t.focus_order.len} of {panes.len} panes" }
+        if t.focus_order[0] != t.focus { return "tab {t.id} focus {t.focus} is not first in its order" }
+        var order = Map[int, int]()
+        for p in t.focus_order {
+            if (order[p] else 0) == 1 { return "tab {t.id} focus order names {p} twice" }
+            order[p] = 1
+        }
+        for p in panes {
+            if (order[p] else 0) != 1 { return "tab {t.id} focus order lacks {p}" }
+        }
+    }
+    if !active { return "active tab {l.active} does not exist" }
+    ""
+}
+
+/// Invariant 3, shares: only resize (one split) and equalize change an
+/// existing split's share.
+pub fn shares_kept(before: layout.Layout, after: layout.Layout, resized: bool, equalized: bool) -> str {
+    var changed = 0
+    for t in after.tabs {
+        for b in before.tabs {
+            if b.id == t.id {
+                var i = 0
+                while i < t.nodes.len && i < b.nodes.len {
+                    let x = b.nodes[i]
+                    let y = t.nodes[i]
+                    if x.kind == layout.SPLIT && y.kind == layout.SPLIT && x.share != y.share {
+                        if equalized && y.share != 5000 { return "equalize left share {y.share}" }
+                        changed += 1
+                    }
+                    i += 1
+                }
+            }
+        }
+    }
+    if !resized && !equalized && changed > 0 { return "{changed} shares changed" }
+    if resized && changed > 1 { return "a resize changed {changed} shares" }
+    ""
+}
+
+/// Invariant 3, sizes: a pane visible at a size is visible at larger ones.
+pub fn reveals(l: layout.Layout, tab: int, cols: int, rows: int) -> str {
+    let why = revealed(l, tab, cols, rows, cols + 7, rows + 3) + revealed(l, tab, cols, rows, cols * 2, rows * 2)
+    if why.len > 0 || cols > 512 || rows > 512 { return why }
+    revealed(l, tab, cols, rows, 512, 512)
+}
+
+fn revealed(l: layout.Layout, tab: int, cols: int, rows: int, bc: int, br: int) -> str {
+    let small = layout.rects(l, tab, cols, rows)
+    let large = layout.rects(l, tab, bc, br)
+    if large.len != small.len { return "rects differ in length at {bc}x{br}" }
+    var i = 0
+    while i < small.len {
+        if !hidden(small[i]) && hidden(large[i]) {
+            return "pane {small[i].pane} visible at {cols}x{rows}, hidden at {bc}x{br}"
+        }
+        i += 1
+    }
+    ""
+}
+
+/// Whether the visible rects form a grid: every column span meets every
+/// row span, nothing hidden.
+pub fn grid(rs: List[layout.Rect]) -> bool {
+    var cs = List[int]()
+    var ws = List[int]()
+    var ts = List[int]()
+    var hs = List[int]()
+    for r in rs {
+        if hidden(r) { return false }
+        var known = false
+        var i = 0
+        while i < cs.len {
+            if cs[i] == r.col && ws[i] == r.cols { known = true }
+            i += 1
+        }
+        if !known {
+            (mut cs).push(r.col)
+            (mut ws).push(r.cols)
+        }
+        known = false
+        i = 0
+        while i < ts.len {
+            if ts[i] == r.row && hs[i] == r.rows { known = true }
+            i += 1
+        }
+        if !known {
+            (mut ts).push(r.row)
+            (mut hs).push(r.rows)
+        }
+    }
+    cs.len * ts.len == rs.len
+}
+
+/// The tab's index in the layout, or -1.
+pub fn index_of(l: layout.Layout, tab: int) -> int {
+    var i = 0
+    while i < l.tabs.len {
+        if l.tabs[i].id == tab { return i }
+        i += 1
+    }
+    -1
+}
+
+fn opposite(d: int) -> int {
+    if d == layout.LEFT { return layout.RIGHT }
+    if d == layout.RIGHT { return layout.LEFT }
+    if d == layout.UP { return layout.DOWN }
+    layout.UP
+}
+
+fn there_and_back(l: layout.Layout, tab: int, pane: int, d: int, cols: int, rows: int) -> str {
+    var m = copy l
+    layout.focus_pane(mut m, pane) else |e| { return "focus_pane {pane}: {e}" }
+    let ti = index_of(m, tab)
+    layout.focus(mut m, tab, d, cols, rows) else |_| { return "" }
+    let went = m.tabs[ti].focus
+    layout.focus(mut m, tab, opposite(d), cols, rows) else |e| { return "from {pane} to {went} and no way back: {e}" }
+    if m.tabs[ti].focus != pane { return "from {pane} to {went} and back to {m.tabs[ti].focus}" }
+    ""
+}
+
+/// Invariant 6 on a tab whose rects form a grid; answers "" and leaves
+/// `exercised` counting the round trips actually made.
+pub fn focus_back(l: layout.Layout, tab: int, cols: int, rows: int, mut exercised: int) -> str {
+    let rs = layout.rects(l, tab, cols, rows)
+    for r in rs {
+        var d = 0
+        while d < 4 {
+            let why = there_and_back(l, tab, r.pane, d, cols, rows)
+            if why.len > 0 { return why }
+            exercised += 1
+            d += 1
+        }
+    }
+    ""
+}
