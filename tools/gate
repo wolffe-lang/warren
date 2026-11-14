@@ -152,15 +152,15 @@ done
 # The one-pane server: the dependency rows (each tier), composed images
 # applied by the client's applier against the emulator, and the session
 # rows, where a scripted client drives a real server over its socket.
-session_rows() {
-  local rows=(echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack
+session_rows() (
+  rows=(echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack
     fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte
     inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending
     max-sessions resize-crossing-image too-slow flood-beside-quiet)
   if [ "$mode" = linux ]; then rows+=(pane-signals-and-handles threads rss-flat); fi
   rm -rf target/rows && mkdir -p target/rows && cd target/rows
   "$root/target/native/session-rows" "$root/target/native/warren" "${rows[@]}"
-}
+)
 step deps-rows python3 -I tests/deps/run.py --wolf "$WOLF" --lupin "$LUPIN" --std "$WOLF_STD"
 step compose-build "$WOLF" build --deny-warnings src/compose_rows.lu -o "$root/target/native/compose-rows"
 step compose-native "$root/target/native/compose-rows"
