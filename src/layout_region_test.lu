@@ -1,0 +1,104 @@
+//! member: false
+//! Every layout operation applied inside a `region` block to a layout that
+//! outlives the block, as the server's turn applies them (one region a
+//! turn): each must compile there, keeping nothing of the block in the
+//! layout, and the layout must read back whole after another region has
+//! reused the freed arena. Names built inside the block are the case that
+//! matters: their bytes live in the block's region.
+
+use layout
+
+// Allocate and free a region's worth of strings, so a freed arena is reused.
+fn churn() -> int {
+    var n = 0
+    region other {
+        var junk = List[str]()
+        var k = 0
+        while k < 500 {
+            (mut junk).push("junk-{k}-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+            k += 1
+        }
+        n = junk.len
+    }
+    n
+}
+
+fn test_layout_operations_inside_a_region() {
+    var l = layout.new(1, "main") else |_| {
+        assert(false, "new")
+        return
+    }
+    var k = 3
+    region turn {
+        layout.split(mut l, 1, 1, layout.COLS, 2, true, 80, 22) else |_| { assert(false, "split") }
+    }
+    region turn {
+        let id = layout.new_tab(mut l, 3, "logs-{k}") else |_| { 0 }
+        assert(id == 2, "new_tab id")
+    }
+    region turn {
+        layout.rename_tab(mut l, 1, "editor-{k}") else |_| { assert(false, "rename") }
+    }
+    k = 4
+    region turn {
+        let id = layout.new_tab(mut l, 4, "scratch-{k}") else |_| { 0 }
+        assert(id == 3, "second new_tab id")
+    }
+    region turn {
+        layout.close_tab(mut l, 3) else |_| { assert(false, "close_tab") }
+    }
+    region turn {
+        layout.select_tab(mut l, 1) else |_| { assert(false, "select_tab") }
+    }
+    region turn {
+        layout.focus(mut l, 1, layout.LEFT, 80, 22) else |_| { assert(false, "focus") }
+    }
+    region turn {
+        let grew = layout.resize(mut l, 1, layout.RIGHT, 5, 80, 22) else |_| { 0 }
+        assert(grew == 5, "resize")
+    }
+    region turn {
+        layout.focus_next(mut l, 1) else |_| { assert(false, "focus_next") }
+        layout.focus_previous(mut l, 1) else |_| { assert(false, "focus_previous") }
+        layout.focus_pane(mut l, 1) else |_| { assert(false, "focus_pane") }
+        layout.next_tab(mut l)
+        layout.previous_tab(mut l)
+        layout.select_tab_id(mut l, 1) else |_| { assert(false, "select_tab_id") }
+    }
+    region turn {
+        layout.zoom(mut l, 1) else |_| { assert(false, "zoom") }
+    }
+    region turn {
+        layout.equalize(mut l, 1) else |_| { assert(false, "equalize") }
+    }
+    region turn {
+        layout.close(mut l, 2) else |_| { assert(false, "close") }
+    }
+    k = 7
+    region turn {
+        layout.rename_tab(mut l, 1, "edit-{k}") else |_| { assert(false, "rename again") }
+    }
+    assert(churn() == 500, "churn")
+    let want = "layout tabs=2 active=1 next=4\n" +
+        "tab 1 focus=1 zoomed=0 order=1 name=\"edit-7\"\n" +
+        "  pane 1\n" +
+        "tab 2 focus=3 zoomed=0 order=3 name=\"logs-3\"\n" +
+        "  pane 3\n"
+    assert(layout.dump(l) == want, "the layout after the regions")
+}
+
+fn test_layout_close_of_a_tabs_last_pane_inside_a_region() {
+    var l = layout.new(1, "a") else |_| {
+        assert(false, "new")
+        return
+    }
+    let k = 9
+    region turn {
+        let _id = layout.new_tab(mut l, 2, "b-{k}") else |_| { 0 }
+    }
+    region turn {
+        layout.close(mut l, 2) else |_| { assert(false, "close") }
+    }
+    assert(churn() == 500, "churn")
+    assert(layout.dump(l) == "layout tabs=1 active=1 next=3\ntab 1 focus=1 zoomed=0 order=1 name=\"a\"\n  pane 1\n", "after")
+}
