@@ -262,8 +262,8 @@ fn resize_back(l: layout.Layout, mut g: Rng, cols: int, rows: int, mut made: int
     let b = layout.rects(m, tab, cols, rows)
     var i = 0
     while i < a.len {
-        let x = a[i]
-        let y = b[i]
+        let x = copy a[i]
+        let y = copy b[i]
         if x.pane != y.pane || x.col != y.col || x.row != y.row || x.cols != y.cols || x.rows != y.rows {
             return "resize {pane} {d} by {n} and back moved pane {x.pane}"
         }
@@ -402,7 +402,7 @@ fn one_size(cols: int, rows: int, index: int, count: int, length: int) -> int {
     var t = tally()
     var seq = 0
     while seq < count {
-        region take {
+        region turn {
             sequence(mut t, cols, rows, seq, 1 + index * 100003 + seq * 7919, length)
         }
         seq += 1

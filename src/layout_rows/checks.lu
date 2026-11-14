@@ -25,7 +25,7 @@ pub fn tiling(l: layout.Layout, tab: int, cols: int, rows: int) -> str {
     var r1 = List[int]()
     var i = 0
     while i < rs.len {
-        let r = rs[i]
+        let r = copy rs[i]
         if r.pane != ps[i] { return "rect {i} is pane {r.pane}; tree order has {ps[i]}" }
         if !hidden(r) {
             if r.cols < 1 || r.rows < 1 { return "pane {r.pane} has a degenerate rect {r.cols}x{r.rows}" }
@@ -96,7 +96,7 @@ pub fn structure(l: layout.Layout) -> str {
             let i = (mut stack).pop() else -1
             visited += 1
             if visited > t.nodes.len { return "tab {t.id} arena has a cycle" }
-            let n = t.nodes[i]
+            let n = copy t.nodes[i]
             if n.kind == layout.LEAF {
                 if n.pane < 1 { return "pane id {n.pane} below 1" }
                 if (seen[n.pane] else 0) == 1 { return "pane {n.pane} appears twice" }
@@ -142,8 +142,8 @@ pub fn shares_kept(before: layout.Layout, after: layout.Layout, resized: bool, e
             if b.id == t.id {
                 var i = 0
                 while i < t.nodes.len && i < b.nodes.len {
-                    let x = b.nodes[i]
-                    let y = t.nodes[i]
+                    let x = copy b.nodes[i]
+                    let y = copy t.nodes[i]
                     if x.kind == layout.SPLIT && y.kind == layout.SPLIT && x.share != y.share {
                         if equalized && y.share != 5000 { return "equalize left share {y.share}" }
                         changed += 1

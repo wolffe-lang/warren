@@ -1,7 +1,6 @@
 //! member: true
 //! The layout rows: goldens and properties, one PASS or FAIL line per row.
 //! FAIL lines start at column 0 with the row's name; detail is indented.
-use layout
 
 fn show_difference(want: str, got: str) {
     let a = want.split("\n")
