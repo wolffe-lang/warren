@@ -632,9 +632,10 @@ fn row_second_client(warren: str) -> str {
         return "launch: {e}"
     }
     if !until_screen(mut b, "$", 10000) {
+        let list = reply_out("list-sessions").trim()
         close_quiet(b)
         close_run(a)
-        return "no prompt in the second client"
+        return "no prompt in the second client (60x20 beside 80x24; the server lists '{list}')"
     }
     let t0 = now_ms()
     type_text(mut a, "{me} --print-size s1\r")
