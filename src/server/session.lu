@@ -1,0 +1,251 @@
+//! member: true
+//! Sessions and their one pane: the pseudo-terminal master, the program on
+//! its slave, the emulator fed from the master, and the input queued for
+//! it. Handles are kept as numbers; a std handle is made at each call.
+use std.env
+use std.fs
+use std.process
+use std.signal
+use std.term
+use vt
+
+/// One pane: the master, its child, its emulator and its input queue.
+/// `child_live` is true until the child is reaped; `ended` once the
+/// master has reported its end (eof or a pty master's io).
+pub struct Pane {
+    master: int,
+    key: int,
+    child: int,
+    pid: int,
+    child_live: bool,
+    status: int,
+    ended: bool,
+    screen: vt.Vt,
+    input: List[byte],
+    in_off: int,
+    in_len: int,
+    write_on: bool,
+    last_output: int,
+    sync_since: int,
+}
+
+/// A session: a name, its size (the smallest attached member's, or the
+/// last such size when nobody is attached), its pane and its members.
+pub struct Session {
+    live: bool,
+    name: List[byte],
+    name_len: int,
+    cols: int,
+    rows: int,
+    members: int,
+    pane: Pane,
+    changed: bool,
+    generation: int,
+}
+
+/// What a spawn needs from the HELLO that creates a session.
+pub struct Spawn {
+    cols: int,
+    rows: int,
+    cwd: str,
+    names: List[str],
+    values: List[str],
+    pane_id: int,
+}
+
+/// Every listenable meaning: a pane's program starts with each at its
+/// default, whatever the server ignores or listens for.
+pub const ALL_MEANINGS: int = 1048575
+
+fn empty_pane(take screen: vt.Vt) -> Pane {
+    var input = List[byte]()
+    (mut input).reserve(INPUT_QUEUE)
+    Pane {
+        master: 0 - 1, key: 0 - 1, child: 0 - 1, pid: 0 - 1, child_live: false, status: 0 - 1,
+        ended: true, screen: screen, input: input, in_off: 0, in_len: 0, write_on: false,
+        last_output: 0, sync_since: 0,
+    }
+}
+
+/// A session's name as text (the bytes were a valid str when set).
+pub fn name_of(s: Session) -> str {
+    str_from_utf8(s.name[0..s.name_len]) else ""
+}
+
+/// Does the session have this name?
+pub fn named(s: Session, name: str) -> bool {
+    if !s.live || s.name_len != name.len { return false }
+    var i = 0
+    for b in name.bytes() {
+        if s.name[i] != b { return false }
+        i += 1
+    }
+    true
+}
+
+/// Set a session's name in place.
+pub fn set_name(mut s: Session, name: str) {
+    var i = 0
+    for b in name.bytes() {
+        if i < s.name.len { s.name[i] = b } else { (mut s.name).push(b) }
+        i += 1
+    }
+    s.name_len = name.len
+}
+
+/// A free session slot holding a reusable emulator.
+pub fn idle_session() -> Session {
+    Session { live: false, name: List[byte](), name_len: 0, cols: 0, rows: 0, members: 0,
+        pane: empty_pane(take vt.new(MIN_COLS, MIN_ROWS, HISTORY_BYTES)), changed: false, generation: 0 }
+}
+
+// The environment a pane's program is given (docs/TERM.md): the creating
+// client's, less other multiplexers' markers and the size variables,
+// with warren's terminal promise.
+fn dropped(name: str) -> bool {
+    name == "TMUX" || name == "TMUX_PANE" || name == "STY" || name == "ZELLIJ" ||
+        name == "ZELLIJ_SESSION_NAME" || name == "ZELLIJ_PANE_ID" || name == "LINES" || name == "COLUMNS"
+}
+
+fn apply_environment(s: Spawn, session: str) -> () ! {invalid} {
+    for entry in env.vars() {
+        let name = env.entry_key(entry)
+        env.unset(name)?
+    }
+    var i = 0
+    while i < s.names.len {
+        if !dropped(s.names[i]) { env.set(s.names[i], s.values[i])? }
+        i += 1
+    }
+    env.set("TERM", "xterm-256color")?
+    env.set("COLORTERM", "truecolor")?
+    env.set("TERM_PROGRAM", "warren")?
+    env.set("TERM_PROGRAM_VERSION", vt.package_version())?
+    env.set("WARREN", session)?
+    env.set("WARREN_PANE", "%{s.pane_id}")?
+}
+
+fn shell_of(s: Spawn) -> str {
+    var i = 0
+    while i < s.names.len {
+        if s.names[i] == "SHELL" && s.values[i].len > 0 { return s.values[i] }
+        i += 1
+    }
+    "/bin/sh"
+}
+
+/// Start the pane's program on a new pseudo-terminal of the session's
+/// size, in a session of its own with every signal at its default. The
+/// parent's slave is closed as soon as the child has it. On a failure
+/// every acquired descriptor is closed and the reason returned.
+pub fn start_pane(mut s: Session, sp: Spawn, argv: List[str]) -> str {
+    let p = term.open_pty() else |e| { return "open-pty-{e}" }
+    var master = p.master
+    var slave = p.slave
+    term.set_size(master, term.Size { rows: sp.rows, columns: sp.cols }, 0, 0) else |e| {
+        fs.close(take master) else |_| {}
+        fs.close(take slave) else |_| {}
+        return "set-size-{e}"
+    }
+    let here = env.cwd() else "/"
+    apply_environment(sp, name_of(s)) else |e| {
+        fs.close(take master) else |_| {}
+        fs.close(take slave) else |_| {}
+        return "environment-{e}"
+    }
+    var c = process.command(if argv.len > 0 then argv[0] else shell_of(sp))
+    var i = 1
+    while i < argv.len {
+        process.push_arg(mut c, argv[i])
+        i += 1
+    }
+    process.set_stdin(mut c, slave)
+    process.set_stdout(mut c, slave)
+    process.set_stderr(mut c, slave)
+    if sp.cwd.len > 0 { env.set_cwd(sp.cwd) else |_| {} }
+    var started = "ok"
+    var child = process.start_session(c, ALL_MEANINGS) else |e| {
+        started = "start-{e}"
+        process.Child { slot: 0 - 1 }
+    }
+    env.set_cwd(here) else |_| {}
+    fs.close(take slave) else |_| {}
+    if started != "ok" {
+        fs.close(take master) else |_| {}
+        return started
+    }
+    fs.set_nonblock(mut master, true) else |e| {
+        fs.close(take master) else |_| {}
+        s.pane.child = child.slot
+        s.pane.child_live = true
+        return "nonblock-{e}"
+    }
+    s.pane.master = master.fd
+    s.pane.child = child.slot
+    s.pane.pid = process.pid(child) else 0 - 1
+    s.pane.child_live = true
+    s.pane.status = 0 - 1
+    s.pane.ended = false
+    s.pane.in_off = 0
+    s.pane.in_len = 0
+    s.pane.write_on = false
+    ""
+}
+
+/// Reset a reused emulator to a fresh pane of a size: a full reset (which
+/// also empties its history) and a resize.
+pub fn fresh_screen(mut s: Session, cols: int, rows: int) {
+    vt.feed(mut s.pane.screen, "\u{1b}c".bytes())
+    let _r = vt.resize(mut s.pane.screen, cols, rows)
+    let _a = vt.take_answers(mut s.pane.screen)
+    let _e = vt.take_events(mut s.pane.screen)
+}
+
+/// Queue bytes for the pane's program; all or nothing. False when the
+/// queue cannot hold them.
+pub fn queue_input(mut p: Pane, data: List[byte]) -> bool {
+    if p.ended || p.in_len - p.in_off + data.len > INPUT_QUEUE { return false }
+    if p.in_off > 0 && p.in_off == p.in_len {
+        p.in_off = 0
+        p.in_len = 0
+    }
+    if p.in_len + data.len > INPUT_QUEUE {
+        var j = 0
+        while p.in_off + j < p.in_len {
+            p.input[j] = p.input[p.in_off + j]
+            j += 1
+        }
+        p.in_len = p.in_len - p.in_off
+        p.in_off = 0
+    }
+    for b in data {
+        if p.in_len < p.input.len { p.input[p.in_len] = b } else { (mut p.input).push(b) }
+        p.in_len += 1
+    }
+    true
+}
+
+/// The master as a std file.
+pub fn master_file(p: Pane) -> fs.File {
+    fs.File { fd: p.master }
+}
+
+/// Close the master; the program learns of it as a hangup.
+pub fn close_master(mut p: Pane) {
+    if p.master >= 0 {
+        var f = fs.File { fd: p.master }
+        fs.close(take f) else |_| {}
+        p.master = 0 - 1
+    }
+    p.ended = true
+}
+
+/// Tell the pseudo-terminal its new size (the program hears SIGWINCH).
+pub fn term_size(f: fs.File, cols: int, rows: int) {
+    term.set_size(f, term.Size { rows: rows, columns: cols }, 0, 0) else |_| {}
+}
+
+/// The meaning set the server listens for.
+pub fn listened() -> int {
+    signal.child() | signal.terminate() | signal.interrupt()
+}
