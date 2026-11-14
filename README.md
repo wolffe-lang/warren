@@ -5,8 +5,8 @@ for PAX first, and measured on x86-64 Linux and macOS arm64 from the first
 pull request. It takes its ideas from tmux, zellij and herdr, and none of
 their code.
 
-**Status: a pure terminal core, protocol v1 codec and layout module, with a
-diagnostic CLI. No working multiplexer is implemented yet.** The repository holds the pins,
+**Status: a working server and terminal client with sessions, panes and tabs;
+modes, the hint bar, configuration, the mouse and copy mode are still to come.** The repository holds the pins,
 tiered CI, a pinned reference emulator with a cell-for-cell harness, a survey,
 recorded corpus, and reference contracts for the emulator and protocol.
 `src/vt/parser.lu` decodes split UTF-8 and recognises bounded terminal
@@ -39,7 +39,9 @@ with no arguments `warren` attaches the terminal to the default session,
 starting the server and the session when there are none; `warren new [-d]
 [-s NAME]`, `warren attach -t NAME`, `kill-server` and `list-sessions` work,
 several clients may share a session, and the server outlives the client that
-started it; `vt-dump` is a diagnostic command.
+started it. Behind the prefix (Ctrl-Space) a session splits into panes and
+holds tabs, drawn with their borders and a bar (SERVER.md §8); `vt-dump` is a
+diagnostic command.
 [MAP](docs/MAP.md) separates what is planned from what is measured.
 
 ## What is planned
@@ -71,7 +73,7 @@ started it; `vt-dump` is a diagnostic command.
 | W0 | the map: pins, CI, the oracle, the survey, the prediction | in progress |
 | W1 | the emulator | pure core/history/reflow, diagnostic CLI and full-frame/property gates |
 | W2 | one pane; detach and attach | server, terminal client, new, attach, detach and a second client, with rows on Linux, macOS and PAX under QEMU; surviving a PAX console logout waits on PAX |
-| W3 | panes, tabs, the bar, keys | pure layout module; compositor, keys and bar planned |
+| W3 | panes, tabs, the bar, keys | pure layout module; panes and tabs in the server, borders and the focus mark, the bar's lines, a fixed prefix table; modes, hints and configuration planned |
 | W4 | mouse, scrollback, copy | planned |
 | W5 | layouts, commands, persistence | planned |
 | W6 | on the PAX image, on real hardware | planned |
@@ -158,8 +160,9 @@ What the Linux gate measures today is the harness, not a multiplexer:
   resize; quarry; pelt with its completion menu; den's log), dumped twice and
   held by digest.
 - **Session rows against tmux:** what it tells a pane, that its text and
-  cursor agree with the reference on six cases, and how it sizes a session
-  shared by two clients.
+  cursor agree with the reference on six cases, how it sizes a session
+  shared by two clients, its split sizes, zoom, the border cells it marks for
+  the focused pane, and that a killed pane's program ends.
 
 [SCREEN-DUMP](docs/SCREEN-DUMP.md) describes the dump, how the reference is
 read, every normalisation by name, and what the mechanism cannot show.
@@ -188,7 +191,7 @@ nightly run and a manual dispatch run everything.
 | `src/vt/` | the emulator: parser, grid, scrollback (pure) |
 | `src/proto/` | the wire protocol's frames (pure) |
 | `src/layout/` | tabs and the split tree: geometry and operations ([LAYOUT](docs/LAYOUT.md)) (pure) |
-| `src/server/` | the server and its event loop (not implemented) |
+| `src/server/` | the server: its event loop, sessions, panes and tabs, the compositor ([SERVER](docs/SERVER.md)) |
 | `src/server_model/` | pure connection transitions/actions, without I/O |
 | `src/client/` | the client: input parser and renderer |
 | `src/cmd/` | `warren <verb>` and the command dispatcher |

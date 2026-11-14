@@ -74,7 +74,9 @@ reports, bracketed paste (at most 64 KiB a PASTE; a longer paste goes as
 several) and focus reports. A lone ESC waits 30 ms for the rest of a sequence
 before it is the Escape key; an unfinished sequence at that point, or one
 longer than 64 bytes, goes to the pane unchanged. The server's own encoding of
-every named key and modifier parses back to the same event (a row).
+every named key and modifier parses back to the same event (a row). What a key
+does after the prefix (split, focus, tabs, zoom, close, detach) is the
+server's table (SERVER.md §8).
 
 ## Rendering
 
