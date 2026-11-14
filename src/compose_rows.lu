@@ -1,0 +1,238 @@
+//! member: false
+//! Compose rows: the server's images, applied by the client's applier,
+//! hold exactly the emulator's stored cells (scalars, marks, widths,
+//! continuations, rendition, cursor), for full images and for deltas,
+//! including overwrites of half a wide pair; and the applier refuses a
+//! delta whose base is not its image or that would split an old pair.
+//! Also measures compose, encode and apply time and image bytes at 80x24
+//! and 320x90 (stderr; a measurement, never a bound).
+use std.time
+use proto
+use server
+use vt
+
+fn cell_equal(img: proto.Image, pane: vt.Vt, i: int) -> bool {
+    let c = if pane.active_alternate then copy pane.alternate.cells[i] else copy pane.primary.cells[i]
+    if c.width == 0 { return img.width[i] == 0 }
+    let base = if c.base == 0 then 0 else c.base
+    img.base[i] == base && img.mark1[i] == c.mark1 && img.mark2[i] == c.mark2 && img.width[i] == c.width &&
+        img.flags[i] == c.flags && img.fg[i] == server.wire_colour(c.foreground) && img.bg[i] == server.wire_colour(c.background)
+}
+
+fn clamp(v: int, low: int, high: int) -> int {
+    if v < low { return low }
+    if v > high { return high }
+    v
+}
+
+fn mismatch(img: proto.Image, pane: vt.Vt) -> int {
+    if img.cols != pane.cols || img.rows != pane.rows { return 0 - 2 }
+    var i = 0
+    while i < pane.cols * pane.rows {
+        if !cell_equal(img, pane, i) { return i }
+        i += 1
+    }
+    let row = clamp(pane.cursor_row, 1, pane.rows)
+    let col = clamp(pane.cursor_col, 1, pane.cols)
+    if img.cursor_row != row || img.cursor_col != col || img.shape != pane.cursor_shape { return 0 - 3 }
+    0 - 1
+}
+
+struct Pair {
+    pane: vt.Vt,
+    shadow: server.Shadow,
+    img: proto.Image,
+    seq: int,
+    bytes: int,
+    frames: int,
+}
+
+fn pair(cols: int, rows: int) -> Pair {
+    Pair { pane: vt.new(cols, rows, 0), shadow: server.no_shadow(), img: proto.image(), seq: 0, bytes: 0, frames: 0 }
+}
+
+// Compose for the pair's client, apply it; "" or the reason it failed.
+fn publish(mut p: Pair, full: bool) -> str {
+    let payload = server.compose(mut p.shadow, p.pane, p.seq + 1, full)
+    if payload.len == 0 { return "" }
+    let wire = server.frame_wire(payload)
+    if wire.len == 0 { return "compose made an invalid image" }
+    let code = proto.apply(mut p.img, payload)
+    if code != 0 { return "apply refused ({proto.refusal(code)})" }
+    p.seq = p.seq + 1
+    p.bytes = p.bytes + wire.len
+    p.frames = p.frames + 1
+    let m = mismatch(p.img, p.pane)
+    if m != 0 - 1 { return "image differs from the emulator at {m}" }
+    ""
+}
+
+fn feed(mut p: Pair, text: str) {
+    vt.feed(mut p.pane, text.bytes())
+}
+
+fn test_full_and_deltas() {
+    var p = pair(20, 6)
+    feed(mut p, "\u{1b}[1;31;48;2;1;2;3mA\u{4e2d}e\u{301}\u{1b}[m z\u{1b}[5 q")
+    assert(publish(mut p, true) == "", "compose-full")
+    assert(p.img.width[1] == 2 && p.img.width[2] == 0, "compose-wide-pair")
+    feed(mut p, "\u{1b}[1;3Hx")
+    assert(publish(mut p, false) == "", "compose-overwrite-continuation")
+    assert(p.img.width[1] == 1 && p.img.width[2] == 1 && p.img.base[2] == 120, "compose-pair-broken-both-halves")
+    feed(mut p, "\u{1b}[2;1H\u{4e2d}\u{4e2d}\u{1b}[2;2H\u{3042}")
+    assert(publish(mut p, false) == "", "compose-shifted-pair")
+    feed(mut p, "\u{1b}[?25l\u{1b}[?1049hALT")
+    assert(publish(mut p, false) == "", "compose-alternate")
+    let before = p.frames
+    assert(publish(mut p, false) == "" && p.frames == before, "compose-nothing-to-send")
+    feed(mut p, "\u{1b}[?1049l\u{1b}[?25h")
+    assert(publish(mut p, false) == "", "compose-back")
+}
+
+fn test_applier_refusals() {
+    var p = pair(20, 6)
+    feed(mut p, "ab\u{4e2d}cd")
+    assert(publish(mut p, true) == "", "applier-full")
+    // A delta on a base this image is not.
+    var other = server.no_shadow()
+    var q = vt.new(20, 6, 0)
+    vt.feed(mut q, "zz".bytes())
+    let full_other = server.compose(mut other, q, 1, true)
+    vt.feed(mut q, "y".bytes())
+    let delta_other = server.compose(mut other, q, 7, false)
+    let _f = full_other.len
+    assert(proto.apply(mut p.img, delta_other) == proto.MALFORMED, "applier-wrong-base")
+    // A delta touching only the continuation of the old pair at 3-4.
+    var raw = List[byte]()
+    proto.put(mut raw, p.seq + 1, 4)
+    proto.put(mut raw, p.seq, 4)
+    proto.put(mut raw, 20, 2)
+    proto.put(mut raw, 6, 2)
+    proto.put(mut raw, 1, 2)
+    proto.put(mut raw, 1, 2)
+    proto.put(mut raw, 0, 1)
+    proto.put(mut raw, 1, 1)
+    proto.put(mut raw, 1, 4)
+    proto.put(mut raw, 1, 2)
+    proto.put(mut raw, 4, 2)
+    proto.put(mut raw, 0, 2)
+    proto.put(mut raw, 0, 4)
+    proto.put(mut raw, 0, 4)
+    proto.put(mut raw, 1, 2)
+    proto.put(mut raw, 1, 2)
+    proto.put(mut raw, 1, 1)
+    proto.put(mut raw, 1, 2)
+    proto.put(mut raw, 1, 1)
+    proto.put(mut raw, 81, 4)
+    assert(proto.validate(131, raw) == 0, "applier-orphan-frame-decodes")
+    let seq_before = p.img.seq
+    assert(proto.apply(mut p.img, raw) == proto.MALFORMED, "applier-orphan-refused")
+    assert(p.img.seq == seq_before && p.img.width[2] == 2, "applier-refusal-changes-nothing")
+}
+
+// A seeded stream of text, controls, colours, wide and combining
+// characters, fed in chunks; every chunk's delta must hold the emulator.
+fn lcg(x: int) -> int {
+    (x * 1103515245 + 12345) % 2147483648
+}
+
+fn piece(r: int) -> str {
+    let k = r % 16
+    match k {
+        0 => "\r\n",
+        1 => "\u{1b}[31m",
+        2 => "\u{1b}[38;2;10;200;30m",
+        3 => "\u{1b}[m",
+        4 => "\u{4e2d}",
+        5 => "e\u{301}",
+        6 => "\u{1b}[2K",
+        7 => "\u{1b}[H",
+        8 => "\u{1b}[5;7H",
+        9 => "\u{1b}[7m",
+        10 => "\u{1b}[1@",
+        11 => "\u{1b}[2P",
+        12 => "\u{1f600}",
+        13 => "\u{1b}[?1049h",
+        14 => "\u{1b}[?1049l",
+        _ => "word",
+    }
+}
+
+fn soak(cols: int, rows: int, chunks: int, seed: int) -> str {
+    var p = pair(cols, rows)
+    var r = seed
+    var n = 0
+    let first = publish(mut p, true)
+    if first.len > 0 { return first }
+    while n < chunks {
+        var text = ""
+        var k = 0
+        while k < 12 {
+            r = lcg(r)
+            text = text + piece(r / 65536)
+            k += 1
+        }
+        feed(mut p, text)
+        let why = publish(mut p, false)
+        if why.len > 0 { return "chunk {n}: {why}" }
+        n += 1
+    }
+    ""
+}
+
+fn test_seeded_soak() {
+    assert(soak(80, 24, 300, 7) == "", "compose-soak-80x24")
+    assert(soak(23, 7, 300, 11) == "", "compose-soak-23x7")
+}
+
+fn fill(cols: int, rows: int) -> vt.Vt {
+    var pane = vt.new(cols, rows, 0)
+    var text = ""
+    var i = 0
+    while i < cols * rows {
+        text = text + "\u{1b}[38;5;{i % 256}m{"abcdefghijklmnopqrstuvwxyz"[i % 26..i % 26 + 1]}"
+        i += 1
+    }
+    vt.feed(mut pane, text.bytes())
+    pane
+}
+
+fn measure(cols: int, rows: int) {
+    let pane = fill(cols, rows)
+    var best_compose = 0
+    var best_apply = 0
+    var bytes = 0
+    var k = 0
+    while k < 5 {
+        var sh = server.no_shadow()
+        var img = proto.image()
+        let t0 = time.monotonic_ns()
+        let payload = server.compose(mut sh, pane, 1, true)
+        let wire = server.frame_wire(payload)
+        let t1 = time.monotonic_ns()
+        let _a = proto.apply(mut img, payload)
+        let t2 = time.monotonic_ns()
+        if k == 0 || t1 - t0 < best_compose { best_compose = t1 - t0 }
+        if k == 0 || t2 - t1 < best_apply { best_apply = t2 - t1 }
+        bytes = wire.len
+        k += 1
+    }
+    var sh = server.no_shadow()
+    let _p = server.compose(mut sh, pane, 1, true)
+    var one = fill(cols, rows)
+    vt.feed(mut one, "\u{1b}[1;1HZ".bytes())
+    let t3 = time.monotonic_ns()
+    let delta = server.compose(mut sh, one, 2, false)
+    let t4 = time.monotonic_ns()
+    let dwire = server.frame_wire(delta)
+    eprint("MEASURE compose {cols}x{rows} full-compose+encode-ns={best_compose} full-apply-ns={best_apply} full-wire-bytes={bytes} one-cell-delta-compose-ns={t4 - t3} one-cell-delta-wire-bytes={dwire.len}")
+}
+
+fn main() -> int {
+    test_full_and_deltas()
+    test_applier_refusals()
+    test_seeded_soak()
+    measure(80, 24)
+    measure(320, 90)
+    0
+}
