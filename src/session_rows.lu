@@ -229,6 +229,13 @@ fn row_refusals(mut r: Rig) -> str {
     let c3 = refusal(mut ro)
     if c3 != 3 { return "read-only refusal {c3}" }
     client.hang_up(mut ro)
+    // No session is made under a name holding '/' or a control byte.
+    for bad in "x/y|a\u{1}b".split("|") {
+        var n = attach(r, 80, 24, bad, 1) else |e| { return "dial-{e}" }
+        let c5 = refusal(mut n)
+        if c5 != 6 { return "a session named '{bad}' was not refused as invalid ({c5})" }
+        client.hang_up(mut n)
+    }
     // Too small: WELCOME, then BYE 7, and no session is created.
     var small = attach(r, 19, 6, "tiny", 1) else |e| { return "dial-{e}" }
     if !client.until_kind(mut small, 129, 3000) { return "too small: no WELCOME" }
