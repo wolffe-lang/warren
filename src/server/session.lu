@@ -1,18 +1,32 @@
 //! member: true
-//! Sessions and their one pane: the pseudo-terminal master, the program on
-//! its slave, the emulator fed from the master, and the input queued for
-//! it. Handles are kept as numbers; a std handle is made at each call.
+//! Sessions and their panes. A pane is a slot of the server's pane table:
+//! the pseudo-terminal master, the program on its slave, the emulator fed
+//! from the master, and the input queued for it. A session holds a layout
+//! (its tabs and split trees) whose leaves name panes by id. Slots of both
+//! tables are reused, never dropped: nothing allocated in the server's
+//! long-lived ambient is freed. Handles are kept as numbers; a std handle
+//! is made at each call.
 use std.env
 use std.fs
 use std.process
 use std.signal
 use std.term
+use layout
 use vt
 
-/// One pane: the master, its child, its emulator and its input queue.
-/// `child_live` is true until the child is reaped; `ended` once the
-/// master has reported its end (eof or a pty master's io).
+/// One pane slot. `live` while a session's layout names it (or while an
+/// ended session's last image may still be composed from it); `id` is
+/// the layout's pane id (server-wide, never reused); `gen` changes at
+/// every reuse. `child_live` is true until the child is reaped; `ended`
+/// once the master has reported its end (eof or a pty master's io).
+/// `damage` counts every change to its cells; `shown` says it is drawn
+/// now (in its session's active tab, not hidden), at `at_col`,`at_row`.
 pub struct Pane {
+    live: bool,
+    id: int,
+    session: int,
+    session_gen: int,
+    gen: int,
     master: int,
     key: int,
     child: int,
@@ -27,10 +41,17 @@ pub struct Pane {
     write_on: bool,
     last_output: int,
     sync_since: int,
+    damage: int,
+    shown: bool,
+    at_col: int,
+    at_row: int,
 }
 
 /// A session: a name, its size (the smallest attached member's, or the
-/// last such size when nobody is attached), its pane and its members.
+/// last such size when nobody is attached), its members and its layout,
+/// with the working directory and environment its panes start with. The
+/// compositor's owner map and border cells (the tab area's) are kept here
+/// for the layout generation they were built for.
 pub struct Session {
     live: bool,
     name: List[byte],
@@ -38,12 +59,22 @@ pub struct Session {
     cols: int,
     rows: int,
     members: int,
-    pane: Pane,
     changed: bool,
     generation: int,
+    layout: layout.Layout,
+    cwd: List[byte],
+    env_names: List[str],
+    env_values: List[str],
+    layout_gen: int,
+    bar_gen: int,
+    chrome_gen: int,
+    owner: List[int],
+    border: List[vt.Cell],
+    last_output: int,
 }
 
-/// What a spawn needs from the HELLO that creates a session.
+/// What a spawn needs: the pane's size, the session's working directory
+/// and environment, and the pane's id.
 pub struct Spawn {
     cols: int,
     rows: int,
@@ -57,13 +88,15 @@ pub struct Spawn {
 /// default, whatever the server ignores or listens for.
 pub const ALL_MEANINGS: int = 1048575
 
-fn empty_pane(take screen: vt.Vt) -> Pane {
+/// A free pane slot holding an emulator of a size, for reuse.
+pub fn idle_pane(cols: int, rows: int) -> Pane {
     var input = List[byte]()
     (mut input).reserve(INPUT_QUEUE)
     Pane {
+        live: false, id: 0, session: 0 - 1, session_gen: 0, gen: 0,
         master: 0 - 1, key: 0 - 1, child: 0 - 1, pid: 0 - 1, child_live: false, status: 0 - 1,
-        ended: true, screen: screen, input: input, in_off: 0, in_len: 0, write_on: false,
-        last_output: 0, sync_since: 0,
+        ended: true, screen: vt.new(cols, rows, HISTORY_BYTES), input: input, in_off: 0, in_len: 0, write_on: false,
+        last_output: 0, sync_since: 0, damage: 0, shown: false, at_col: 0, at_row: 0,
     }
 }
 
@@ -93,10 +126,17 @@ pub fn set_name(mut s: Session, name: str) {
     s.name_len = name.len
 }
 
-/// A free session slot holding a reusable emulator.
+/// A free session slot.
 pub fn idle_session() -> Session {
-    Session { live: false, name: List[byte](), name_len: 0, cols: 0, rows: 0, members: 0,
-        pane: empty_pane(take vt.new(MIN_COLS, MIN_ROWS, HISTORY_BYTES)), changed: false, generation: 0 }
+    Session { live: false, name: List[byte](), name_len: 0, cols: 0, rows: 0, members: 0, changed: false,
+        generation: 0, layout: layout.Layout { tabs: List[layout.Tab](), active: 0, next_id: 1 },
+        cwd: List[byte](), env_names: List[str](), env_values: List[str](), layout_gen: 0, bar_gen: 0,
+        chrome_gen: 0 - 1, owner: List[int](), border: List[vt.Cell](), last_output: 0 }
+}
+
+/// The session's working directory as text.
+pub fn cwd_of(s: Session) -> str {
+    str_from_utf8(s.cwd[0..s.cwd.len]) else ""
 }
 
 // The environment a pane's program is given (docs/TERM.md): the creating
@@ -181,7 +221,7 @@ fn become_pane(name: str, c: process.Command, environ: List[str], cwd: str, inhe
 /// closed after the fork. Where fork is unavailable the program starts in
 /// a session of its own without a controlling terminal. On a failure every
 /// acquired descriptor is closed and the reason returned.
-pub fn start_pane(mut s: Session, sp: Spawn, argv: List[str], inherited: List[int]) -> str {
+pub fn start_pane(mut pane: Pane, session_name: str, sp: Spawn, argv: List[str], inherited: List[int]) -> str {
     let p = term.open_pty() else |e| { return "open-pty-{e}" }
     var master = p.master
     var slave = p.slave
@@ -195,7 +235,7 @@ pub fn start_pane(mut s: Session, sp: Spawn, argv: List[str], inherited: List[in
         fs.close(take slave) else |_| {}
         return "pty-name-{e}"
     }
-    let environ = environment(sp, name_of(s))
+    let environ = environment(sp, session_name)
     var c = process.command(if argv.len > 0 then argv[0] else shell_of(sp))
     var i = 1
     while i < argv.len {
@@ -239,29 +279,30 @@ pub fn start_pane(mut s: Session, sp: Spawn, argv: List[str], inherited: List[in
     }
     fs.set_nonblock(mut master, true) else |e| {
         fs.close(take master) else |_| {}
-        s.pane.child = child_slot
-        s.pane.child_live = true
+        pane.child = child_slot
+        pane.child_live = true
         return "nonblock-{e}"
     }
-    s.pane.master = master.fd
-    s.pane.child = child_slot
-    s.pane.pid = pid
-    s.pane.child_live = true
-    s.pane.status = 0 - 1
-    s.pane.ended = false
-    s.pane.in_off = 0
-    s.pane.in_len = 0
-    s.pane.write_on = false
+    pane.master = master.fd
+    pane.child = child_slot
+    pane.pid = pid
+    pane.child_live = true
+    pane.status = 0 - 1
+    pane.ended = false
+    pane.in_off = 0
+    pane.in_len = 0
+    pane.write_on = false
     ""
 }
 
 /// Reset a reused emulator to a fresh pane of a size: a full reset (which
-/// also empties its history) and a resize.
-pub fn fresh_screen(mut s: Session, cols: int, rows: int) {
-    vt.feed(mut s.pane.screen, "\u{1b}c".bytes())
-    let _r = vt.resize(mut s.pane.screen, cols, rows)
-    let _a = vt.take_answers(mut s.pane.screen)
-    let _e = vt.take_events(mut s.pane.screen)
+/// also empties its history) and a resize (none when the size is kept).
+pub fn fresh_screen(mut pane: Pane, cols: int, rows: int) {
+    vt.feed(mut pane.screen, "\u{1b}c".bytes())
+    let _r = vt.resize(mut pane.screen, cols, rows)
+    let _a = vt.take_answers(mut pane.screen)
+    let _e = vt.take_events(mut pane.screen)
+    pane.sync_since = 0
 }
 
 /// Queue bytes for the pane's program; all or nothing. False when the
