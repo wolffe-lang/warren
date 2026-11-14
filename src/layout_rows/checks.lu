@@ -255,3 +255,50 @@ pub fn focus_back(l: layout.Layout, tab: int, cols: int, rows: int, mut exercise
     }
     ""
 }
+
+fn same_tree(a: layout.Tab, i: int, b: layout.Tab, j: int) -> bool {
+    let x = copy a.nodes[i]
+    let y = copy b.nodes[j]
+    if x.kind != y.kind { return false }
+    if x.kind == layout.LEAF { return x.pane == y.pane }
+    if x.axis != y.axis || x.share != y.share { return false }
+    same_tree(a, x.first, b, y.first) && same_tree(a, x.second, b, y.second)
+}
+
+fn same_ints(a: List[int], b: List[int]) -> bool {
+    if a.len != b.len { return false }
+    var i = 0
+    while i < a.len {
+        if a[i] != b[i] { return false }
+        i += 1
+    }
+    true
+}
+
+fn same_bytes(a: List[byte], b: List[byte]) -> bool {
+    if a.len != b.len { return false }
+    var i = 0
+    while i < a.len {
+        if a[i] != b[i] { return false }
+        i += 1
+    }
+    true
+}
+
+/// Equal as the canonical dump defines it: everything but the arenas'
+/// slot numbers. Cheaper than comparing two dumps; the golden rows hold
+/// the dump itself.
+pub fn same_layout(a: layout.Layout, b: layout.Layout) -> bool {
+    if a.tabs.len != b.tabs.len || a.active != b.active || a.next_id != b.next_id { return false }
+    var i = 0
+    while i < a.tabs.len {
+        let x = a.tabs[i].id == b.tabs[i].id && a.tabs[i].focus == b.tabs[i].focus &&
+            a.tabs[i].zoomed == b.tabs[i].zoomed
+        if !x { return false }
+        if !same_ints(a.tabs[i].focus_order, b.tabs[i].focus_order) { return false }
+        if !same_bytes(a.tabs[i].name, b.tabs[i].name) { return false }
+        if !same_tree(a.tabs[i], a.tabs[i].root, b.tabs[i], b.tabs[i].root) { return false }
+        i += 1
+    }
+    true
+}
