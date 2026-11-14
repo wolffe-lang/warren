@@ -42,6 +42,7 @@ pub struct Server {
     rotate: int,
     trace: bool,
     turns: int,
+    master_read: int,
 }
 
 fn now_ns() -> int {
@@ -696,7 +697,7 @@ fn read_master(mut s: Server, si: int, now: int) {
     var f = master_file(s.sessions[si].pane)
     var end = false
     var nothing = false
-    let got = fs.read_chunk(mut f, READ_BUDGET) else |e| {
+    let got = fs.read_chunk(mut f, s.master_read) else |e| {
         let n = os_error()
         if "{e}" == "io" && (n == 11 || n == 35) { nothing = true } else { end = true }
         List[byte]()
@@ -1068,6 +1069,10 @@ pub fn serve() -> int {
         return 1
     }
     let lifetime_ms = (env.get("WARREN_LIFETIME_MS") else "0").to_int() else 0
+    // A measurement override of the per-turn master read (rows compare
+    // budgets with it); READ_BUDGET is the server's rule.
+    var master_read = (env.get("WARREN_MEASURE_MASTER_READ") else "0").to_int() else 0
+    if master_read <= 0 || master_read > READ_BUDGET { master_read = READ_BUDGET }
     var conns = List[Conn]()
     var i = 0
     while i < MAX_CONNECTIONS {
@@ -1085,7 +1090,7 @@ pub fn serve() -> int {
         key_gen: List[int](), next_id: 0, stopping: false, stop_deadline: 0, started: now_ns(),
         idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
         version: vt.package_version(), again: false, need_slot: false, rotate: 0,
-        trace: env.has("WARREN_TRACE"), turns: 0,
+        trace: env.has("WARREN_TRACE"), turns: 0, master_read: master_read,
     }
     net.set_listener_deadline(mut s.place.listener, 1) else |_| {}
     listener_interest(mut s)
