@@ -1,0 +1,441 @@
+//! member: false
+//! Client rows: a real `warren` client in a pseudo-terminal this program
+//! owns, its output read back through warren's own emulator. Every way a
+//! client ends gives the terminal back: the mode read from the terminal
+//! after it ends equals the mode before it started, and the bytes that
+//! leave what it turned on were written. Rows: detach and reattach, the
+//! session ending, the server stopping, too small, a refusal, a server
+//! that closes or sends an image that does not apply (a fake server here),
+//! terminate and hangup signals, suspend and continue, and KILL (which
+//! runs nothing and is reported, not promised).
+//!
+//! After every row nothing it started may still run (Linux reads /proc; a
+//! process whose environment names the row's runtime directory is red).
+//!
+//!   client_rows WARREN [ROW...]
+use std.env
+use std.fs
+use std.net
+use std.net.unix
+use std.poll
+use std.process
+use std.signal
+use std.term
+use std.time
+use client
+use proto
+use vt
+
+struct Run {
+    warren: str,
+    dir: str,
+    master: fs.File,
+    slave: fs.File,
+    pid: int,
+    slot: int,
+    out: List[byte],
+    screen: vt.Vt,
+    before: int,
+    status: int,
+    ended: bool,
+}
+
+fn now_ms() -> int {
+    time.monotonic_ns() / 1000000
+}
+
+fn row_dir(name: str) -> str {
+    let here = env.cwd() else "."
+    here + "/rt-" + name
+}
+
+// A pty at cols x rows, a known cooked mode on it, the client started
+// on it as its controlling terminal with `args`.
+fn launch(warren: str, name: str, args: List[str], cols: int, rows: int) -> Run ! {io} {
+    let dir = row_dir(name)
+    let pty = term.open_pty() else { return io }
+    let tty_name = term.pty_name(pty.master) else { return io }
+    term.set_size(pty.slave, term.Size { rows: rows, columns: cols }, 0, 0) else { return io }
+    let before = term.pack(term.mode(pty.slave) else { return io })
+    // The pane runs /bin/sh with a home of the row's own: never the
+    // user's shell or its configuration.
+    fs.create_dir_mode(dir + "-home", 448) else |_| {}
+    env.set("WARREN_RUNTIME_DIR", dir) else { return io }
+    env.set("WARREN_LIFETIME_MS", "60000") else { return io }
+    env.set("WARREN_PANE_COMMAND", "/bin/sh") else { return io }
+    env.set("SHELL", "/bin/sh") else { return io }
+    env.set("HOME", dir + "-home") else { return io }
+    env.set("ENV", "") else { return io }
+    env.set("TERM", "xterm-256color") else { return io }
+    env.set("COLORTERM", "truecolor") else { return io }
+    let pid_file = dir + "-pid"
+    fs.remove(pid_file) else |_| {}
+    // As under a shell: a session leader with the terminal starts the
+    // client as a foreground job of its own group (so a stop signal stops
+    // it), writes its pid, and ends with its status (128 + N for signal N).
+    let a = process.fork() else { return io }
+    if process.is_child(a) {
+        process.lead_session() else { process.exit(126) }
+        var tty = term.open_controlling(tty_name) else |_| {
+            process.exit(126)
+            return io
+        }
+        var c = process.command(warren)
+        for x in args { process.push_arg(mut c, x) }
+        process.set_stdin(mut c, tty)
+        process.set_stdout(mut c, tty)
+        process.set_stderr(mut c, tty)
+        // As a shell does for a job: its stop and continue signals at their
+        // defaults, whatever this program inherited.
+        let b = process.start_foreground(c, 0, tty, signal.suspend() | signal.continued()) else |_| {
+            process.exit(127)
+            return io
+        }
+        let bpid = process.pid(process.Child { slot: b.slot }) else 0
+        fs.write_text(pid_file, "{bpid}") else |_| {}
+        let st = process.wait_status(take b) else 0 - 1
+        process.exit(if st >= 0 then st else 128 - st)
+    }
+    var pid = 0
+    let t0 = now_ms()
+    while pid == 0 && now_ms() - t0 < 3000 {
+        let text = fs.read_text(pid_file) else ""
+        pid = text.trim().to_int() else 0
+        if pid == 0 { time.sleep(time.millis(10)) }
+    }
+    Run { warren: warren, dir: dir, master: pty.master, slave: pty.slave, pid: pid, slot: a.child.slot,
+        out: List[byte](), screen: vt.new(cols, rows, 0), before: before, status: 0, ended: false }
+}
+
+// Read what the client wrote, for up to ms; reap it if it ended.
+fn pump(mut r: Run, ms: int) {
+    let until = now_ms() + ms
+    while true {
+        var w = poll.open() else { return }
+        let k = poll.add_file(mut w, r.master, poll.READ) else { return }
+        let left = until - now_ms()
+        let ev = poll.wait(mut w, 0, if left < 0 then 0 else (if left > 50 then 50 else left)) else { return }
+        poll.remove(mut w, k) else |_| {}
+        poll.close(take w) else |_| {}
+        if ev.ready.len > 0 {
+            let got = fs.read_chunk(mut r.master, 65536) else List[byte]()
+            for b in got { (mut r.out).push(b) }
+            vt.feed(mut r.screen, got)
+        }
+        if !r.ended {
+            var seen = false
+            let c = process.poll() else |_| {
+                seen = true
+                return
+            }
+            if !seen && c.changed && c.child.slot == r.slot && !process.is_stopped(c.status) {
+                r.ended = true
+                r.status = c.status.value
+            }
+        }
+        if now_ms() >= until { return }
+    }
+}
+
+fn screen_text(v: vt.Vt) -> str {
+    var t = List[byte]()
+    let cells = if v.active_alternate then v.alternate.cells else v.primary.cells
+    var i = 0
+    while i < cells.len {
+        if i > 0 && i % v.cols == 0 { (mut t).push(10 as byte) }
+        let c = copy cells[i]
+        if c.width != 0 { client.utf8(mut t, if c.base == 0 then 32 else c.base) }
+        i += 1
+    }
+    str_from_utf8(t) else ""
+}
+
+fn until_screen(mut r: Run, text: str, ms: int) -> bool {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        if screen_text(r.screen).contains(text) { return true }
+        pump(mut r, 50)
+    }
+    screen_text(r.screen).contains(text)
+}
+
+fn until_end(mut r: Run, ms: int) -> bool {
+    let until = now_ms() + ms
+    while !r.ended && now_ms() < until { pump(mut r, 50) }
+    r.ended
+}
+
+fn type_text(mut r: Run, text: str) {
+    fs.write_chunk(mut r.master, text.bytes()) else |_| {}
+}
+
+fn output_text(r: Run) -> str {
+    str_from_utf8(r.out) else ""
+}
+
+// The mode after equals the mode before, and the bytes that leave what
+// the client turned on came after the last time it turned them on.
+fn restored(r: Run) -> str {
+    let after = term.pack(term.mode(r.slave) else { return "the mode cannot be read" })
+    if after != r.before { return "the mode was {after}, not {r.before} as before" }
+    let t = output_text(r)
+    let enter = t.rfind("\u{1b}[?1049h") else 0 - 1
+    let leave = t.rfind("\u{1b}[?1049l") else 0 - 1
+    let paste_off = t.rfind("\u{1b}[?2004l") else 0 - 1
+    let mouse_off = t.rfind("\u{1b}[?1000l") else 0 - 1
+    if enter < 0 { return "the client never took the terminal" }
+    if leave < enter || paste_off < enter || mouse_off < enter { return "the leave bytes were not all sent" }
+    ""
+}
+
+fn words(text: str) -> List[str] {
+    var x = List[str]()
+    for w in text.split(" ") {
+        if w.len > 0 { (mut x).push(w) }
+    }
+    x
+}
+
+fn stop_server() {
+    let _s = client.command(words("kill-server"))
+}
+
+fn close_run(r: Run) {
+    stop_server()
+    fs.close(take copy r.master) else |_| {}
+    fs.close(take copy r.slave) else |_| {}
+}
+
+fn ends_with(mut r: Run, code: int, line: str) -> str {
+    if !until_end(mut r, 10000) { return "the client did not end" }
+    pump(mut r, 100)
+    if r.status != code { return "the client ended {r.status}, not {code}: " + output_text(r) }
+    if line.len > 0 && !output_text(r).contains(line) { return "no '{line}' after the end" }
+    restored(r)
+}
+
+// ---------------- rows ----------------
+
+fn row_detach_reattach(warren: str) -> str {
+    var r = launch(warren, "detach", List[str](), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut r, "$", 10000) { return "no prompt: " + screen_text(r.screen) }
+    type_text(mut r, "echo hi-$((40+2))\r")
+    if !until_screen(mut r, "hi-42", 5000) { return "the echo was not drawn" }
+    type_text(mut r, "\u{0}d")
+    let why = ends_with(mut r, 0, "[detached")
+    if why.len > 0 {
+        close_run(r)
+        return "detach: " + why
+    }
+    fs.close(take copy r.master) else |_| {}
+    fs.close(take copy r.slave) else |_| {}
+    var a = launch(warren, "detach", words("attach"), 80, 24) else |e| { return "relaunch: {e}" }
+    if !until_screen(mut a, "hi-42", 10000) { return "the session's screen was not kept: " + screen_text(a.screen) }
+    type_text(mut a, "exit\r")
+    let why2 = ends_with(mut a, 0, "ended]")
+    close_run(a)
+    if why2.len > 0 { return "session end: " + why2 }
+    ""
+}
+
+fn row_server_stopping(warren: str) -> str {
+    var r = launch(warren, "stopping", List[str](), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut r, "$", 10000) { return "no prompt" }
+    stop_server()
+    let why = ends_with(mut r, 0, "[the server stopped]")
+    close_run(r)
+    why
+}
+
+fn row_too_small(warren: str) -> str {
+    var r = launch(warren, "small", List[str](), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut r, "$", 10000) { return "no prompt" }
+    term.set_size(r.slave, term.Size { rows: 4, columns: 10 }, 0, 0) else { return "resize" }
+    let why = ends_with(mut r, 1, "too small")
+    close_run(r)
+    why
+}
+
+fn row_refused(warren: str) -> str {
+    var s = launch(warren, "refused", List[str](), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut s, "$", 10000) { return "no prompt" }
+    var r = launch(warren, "refused", words("attach -t missing"), 80, 24) else |e| { return "launch: {e}" }
+    let why = ends_with(mut r, 1, "refused")
+    fs.close(take copy r.master) else |_| {}
+    fs.close(take copy r.slave) else |_| {}
+    close_run(s)
+    why
+}
+
+// A fake server: it listens where the client looks, takes the HELLO and
+// then either closes (`bad` false) or sends an image no applier takes (a
+// delta with nothing before it).
+fn fake(warren: str, name: str, bad: bool) -> str {
+    let dir = row_dir(name)
+    fs.remove_dir_all(dir) else |_| {}
+    fs.create_dir_mode(dir, 448) else { return "dir" }
+    var l = unix.listen(dir + "/default") else |e| { return "listen: {e}" }
+    var r = launch(warren, name, words("attach"), 80, 24) else |e| { return "launch: {e}" }
+    var s = net.accept(mut l) else |e| { return "accept: {e}" }
+    pump(mut r, 300)
+    let _h = net.read_bytes(mut s, 65536) else List[byte]()
+    if bad {
+        var f = List[byte]()
+        proto.put(mut f, 2, 4)
+        proto.put(mut f, 1, 4)
+        proto.put(mut f, 80, 2)
+        proto.put(mut f, 24, 2)
+        proto.put(mut f, 1, 2)
+        proto.put(mut f, 1, 2)
+        proto.put(mut f, 0, 1)
+        proto.put(mut f, 1, 1)
+        proto.put(mut f, 0, 4)
+        let e = proto.encode(131, 0, f)
+        net.write_bytes(mut s, e.bytes) else |_| {}
+    }
+    pump(mut r, 300)
+    net.close(take s) else |_| {}
+    net.close_listener(take l) else |_| {}
+    let why = ends_with(mut r, 1, if bad then "does not apply" else "closed the connection")
+    fs.close(take copy r.master) else |_| {}
+    fs.close(take copy r.slave) else |_| {}
+    why
+}
+
+fn by_signal(warren: str, name: str, meaning: int) -> str {
+    var r = launch(warren, name, List[str](), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut r, "$", 10000) { return "no prompt" }
+    signal.send(r.pid, meaning) else |e| { return "signal: {e}" }
+    let why = ends_with(mut r, 1, "ended by a signal")
+    close_run(r)
+    why
+}
+
+fn row_suspend_continue(warren: str) -> str {
+    var r = launch(warren, "suspend", List[str](), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut r, "$", 10000) { return "no prompt" }
+    signal.send(r.pid, signal.suspend()) else |e| { return "signal: {e}" }
+    pump(mut r, 500)
+    let stopped = term.pack(term.mode(r.slave) else { return "mode" })
+    var state = proc_state(r.pid)
+    let status_text = fs.read_text("/proc/{r.pid}/status") else ""
+    for line in status_text.lines() {
+        if line.starts_with("SigBlk") || line.starts_with("SigIgn") || line.starts_with("SigCgt") || line.starts_with("SigPnd") || line.starts_with("ShdPnd") {
+            state = state + " " + line.replace("\t", "")
+        }
+    }
+    signal.send(r.pid, signal.continued()) else |e| { return "signal: {e}" }
+    pump(mut r, 500)
+    let resumed = term.pack(term.mode(r.slave) else { return "mode" })
+    type_text(mut r, "echo back-$((50+5))\r")
+    let drawn = until_screen(mut r, "back-55", 5000)
+    type_text(mut r, "\u{0}d")
+    let why = ends_with(mut r, 0, "[detached")
+    close_run(r)
+    if stopped != r.before { return "while suspended (state {state}) the mode was {stopped}, not the terminal's own {r.before}" }
+    if resumed == r.before { return "after continue the terminal was not taken again" }
+    if !drawn { return "nothing was drawn after continue" }
+    why
+}
+
+// The process's state letter from /proc (Linux), "?" elsewhere.
+fn proc_state(pid: int) -> str {
+    let text = fs.read_text("/proc/{pid}/stat") else { return "?" }
+    let close = text.rfind(")") else 0 - 1
+    if close < 0 || close + 3 > text.len { return "?" }
+    text[close + 2..close + 3]
+}
+
+// Processes this program started that are still running: any whose
+// environment names a runtime directory under this program's working
+// directory (Linux, from /proc; elsewhere it cannot be read and is named).
+fn leftovers() -> str {
+    let names = fs.read_dir("/proc") else { return "" }
+    let here = env.cwd() else "."
+    let marker = "WARREN_RUNTIME_DIR=" + here + "/rt-"
+    let me = env.pid()
+    var found = ""
+    for n in names {
+        let pid = n.to_int() else 0
+        if pid <= 0 || pid == me { continue }
+        let raw = fs.read_bytes("/proc/{pid}/environ") else { continue }
+        let text = str_from_utf8(raw) else ""
+        if text.contains(marker) {
+            let cmd = fs.read_text("/proc/{pid}/cmdline") else ""
+            found = found + " {pid}:" + cmd.replace("\u{0}", " ").trim()
+        }
+    }
+    found
+}
+
+fn after_row() -> str {
+    let t0 = now_ms()
+    var left = leftovers()
+    while left.len > 0 && now_ms() - t0 < 5000 {
+        time.sleep(time.millis(50))
+        left = leftovers()
+    }
+    if left.len > 0 { return "left running after the row:" + left }
+    ""
+}
+
+fn row_kill_reported(warren: str) -> str {
+    var r = launch(warren, "kill", List[str](), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut r, "$", 10000) { return "no prompt" }
+    signal.send(r.pid, signal.kill()) else |e| { return "signal: {e}" }
+    if !until_end(mut r, 10000) { return "the client did not end" }
+    let after = term.pack(term.mode(r.slave) else { return "mode" })
+    print("MEASURE kill status={r.status} mode-restored={after == r.before} (KILL runs nothing; not promised)")
+    term.set_mode(r.slave, term.unpack(r.before)) else |_| {}
+    close_run(r)
+    if r.status != 137 { return "KILL did not end the client by its signal ({r.status})" }
+    ""
+}
+
+fn run_row(warren: str, name: str) -> str {
+    if name == "detach-reattach" { return row_detach_reattach(warren) }
+    if name == "server-stopping" { return row_server_stopping(warren) }
+    if name == "too-small" { return row_too_small(warren) }
+    if name == "refused" { return row_refused(warren) }
+    if name == "server-eof" { return fake(warren, "eof", false) }
+    if name == "image-refused" { return fake(warren, "image", true) }
+    if name == "terminate" { return by_signal(warren, "term", signal.terminate()) }
+    if name == "hangup" { return by_signal(warren, "hup", signal.reload()) }
+    if name == "suspend-continue" { return row_suspend_continue(warren) }
+    if name == "kill-reported" { return row_kill_reported(warren) }
+    "no such row"
+}
+
+fn main() -> int {
+    let args = env.args()
+    if args.len < 1 {
+        eprint("usage: client_rows WARREN [ROW...]")
+        return 2
+    }
+    var rows = List[str]()
+    var i = 1
+    while i < args.len {
+        (mut rows).push(args[i])
+        i += 1
+    }
+    if rows.len == 0 {
+        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported")
+    }
+    var failed = 0
+    for name in rows {
+        let t0 = now_ms()
+        var why = run_row(args[0], name)
+        // Nothing a row started may outlive it.
+        let left = after_row()
+        if left.len > 0 { why = if why.len > 0 then why + "; " + left else left }
+        if why.len == 0 {
+            print("PASS {name} ms={now_ms() - t0}")
+        } else {
+            failed += 1
+            print("FAIL {name} {why}")
+        }
+    }
+    print("CLIENT-ROWS rows={rows.len} failed={failed}")
+    if failed > 0 { return 1 }
+    0
+}
