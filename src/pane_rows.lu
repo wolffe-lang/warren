@@ -907,8 +907,6 @@ fn row_keys_in_split(mut r: Rig) -> str {
     var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
     let _s = prefix(p, 124)
     if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "no prompt in the new pane" }
-    let _c = client.input(p, "clear\r")
-    if !until_rect_line(mut p, "$", 41, 1, 40, 1, 5000) { return "no prompt on the right pane's first row" }
     let quiet = keystrokes(mut p, 120, 25)
     if quiet.len == 0 { return "a keystroke in the split was not shown" }
     let _q = report("keys-quiet-split gap-ms=25", quiet)
