@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Run pure grid programs on the explicit checked machine, never native fallback."""
+"""Run pure programs on the explicit checked machine, never native fallback.
+
+With no entries, the grid programs; otherwise the named ones (the key table's
+rows, under their own label)."""
 import argparse
 import json
 from pathlib import Path
@@ -29,12 +32,16 @@ def validate(record, pin):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--out', type=Path, default=ROOT / 'target/checked-vt')
+    parser.add_argument('--label', default='checked-vt')
     parser.add_argument('wolf')
+    parser.add_argument('entries', nargs='*')
     args = parser.parse_args()
+    entries = tuple(args.entries) or ENTRIES
+    label = args.label
     args.out.mkdir(parents=True, exist_ok=True)
     pin = tomllib.loads((ROOT / 'wolf-toolchain.toml').read_text())['wolf']
     failed = 0
-    for entry in ENTRIES:
+    for entry in entries:
         command = [args.wolf, 'conform-run', 'src/' + entry + '.lu', '--json', '--checked', '--deny-warnings']
         try:
             result = subprocess.run(command, cwd=ROOT, capture_output=True, timeout=300)
@@ -45,10 +52,10 @@ def main():
             validate(json.loads(result.stdout), pin)
         except (ValueError, OSError, subprocess.TimeoutExpired) as error:
             failed += 1
-            print('FAIL checked-vt %s %s' % (entry, error), flush=True)
+            print('FAIL %s %s %s' % (label, entry, error), flush=True)
         else:
-            print('PASS checked-vt %s explicit-conform-run-checked' % entry, flush=True)
-    print('CHECKED-VT entries=%d failed=%d' % (len(ENTRIES), failed))
+            print('PASS %s %s explicit-conform-run-checked' % (label, entry), flush=True)
+    print('%s entries=%d failed=%d' % (label.upper(), len(entries), failed))
     return bool(failed)
 
 
