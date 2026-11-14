@@ -293,27 +293,29 @@ Action bits: 1 unregister/close/free, 2 REFUSE, 4 WELCOME, 8 join membership,
 full action sets a flag, not a second outstanding image. REFUSE/BYE reason
 selection and actual resources stay in the event dispatcher, not this model.
 
-The transitions are exercised through the real event dispatcher by the
-session rows (`src/session_rows.lu`): a scripted client, itself wolf so that
-PAX runs it too, drives a real server over its socket. Each row starts its own
-server in its own runtime directory with a lifetime bound and stops it with
+The transitions are exercised through the real event dispatcher by the session
+rows (`src/session_rows.lu`): a scripted client, itself wolf so that PAX runs
+it too, drives a real server over its socket. Each row starts its own server
+in its own runtime directory with a lifetime bound and stops it with
 `kill-server`. They cover HELLO split at every byte, a bad first frame and bad
 magic (closed silently), the version, no-session and read-only refusals, a
 too-small attach (WELCOME then BYE, no session created), the HELLO deadline,
 stale and future ACKs, a message inside a paste's fragment chain, two client
 sizes converging to their minima and back, a client that never ACKs beside an
 active one, detach by the prefix binding and by DETACH, Ctrl-C as the byte 03,
-the last session ending the server, the command role, a second server
-meeting the start lock, a pane's last output reaching its client before the
-session ends, a program that outlives its pane being reaped, a pane's program
-starting with no signal ignored or blocked and no inherited descriptor, the
-server's thread count, the pre-HELLO and session limits, a resize while an
-image is outstanding, a client too slow for its events beside one that keeps
-up, a keystroke's delay beside a flooding pane, and a flat resident size over
-10,000 keystrokes. `src/compose_rows.lu` holds every composed image, applied
-by the client's applier, to the emulator's stored cells, and holds the event
-queue's cap to the bytes a client has yet to take (a small socket under a
-steady pane never empties the queue, and must not count what it sent).
+the last session ending the server, the command role, a second server meeting
+the start lock, a pane's last output reaching its client before the session
+ends, a program that outlives its pane being reaped, a pane's program starting
+with no signal ignored or blocked and no inherited descriptor, the server's
+thread count, the pre-HELLO, connection, session and memory limits (the memory
+row lowers the budget through `WARREN_MEMORY_BUDGET`, which the server takes
+only below its own), a resize while an image is outstanding, a client too slow
+for its events beside one that keeps up, a keystroke's delay beside a flooding
+pane, and a flat resident size over 10,000 keystrokes. `src/compose_rows.lu`
+holds every composed image, applied by the client's applier, to the emulator's
+stored cells, and holds the event queue's cap to the bytes a client has yet to
+take (a small socket under a steady pane never empties the queue, and must not
+count what it sent).
 
 On PAX a pane ends when its program ends, not when the program closes its
 terminal: the late-child row measures the session's end about a second after
