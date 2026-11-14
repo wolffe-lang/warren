@@ -1,0 +1,6 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# sizes a session to its larger client's columns, not the smaller's.
+floor 15
+rig w2-lifecycle-plant-step.sh sha256=109971d44d3c8855fec3804aa871d41439053697ec370ce6db5759807e6587b5
+step w2-lifecycle-plant-build tools=python3,cc script=w2-lifecycle-plant-step.sh -- build
+step second-client needs=w2-lifecycle-plant-build tools=python3 script=w2-lifecycle-plant-step.sh -- rows
