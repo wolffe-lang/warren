@@ -66,7 +66,12 @@ def expectations():
 
 
 def expected(table, row, tier, host):
-    for key in ((row, tier, host), (row, tier, '*')):
+    # A super-user's run may measure what others cannot (a second uid);
+    # its own header comes first when there is one.
+    keys = [(row, tier, host), (row, tier, '*')]
+    if os.geteuid() == 0:
+        keys.insert(0, (row, tier, host + '-root'))
+    for key in keys:
         if key in table:
             return table[key]
     return None

@@ -92,6 +92,11 @@ forked_peer=true
 self_peer=true
 other_uid=not-measured
 
+[peer_cred native linux-root]
+forked_peer=true
+self_peer=true
+other_uid=denied
+
 [peer_cred native darwin]
 forked_peer=true
 self_peer=true
