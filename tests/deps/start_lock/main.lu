@@ -74,7 +74,7 @@ fn after_holder_exit(path: str) -> str ! {io, unsupported} {
     if process.is_child(f) {
         var g = fs.open_mode(path, 3 + fs.NOFOLLOW) else |_| {
             process.exit(12)
-            return
+            return "unreachable"
         }
         let r = lock_row(mut g)
         if r == "taken" { process.exit(11) }
