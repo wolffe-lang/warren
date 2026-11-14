@@ -1,0 +1,236 @@
+//! member: true
+//! Input events to the bytes a pane's program reads, in the pane's own
+//! requested dialect (cursor-key and keypad modes, mouse reporting,
+//! bracketed paste, focus reports), never the outer terminal's.
+use vt
+
+const ESC: int = 27
+
+fn mode(p: vt.Vt, index: int) -> bool {
+    p.mode_values[index] == 1
+}
+
+fn push_text(mut out: List[byte], text: str) {
+    for b in text.bytes() { (mut out).push(b) }
+}
+
+/// UTF-8 of one Unicode scalar.
+pub fn push_scalar(mut out: List[byte], cp: int) {
+    if cp < 128 {
+        (mut out).push(cp as byte)
+    } else if cp < 2048 {
+        (mut out).push((192 + cp / 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else if cp < 65536 {
+        (mut out).push((224 + cp / 4096) as byte)
+        (mut out).push((128 + cp / 64 % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else {
+        (mut out).push((240 + cp / 262144) as byte)
+        (mut out).push((128 + cp / 4096 % 64) as byte)
+        (mut out).push((128 + cp / 64 % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    }
+}
+
+fn control_of(cp: int) -> int {
+    if cp >= 97 && cp <= 122 { return cp - 96 }
+    if cp >= 64 && cp <= 95 { return cp - 64 }
+    if cp == 32 || cp == 50 { return 0 }
+    if cp == 63 { return 127 }
+    if cp == 47 { return 31 }
+    0 - 1
+}
+
+// CSI final with an optional modifier: ESC [ X, ESC O X (application
+// mode, no modifier), or ESC [ 1 ; m X.
+fn cursor_key(mut out: List[byte], final: str, mods: int, application: bool) {
+    (mut out).push(ESC as byte)
+    if mods != 0 {
+        push_text(mut out, "[1;{mods + 1}{final}")
+    } else if application {
+        push_text(mut out, "O{final}")
+    } else {
+        push_text(mut out, "[{final}")
+    }
+}
+
+fn tilde_key(mut out: List[byte], n: int, mods: int) {
+    (mut out).push(ESC as byte)
+    if mods != 0 { push_text(mut out, "[{n};{mods + 1}~") } else { push_text(mut out, "[{n}~") }
+}
+
+fn keypad(mut out: List[byte], application: bool, plain: str, app: str) {
+    if application {
+        (mut out).push(ESC as byte)
+        push_text(mut out, "O{app}")
+    } else {
+        push_text(mut out, plain)
+    }
+}
+
+/// The bytes of one KEY event for the pane. kind 0 is a scalar, kind 1 a
+/// named key (PROTOCOL.md's numbering). Shift is already in a scalar.
+pub fn key_bytes(p: vt.Vt, mods: int, kind: int, code: int) -> List[byte] {
+    var out = List[byte]()
+    let alt = mods & 2 != 0
+    let ctrl = mods & 4 != 0
+    if kind == 0 {
+        var cp = code
+        if ctrl {
+            let c = control_of(cp)
+            if c >= 0 { cp = c }
+        }
+        if alt { (mut out).push(ESC as byte) }
+        push_scalar(mut out, cp)
+        return out
+    }
+    let app_cursor = mode(p, 2)
+    let app_keypad = mode(p, 7)
+    if code >= 1 && code <= 6 {
+        let f = "ABCDHF"[code - 1..code]
+        cursor_key(mut out, f, mods, app_cursor)
+    } else if code == 7 { tilde_key(mut out, 5, mods) }
+    else if code == 8 { tilde_key(mut out, 6, mods) }
+    else if code == 9 { tilde_key(mut out, 2, mods) }
+    else if code == 10 { tilde_key(mut out, 3, mods) }
+    else if code == 11 {
+        if alt { (mut out).push(ESC as byte) }
+        (mut out).push((if ctrl then 8 else 127) as byte)
+    } else if code == 12 {
+        if mods & 1 != 0 {
+            (mut out).push(ESC as byte)
+            push_text(mut out, "[Z")
+        } else {
+            if alt { (mut out).push(ESC as byte) }
+            (mut out).push(9 as byte)
+        }
+    } else if code == 13 {
+        if alt { (mut out).push(ESC as byte) }
+        (mut out).push(13 as byte)
+    } else if code == 14 {
+        if alt { (mut out).push(ESC as byte) }
+        (mut out).push(ESC as byte)
+    } else if code >= 15 && code <= 38 {
+        // F1..F24; F13..F24 are F1..F12 with shift, as xterm sends them.
+        var n = code - 14
+        var m = mods
+        if n > 12 {
+            n = n - 12
+            m = m | 1
+        }
+        if n <= 4 {
+            let f = "PQRS"[n - 1..n]
+            (mut out).push(ESC as byte)
+            if m != 0 { push_text(mut out, "[1;{m + 1}{f}") } else { push_text(mut out, "O{f}") }
+        } else {
+            let t = match n {
+                5 => 15,
+                6 => 17,
+                7 => 18,
+                8 => 19,
+                9 => 20,
+                10 => 21,
+                11 => 23,
+                _ => 24,
+            }
+            tilde_key(mut out, t, m)
+        }
+    } else if code >= 39 && code <= 48 {
+        let digit = code - 39
+        keypad(mut out, app_keypad, "{digit}", "pqrstuvwxy"[digit..digit + 1])
+    } else if code == 49 { keypad(mut out, app_keypad, ".", "n") }
+    else if code == 50 { keypad(mut out, app_keypad, "/", "o") }
+    else if code == 51 { keypad(mut out, app_keypad, "*", "j") }
+    else if code == 52 { keypad(mut out, app_keypad, "-", "m") }
+    else if code == 53 { keypad(mut out, app_keypad, "+", "k") }
+    else if code == 54 {
+        if app_keypad {
+            (mut out).push(ESC as byte)
+            push_text(mut out, "OM")
+        } else {
+            (mut out).push(13 as byte)
+        }
+    } else if code == 55 { keypad(mut out, app_keypad, "=", "X") }
+    out
+}
+
+/// The bytes of one MOUSE event for the pane, or none when the pane asked
+/// for no report of this kind. kind 0 press, 1 release, 2 motion, 3/4
+/// wheel; button 0..3.
+pub fn mouse_bytes(p: vt.Vt, kind: int, button: int, mods: int, col: int, row: int) -> List[byte] {
+    var out = List[byte]()
+    let press_release = mode(p, 8)
+    let button_motion = mode(p, 9)
+    let any_motion = mode(p, 10)
+    let sgr = mode(p, 12)
+    if !press_release && !button_motion && !any_motion { return out }
+    if kind == 2 && !any_motion && !(button_motion && button != 0) { return out }
+    var b = button - 1
+    if button == 0 { b = 3 }
+    if kind == 3 { b = 64 }
+    if kind == 4 { b = 65 }
+    if kind == 2 { b = b + 32 }
+    if mods & 1 != 0 { b = b + 4 }
+    if mods & 2 != 0 { b = b + 8 }
+    if mods & 4 != 0 { b = b + 16 }
+    (mut out).push(ESC as byte)
+    if sgr {
+        let f = if kind == 1 then "m" else "M"
+        push_text(mut out, "[<{b};{col};{row}{f}")
+        return out
+    }
+    if kind == 1 { b = 3 + (b & 28) }
+    if col > 223 || row > 223 { return List[byte]() }
+    push_text(mut out, "[M")
+    (mut out).push((32 + b) as byte)
+    (mut out).push((32 + col) as byte)
+    (mut out).push((32 + row) as byte)
+    out
+}
+
+/// A focus report when the pane asked for them, else none.
+pub fn focus_bytes(p: vt.Vt, gained: bool) -> List[byte] {
+    var out = List[byte]()
+    if !mode(p, 11) { return out }
+    (mut out).push(ESC as byte)
+    push_text(mut out, if gained then "[I" else "[O")
+    out
+}
+
+/// A paste for the pane: every ESC [ 2 0 1 ~ removed; bracketed when the
+/// pane asked for it, otherwise control bytes other than tab, CR and LF
+/// removed. Bytes above 7f are kept.
+pub fn paste_bytes(p: vt.Vt, data: List[byte]) -> List[byte] {
+    var clean = List[byte]()
+    let end_mark = "\u{1b}[201~".bytes()
+    var i = 0
+    while i < data.len {
+        if i + 6 <= data.len && data[i] == 27 as byte {
+            var hit = true
+            var k = 0
+            while k < 6 {
+                if data[i + k] != end_mark[k] { hit = false }
+                k += 1
+            }
+            if hit {
+                i += 6
+                continue
+            }
+        }
+        (mut clean).push(data[i])
+        i += 1
+    }
+    var out = List[byte]()
+    if mode(p, 14) {
+        push_text(mut out, "\u{1b}[200~")
+        for b in clean { (mut out).push(b) }
+        push_text(mut out, "\u{1b}[201~")
+        return out
+    }
+    for b in clean {
+        let n = b as int
+        if (n >= 32 && n != 127) || n == 9 || n == 10 || n == 13 { (mut out).push(b) }
+    }
+    out
+}
