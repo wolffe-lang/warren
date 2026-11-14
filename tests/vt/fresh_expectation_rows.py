@@ -49,6 +49,25 @@ def main():
     wrong_cell = copy.deepcopy(indexed)
     wrong_cell['rows'][0][0][1] = 'U+0059'
     refuses(lambda: legacy_pair(C + b'1;30mX', black, wrong_cell))
+    # N1 already removes unobservable foregrounds from plain blanks. These
+    # are not D13 corrections and must not enter its bold/value/direction gate.
+    for old, new in ((8, 0), (0, 8)):
+        erased = blank(12, 4)
+        erased['rows'][0][0][2] = 'fg=idx:%d,bg=idx:32' % old
+        recolored = copy.deepcopy(erased)
+        recolored['rows'][0][0][2] = 'fg=idx:%d,bg=idx:32' % new
+        fixed, bounds = legacy_pair(C + b'30m' + C + b'X', erased, recolored)
+        assert fixed == erased and bounds['cells'] == [], 'N1 blank is not a D13 delta'
+        for field, value in ((1, 'U+0058'), (2, 'fg=idx:%d,bg=idx:33' % new)):
+            wrong = copy.deepcopy(recolored)
+            wrong['rows'][0][0][field] = value
+            refuses(lambda: legacy_pair(C + b'30m' + C + b'X', erased, wrong))
+    for visible in ('', 'underline', 'double-underline', 'strike', 'inverse'):
+        unbold = blank(12, 4)
+        text_row(unbold, 0, [88 if not visible else 32], ','.join(filter(None, (visible, 'fg=idx:8'))))
+        changed = copy.deepcopy(unbold)
+        changed['rows'][0][0][2] = ','.join(filter(None, (visible, 'fg=idx:0')))
+        refuses(lambda: legacy_pair(C + b'30mX', unbold, changed))
     low = blank(12, 4)
     text_row(low, 0, [88], 'bold,fg=idx:1')
     high = copy.deepcopy(low)
