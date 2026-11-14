@@ -1,0 +1,108 @@
+//! member: true
+//! The canonical text form (docs/LAYOUT.md, The canonical dump): `dump`
+//! for the layout alone, `dump_at` with every node's geometry at a size.
+
+fn put(mut buf: List[byte], s: str) {
+    for b in s.bytes() { (mut buf).push(b) }
+}
+
+fn hex_digit(n: int) -> byte {
+    if n < 10 { return (48 + n) as byte }
+    (87 + n) as byte
+}
+
+/// A name's bytes between quotes: `\"`, `\\`, `\xHH` below 0x20 and for
+/// 0x7f, every other byte as it is.
+fn put_name(mut buf: List[byte], name: List[byte]) {
+    put(mut buf, "\"")
+    for b in name {
+        let v = b as int
+        if v == 34 || v == 92 {
+            (mut buf).push(92 as byte)
+            (mut buf).push(b)
+        } else if v < 32 || v == 127 {
+            put(mut buf, "\\x")
+            (mut buf).push(hex_digit(v / 16))
+            (mut buf).push(hex_digit(v % 16))
+        } else {
+            (mut buf).push(b)
+        }
+    }
+    put(mut buf, "\"")
+}
+
+fn put_box(mut buf: List[byte], b: Box) {
+    put(mut buf, " at={b.col},{b.row} size={b.cols}x{b.rows}")
+}
+
+/// One node and everything under it. `visible` is false under a hidden
+/// split and for every split of a zoomed tab.
+fn describe(t: Tab, i: int, depth: int, b: Box, visible: bool, geometry: bool, whole: Box, mut buf: List[byte]) {
+    var k = 0
+    while k < depth {
+        put(mut buf, "  ")
+        k += 1
+    }
+    let n = copy t.nodes[i]
+    if n.kind == LEAF {
+        put(mut buf, "pane {n.pane}")
+        if geometry {
+            if t.zoomed && n.pane == t.focus && whole.cols > 0 {
+                put_box(mut buf, whole)
+            } else if visible && !t.zoomed {
+                put_box(mut buf, b)
+            } else {
+                put(mut buf, " hidden")
+            }
+        }
+        put(mut buf, "\n")
+        return
+    }
+    let axis = if n.axis == COLS then "cols" else "rows"
+    put(mut buf, "split {axis} share={n.share}")
+    let c = cut(n.axis, n.share, b)
+    if geometry {
+        if visible && !t.zoomed {
+            put_box(mut buf, b)
+            if c.both { put(mut buf, " border={c.border}") } else { put(mut buf, " border=none") }
+        } else {
+            put(mut buf, " hidden")
+        }
+    }
+    put(mut buf, "\n")
+    describe(t, n.first, depth + 1, c.first, visible, geometry, whole, mut buf)
+    describe(t, n.second, depth + 1, c.second, visible && c.both, geometry, whole, mut buf)
+}
+
+fn text(l: Layout, cols: int, rows: int, geometry: bool) -> str {
+    var buf = List[byte]()
+    put(mut buf, "layout tabs={l.tabs.len} active={l.active} next={l.next_id}")
+    if geometry { put(mut buf, " size={cols}x{rows}") }
+    put(mut buf, "\n")
+    let whole = area(cols, rows)
+    for t in l.tabs {
+        let zoomed = if t.zoomed then 1 else 0
+        put(mut buf, "tab {t.id} focus={t.focus} zoomed={zoomed} order=")
+        var i = 0
+        while i < t.focus_order.len {
+            if i > 0 { put(mut buf, ",") }
+            put(mut buf, "{t.focus_order[i]}")
+            i += 1
+        }
+        put(mut buf, " name=")
+        put_name(mut buf, t.name)
+        put(mut buf, "\n")
+        describe(t, t.root, 1, whole, whole.cols > 0, geometry, whole, mut buf)
+    }
+    str_from_utf8(buf) else "<layout dump is not utf-8>"
+}
+
+/// The canonical text of a layout.
+pub fn dump(l: Layout) -> str {
+    text(l, 0, 0, false)
+}
+
+/// The canonical text with every node's geometry at `cols` x `rows`.
+pub fn dump_at(l: Layout, cols: int, rows: int) -> str {
+    text(l, cols, rows, true)
+}
