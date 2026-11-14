@@ -44,6 +44,7 @@ pub struct Server {
     trace: bool,
     turns: int,
     master_read: int,
+    budget: int,
     uid: int,
     inherited: List[int],
 }
@@ -627,7 +628,7 @@ fn hello(mut s: Server, index: int) {
             return
         }
         if s.stopping || live_sessions(s) >= MAX_SESSIONS ||
-            projected(s, pane_bytes(h.cols, h.rows) + attached_bytes(h.cols, h.rows) - connection_bytes()) > MEMORY_BUDGET {
+            projected(s, pane_bytes(h.cols, h.rows) + attached_bytes(h.cols, h.rows) - connection_bytes()) > s.budget {
             s.conns[index].hello_ready = false
             terminal(mut s, index, 130, 7, "resource limit")
             return
@@ -669,7 +670,7 @@ fn hello(mut s: Server, index: int) {
         s.sessions[slot].live = true
         si = slot
         trace(s, "session {si} created: {name}")
-    } else if projected(s, attached_bytes(s.sessions[si].cols, s.sessions[si].rows) - connection_bytes()) > MEMORY_BUDGET {
+    } else if projected(s, attached_bytes(s.sessions[si].cols, s.sessions[si].rows) - connection_bytes()) > s.budget {
         s.conns[index].hello_ready = false
         terminal(mut s, index, 130, 7, "resource limit")
         return
@@ -1095,6 +1096,10 @@ pub fn serve() -> int {
     // budgets with it); READ_BUDGET is the server's rule.
     var master_read = (env.get("WARREN_MEASURE_MASTER_READ") else "0").to_int() else 0
     if master_read <= 0 || master_read > READ_BUDGET { master_read = READ_BUDGET }
+    // A row's lower memory budget, so that it reaches the refusal without
+    // the memory; MEMORY_BUDGET is the server's rule and is never raised.
+    var budget = (env.get("WARREN_MEMORY_BUDGET") else "0").to_int() else 0
+    if budget <= 0 || budget > MEMORY_BUDGET { budget = MEMORY_BUDGET }
     var conns = List[Conn]()
     var i = 0
     while i < MAX_CONNECTIONS {
@@ -1112,7 +1117,7 @@ pub fn serve() -> int {
         key_gen: List[int](), next_id: 0, stopping: false, stop_deadline: 0, started: now_ns(),
         idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
         version: vt.package_version(), again: false, need_slot: false, rotate: 0,
-        trace: env.has("WARREN_TRACE"), turns: 0, master_read: master_read, uid: env.euid() else 0 - 1,
+        trace: env.has("WARREN_TRACE"), turns: 0, master_read: master_read, budget: budget, uid: env.euid() else 0 - 1,
         inherited: inherited,
     }
     net.set_listener_deadline(mut s.place.listener, 1) else |_| {}
