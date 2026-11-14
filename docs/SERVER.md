@@ -377,8 +377,10 @@ another pane's zoom, keeps its last size and is resized when it shows again.
 A zoomed pane takes the whole area. A split's new pane starts at its rect, in
 the session's working directory, with the session's environment.
 
-**Operations**, behind the prefix (Ctrl-Space, then a key; the table is
-fixed in this version and becomes data with the modes):
+**Keys and modes.** Every KEY goes through the key table (`src/config/keys.lu`)
+in the client's own mode; modes are per client, focus is per session. One key
+is taken from programs in normal mode, the prefix (Ctrl-Space). After it, one
+key of the prefix table:
 
 | key | operation |
 |---|---|
@@ -388,29 +390,56 @@ fixed in this version and becomes data with the modes):
 | `H J K L` | move a border of the focused pane left, down, up, right (its own on that side, else the one on the other side), 2 columns or 1 row |
 | `z` | zoom the focused pane, or unzoom |
 | `=` | every split of the tab back to halves |
-| `x` | close the focused pane |
+| `x` | close the focused pane, after `y` |
 | `c` | a new tab |
 | `n` / `p` / `1`-`9` | the next / previous tab, or the tab at that position |
+| `,` | rename the tab at a prompt |
+| `:` | the command line |
+| `?` | the key list |
 | `d` | detach |
+| `w` `t` `r` `s` | pane, tab, resize and session mode |
+| `g` | locked mode |
 | Ctrl-Space | send Ctrl-Space (NUL) to the pane |
 
-A key that is not in the table is dropped. A refused split or new tab (too
-small, the pane limit, the memory budget, a program that did not start) leaves
-everything as it was and is named on that client's hint line for 2 s; a focus
-move with no neighbour does nothing.
+A key that is not in the table is dropped. The four sticky modes keep taking
+their keys until Esc or Enter (Ctrl-Space goes to the prefix from them): pane
+mode `| - h j k l` (and arrows) `x z o =`; tab mode `h l` (arrows, `n p`)
+previous and next, `c` new, `x` close, `r` rename, `1`-`9`; resize mode `h j k
+l` (arrows, `H J K L`) and `=`; session mode `d`. Locked mode passes every key
+to the pane, the prefix included, and is left only with Ctrl-g. A close (`x`)
+asks on the hint line; `y` closes and any other key keeps. The rename and
+command prompts take printable keys, Backspace and Ctrl-u, run on Enter and are
+left with Esc; confirm, the key list and the prompts go back to the sticky mode
+they came from. The command line takes the table's action names and their
+arguments: `split-right`, `split-down`, `focus left|right|up|down`,
+`focus-next`, `resize DIRECTION [N]`, `zoom`, `equalize`, `close-pane`,
+`new-tab`, `close-tab`, `next-tab`, `previous-tab`, `select-tab N`,
+`rename-tab NAME`, `detach`, `lock`; an unknown verb or a bad argument is
+answered on the hint line. INPUT, PASTE and mouse events reach the pane only in
+normal and locked mode, and are dropped in the others.
 
-**Closing.** A pane closes on `x` or when its program's terminal ends; the
-last pane of the last tab ends the session (as one pane did before). Keys,
-pastes, INPUT, focus reports and mouse events go to the focused pane of the
-active tab; a mouse event outside it is dropped, one inside is made relative to
+A refused split or new tab (too small, the pane limit, the memory budget, a
+program that did not start) leaves everything as it was and is named on that
+client's hint line for 2 s; a focus move with no neighbour does nothing.
+
+**Closing.** A pane closes on `x` and `y` or when its program's terminal
+ends; a tab closes with all its panes on `x` and `y` in tab mode; the last pane
+of the last tab ends the session (as one pane did before). Keys, pastes, INPUT,
+focus reports and mouse events go to the focused pane of the active tab; a mouse event outside it is dropped, one inside is made relative to
 its rect. When focus moves, a pane that asked for focus reports hears it lose
 or take focus, and the clients take the new pane's title. A bell from the
 active tab reaches the clients; titles come from the focused pane only.
 
 **The frame** is the session's size: the tab area, then line one of the bar
 (the session's name and the tabs, the active one inverse; tabs that do not fit
-leave out the far side of the active one, marked `<` or `>`), then the hint
-line (a message while one lasts; the key hints come with the modes). Each
+leave out the far side of the active one, marked `<` or `>`; at the right end
+the client's mode in a fixed field of nine columns, inverse and bold), then the
+hint line: the mode's rows of the key table, `keys label` with the keys
+inverse, two spaces apart, those that do not fit counted as `+N` (normal and
+prefix mode share one line, so the prefix repaints only the mode field); a
+prompt with its cursor; the confirm question; or a message while one lasts.
+The key list (`?`) is drawn over the tab area for that client only, one line a
+binding, and scrolls with `j` and `k`. Each
 shown pane's grid is drawn in its rect. Border cells are `│` and `─`, with
 `├ ┤ ┬ ┴ ┼` where borders meet. The border cells within one cell of the
 focused pane's rect are drawn in colour 2; when exactly two panes show they
