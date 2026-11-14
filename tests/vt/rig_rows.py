@@ -6,23 +6,27 @@ import re
 
 ROOT = Path(__file__).resolve().parents[2]
 RIG = ROOT / 'tests/vt/rig'
+SESSION_RIG = ROOT / 'tests/session/rig'
 
 
 def main():
-    for filename, expected in (
-        ('w1-linux.manifest', ['w1-linux-gate', 'w1-resource', 'w1-widths', 'w1-recordings-lupin']),
-        ('w1-plant.manifest', ['w1-plant-build', 'vt-scalar-value'])):
-        raw = (RIG / filename).read_text()
+    for rig, filename, expected in (
+        (RIG, 'w1-linux.manifest', ['w1-linux-gate', 'w1-resource', 'w1-widths', 'w1-recordings-lupin']),
+        (RIG, 'w1-plant.manifest', ['w1-plant-build', 'vt-scalar-value']),
+        (SESSION_RIG, 'w2-plant.manifest', ['w2-plant-build', 'one-image'])):
+        raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
         scripts = re.findall(r'^rig (\S+) sha256=([a-f0-9]{64})$', raw, re.M)
         assert scripts
         for relative, digest in scripts:
-            assert hashlib.sha256((RIG / relative).read_bytes()).hexdigest() == digest
+            assert hashlib.sha256((rig / relative).read_bytes()).hexdigest() == digest
         assert 'floor ' in raw
     plant = (RIG / 'w1-plant-step.sh').read_text()
     assert 'FAIL vt-scalar-value ' in plant and 'exit "$rc"' in plant
     assert '[ "$rc" -eq 134 ]' in plant
+    server_plant = (SESSION_RIG / 'w2-plant-step.sh').read_text()
+    assert 'never-ack-beside-active resize-crossing-image' in server_plant
     linux = (RIG / 'w1-step.sh').read_text()
     assert 'tools/gate linux' in linux and 'vt_resource_bench.lu' in linux
     assert 'width_sweep.py' in linux and '--suite recordings' in linux
