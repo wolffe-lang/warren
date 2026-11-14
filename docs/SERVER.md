@@ -311,16 +311,18 @@ sizes converging to their minima and back, a client that never ACKs beside an
 active one, detach by the prefix binding and by DETACH, Ctrl-C as the byte 03,
 the last session ending the server, the command role, a second server meeting
 the start lock, a pane's last output reaching its client before the session
-ends, a program that outlives its pane being reaped, a pane's program starting
-with no signal ignored or blocked and no inherited descriptor, the server's
-thread count, the pre-HELLO, connection, session and memory limits (the memory
-row lowers the budget through `WARREN_MEMORY_BUDGET`, which the server takes
-only below its own), a resize while an image is outstanding, a client too slow
-for its events beside one that keeps up, a keystroke's delay beside a flooding
-pane, and a flat resident size over 10,000 keystrokes. `src/compose_rows.lu`
-holds every composed image, applied by the client's applier, to the emulator's
-stored cells, and holds the event queue's cap to the bytes a client has yet to
-take (a small socket under a steady pane never empties the queue, and must not
+ends (a client still owing its ACK gets the last image after that ACK, then
+BYE session-ended, or the BYE alone at the closing deadline), a program that
+outlives its pane being reaped, a pane's program starting with no signal
+ignored or blocked and no inherited descriptor, the server's thread count, the
+pre-HELLO, connection, session and memory limits (the memory row lowers the
+budget through `WARREN_MEMORY_BUDGET`, which the server takes only below its
+own), a resize while an image is outstanding, a client too slow for its events
+beside one that keeps up, a keystroke's delay beside a flooding pane, and a
+flat resident size over 10,000 keystrokes. `src/compose_rows.lu` holds every
+composed image, applied by the client's applier, to the emulator's stored
+cells, and holds the event queue's cap to the bytes a client has yet to take
+(a small socket under a steady pane never empties the queue, and must not
 count what it sent).
 
 On PAX a pane ends when its program ends, not when the program closes its
