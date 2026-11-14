@@ -66,6 +66,8 @@ fn launch(warren: str, name: str, args: List[str], cols: int, rows: int) -> Run 
     env.set("SHELL", "/bin/sh") else { return io }
     env.set("HOME", dir + "-home") else { return io }
     env.set("ENV", "") else { return io }
+    // The prompt the rows wait for, whoever runs them (root's is `#`).
+    env.set("PS1", "$ ") else { return io }
     env.set("TERM", "xterm-256color") else { return io }
     env.set("COLORTERM", "truecolor") else { return io }
     let pid_file = dir + "-pid"
