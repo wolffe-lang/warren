@@ -4,8 +4,35 @@
 session, starting the server (detached, in a session of its own, its standard
 streams on `/dev/null`) and the session when there are none. `warren attach
 [-t NAME]` attaches to a session that exists and is refused when it does not.
-`warren kill-server` and `warren list-sessions` ask a running server over the
-command role. Later verbs (`new`, `split`, `tab`, ...) fail by name.
+`warren new [-d] [-s NAME]` makes a session and attaches to it. `warren
+kill-server` and `warren list-sessions` ask a running server over the command
+role. Later verbs (`detach`, `split`, `tab`, ...) fail by name.
+
+## Sessions and clients
+
+`warren new` makes a session at this terminal's size, in this directory and
+with this environment, prints its name and attaches to it. With `-d` it makes
+the session and returns (at 80x24 when there is no terminal). Without `-s` the
+server names it with the lowest positive number not in use. A name in use is
+refused, and so are an empty name and one holding `/` or a control byte; names
+are compared as bytes.
+
+Several clients may attach to one session. The pane takes the smallest
+columns and, separately, the smallest rows of the clients attached. When a
+client detaches, ends or loses its terminal, the pane and the other clients go
+on, and the size follows the clients left. With nobody attached the session
+keeps its last size.
+
+The server runs in a session of its own, detached from the terminal of the
+client that started it: that client can end, or its terminal go away, and the
+server and its sessions stay for the next `warren attach`. The server stops on
+`kill-server`, or a while after its last session has ended with no client
+connected. On PAX the server outlives the client that started it; surviving a
+logout of the console waits on PAX keeping its first process (pax#358) and is
+not promised here.
+
+A command the server does not know is refused with the usage status and its
+name, so a newer client facing an older server fails cleanly.
 
 ## The terminal, taken and given back
 
@@ -72,6 +99,13 @@ one-cell-a-code-point console holds the console policy.
 
 The client rows run natively on Linux and macOS, and on PAX under QEMU from a
 console transcript, with the client in a pseudo-terminal of the rows' own.
+They hold every way out above and the sessions-and-clients rules: `new`
+detached, numbered, refused and attached; a second client at a smaller size
+beside the first, then gone; the server outliving the client that started it;
+a verb the server does not know; and the names a session may hold. On Linux,
+the first prompt after starting the server is drawn about 0.1 s after the
+client starts, and `new -d` against a running server takes about 40 ms from
+its start to its exit.
 Attached to one 80x24 session, the client's resident size peaks at 4-5.2 MB
 on Linux and 10.3 MB on PAX (`MEASURE client`). Rendering a full 80x24 image
 takes about 0.8 ms on Linux and a one-cell delta about 0.08 ms
