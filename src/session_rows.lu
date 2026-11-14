@@ -613,6 +613,42 @@ fn row_last_output(mut r: Rig) -> str {
     ""
 }
 
+// A client still owing its ACK when the session ends: the pane's last
+// words must reach it (after its ACK, before BYE session-ended).
+fn row_last_output_after_ack(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_line(mut p, "$", 5000) { return "no prompt" }
+    p.auto_ack = false
+    let _h = client.input(p, "echo held-$((1+1))\r")
+    if !client.until_kind(mut p, 131, 3000) { return "no image to hold" }
+    let held = p.image.seq
+    // While that image is unacknowledged, the program prints and ends.
+    let _e = client.input(p, "echo last-$((20+22)); exit\r")
+    time.sleep(time.millis(700))
+    var a = List[byte]()
+    proto.put(mut a, held, 4)
+    let _a = client.send(p, 8, a)
+    p.auto_ack = true
+    var seen = false
+    var n = 0
+    while n < 200 {
+        let k = client.step(mut p, 3000)
+        if k <= 0 { n = 200 }
+        if k == 131 && client.screen_text(p).contains("last-42") { seen = true }
+        if k == 135 { n = 200 }
+        n = n + 1
+    }
+    client.hang_up(mut p)
+    var ch = process.Child { slot: r.server }
+    r.started = false
+    let _st = process.wait_status(take ch) else 0 - 1
+    if p.end_kind != 135 || p.end_code != 2 { return "BYE {p.end_code}, expected session-ended" }
+    if !seen { return "the pane's last words never reached the client that owed its ACK: " + client.screen_text(p) }
+    ""
+}
+
 fn row_late_child(mut r: Rig) -> str {
     let why = start_server(mut r, "/bin/sh")
     if why.len > 0 { return why }
@@ -916,6 +952,7 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "rss-flat" { why = row_rss_flat(mut r) }
     else if name == "last-output" { why = row_last_output(mut r) }
     else if name == "late-child-reaped" { why = row_late_child(mut r) }
+    else if name == "last-output-after-ack" { why = row_last_output_after_ack(mut r) }
     else if name == "inherited-ignore-reset" { why = row_inherited_ignore(mut r) }
     else if name == "pane-signals-and-handles" { why = row_pane_proc(mut r) }
     else if name == "threads" { why = row_threads(mut r) }
@@ -931,7 +968,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack".split(" ") {
         (mut x).push(n)
     }
     x
