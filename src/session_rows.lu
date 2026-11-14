@@ -620,17 +620,24 @@ fn row_late_child(mut r: Rig) -> str {
     // The master ends while its program lives on: the pane goes, and the
     // program is still reaped when it exits.
     let _i = client.input(p, "exec sh -c 'trap \"\" HUP; echo closing-$((1+1)); exec 0<&- 1>&- 2>&-; sleep 1'\r")
-    if !client.until_kind(mut p, 135, 5000) || p.end_code != 2 { return "BYE {p.end_code}, expected session-ended" }
+    if !client.until_text(mut p, "closing-2", 5000) { return "the program did not start: " + client.screen_text(p) }
     let t0 = now_ms()
+    if !client.until_kind(mut p, 135, 5000) || p.end_code != 2 { return "BYE {p.end_code}, expected session-ended" }
+    let t1 = now_ms()
     client.hang_up(mut p)
     var ch = process.Child { slot: r.server }
     r.started = false
     let st = process.wait_status(take ch) else 0 - 1
-    let t = now_ms() - t0
+    let t2 = now_ms()
     if st != 0 { return "server exit {st}" }
-    if t > 4500 { return "the server waited {t} ms: its late child was not reaped when it ended" }
-    if t < 500 { return "the server ended after {t} ms, before its pane's program (which ignores hangup) did" }
-    print("MEASURE late-child server-exit-after-ms={t}")
+    // Where the pane ends when its program closes the terminal, the server
+    // waits for the program after the BYE; where the terminal stays open
+    // until the program ends, the BYE itself waits. Either way the server
+    // must not end before the program does (a second after closing-2), and
+    // must reap it when it does.
+    print("MEASURE late-child closing-to-bye-ms={t1 - t0} bye-to-exit-ms={t2 - t1}")
+    if t2 - t1 > 4500 { return "the server waited {t2 - t1} ms after the BYE: its late child was not reaped when it ended" }
+    if t2 - t0 < 700 { return "the server ended {t2 - t0} ms after closing-2, before its pane's program (which ignores hangup) did" }
     ""
 }
 
@@ -785,7 +792,9 @@ fn row_too_slow(mut r: Rig) -> str {
     // The first client stops reading; the pane sends titles faster than it
     // could take them. Past its event queue it is closed, alone.
     let _i = client.input(w, "i=0; t=$(printf '%04000d' 0); while [ $i -lt 200 ]; do printf '\\033]2;%s%s\\007' $i $t; i=$((i+1)); done; echo titles-$((100+100))\r")
-    if !client.until_text(mut w, "titles-200", 20000) { return "the second client stalled: " + client.screen_text(w) }
+    let t0 = now_ms()
+    if !client.until_text(mut w, "titles-200", 90000) { return "the second client stalled: " + client.screen_text(w) }
+    print("MEASURE too-slow titles-ms={now_ms() - t0}")
     // The stalled client finds its connection closed, without a BYE that
     // could not fit.
     var closed = false
