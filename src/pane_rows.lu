@@ -497,6 +497,9 @@ fn row_exit_closes_pane(mut r: Rig) -> str {
     let _s = prefix(p, 124)
     if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "no prompt in the new pane:\n" + client.screen_text(p) }
     let _x = client.input(p, "exit\r")
+    let until = now_ms() + 5000
+    while border_cells(p.image) != 0 && now_ms() < until { let _k = client.step(mut p, 100) }
+    if border_cells(p.image) != 0 { return "the exited pane's border is still drawn:\n" + client.screen_text(p) }
     let _a = client.input(p, "{self_path()} --print-size E\r")
     if !until_text(mut p, "E 22 80", 5000) { return "the remaining pane did not take the area:\n" + client.screen_text(p) }
     let _e = client.input(p, "exit\r")
@@ -516,9 +519,9 @@ fn row_tabs(mut r: Rig) -> str {
     let _a = client.input(p, "echo T1-$((0+1))\r")
     if !until_text(mut p, "T1-1", 5000) { return "no echo in tab 1" }
     let _c = prefix(p, 99)
-    if !client.until_line(mut p, "$", 5000) { return "no prompt in tab 2:\n" + client.screen_text(p) }
+    if !until_rect(mut p, "1  2", 1, 23, 80, 1, 5000) { return "the bar does not list two tabs: '" + cells(p.image, 23, 1, 80) + "'" }
+    if !until_rect_line(mut p, "$", 1, 1, 80, 1, 5000) { return "no prompt on tab 2's first row:\n" + client.screen_text(p) }
     if rect_has(p.image, "T1-1", 1, 1, 80, AREA) { return "tab 1's pane is still drawn in tab 2" }
-    if !until_rect(mut p, "1  2", 1, 23, 80, 1, 2000) { return "the bar does not list two tabs: '" + cells(p.image, 23, 1, 80) + "'" }
     let _b = client.input(p, "sleep 1; echo LATE-$((5+5))\r")
     time.sleep(time.millis(200))
     let _p = prefix(p, 112)
@@ -558,10 +561,11 @@ fn row_resize_all_tabs(mut r: Rig) -> str {
     ""
 }
 
+/// Border glyphs (the box-drawing block) in the image's tab area.
 fn border_cells(img: proto.Image) -> int {
     var n = 0
     var row = 1
-    while row <= AREA {
+    while row <= img.rows - 2 {
         var c = 1
         while c <= img.cols {
             let b = img.base[(row - 1) * img.cols + c - 1]
