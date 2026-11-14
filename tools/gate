@@ -103,6 +103,7 @@ step width-vector-native python3 -I tests/vt/width_vector_rows.py --out "$root/t
 step resource-smoke-build "$WOLF" build --deny-warnings src/vt_resource_test.lu -o "$root/target/native/resource-smoke"
 step resource-smoke-native "$root/target/native/measure-child" "$root/target/native/resource-smoke"
 step checked-vt python3 -I tests/vt/checked_rows.py "$WOLF"
+step checked-keys python3 -I tests/vt/checked_rows.py --out "$root/target/checked-keys" --label checked-keys "$WOLF" keys_test
 step build "$WOLF" build --deny-warnings src/warren.lu -o "$root/target/native/warren"
 step cli-native python3 -I tests/vt/cli_rows.py "$root/target/native/warren"
 step cases-native python3 -I tests/vt/compare_cases.py "$root/target/native/warren"
@@ -125,6 +126,7 @@ step corpus-properties-native python3 -I tests/vt/corpus_properties.py "$root/ta
 step modules-run modules_run "$root/target/native/warren"
 step wolf-test "$WOLF" test --deny-warnings src
 step lupin-pure "$LUPIN" run src/pure_test.lu
+step keys-lupin "$LUPIN" run src/keys_test.lu
 step cli-lupin python3 -I tests/vt/cli_rows.py "$LUPIN" run src/warren.lu
 step cases-lupin python3 -I tests/vt/compare_cases.py "$LUPIN" run src/warren.lu
 step combining-frames-lupin python3 -I tests/vt/compare_combining.py "$LUPIN" run src/warren.lu
@@ -172,7 +174,8 @@ step session-rows session_rows
 pane_rows() (
   rows=(split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs
     resize-all-tabs zoom too-small pane-memory pane-limit frame-golden damage-in-rect focus-bytes
-    keys-in-split split-latency)
+    keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode
+    session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay)
   if [ "$mode" = linux ]; then rows+=(split-close-cycles); fi
   rm -rf target/prows && mkdir -p target/prows && cd target/prows
   "$root/target/native/pane-rows" "$root/target/native/warren" "${rows[@]}"
