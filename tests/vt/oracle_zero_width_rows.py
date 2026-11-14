@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Decode measured zero-width jamo/Egyptian print clusters, not all Cf/Lo."""
+"""Decode pinned Unicode15.1 classes, not the host Python's Unicode version."""
 from pathlib import Path
+import json
 import sys
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -9,22 +10,37 @@ import run as oracle
 
 
 def main():
-    attached = ((0x1160, 0x11FF), (0xD7B0, 0xD7C6),
-                (0xD7CB, 0xD7FB), (0x13430, 0x1343F))
-    count = 0
-    for low, high in attached:
-        for cp in range(low, high + 1):
-            count += 1
-            clusters = oracle.parse_print(('a' + chr(cp) + '\r\n').encode(), 1)[0]
-            assert clusters == [[[0x61, cp], '-', False]], ('attached-print-cluster', hex(cp), clusters)
-            assert oracle.lay_out(clusters, ['FF9F', 'FFE0'], 2) == [
-                [1, 'U+0061+U+%04X' % cp, '-', False]]
-    assert count == 248
-    # These are not observed attached scalar classes. In particular FFF9 is
-    # omitted by the pinned reference printer, not evidence to absorb all Cf.
+    pins = json.loads((ROOT / 'tests/vt/unicode-sources.json').read_text())
+    assigned = json.loads((ROOT / 'tests/vt/assigned-ranges.json').read_text())
+    exceptions = json.loads((ROOT / 'tests/vt/width-exceptions.json').read_text())
+    assert pins['version'] == assigned['version'] == exceptions['unicode'] == '15.1.0'
+    assert assigned['source_sha256'] == next(source['sha256'] for source in pins['sources'] if source['name'] == 'UnicodeData.txt')
+
+    def category(cp):
+        return next((kind for low, high, kind in assigned['ranges'] if low <= cp <= high), 'Cn')
+
+    attached = set()
+    for group in exceptions['groups']:
+        if group['width'] == 0:
+            for low, high in group['ranges']:
+                attached.update(range(int(low, 16), int(high, 16) + 1))
+    attached.difference_update(range(0xFFF9, 0xFFFC))  # Observed annotation controls are omitted.
+    assert len(attached) == 248
+    for cp in sorted(attached):
+        assert category(cp) in ('Lo', 'Cf')
+        clusters = oracle.parse_print(('a' + chr(cp) + '\r\n').encode(), 1)[0]
+        assert clusters == [[[0x61, cp], '-', False]], ('attached-print-cluster', hex(cp), clusters)
+        assert oracle.lay_out(clusters, ['FF9F', 'FFE0'], 2) == [
+            [1, 'U+0061+U+%04X' % cp, '-', False]]
+    # Outside the exception classes, expectations come from the pinned category
+    # data too. U13440 is Mn in15.1, not the Cn of Python3.11's Unicode14 data.
     for cp in (0x115F, 0x1200, 0xD7AF, 0xD7C7, 0xD7CA, 0xD7FC,
-               0xFFF9, 0xFFFA, 0xFFFB, 0x1342F, 0x13440, 0x200D):
-        assert not oracle.is_combining(cp), ('nontrigger-cluster-class', hex(cp))
+               0xFFF9, 0xFFFA, 0xFFFB, 0x1342F, 0x13440, 0x13441, 0x200D, 0x301):
+        expected = category(cp) in ('Mn', 'Me')
+        assert oracle.is_combining(cp) == expected, ('pinned-nonexception-class', hex(cp), category(cp))
+    assert category(0x13440) == 'Mn' and oracle.is_combining(0x13440)
+    clusters = oracle.parse_print('a\U00013440\r\n'.encode(), 1)[0]
+    assert clusters == [[[0x61, 0x13440], '-', False]]
     base = oracle.parse_print('aᅠ\r\n'.encode(), 1)[0]
     try:
         oracle.lay_out(base, ['FF9E', 'FFE0'], 2)
@@ -32,8 +48,7 @@ def main():
         pass
     else:
         raise AssertionError('wrong checksum accepted')
-    assert oracle.is_combining(0x301)
-    print('PASS oracle-zero-width-clusters attached248 strict-adjacent-and-Cf-controls checksum-refusal')
+    print('PASS oracle-zero-width-clusters pinned-unicode=15.1.0 attached248 U13440=Mn host-unicodedata=unused checksum-refusal')
 
 
 if __name__ == '__main__':
