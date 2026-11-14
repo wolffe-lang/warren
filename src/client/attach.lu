@@ -210,6 +210,9 @@ pub fn attach(target: str, create: bool) -> int {
 fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Policy, features: int,
     hello: List[byte]) -> End {
     if !send(p, 1, hello) { return End { code: 1, line: "warren: the server closed the connection" } }
+    // A suspend is the client's to handle (it gives the terminal back
+    // first): an inherited ignore of it would hide it from the wait.
+    signal.reset(signal.suspend()) else |_| {}
     signal.listen(LISTENED) else |e| { return End { code: 1, line: "warren: signals: {e}" } }
     var w = poll.open() else |e| { return End { code: 1, line: "warren: readiness set: {e}" } }
     let tty_key = poll.add_file(mut w, t.file, poll.READ) else |e| {
@@ -235,10 +238,10 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
             return End { code: 1, line: "warren: wait failed: {e}" }
         }
         let m = ev.meaning
-        if m == signal.terminate() || m == signal.reload() || m == signal.quit() || m == signal.interrupt() {
+        if m & (signal.terminate() | signal.reload() | signal.quit() | signal.interrupt()) != 0 {
             return End { code: 1, line: "warren: ended by a signal" }
         }
-        if m == signal.suspend() {
+        if m & signal.suspend() != 0 {
             give_back(mut t)
             signal.reset_one(signal.suspend()) else |_| {}
             signal.raise(signal.stop()) else |_| {}
@@ -247,12 +250,12 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
             drawn = proto.image()
             let _r = send(p, 9, List[byte]())
         }
-        if m == signal.continued() {
+        if m & signal.continued() != 0 {
             take_again(mut t)
             drawn = proto.image()
             let _r = send(p, 9, List[byte]())
         }
-        if m == signal.resize() {
+        if m & signal.resize() != 0 {
             let s = term.size(t.file) else |_| term.Size { rows: last_rows, columns: last_cols }
             if s.columns != last_cols || s.rows != last_rows {
                 last_cols = s.columns
