@@ -4,10 +4,13 @@
 //! continuations, rendition, cursor), for full images and for deltas,
 //! including overwrites of half a wide pair; and the applier refuses a
 //! delta whose base is not its image or that would split an old pair.
-//! The event queue's cap counts only what a client has yet to take.
+//! The event queue's cap counts only what a client has yet to take. The
+//! client's renderer, fed to the emulator as the outer terminal, shows each
+//! image exactly under a seeded soak at every colour depth.
 //! Also measures compose, encode and apply time and image bytes at 80x24
 //! and 320x90 (stderr; a measurement, never a bound).
 use std.time
+use client
 use proto
 use server
 use vt
@@ -278,11 +281,128 @@ fn test_event_queue() {
     assert(server.events_queued(mixed) == (taken - 1) * 4000, "event-queue-past-image")
 }
 
+// ---- the client renderer under a seeded soak (native: the step budget of
+// `wolf test` is too small for it) ----
+
+struct RenderPair {
+    pane: vt.Vt,
+    shadow: server.Shadow,
+    img: proto.Image,
+    drawn: proto.Image,
+    outer: vt.Vt,
+    seq: int,
+    sent: int,
+}
+
+fn render_pair(cols: int, rows: int) -> RenderPair {
+    RenderPair { pane: vt.new(cols, rows, 0), shadow: server.no_shadow(), img: proto.image(), drawn: proto.image(),
+        outer: vt.new(cols, rows, 0), seq: 0, sent: 0 }
+}
+
+fn render_wire_to_vt(c: int) -> int {
+    if c == 0 { return 0 - 1 }
+    if c >= 33554432 { return 16777216 + c - 33554432 }
+    c - 16777216
+}
+
+// Compose, apply, render under `pol` into the outer emulator.
+fn render_step(mut p: RenderPair, full: bool, pol: client.Policy) -> List[byte] {
+    let payload = server.compose(mut p.shadow, p.pane, p.seq + 1, full)
+    if payload.len == 0 { return List[byte]() }
+    assert(proto.apply(mut p.img, payload) == 0, "render-apply")
+    p.seq = p.seq + 1
+    let bytes = client.render(mut p.drawn, p.img, pol)
+    p.sent = p.sent + bytes.len
+    vt.feed(mut p.outer, bytes)
+    bytes
+}
+
+fn render_outer_cell(p: RenderPair, i: int) -> vt.Cell {
+    if p.outer.active_alternate { return copy p.outer.alternate.cells[i] }
+    copy p.outer.primary.cells[i]
+}
+
+// The first cell where the outer emulator differs from the image, or -1.
+fn render_differs(p: RenderPair, depth: int) -> int {
+    var i = 0
+    while i < p.img.cols * p.img.rows {
+        let c = render_outer_cell(p, i)
+        let base = if p.img.base[i] == 0 then 32 else p.img.base[i]
+        if c.width != p.img.width[i] { return i }
+        if p.img.width[i] != 0 {
+            if c.base != base || c.mark1 != p.img.mark1[i] || c.mark2 != p.img.mark2[i] { return i }
+            if c.flags != p.img.flags[i] { return i }
+            if c.foreground != render_wire_to_vt(client.downsample(p.img.fg[i], depth)) { return i }
+            if c.background != render_wire_to_vt(client.downsample(p.img.bg[i], depth)) { return i }
+        }
+        i += 1
+    }
+    if p.outer.cursor_row != p.img.cursor_row || p.outer.cursor_col != p.img.cursor_col { return 0 - 2 }
+    0 - 1
+}
+
+fn render_native(depth: int) -> client.Policy {
+    client.Policy { depth: depth, explicit_wide: false, marks: true, sync: true, shape: true }
+}
+
+fn render_feed(mut p: RenderPair, text: str) {
+    vt.feed(mut p.pane, text.bytes())
+}
+
+fn render_lcg(x: int) -> int {
+    (x * 1103515245 + 12345) % 2147483648
+}
+
+fn render_piece(r: int) -> str {
+    let k = r % 14
+    if k == 0 { return "中" }
+    if k == 1 { return "e\u{301}" }
+    if k == 2 { return "\u{1b}[{1 + r / 7 % 9}m" }
+    if k == 3 { return "\u{1b}[3{r / 5 % 8}m" }
+    if k == 4 { return "\u{1b}[38;5;{r / 3 % 256}m" }
+    if k == 5 { return "\u{1b}[48;2;{r / 3 % 256};{r / 11 % 256};{r / 13 % 256}m" }
+    if k == 6 { return "\u{1b}[0m" }
+    if k == 7 { return "\u{1b}[{1 + r / 3 % 8};{1 + r / 17 % 30}H" }
+    if k == 8 { return "\r\n" }
+    if k == 9 { return "\u{1b}[K" }
+    if k == 10 { return "\u{1b}[{1 + r % 3}P" }
+    if k == 11 { return "\u{1b}[21m" }
+    "ab"
+}
+
+// Seeded deltas at every depth: the outer emulator always equals the image
+// under that depth's downsampling.
+fn test_render_soak() {
+    var depth = 0
+    while depth <= 3 {
+        var p = render_pair(30, 8)
+        var r = 12345 + depth
+        let _f = render_step(mut p, true, render_native(depth))
+        var n = 0
+        while n < 300 {
+            var k = 0
+            while k < 6 {
+                r = render_lcg(r)
+                render_feed(mut p, render_piece(r))
+                k += 1
+            }
+            let _d = render_step(mut p, false, render_native(depth))
+            let at = render_differs(p, depth)
+            if at != 0 - 1 { print("render-soak depth {depth} frame {n}: differs at {at}") }
+            assert(at == 0 - 1, "render-soak")
+            n += 1
+        }
+        depth += 1
+    }
+}
+
+
 fn main() -> int {
     test_full_and_deltas()
     test_applier_refusals()
     test_seeded_soak()
     test_event_queue()
+    test_render_soak()
     measure(80, 24)
     measure(320, 90)
     0
