@@ -136,6 +136,20 @@ fn shell_of(s: Spawn) -> str {
     "/bin/sh"
 }
 
+/// Every real-time signal back to its default, by its host number: the
+/// meanings `reset` takes do not name them, and an ignore a parent left
+/// on one would otherwise pass through `exec` to the pane's program. The C
+/// library's own numbers below the range are refused by the runtime and
+/// keep their inherited state (docs/SERVER.md).
+pub fn reset_realtime() {
+    let rt = signal.realtime() else { return }
+    var n = rt.first
+    while n <= rt.last {
+        signal.reset_one(signal.host(n)) else |_| {}
+        n += 1
+    }
+}
+
 // In the fork's child: a session of its own with the terminal as its
 // controlling terminal (so its keys' signals and its hangup reach the
 // program), every signal at its default, then the program. Never returns.
@@ -146,6 +160,7 @@ fn become_pane(name: str, c: process.Command, environ: List[str], cwd: str, inhe
         return
     }
     signal.reset(ALL_MEANINGS) else |_| {}
+    reset_realtime()
     var cmd = copy c
     process.set_stdin(mut cmd, tty)
     process.set_stdout(mut cmd, tty)
