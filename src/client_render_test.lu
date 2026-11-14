@@ -1,0 +1,226 @@
+//! member: false
+//! The client's renderer: what it sends, fed to warren's own emulator as
+//! the outer terminal, shows exactly the image (glyphs, marks, widths,
+//! rendition, colours, cursor), for full repaints and for deltas; colours
+//! are downsampled to the policy's depth; PAX's console policy, read by a
+//! one-cell-a-code-point model, keeps every later cell in its column and
+//! never sends RGB, indexed colours, OSC, DCS or APC.
+use client
+use proto
+use server
+use vt
+
+struct Pair {
+    pane: vt.Vt,
+    shadow: server.Shadow,
+    img: proto.Image,
+    drawn: proto.Image,
+    outer: vt.Vt,
+    seq: int,
+    sent: int,
+}
+
+fn pair(cols: int, rows: int) -> Pair {
+    Pair { pane: vt.new(cols, rows, 0), shadow: server.no_shadow(), img: proto.image(), drawn: proto.image(),
+        outer: vt.new(cols, rows, 0), seq: 0, sent: 0 }
+}
+
+fn wire_to_vt(c: int) -> int {
+    if c == 0 { return 0 - 1 }
+    if c >= 33554432 { return 16777216 + c - 33554432 }
+    c - 16777216
+}
+
+// Compose, apply, render under `pol` into the outer emulator.
+fn step(mut p: Pair, full: bool, pol: client.Policy) -> List[byte] {
+    let payload = server.compose(mut p.shadow, p.pane, p.seq + 1, full)
+    if payload.len == 0 { return List[byte]() }
+    assert(proto.apply(mut p.img, payload) == 0, "render-apply")
+    p.seq = p.seq + 1
+    let bytes = client.render(mut p.drawn, p.img, pol)
+    p.sent = p.sent + bytes.len
+    vt.feed(mut p.outer, bytes)
+    bytes
+}
+
+fn outer_cell(p: Pair, i: int) -> vt.Cell {
+    if p.outer.active_alternate { return copy p.outer.alternate.cells[i] }
+    copy p.outer.primary.cells[i]
+}
+
+// The first cell where the outer emulator differs from the image, or -1.
+fn differs(p: Pair, depth: int) -> int {
+    var i = 0
+    while i < p.img.cols * p.img.rows {
+        let c = outer_cell(p, i)
+        let base = if p.img.base[i] == 0 then 32 else p.img.base[i]
+        if c.width != p.img.width[i] { return i }
+        if p.img.width[i] != 0 {
+            if c.base != base || c.mark1 != p.img.mark1[i] || c.mark2 != p.img.mark2[i] { return i }
+            if c.flags != p.img.flags[i] { return i }
+            if c.foreground != wire_to_vt(client.downsample(p.img.fg[i], depth)) { return i }
+            if c.background != wire_to_vt(client.downsample(p.img.bg[i], depth)) { return i }
+        }
+        i += 1
+    }
+    if p.outer.cursor_row != p.img.cursor_row || p.outer.cursor_col != p.img.cursor_col { return 0 - 2 }
+    0 - 1
+}
+
+fn native(depth: int) -> client.Policy {
+    client.Policy { depth: depth, explicit_wide: false, marks: true, sync: true, shape: true }
+}
+
+fn feed(mut p: Pair, text: str) {
+    vt.feed(mut p.pane, text.bytes())
+}
+
+fn test_full_then_deltas() {
+    var p = pair(30, 8)
+    feed(mut p, "plain \u{1b}[1;31mbold red\u{1b}[0m 中文 e\u{301}\u{302}x\r\n")
+    feed(mut p, "\u{1b}[38;2;10;200;30mrgb\u{1b}[48;5;200mbg\u{1b}[0m \u{1b}[4;7;9munder\u{1b}[0m")
+    let _a = step(mut p, true, native(3))
+    assert(differs(p, 3) == 0 - 1, "render-full")
+    // A delta that overwrites half of a wide pair and moves the cursor.
+    feed(mut p, "\u{1b}[1;10Hz\u{1b}[2;1H\u{1b}[2K\u{1b}[3mitalic 字\u{1b}[5;5H")
+    let delta = step(mut p, false, native(3))
+    assert(delta.len > 0 && differs(p, 3) == 0 - 1, "render-delta")
+    // An unchanged screen sends only the cursor's bytes.
+    feed(mut p, "\u{1b}[5;5H")
+    let none = step(mut p, false, native(3))
+    assert(none.len == 0 || differs(p, 3) == 0 - 1, "render-unchanged")
+}
+
+fn test_one_cell_delta_is_small() {
+    var p = pair(80, 24)
+    feed(mut p, "$ ")
+    let _f = step(mut p, true, native(3))
+    feed(mut p, "x")
+    let d = step(mut p, false, native(3))
+    print("MEASURE render one-cell-delta-bytes={d.len}")
+    assert(d.len > 0 && d.len < 64, "render-one-cell-small")
+    assert(differs(p, 3) == 0 - 1, "render-one-cell")
+}
+
+fn test_downsample() {
+    let idx = 16777216
+    let rgb = 33554432
+    assert(client.downsample(rgb + 16711680, 3) == rgb + 16711680, "downsample-rgb-kept")
+    assert(client.downsample(rgb + 16711680, 2) == idx + 196, "downsample-red-to-cube")
+    assert(client.downsample(rgb + 16711680, 1) == idx + 9, "downsample-red-to-bright")
+    assert(client.downsample(idx + 196, 1) == idx + 9, "downsample-index-to-16")
+    assert(client.downsample(idx + 3, 1) == idx + 3, "downsample-16-kept")
+    assert(client.downsample(rgb + 8421504, 2) == idx + 244, "downsample-grey")
+    assert(client.downsample(idx + 200, 0) == 0 && client.downsample(0, 3) == 0, "downsample-none")
+}
+
+// A console that draws one cell per code point: CUP, ED 2, SGR (sixteen
+// colours and flags), private modes ignored; every scalar one cell.
+struct Console {
+    cols: int,
+    rows: int,
+    row: int,
+    col: int,
+    base: List[int],
+    fg: List[int],
+    bad: str,
+}
+
+fn console(cols: int, rows: int) -> Console {
+    var c = Console { cols: cols, rows: rows, row: 1, col: 1, base: List[int](), fg: List[int](), bad: "" }
+    var i = 0
+    while i < cols * rows {
+        (mut c.base).push(32)
+        (mut c.fg).push(0 - 1)
+        i += 1
+    }
+    c
+}
+
+fn console_feed(mut c: Console, bytes: List[byte]) {
+    var fg = 0 - 1
+    var i = 0
+    while i < bytes.len {
+        let b = bytes[i] as int
+        if b == 27 {
+            if i + 1 >= bytes.len || (bytes[i + 1] as int) != 91 {
+                c.bad = "a non-CSI escape"
+                return
+            }
+            var j = i + 2
+            var params = ""
+            while j < bytes.len && ((bytes[j] as int) < 64 || (bytes[j] as int) > 126) {
+                params = params + (str_from_utf8(bytes[j..j + 1]) else "")
+                j += 1
+            }
+            if j >= bytes.len {
+                c.bad = "an unfinished sequence"
+                return
+            }
+            let f = bytes[j] as int
+            if f == 72 {
+                let parts = params.split(";")
+                c.row = parts[0].to_int() else 1
+                c.col = 1
+                if parts.len > 1 { c.col = parts[1].to_int() else 1 }
+            } else if f == 74 {
+                var k = 0
+                while k < c.cols * c.rows {
+                    c.base[k] = 32
+                    k += 1
+                }
+            } else if f == 109 {
+                for part in params.split(";") {
+                    let v = part.to_int() else 0
+                    if v == 0 || v == 39 { fg = 0 - 1 }
+                    else if v >= 30 && v <= 37 { fg = v - 30 }
+                    else if v >= 90 && v <= 97 { fg = v - 82 }
+                    else if v == 38 || v == 48 { c.bad = "an extended colour" }
+                }
+            }
+            i = j + 1
+            continue
+        }
+        var n = 1
+        var cp = b
+        if b >= 240 { n = 4 } else if b >= 224 { n = 3 } else if b >= 192 { n = 2 }
+        if n > 1 {
+            cp = if n == 2 then b % 32 else if n == 3 then b % 16 else b % 8
+            var k = 1
+            while k < n {
+                cp = cp * 64 + (bytes[i + k] as int) % 64
+                k += 1
+            }
+        }
+        if c.row >= 1 && c.row <= c.rows && c.col >= 1 && c.col <= c.cols {
+            let at = (c.row - 1) * c.cols + c.col - 1
+            c.base[at] = cp
+            c.fg[at] = fg
+        }
+        c.col += 1
+        i += n
+    }
+}
+
+fn test_console_policy() {
+    let pol = client.policy_for("", "", true)
+    var p = pair(30, 8)
+    feed(mut p, "a中b e\u{301}\u{302}c \u{1b}[38;2;250;0;0mred\u{1b}[38;5;21mblue\u{1b}[0m 字字")
+    let bytes = step(mut p, true, pol)
+    var c = console(30, 8)
+    console_feed(mut c, bytes)
+    assert(c.bad.len == 0, "console-only-csi-and-sixteen-colours")
+    var i = 0
+    while i < 30 * 8 {
+        let base = if p.img.base[i] == 0 then 32 else p.img.base[i]
+        if p.img.width[i] == 0 {
+            assert(c.base[i] == 32, "console-continuation-blank")
+        } else {
+            assert(c.base[i] == base, "console-glyph-in-its-column")
+            let want = client.downsample(p.img.fg[i], 1)
+            let want_index = if want == 0 then 0 - 1 else want - 16777216
+            assert(c.fg[i] == want_index, "console-sixteen-colours")
+        }
+        i += 1
+    }
+}
