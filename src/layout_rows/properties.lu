@@ -1,0 +1,425 @@
+//! member: true
+//! Seeded random operation sequences, every invariant held after every
+//! operation, at each of the five sizes. Also constructed grids for
+//! invariant 6, which random sequences rarely make.
+use layout
+
+/// The rows a property take reports, by index.
+fn row_name(i: int) -> str {
+    if i == 0 { return "layout-refusal-unchanged" }
+    if i == 1 { return "layout-inv1-tiling" }
+    if i == 2 { return "layout-inv2-structure" }
+    if i == 3 { return "layout-inv3-shares" }
+    if i == 4 { return "layout-inv4-split-close" }
+    if i == 5 { return "layout-inv5-resize-back" }
+    "layout-inv6-focus-back"
+}
+
+fn op_name(k: int) -> str {
+    if k == 0 { return "split" }
+    if k == 1 { return "close" }
+    if k == 2 { return "focus" }
+    if k == 3 { return "focus_pane" }
+    if k == 4 { return "focus_next" }
+    if k == 5 { return "focus_previous" }
+    if k == 6 { return "resize" }
+    if k == 7 { return "zoom" }
+    if k == 8 { return "equalize" }
+    if k == 9 { return "new_tab" }
+    if k == 10 { return "close_tab" }
+    if k == 11 { return "select_tab" }
+    if k == 12 { return "select_tab_id" }
+    if k == 13 { return "next_tab" }
+    if k == 14 { return "previous_tab" }
+    "rename_tab"
+}
+
+struct Rng {
+    state: int,
+}
+
+fn roll(mut g: Rng, n: int) -> int {
+    g.state = (g.state * 48271) % 2147483647
+    g.state % n
+}
+
+/// One size's counts: per row, checks and failures (and attempts for the
+/// rows that need a precondition); per operation kind, applied and refused.
+struct Tally {
+    checks: List[int],
+    fails: List[int],
+    attempts: List[int],
+    applied: List[int],
+    refused: List[int],
+}
+
+fn zeros(n: int) -> List[int] {
+    var xs = List[int]()
+    var i = 0
+    while i < n {
+        (mut xs).push(0)
+        i += 1
+    }
+    xs
+}
+
+fn tally() -> Tally {
+    Tally { checks: zeros(7), fails: zeros(7), attempts: zeros(7), applied: zeros(16), refused: zeros(16) }
+}
+
+/// Count one check of `row`; print the first failure of each row at a size.
+fn judge(mut t: Tally, row: int, why: str, cols: int, rows: int, seq: int, step: int, what: str) {
+    t.checks[row] += 1
+    if why.len == 0 { return }
+    if t.fails[row] == 0 {
+        print("FAIL {row_name(row)} size={cols}x{rows} sequence={seq} step={step} op={what}: {why}")
+    }
+    t.fails[row] += 1
+}
+
+fn all_panes(l: layout.Layout) -> List[int] {
+    var ps = List[int]()
+    for t in l.tabs {
+        for p in layout.panes(l, t.id) { (mut ps).push(p) }
+    }
+    ps
+}
+
+fn pick_pane(mut g: Rng, ps: List[int], fresh: int) -> int {
+    if roll(mut g, 20) == 0 { return fresh + 100 }
+    ps[roll(mut g, ps.len)]
+}
+
+fn pick_tab(mut g: Rng, l: layout.Layout) -> int {
+    if roll(mut g, 20) == 0 { return l.next_id + 5 }
+    l.tabs[roll(mut g, l.tabs.len)].id
+}
+
+fn pick_new(mut g: Rng, ps: List[int], fresh: int) -> int {
+    let r = roll(mut g, 25)
+    if r == 0 { return ps[roll(mut g, ps.len)] }
+    if r == 1 { return 0 - roll(mut g, 3) }
+    fresh
+}
+
+fn pick_name(mut g: Rng) -> str {
+    let r = roll(mut g, 6)
+    if r == 0 { return "" }
+    if r == 1 { return "a" }
+    if r == 2 { return "build" }
+    if r == 3 { return "x y" }
+    if r == 4 { return "q\"b\\" }
+    "é"
+}
+
+fn kind_of(r: int) -> int {
+    if r < 30 { return 0 }
+    if r < 42 { return 1 }
+    if r < 52 { return 2 }
+    if r < 56 { return 3 }
+    if r < 58 { return 4 }
+    if r < 60 { return 5 }
+    if r < 76 { return 6 }
+    if r < 81 { return 7 }
+    if r < 83 { return 8 }
+    if r < 89 { return 9 }
+    if r < 92 { return 10 }
+    if r < 94 { return 11 }
+    if r < 95 { return 12 }
+    if r < 97 { return 13 }
+    if r < 98 { return 14 }
+    15
+}
+
+/// What an operation did: its kind, whether it refused, a label for a
+/// failure line.
+struct Done {
+    kind: int,
+    refused: bool,
+    label: str,
+}
+
+fn apply(mut l: layout.Layout, mut g: Rng, fresh: int, cols: int, rows: int) -> Done {
+    let ps = all_panes(l)
+    let k = kind_of(roll(mut g, 100))
+    let pane = pick_pane(mut g, ps, fresh)
+    let tab = pick_tab(mut g, l)
+    let d = roll(mut g, 4)
+    if k == 0 {
+        let owner = layout.tab_of(l, pane)
+        let t = if roll(mut g, 10) == 0 then tab else owner
+        let axis = roll(mut g, 2)
+        let after = roll(mut g, 2) == 0
+        let id = pick_new(mut g, ps, fresh)
+        let label = "split {t} {pane} {axis} {id} {after}"
+        layout.split(mut l, t, pane, axis, id, after, cols, rows) else |_| { return Done { kind: k, refused: true, label: label } }
+        return Done { kind: k, refused: false, label: label }
+    }
+    if k == 1 {
+        layout.close(mut l, pane) else |_| { return Done { kind: k, refused: true, label: "close {pane}" } }
+        return Done { kind: k, refused: false, label: "close {pane}" }
+    }
+    if k == 2 {
+        layout.focus(mut l, tab, d, cols, rows) else |_| { return Done { kind: k, refused: true, label: "focus {tab} {d}" } }
+        return Done { kind: k, refused: false, label: "focus {tab} {d}" }
+    }
+    if k == 3 {
+        layout.focus_pane(mut l, pane) else |_| { return Done { kind: k, refused: true, label: "focus_pane {pane}" } }
+        return Done { kind: k, refused: false, label: "focus_pane {pane}" }
+    }
+    if k == 4 {
+        layout.focus_next(mut l, tab) else |_| { return Done { kind: k, refused: true, label: "focus_next {tab}" } }
+        return Done { kind: k, refused: false, label: "focus_next {tab}" }
+    }
+    if k == 5 {
+        layout.focus_previous(mut l, tab) else |_| { return Done { kind: k, refused: true, label: "focus_previous {tab}" } }
+        return Done { kind: k, refused: false, label: "focus_previous {tab}" }
+    }
+    if k == 6 {
+        let cells = roll(mut g, 13) - 6
+        let label = "resize {pane} {d} {cells}"
+        let moved = layout.resize(mut l, pane, d, cells, cols, rows) else |_| { return Done { kind: k, refused: true, label: label } }
+        if moved * cells < 0 || moved > 6 || moved < -6 { return Done { kind: k, refused: false, label: label + " moved {moved}!" } }
+        return Done { kind: k, refused: false, label: label }
+    }
+    if k == 7 {
+        layout.zoom(mut l, tab) else |_| { return Done { kind: k, refused: true, label: "zoom {tab}" } }
+        return Done { kind: k, refused: false, label: "zoom {tab}" }
+    }
+    if k == 8 {
+        layout.equalize(mut l, tab) else |_| { return Done { kind: k, refused: true, label: "equalize {tab}" } }
+        return Done { kind: k, refused: false, label: "equalize {tab}" }
+    }
+    if k == 9 {
+        let id = pick_new(mut g, ps, fresh)
+        let made = layout.new_tab(mut l, id, pick_name(mut g)) else |_| { return Done { kind: k, refused: true, label: "new_tab {id}" } }
+        return Done { kind: k, refused: false, label: "new_tab {id} -> {made}" }
+    }
+    if k == 10 {
+        layout.close_tab(mut l, tab) else |_| { return Done { kind: k, refused: true, label: "close_tab {tab}" } }
+        return Done { kind: k, refused: false, label: "close_tab {tab}" }
+    }
+    if k == 11 {
+        let n = roll(mut g, l.tabs.len + 2)
+        layout.select_tab(mut l, n) else |_| { return Done { kind: k, refused: true, label: "select_tab {n}" } }
+        return Done { kind: k, refused: false, label: "select_tab {n}" }
+    }
+    if k == 12 {
+        layout.select_tab_id(mut l, tab) else |_| { return Done { kind: k, refused: true, label: "select_tab_id {tab}" } }
+        return Done { kind: k, refused: false, label: "select_tab_id {tab}" }
+    }
+    if k == 13 {
+        layout.next_tab(mut l)
+        return Done { kind: k, refused: false, label: "next_tab" }
+    }
+    if k == 14 {
+        layout.previous_tab(mut l)
+        return Done { kind: k, refused: false, label: "previous_tab" }
+    }
+    layout.rename_tab(mut l, tab, pick_name(mut g)) else |_| { return Done { kind: k, refused: true, label: "rename_tab {tab}" } }
+    Done { kind: k, refused: false, label: "rename_tab {tab}" }
+}
+
+/// The layout with one tab unzoomed, as a split or a resize leaves it.
+fn unzoomed(l: layout.Layout, tab: int) -> layout.Layout {
+    var m = copy l
+    let ti = index_of(m, tab)
+    if ti >= 0 { m.tabs[ti].zoomed = false }
+    m
+}
+
+/// Invariant 4: split a pane and close the new one; answers "" when the
+/// split was refused (and does not count an attempt then).
+fn split_close(l: layout.Layout, mut g: Rng, fresh: int, cols: int, rows: int, mut made: int) -> str {
+    let ps = all_panes(l)
+    let pane = ps[roll(mut g, ps.len)]
+    let tab = layout.tab_of(l, pane)
+    var m = copy l
+    layout.split(mut m, tab, pane, roll(mut g, 2), fresh, roll(mut g, 2) == 0, cols, rows) else |_| { return "" }
+    made += 1
+    layout.close(mut m, fresh) else |e| { return "close of the new pane {fresh}: {e}" }
+    let want = layout.dump(unzoomed(l, tab))
+    let got = layout.dump(m)
+    if got != want { return "split {pane} then close {fresh} changed the layout" }
+    ""
+}
+
+/// Invariant 5: resize by +n then -n; equal rects when neither was clamped.
+fn resize_back(l: layout.Layout, mut g: Rng, cols: int, rows: int, mut made: int) -> str {
+    let ps = all_panes(l)
+    let pane = ps[roll(mut g, ps.len)]
+    let tab = layout.tab_of(l, pane)
+    let d = roll(mut g, 4)
+    let n = 1 + roll(mut g, 5)
+    let start = unzoomed(l, tab)
+    var m = copy l
+    let there = layout.resize(mut m, pane, d, n, cols, rows) else |_| { return "" }
+    if there != n { return "" }
+    let back = layout.resize(mut m, pane, d, 0 - n, cols, rows) else |e| { return "resize {pane} {d} back by {n}: {e}" }
+    if back != 0 - n { return "" }
+    made += 1
+    let a = layout.rects(start, tab, cols, rows)
+    let b = layout.rects(m, tab, cols, rows)
+    var i = 0
+    while i < a.len {
+        let x = a[i]
+        let y = b[i]
+        if x.pane != y.pane || x.col != y.col || x.row != y.row || x.cols != y.cols || x.rows != y.rows {
+            return "resize {pane} {d} by {n} and back moved pane {x.pane}"
+        }
+        i += 1
+    }
+    ""
+}
+
+fn check_all(mut t: Tally, before: layout.Layout, l: layout.Layout, done: Done, mut g: Rng, fresh: int,
+    cols: int, rows: int, seq: int, step: int) {
+    if done.refused {
+        var why = ""
+        if layout.dump(l) != layout.dump(before) { why = "a refused operation changed the layout" }
+        judge(mut t, 0, why, cols, rows, seq, step, done.label)
+    }
+    for tab in l.tabs {
+        judge(mut t, 1, tiling(l, tab.id, cols, rows), cols, rows, seq, step, done.label)
+    }
+    judge(mut t, 2, structure(l), cols, rows, seq, step, done.label)
+    var why = shares_kept(before, l, done.kind == 6, done.kind == 8)
+    if why.len == 0 { why = reveals(l, l.active, cols, rows) }
+    judge(mut t, 3, why, cols, rows, seq, step, done.label)
+    var made = 0
+    let split_why = split_close(l, mut g, fresh + 1, cols, rows, mut made)
+    t.attempts[4] += 1
+    if made > 0 { judge(mut t, 4, split_why, cols, rows, seq, step, done.label) }
+    made = 0
+    let resize_why = resize_back(l, mut g, cols, rows, mut made)
+    t.attempts[5] += 1
+    if made > 0 || resize_why.len > 0 { judge(mut t, 5, resize_why, cols, rows, seq, step, done.label) }
+    let rs = layout.rects(l, l.active, cols, rows)
+    if rs.len > 1 && grid(rs) {
+        var trips = 0
+        let back_why = focus_back(l, l.active, cols, rows, mut trips)
+        t.attempts[6] += 1
+        judge(mut t, 6, back_why, cols, rows, seq, step, done.label)
+    }
+}
+
+fn sequence(mut t: Tally, cols: int, rows: int, seq: int, seed: int, length: int) {
+    var g = Rng { state: seed }
+    var l = layout.new(1, "t") else |_| {
+        judge(mut t, 2, "new refused pane 1", cols, rows, seq, 0, "new")
+        return
+    }
+    var fresh = 2
+    var step = 0
+    while step < length {
+        let before = copy l
+        let done = apply(mut l, mut g, fresh, cols, rows)
+        if done.kind == 0 || done.kind == 9 { fresh += 1 }
+        t.applied[done.kind] += 1
+        if done.refused { t.refused[done.kind] += 1 }
+        check_all(mut t, before, l, done, mut g, fresh, cols, rows, seq, step)
+        step += 1
+    }
+}
+
+/// Grids of every shape up to 4x4 built at the size; invariants 1 and 6.
+fn grids(mut t: Tally, cols: int, rows: int) {
+    var across = 1
+    while across <= 4 {
+        var down = 1
+        while down <= 4 {
+            region grid_take {
+                grid_one(mut t, cols, rows, across, down)
+            }
+            down += 1
+        }
+        across += 1
+    }
+}
+
+fn grid_one(mut t: Tally, cols: int, rows: int, across: int, down: int) {
+    var l = layout.new(1, "grid") else |_| { return }
+    var next = 2
+    var tops = List[int]()
+    (mut tops).push(1)
+    var c = 1
+    while c < across {
+        layout.split(mut l, 1, tops[tops.len - 1], layout.COLS, next, true, cols, rows) else |_| { return }
+        (mut tops).push(next)
+        next += 1
+        c += 1
+    }
+    for top in tops {
+        var last = top
+        var r = 1
+        while r < down {
+            layout.split(mut l, 1, last, layout.ROWS, next, true, cols, rows) else |_| { return }
+            last = next
+            next += 1
+            r += 1
+        }
+    }
+    let label = "grid {across}x{down}"
+    judge(mut t, 1, tiling(l, 1, cols, rows), cols, rows, -1, 0, label)
+    let rs = layout.rects(l, 1, cols, rows)
+    var why = ""
+    if !grid(rs) { why = "a constructed {across}x{down} grid is not a grid" }
+    var trips = 0
+    if why.len == 0 { why = focus_back(l, 1, cols, rows, mut trips) }
+    t.attempts[6] += 1
+    judge(mut t, 6, why, cols, rows, -1, 0, label)
+}
+
+fn report(t: Tally, cols: int, rows: int, count: int) -> int {
+    var failed = 0
+    var row = 0
+    while row < 7 {
+        let name = row_name(row)
+        if t.fails[row] > 0 {
+            print("FAIL {name} size={cols}x{rows} failures={t.fails[row]} checks={t.checks[row]}")
+            failed += 1
+        } else if t.checks[row] == 0 {
+            print("FAIL {name} size={cols}x{rows} never-exercised attempts={t.attempts[row]}")
+            failed += 1
+        } else if row >= 4 {
+            print("PASS {name} size={cols}x{rows} sequences={count} checks={t.checks[row]} attempts={t.attempts[row]}")
+        } else {
+            print("PASS {name} size={cols}x{rows} sequences={count} checks={t.checks[row]}")
+        }
+        row += 1
+    }
+    var ops = ""
+    var k = 0
+    while k < 16 {
+        ops = ops + " {op_name(k)}={t.applied[k]}/{t.refused[k]}"
+        k += 1
+    }
+    print("INFO layout-ops size={cols}x{rows} applied/refused{ops}")
+    failed
+}
+
+fn one_size(cols: int, rows: int, index: int, count: int, length: int) -> int {
+    var t = tally()
+    var seq = 0
+    while seq < count {
+        region take {
+            sequence(mut t, cols, rows, seq, 1 + index * 100003 + seq * 7919, length)
+        }
+        seq += 1
+    }
+    grids(mut t, cols, rows)
+    report(t, cols, rows, count)
+}
+
+/// `count` sequences of 50 operations at each size; answers the number of
+/// failing rows.
+pub fn properties(count: int) -> int {
+    var failed = 0
+    failed += one_size(20, 6, 0, count, 50)
+    failed += one_size(80, 24, 1, count, 50)
+    failed += one_size(81, 25, 2, count, 50)
+    failed += one_size(320, 90, 3, count, 50)
+    failed += one_size(512, 512, 4, count, 50)
+    print("LAYOUT-PROPERTIES sizes=5 sequences={count * 5} length=50 failed-rows={failed}")
+    failed
+}
