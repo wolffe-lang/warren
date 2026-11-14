@@ -1,0 +1,7 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# sends a client's typed input to the active tab's first pane, not its
+# focused one.
+floor 15
+rig w3-plant-step.sh sha256=60341c1093129ae26421d297bc211abb8f4a2bf6c80998a9c2a66a514ae873c8
+step w3-plant-build tools=python3,cc script=w3-plant-step.sh -- build
+step keys-reach-focused needs=w3-plant-build tools=python3 script=w3-plant-step.sh -- rows
