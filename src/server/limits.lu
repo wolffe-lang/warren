@@ -2,14 +2,18 @@
 //! The server's admission limits and budgets: named constants, each held
 //! by a row. docs/SERVER.md states them; changing one changes that row.
 
-/// Sessions one server holds at once (one pane each in this version).
+/// Sessions one server holds at once.
 pub const MAX_SESSIONS: int = 16
+/// Panes one session holds at once, across its tabs.
+pub const MAX_PANES: int = 32
 /// Accepted connections of every role and phase, held at once.
 pub const MAX_CONNECTIONS: int = 32
 /// Connections accepted and not yet past HELLO, held at once.
 pub const MAX_PENDING: int = 4
-/// Scrollback history bytes retained per pane.
-pub const HISTORY_BYTES: int = 8388608
+/// Scrollback history bytes retained per pane. 2 MiB while the emulator
+/// makes its whole ring at creation and again at its first resize
+/// (warren#7): a pane then costs about six times this.
+pub const HISTORY_BYTES: int = 2097152
 /// Projected server memory past which a new connection or session is
 /// refused with REFUSE resource-limit (7).
 pub const MEMORY_BUDGET: int = 536870912
@@ -18,11 +22,12 @@ pub const CELL_BYTES: int = 64
 /// Wire bytes a cell may cost in the worst image (a run and three scalars).
 pub const WIRE_CELL_BYTES: int = 34
 
-/// Projected bytes of a pane: its history, both screens, and 1 MiB for
-/// its fixed buffers (measured 8,656,640 at 80x24 and 12,101,872 at
-/// 320x90 with the 8 MiB history).
+/// Projected bytes of a pane as measured resident: its history ring six
+/// times over (made whole with a copy when the emulator is made, then
+/// four times more at its first resize: 16.4 MB and 32.8 MB for an 8 MiB
+/// ring), both screens, and 1 MiB for its fixed buffers.
 pub fn pane_bytes(cols: int, rows: int) -> int {
-    HISTORY_BYTES + 2 * cols * rows * CELL_BYTES + 1048576
+    6 * HISTORY_BYTES + 2 * cols * rows * CELL_BYTES + 1048576
 }
 
 /// Projected bytes of the worst encoded image at a size, every physical
@@ -75,5 +80,13 @@ pub const SYNC_MS: int = 150
 pub const MIN_COLS: int = 20
 /// The smallest attached height.
 pub const MIN_ROWS: int = 6
+/// The bar's lines below the tab area: line one, then the hint line.
+pub const BAR_LINES: int = 2
+/// A resize key moves a border this many columns...
+pub const RESIZE_COLS: int = 2
+/// ...or this many rows.
+pub const RESIZE_ROWS: int = 1
+/// A message on the hint line shows this long.
+pub const MESSAGE_MS: int = 2000
 /// A connection's sequence numbers reconnect before this.
 pub const SEQ_MAX: int = 4294967295
