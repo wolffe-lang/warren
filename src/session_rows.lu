@@ -6,7 +6,7 @@
 //!
 //!   session_rows WARREN [ROW...]
 //!
-//! Prints `PASS <row>` or `FAIL <row>: <why>` per row, then
+//! Prints `PASS <row>` or `FAIL <row> <why>` per row, then
 //! `SESSION-ROWS rows=N failed=M`; exits 1 when any row is red.
 use std.env
 use std.fs
@@ -914,7 +914,7 @@ fn main() -> int {
             print("PASS {name} ms={t}")
         } else {
             failed = failed + 1
-            print("FAIL {name}: {why}")
+            print("FAIL {name} {why}")
         }
     }
     print("SESSION-ROWS rows={rows.len} failed={failed}")
