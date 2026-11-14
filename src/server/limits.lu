@@ -1,0 +1,79 @@
+//! member: true
+//! The server's admission limits and budgets: named constants, each held
+//! by a row. docs/SERVER.md states them; changing one changes that row.
+
+/// Sessions one server holds at once (one pane each in this version).
+pub const MAX_SESSIONS: int = 16
+/// Accepted connections of every role and phase, held at once.
+pub const MAX_CONNECTIONS: int = 32
+/// Connections accepted and not yet past HELLO, held at once.
+pub const MAX_PENDING: int = 4
+/// Scrollback history bytes retained per pane.
+pub const HISTORY_BYTES: int = 8388608
+/// Projected server memory past which a new connection or session is
+/// refused with REFUSE resource-limit (7).
+pub const MEMORY_BUDGET: int = 536870912
+/// Bytes a cell costs in an emulator screen or a client's shadow.
+pub const CELL_BYTES: int = 64
+/// Wire bytes a cell may cost in the worst image (a run and three scalars).
+pub const WIRE_CELL_BYTES: int = 34
+
+/// Projected bytes of a pane: its history, both screens, and 1 MiB for
+/// its fixed buffers (measured 8,656,640 at 80x24 and 12,101,872 at
+/// 320x90 with the 8 MiB history).
+pub fn pane_bytes(cols: int, rows: int) -> int {
+    HISTORY_BYTES + 2 * cols * rows * CELL_BYTES + 1048576
+}
+
+/// Projected bytes of the worst encoded image at a size, every physical
+/// fragment's header included.
+pub fn image_bytes(cols: int, rows: int) -> int {
+    let payload = 22 + cols * rows * WIRE_CELL_BYTES
+    payload + 6 * (payload / 1048576 + 1)
+}
+
+/// Projected bytes of a connection before it is attached: one physical
+/// frame's receive buffer, a paste assembly and the event queue.
+pub fn connection_bytes() -> int {
+    1048582 + 65540 + EVENT_QUEUE
+}
+
+/// Projected bytes of an attached connection at its session's size: the
+/// above, one image and the shadow of what its client holds.
+pub fn attached_bytes(cols: int, rows: int) -> int {
+    connection_bytes() + image_bytes(cols, rows) + cols * rows * CELL_BYTES
+}
+
+/// Bytes read from one handle in one turn.
+pub const READ_BUDGET: int = 65536
+/// Bytes written to one handle in one turn.
+pub const WRITE_BUDGET: int = 65536
+/// Already-buffered bytes parsed for one connection in one turn.
+pub const PARSE_BUDGET: int = 65536
+/// Non-FRAME bytes queued for one attached client before it is too slow.
+pub const EVENT_QUEUE: int = 262144
+/// A pane's input queue.
+pub const INPUT_QUEUE: int = 65536
+/// Accepts taken from the listener in one turn.
+pub const ACCEPT_BATCH: int = 8
+
+/// HELLO must be complete this long after accept.
+pub const HELLO_MS: int = 5000
+/// A draining connection is closed after this long.
+pub const DRAIN_MS: int = 2000
+/// A closing pane's child is given this long before its pane is removed.
+pub const CLOSING_MS: int = 3000
+/// A stopping server exits after this long at most.
+pub const STOPPING_MS: int = 5000
+/// Damage becomes a frame when it is this old...
+pub const FRAME_AGE_MS: int = 8
+/// ...or its pane has been quiet this long.
+pub const FRAME_QUIET_MS: int = 2
+/// Synchronized output delays publication at most this long.
+pub const SYNC_MS: int = 150
+/// The smallest attached width.
+pub const MIN_COLS: int = 20
+/// The smallest attached height.
+pub const MIN_ROWS: int = 6
+/// A connection's sequence numbers reconnect before this.
+pub const SEQ_MAX: int = 4294967295
