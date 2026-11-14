@@ -1,0 +1,6 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# drops the blank a console policy draws for a wide glyph's continuation.
+floor 15
+rig w2-client-plant-step.sh sha256=4962cf3e9170005b66254557233d7d8ec1ca1eefc05e2ec8b31b669afaafaab9
+step w2-client-plant-build tools=python3,cc script=w2-client-plant-step.sh -- build
+step console-policy needs=w2-client-plant-build tools=python3 script=w2-client-plant-step.sh -- rows
