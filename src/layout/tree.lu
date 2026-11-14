@@ -1,0 +1,145 @@
+//! member: true
+//! Finding tabs and panes, walking a tab's tree, and the arena's slots.
+
+/// Where a pane lives: its tab's index and its leaf's slot, or -1s.
+struct Where {
+    tab: int,
+    leaf: int,
+}
+
+/// The index of the tab with this id, or -1.
+fn tab_index(l: Layout, tab: int) -> int {
+    var i = 0
+    while i < l.tabs.len {
+        if l.tabs[i].id == tab { return i }
+        i += 1
+    }
+    -1
+}
+
+/// The slot of the leaf holding `pane`, or -1.
+fn leaf_of(t: Tab, pane: int) -> int {
+    var i = 0
+    while i < t.nodes.len {
+        if t.nodes[i].kind == LEAF && t.nodes[i].pane == pane { return i }
+        i += 1
+    }
+    -1
+}
+
+fn locate(l: Layout, pane: int) -> Where {
+    var ti = 0
+    while ti < l.tabs.len {
+        let leaf = leaf_of(l.tabs[ti], pane)
+        if leaf >= 0 { return Where { tab: ti, leaf: leaf } }
+        ti += 1
+    }
+    Where { tab: -1, leaf: -1 }
+}
+
+/// The id of the tab holding `pane`, or -1.
+pub fn tab_of(l: Layout, pane: int) -> int {
+    let w = locate(l, pane)
+    if w.tab < 0 { return -1 }
+    l.tabs[w.tab].id
+}
+
+fn leaves(t: Tab, i: int, mut out: List[int]) {
+    if t.nodes[i].kind == LEAF {
+        (mut out).push(t.nodes[i].pane)
+        return
+    }
+    leaves(t, t.nodes[i].first, mut out)
+    leaves(t, t.nodes[i].second, mut out)
+}
+
+/// The tab's panes in tree order (a split's first subtree before its
+/// second); empty for an unknown tab.
+pub fn panes(l: Layout, tab: int) -> List[int] {
+    var out = List[int]()
+    let ti = tab_index(l, tab)
+    if ti >= 0 { leaves(l.tabs[ti], l.tabs[ti].root, mut out) }
+    out
+}
+
+/// The least extent along `axis` at which nothing under node `i` hides:
+/// a pane's own minimum; for a split along `axis` both children's and the
+/// border; across it, the larger child's.
+fn least(t: Tab, i: int, axis: int) -> int {
+    if t.nodes[i].kind == LEAF { return minimum(axis) }
+    let a = least(t, t.nodes[i].first, axis)
+    let b = least(t, t.nodes[i].second, axis)
+    if t.nodes[i].axis == axis { return a + 1 + b }
+    if a > b { return a }
+    b
+}
+
+/// Put a node in the first free slot, or a new one; answers its slot.
+fn alloc(mut t: Tab, take n: Node) -> int {
+    var i = 0
+    while i < t.nodes.len {
+        if t.nodes[i].kind == FREE {
+            t.nodes[i] = n
+            return i
+        }
+        i += 1
+    }
+    (mut t.nodes).push(n)
+    t.nodes.len - 1
+}
+
+fn release(mut t: Tab, i: int) {
+    t.nodes[i] = Node { kind: FREE, pane: 0, axis: COLS, first: -1, second: -1, share: 0, parent: -1 }
+}
+
+/// Make `now` stand where `was` stood under `parent` (or at the root).
+fn replace_child(mut t: Tab, parent: int, was: int, now: int) {
+    if parent < 0 {
+        t.root = now
+    } else if t.nodes[parent].first == was {
+        t.nodes[parent].first = now
+    } else {
+        t.nodes[parent].second = now
+    }
+    t.nodes[now].parent = parent
+}
+
+fn name_bytes(name: str) -> List[byte] {
+    var out = List[byte]()
+    for b in name.bytes() { (mut out).push(b) }
+    out
+}
+
+fn one_pane_tab(id: int, pane: int, name: str) -> Tab {
+    var nodes = List[Node]()
+    (mut nodes).push(Node { kind: LEAF, pane: pane, axis: COLS, first: -1, second: -1, share: 0, parent: -1 })
+    var order = List[int]()
+    (mut order).push(pane)
+    Tab { id: id, name: name_bytes(name), nodes: nodes, root: 0, focus: pane, zoomed: false, focus_order: order }
+}
+
+/// Move `pane` to the front of a focus order, adding it if absent.
+fn to_front(mut order: List[int], pane: int) {
+    var i = 0
+    while i < order.len && order[i] != pane { i += 1 }
+    if i == order.len {
+        (mut order).insert(0, pane)
+        return
+    }
+    while i > 0 {
+        order[i] = order[i - 1]
+        i -= 1
+    }
+    order[0] = pane
+}
+
+fn drop_from(mut order: List[int], pane: int) {
+    var i = 0
+    while i < order.len && order[i] != pane { i += 1 }
+    if i == order.len { return }
+    while i + 1 < order.len {
+        order[i] = order[i + 1]
+        i += 1
+    }
+    let _ = (mut order).pop() else 0
+}
