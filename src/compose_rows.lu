@@ -186,15 +186,20 @@ fn test_seeded_soak() {
     assert(soak(23, 7, 300, 11) == "", "compose-soak-23x7")
 }
 
+// A screen of distinct letters, a colour each. The bytes are built in one
+// list: a string grown by concatenation copies itself each time, which at
+// 320x90 held about 10 GB at its peak.
 fn fill(cols: int, rows: int) -> vt.Vt {
     var pane = vt.new(cols, rows, 0)
-    var text = ""
+    var text = List[byte]()
+    let letters = "abcdefghijklmnopqrstuvwxyz".bytes()
     var i = 0
     while i < cols * rows {
-        text = text + "\u{1b}[38;5;{i % 256}m{"abcdefghijklmnopqrstuvwxyz"[i % 26..i % 26 + 1]}"
+        for b in "\u{1b}[38;5;{i % 256}m".bytes() { (mut text).push(b) }
+        (mut text).push(letters[i % 26])
         i += 1
     }
-    vt.feed(mut pane, text.bytes())
+    vt.feed(mut pane, text)
     pane
 }
 
