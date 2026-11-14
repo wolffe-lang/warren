@@ -5,8 +5,8 @@ for PAX first, and measured on x86-64 Linux and macOS arm64 from the first
 pull request. It takes its ideas from tmux, zellij and herdr, and none of
 their code.
 
-**Status: a pure terminal core and protocol v1 codec, with a diagnostic CLI.
-No working multiplexer is implemented yet.** The repository holds the pins,
+**Status: a pure terminal core, protocol v1 codec and layout module, with a
+diagnostic CLI. No working multiplexer is implemented yet.** The repository holds the pins,
 tiered CI, a pinned reference emulator with a cell-for-cell harness, a survey,
 recorded corpus, and reference contracts for the emulator and protocol.
 `src/vt/parser.lu` decodes split UTF-8 and recognises bounded terminal
@@ -30,7 +30,10 @@ measurement entries; PAX replay remains unavailable without a boot fixture.
 `src/proto` implements bounded transport framing, message validation/encoding,
 fragment assembly and connection-wide image acknowledgement sequencing;
 [PROTOCOL](docs/PROTOCOL.md) fixes the bytes and [SERVER](docs/SERVER.md) is
-the event-loop contract and its blocking library dependencies. No server,
+the event-loop contract and its blocking library dependencies. `src/layout`
+holds tabs and split trees as data: their geometry, every operation with its
+named refusals, and a canonical text dump ([LAYOUT](docs/LAYOUT.md)), held by
+hand-written goldens and seeded invariants at five sizes. No server,
 client, socket or pty is implemented. With no arguments the `warren` binary
 still prints its executable scaffold status and exits 1; `vt-dump` is the
 implemented diagnostic command.
@@ -65,7 +68,7 @@ implemented diagnostic command.
 | W0 | the map: pins, CI, the oracle, the survey, the prediction | in progress |
 | W1 | the emulator | pure core/history/reflow, diagnostic CLI and full-frame/property gates |
 | W2 | one pane; detach and attach | pure protocol codec and server contract; I/O planned |
-| W3 | panes, tabs, the bar, keys | planned |
+| W3 | panes, tabs, the bar, keys | pure layout module; compositor, keys and bar planned |
 | W4 | mouse, scrollback, copy | planned |
 | W5 | layouts, commands, persistence | planned |
 | W6 | on the PAX image, on real hardware | planned |
@@ -181,7 +184,7 @@ nightly run and a manual dispatch run everything.
 |---|---|
 | `src/vt/` | the emulator: parser, grid, scrollback (pure) |
 | `src/proto/` | the wire protocol's frames (pure) |
-| `src/layout/` | tabs and the split tree (pure) |
+| `src/layout/` | tabs and the split tree: geometry and operations ([LAYOUT](docs/LAYOUT.md)) (pure) |
 | `src/server/` | the server and its event loop (not implemented) |
 | `src/server_model/` | pure connection transitions/actions, without I/O |
 | `src/client/` | the client: input parser and renderer |
