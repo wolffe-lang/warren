@@ -81,6 +81,14 @@ state every cell's. Pass A's renditions are not used; where pass A did write
 one outright before a character, the two passes must agree, and a dump on
 which they do not is refused.
 
+A terminal that writes no answers and reports that it could not open the
+virtual display is launched once more, and only once. The retry is recorded by
+name (`reference-display-unavailable`), counted in the step's summary and, for
+the fresh drive, in its manifest. A second such launch is red under that name,
+never as an observation or bound failure. A terminal that ran and disagreed is
+never retried. A failed launch's error keeps both the head and the tail of its
+stderr.
+
 The per-cell checksum tells a wide character's second half (it answers zero)
 from a blank. Because the emulator's replacement for a malformed byte and any
 code point whose low sixteen bits are zero also answer zero, the layout of a
