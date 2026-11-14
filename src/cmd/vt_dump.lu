@@ -10,7 +10,12 @@ struct DumpHeader { kind: int, first: int, second: int, length: int, at: int }
 
 /// Print the diagnostic's usage and return its usage-error status.
 pub fn usage() -> int {
-    io.write_err_line("usage: warren vt-dump [--cols N --rows N] [--history-bytes N] [--replay] [FILE|-]")
+    io.write_err_line("usage: warren                      attach, starting the server and session if needed")
+    io.write_err_line("       warren attach [-t NAME]    attach to an existing session")
+    io.write_err_line("       warren kill-server | list-sessions")
+    io.write_err_line("       warren server              run a server in the foreground")
+    io.write_err_line("       warren modules")
+    io.write_err_line("       warren vt-dump [--cols N --rows N] [--history-bytes N] [--replay] [FILE|-]")
     2
 }
 

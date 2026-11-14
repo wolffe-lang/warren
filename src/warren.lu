@@ -1,7 +1,10 @@
 //! member: false
-//! warren's host dispatcher. The vt-dump diagnostic works without a server.
-//! With no arguments, retain scaffold status and exit 1 so scripts cannot
-//! mistake this diagnostic-stage binary for a working multiplexer.
+//! warren's host dispatcher. With no arguments: attach to the default
+//! session, starting the server and the session when there are none.
+//! `attach [-t NAME]` attaches to an existing session; `kill-server` and
+//! `list-sessions` ask the server; `server` runs one in the foreground;
+//! `vt-dump` works without a server; `modules` lists the modules and their
+//! milestones.
 use std.io
 use std.env
 use vt
@@ -14,7 +17,7 @@ use config
 
 fn line(name: str, milestone: str, pure: bool) -> str {
     let kind = if pure { "pure" } else { "host" }
-    "{name}\t{milestone}\t{kind}\tnot implemented"
+    "{name}\t{milestone}\t{kind}"
 }
 
 fn main() -> int {
@@ -26,13 +29,31 @@ fn main() -> int {
         (mut args).push(text)
         index += 1
     }
-    if args.len > 0 {
-        if args[0] == "vt-dump" { return cmd.vt_dump(args) }
-        if args[0] == "server" && args.len == 1 { return server.serve() }
+    if args.len == 0 { return client.attach("", true) }
+    if args[0] == "vt-dump" { return cmd.vt_dump(args) }
+    if args[0] == "server" && args.len == 1 { return server.serve() }
+    if args[0] == "attach" {
+        if args.len == 1 { return client.attach("", false) }
+        if args.len == 3 && args[1] == "-t" { return client.attach(args[2], false) }
         return cmd.usage()
     }
+    if (args[0] == "kill-server" || args[0] == "list-sessions") && args.len == 1 {
+        return client.command(args)
+    }
+    if args[0] == "modules" && args.len == 1 { return modules() }
+    for later in "new detach split close focus resize zoom tab rename source".split(" ") {
+        if args[0] == later {
+            io.write_err_line("warren: {later} is not implemented in this version")
+            return 2
+        }
+    }
+    cmd.usage()
+}
+
+// The modules and the milestone each belongs to.
+fn modules() -> int {
     let version = vt.package_version()
-    io.write_line("warren {version}: scaffold only")
+    io.write_line("warren {version}: modules")
     io.write_line(line("vt", vt.milestone(), vt.pure()))
     io.write_line(line("proto", proto.milestone(), proto.pure()))
     io.write_line(line("layout", layout.milestone(), layout.pure()))
@@ -40,5 +61,5 @@ fn main() -> int {
     io.write_line(line("client", client.milestone(), client.pure()))
     io.write_line(line("cmd", cmd.milestone(), cmd.pure()))
     io.write_line(line("config", config.milestone(), config.pure()))
-    1
+    0
 }

@@ -28,13 +28,13 @@ step() {
   printf 'END %s exit=%s secs=%s\n' "$name" "$rc" "$((SECONDS-start))"
   return "$rc"
 }
-scaffold_run() {
-  # The scaffold must say it is one, and must not exit 0.
+modules_run() {
+  # The module list names all seven modules and their milestones.
   local rc=0
-  "$1" > target/gate/scaffold.out || rc=$?
-  cat target/gate/scaffold.out
-  [ "$rc" -eq 1 ] || { echo "FAIL scaffold-run: exit $rc, expected 1"; return 1; }
-  [ "$(grep -c 'not implemented$' target/gate/scaffold.out)" -eq 7 ] || { echo 'FAIL scaffold-run: expected seven modules'; return 1; }
+  "$1" modules > target/gate/modules.out || rc=$?
+  cat target/gate/modules.out
+  [ "$rc" -eq 0 ] || { echo "FAIL modules-run: exit $rc, expected 0"; return 1; }
+  [ "$(grep -cE '^[a-z]+	W[0-9]+	(pure|host)$' target/gate/modules.out)" -eq 7 ] || { echo 'FAIL modules-run: expected seven modules'; return 1; }
 }
 fuzz_generator() {
   python3 -I tools/corpus/fuzz.py --digests 32 2048 > target/gate/fuzz.sha256
@@ -122,7 +122,7 @@ step corpus-chunking-native python3 -I tests/vt/chunking_suite.py "$root/target/
 step corpus-properties-build "$WOLF" build --deny-warnings src/vt/corpus_properties.lu -o "$root/target/native/corpus-properties"
 step corpus-properties-framing python3 -I tests/vt/corpus_property_rows.py "$root/target/native/corpus-properties" "$root/target/native/warren"
 step corpus-properties-native python3 -I tests/vt/corpus_properties.py "$root/target/native/corpus-properties" "$root/target/native/warren"
-step scaffold-run scaffold_run "$root/target/native/warren"
+step modules-run modules_run "$root/target/native/warren"
 step wolf-test "$WOLF" test --deny-warnings src
 step lupin-pure "$LUPIN" run src/pure_test.lu
 step cli-lupin python3 -I tests/vt/cli_rows.py "$LUPIN" run src/warren.lu

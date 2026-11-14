@@ -83,8 +83,9 @@ def main():
             run(['--replay'], data, code=2)
     unknown = subprocess.run(args.command + ['unknown'], cwd=ROOT, capture_output=True, timeout=180)
     assert unknown.returncode == 2 and not unknown.stdout
-    bare = subprocess.run(args.command, cwd=ROOT, capture_output=True, timeout=180)
-    assert bare.returncode == 1 and b'scaffold only' in bare.stdout
+    # With no arguments warren attaches, which needs a terminal: here there is none.
+    bare = subprocess.run(args.command, cwd=ROOT, capture_output=True, timeout=180, stdin=subprocess.DEVNULL)
+    assert bare.returncode != 0 and not bare.stdout, bare
     print('PASS vt-cli raw binary stdin file chunks usage replay malformed')
 
 
