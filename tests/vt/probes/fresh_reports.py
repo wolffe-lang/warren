@@ -64,8 +64,9 @@ def status_pass(display,source,out):
     for key,value in oracle.RESOURCES.items():command+=['-xrm','XTerm*%s: %s'%(key,value)]
     command+=['-e',sys.executable,'-I',str(Path(__file__).resolve()),'--tab-inner','--source',str(source.resolve()),'--out',str(out.resolve())]
     env={'DISPLAY':display.name,'LC_ALL':'C.UTF-8','PATH':os.environ['PATH'],'HOME':str(out.parent.resolve()),'TERM':'xterm-256color'}
-    done=subprocess.run(command,env=env,capture_output=True,timeout=120)
-    assert done.returncode==0 and out.exists(),(done.returncode,done.stderr[-500:])
+    # The same single named display retry as every reference pass; nothing else is retried.
+    done=oracle.launch(display,'status',command,env,(out,),120)
+    assert done.returncode==0 and out.exists(),(done.returncode,oracle.clipped(done.stderr))
     result=json.loads(out.read_text());assert 'error' not in result,result
     return result
 
@@ -126,7 +127,7 @@ def main():
                 record=status_pass(display,source,out);assert record['input_sha256']==digest
                 queries+=record['DECCIR_queries'];barriers+=record['checksum_barriers'];m['tab_status'][name]=record
                 print('MEASURE tabs-%s tab1=%s queries=%d'%(name,record['tab_one'],record['DECCIR_queries']),flush=True)
-            except (AssertionError,ValueError,OSError,subprocess.TimeoutExpired) as error:
+            except (AssertionError,oracle.OracleError,ValueError,OSError,subprocess.TimeoutExpired) as error:
                 m['errors'].append('tabs-'+name);print('MEASURE-ERROR tabs-'+name,str(error),flush=True)
             save()
     assert queries==138 and barriers==169,(queries,barriers)
