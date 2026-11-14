@@ -19,6 +19,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import screen as S  # noqa: E402
@@ -47,7 +48,29 @@ class OracleError(Exception):
     pass
 
 
+class DisplayUnavailable(OracleError):
+    """The reference terminal gave no answers because it could not open its display."""
+    failure_name = 'reference-display-unavailable'
+
+
+# Only this message, from a launch that wrote no answers, is retried, and only once.
+DISPLAY_FAILURE = b"Can't open display"
+RETRY_PAUSE_SECONDS = 1.0
+
+
+def clipped(data, keep=300):
+    """A child's stderr with both ends kept: the reason can come first, the last error last."""
+    text = data.decode('utf-8', 'replace')
+    if len(text) <= 2 * keep:
+        return text
+    return '%s ... [%d characters omitted] ... %s' % (text[:keep], len(text) - 2 * keep, text[-keep:])
+
+
 class Display:
+    def __init__(self):
+        # Every retried launch, by name; printed when the display closes, never silent.
+        self.retries = []
+
     def __enter__(self):
         if os.environ.get('WARREN_ORACLE_DISPLAY'):
             self.proc, self.name = None, os.environ['WARREN_ORACLE_DISPLAY']
@@ -68,13 +91,37 @@ class Display:
         if self.proc:
             self.proc.terminate()
             self.proc.wait()
+        if self.retries:
+            print('DISPLAY-RETRIES count=%d %s' % (len(self.retries), ' '.join(
+                '%s:%s:%s' % (retry['name'], retry['pass'], retry['work']) for retry in self.retries)),
+                file=sys.stderr, flush=True)
+
+
+def launch(display, which, command, env, outputs, timeout):
+    """Run one reference terminal. outputs[0] is its answers file; every output is cleared first.
+
+    A launch that wrote no answers and reports that it could not open its display
+    is retried once and recorded on the display by name. A second such launch is
+    DisplayUnavailable. Any other result, including a terminal that ran and
+    disagreed, is returned for the caller to judge and is never retried.
+    """
+    for attempt in (1, 2):
+        for path in outputs:
+            if path.exists():
+                path.unlink()
+        done = subprocess.run(command, env=env, capture_output=True, timeout=timeout)
+        if outputs[0].exists() or DISPLAY_FAILURE not in done.stderr:
+            return done
+        if attempt == 2:
+            raise DisplayUnavailable('%s: pass %s: emulator exit %d on both launches: %s' % (
+                DisplayUnavailable.failure_name, which, done.returncode, clipped(done.stderr)))
+        display.retries.append({'name': DisplayUnavailable.failure_name, 'pass': which,
+                                'work': str(outputs[0].parent)})
+        time.sleep(RETRY_PAUSE_SECONDS)
 
 
 def run_pass(display, which, source, cols, rows, work, extra=()):
     answers, printed = work / (which + '.json'), work / (which + '.print')
-    for path in (answers, printed):
-        if path.exists():
-            path.unlink()
     command = ['xterm', '-u8', '-geometry', '%dx%d' % (cols, rows), '-fn', 'fixed',
                '-xrm', 'XTerm*printerCommand: cat > ' + str(printed)]
     for key, value in RESOURCES.items():
@@ -84,10 +131,9 @@ def run_pass(display, which, source, cols, rows, work, extra=()):
     env = {'DISPLAY': display.name, 'LC_ALL': 'C.UTF-8', 'PATH': os.environ['PATH'],
            'HOME': str(work), 'TERM': 'xterm-256color',
            'WARREN_ORACLE_TIMEOUT': os.environ.get('WARREN_ORACLE_TIMEOUT', '20')}
-    done = subprocess.run(command, env=env, capture_output=True, timeout=300)
+    done = launch(display, which, command, env, (answers, printed), 300)
     if done.returncode != 0 or not answers.exists():
-        raise OracleError('pass %s: emulator exit %d: %s' % (
-            which, done.returncode, done.stderr.decode('utf-8', 'replace')[-300:]))
+        raise OracleError('pass %s: emulator exit %d: %s' % (which, done.returncode, clipped(done.stderr)))
     result = json.loads(answers.read_text())
     if 'error' in result:
         raise OracleError('pass %s: %s' % (which, result['error']))
@@ -411,7 +457,7 @@ def cmd_cases(args):
             failed += bool(fails)
             if not fails:
                 print('PASS oracle-case %s (two takes identical)' % name)
-    print('oracle-cases: %d cases, %d failed' % (len(cases), failed))
+    print('oracle-cases: %d cases, %d failed, %d display retries' % (len(cases), failed, len(display.retries)))
     return 1 if failed else 0
 
 
@@ -459,7 +505,8 @@ def cmd_digests(args):
     for name in missing:
         print('FAIL oracle-digest %s: in the manifest, not dumped' % name)
     failed += len(missing)
-    print('oracle-digests: %d streams, two takes each, %d failed' % (len(streams), failed))
+    print('oracle-digests: %d streams, two takes each, %d failed, %d display retries' % (
+        len(streams), failed, len(display.retries)))
     return 1 if failed else 0
 
 
