@@ -331,7 +331,21 @@ the command there (the program's lifetime) and the server's exit right after
 it, where Linux ends the session at once and the server a second
 later. Either way the server does not end before the program does.
 
-This version answers a command connection's COMMAND for `kill-server` and
-`list-sessions` only; every other verb replies status 2 and names itself as
-not implemented. A pane whose program does not start is refused (REFUSE
-invalid-request, with the reason) rather than shown as an error pane.
+This version answers a command connection's COMMAND for `kill-server`,
+`list-sessions` and `new-session [NAME]`; every other verb replies status 2
+and names itself as not implemented, so a newer client facing this server
+fails by name. `new-session` makes a detached session at the command HELLO's
+size (80x24 when both are zero), working directory and environment, and
+replies status 0 with the name on standard output. Without a NAME it takes
+the lowest positive number no live session is named. A name already in use, a
+size below 20x6 and a name that is not allowed reply status 1 with the reason;
+a slot made between turns delays the reply by a turn, as it does a HELLO. A
+pane whose program does not start is refused (REFUSE invalid-request, with the
+reason) rather than shown as an error pane.
+
+Session names are compared as bytes: no case folding and no Unicode
+normalization, so two spellings of one word are two sessions. A name may hold
+any bytes but `/` and the control bytes 00-1f and 7f, and may not be empty.
+`new-session` refuses any other name with status 1, and an attaching HELLO
+that would create a session under one gets REFUSE invalid-request; an attach
+to such a name finds no session.
