@@ -2,87 +2,87 @@
   "lupin": {
     "assets": [
       {
-        "digest": "sha256:7236424618f5bbf1e5f7693cd6333df90b715e1401b08b795668cbb1425ed5af",
-        "id": 733860923,
-        "name": "lupin-0.1.61-aarch64-apple-darwin.tar.gz",
-        "size": 2876085
+        "digest": "sha256:228790ef3aef7605a2f9524abdcb6de5c8a5fa179437d82f3d3af262495a4e7f",
+        "id": 741637603,
+        "name": "lupin-0.1.62-aarch64-apple-darwin.tar.gz",
+        "size": 2879204
       },
       {
-        "digest": "sha256:3a2b92423e53a6b539e30b8a4f055c09ccac30853f332da3305966550d1ac7d3",
-        "id": 733863161,
-        "name": "lupin-0.1.61-aarch64-unknown-linux-gnu.tar.gz",
-        "size": 3053876
+        "digest": "sha256:f5391308ad9cd8ae1e31a42e7a17c1453679e2a0ac03f83783c4ac52e650ef2e",
+        "id": 741570541,
+        "name": "lupin-0.1.62-aarch64-unknown-linux-gnu.tar.gz",
+        "size": 3059706
       },
       {
-        "digest": "sha256:06c4cc82f1ab7d8f6acdd7d21f43b519a2927c22344947d6c068aec588138436",
-        "id": 733850525,
-        "name": "lupin-0.1.61-x86_64-pc-windows-msvc.zip",
-        "size": 2807410
+        "digest": "sha256:423ba4073179b72d925e9e835a3b035ca0fdfcb69042dd0eab0732e23141e537",
+        "id": 741573799,
+        "name": "lupin-0.1.62-x86_64-pc-windows-msvc.zip",
+        "size": 2811807
       },
       {
-        "digest": "sha256:61ce849eac0b531803e5bdf1fe07d91d3d69ecb57f83c5e7eb7c5d553cbef41b",
-        "id": 733849563,
-        "name": "lupin-0.1.61-x86_64-unknown-linux-gnu.tar.gz",
-        "size": 3214198
+        "digest": "sha256:3b3bf9c23a9e545a4a99e65a5183d0c5e71e91d6bfb8a189147e2701c03e177f",
+        "id": 741571183,
+        "name": "lupin-0.1.62-x86_64-unknown-linux-gnu.tar.gz",
+        "size": 3218458
       },
       {
-        "digest": "sha256:7e9f5363b98c60e32700623f154460182fa79dd518e9d770005504f18548b9da",
-        "id": 733851163,
-        "name": "lupin-0.1.61-x86_64-unknown-linux-musl.tar.gz",
-        "size": 3229321
+        "digest": "sha256:1cfbe548262c3bd0b75be731adbf88caf8239d8f4a5b75cb6727052eb0b33057",
+        "id": 741570593,
+        "name": "lupin-0.1.62-x86_64-unknown-linux-musl.tar.gz",
+        "size": 3234489
       },
       {
-        "digest": "sha256:5635d6e05c19b0d878f3e99b5fbac932229be5a61f86ab48f9b784454288affa",
-        "id": 733850527,
+        "digest": "sha256:035da8a67e1d658e7de86b901c5671be0722386565956b304b21ae934662e687",
+        "id": 741573801,
         "name": "lupin.exe",
-        "size": 7359488
+        "size": 7369728
       }
     ],
-    "commit": "a10cbe5745d6092752217932851d3b9c12c66b4d",
-    "id": 441174610,
-    "published_at": "2026-11-11T02:40:35Z",
-    "tag": "v0.1.61"
+    "commit": "72eff3c99b3a9e434b059f5dd3e4b1d29c862ddc",
+    "id": 443651522,
+    "published_at": "2026-11-13T00:00:31Z",
+    "tag": "v0.1.62"
   },
   "std": {
-    "commit": "77cf3210a82c93dc05ded987c249bb69e79b0a89",
-    "tree": "8ed51cc10bbe18b2fc7734c802af84422873899f"
+    "commit": "c339a4716ab30cafa9f05bbb5a39c10f578e4b9e",
+    "tree": "f617e5aae5254f8b8d4d925646fc91a316dc5cae"
   },
   "wolf": {
     "assets": [
       {
-        "digest": "sha256:63de947671c240fc8be3e3480bb36321b0a6ac0b5e12e16bdae164d9050cfde0",
-        "id": 734849433,
-        "name": "wolf-0.2.39-aarch64-apple-darwin.tar.gz",
-        "size": 19918614
+        "digest": "sha256:3f18a56562fb089da05a50a612e031cd297f20a617b9e6e7ada768fbeb69e72b",
+        "id": 742318507,
+        "name": "wolf-0.2.40-aarch64-apple-darwin.tar.gz",
+        "size": 20233979
       },
       {
-        "digest": "sha256:390b6548d6bd8c7eac3ae0a1d09099437564418440de782caca45954463dd344",
-        "id": 734841909,
-        "name": "wolf-0.2.39-aarch64-unknown-linux-gnu.tar.gz",
-        "size": 81134589
+        "digest": "sha256:cea26eea215e7cdba60db2870c0eb4d2c5738065046ec5fe6e0eec7da55e48cd",
+        "id": 742302479,
+        "name": "wolf-0.2.40-aarch64-unknown-linux-gnu.tar.gz",
+        "size": 81724609
       },
       {
-        "digest": "sha256:dbb958fe64e348e9b4421553dfa7718a223d36515b09a6d88ca17d0d80adeb9a",
-        "id": 734849315,
-        "name": "wolf-0.2.39-x86_64-pc-windows-msvc.tar.gz",
-        "size": 16662936
+        "digest": "sha256:df7ef8037df30394de4909217d42861732a6ed60c0991eb00990b4bc5441cbd8",
+        "id": 742336382,
+        "name": "wolf-0.2.40-x86_64-pc-windows-msvc.tar.gz",
+        "size": 16685815
       },
       {
-        "digest": "sha256:53f75d2b2dd79c0532b21920bc9f073098154aa0133caa2405209a1ef2af0457",
-        "id": 734842310,
-        "name": "wolf-0.2.39-x86_64-unknown-linux-gnu.tar.gz",
-        "size": 85859404
+        "digest": "sha256:bc2020e0b7400c18162a6072c299c65c0582ea74a0eba22aaa57ca04ae13e7e1",
+        "id": 742327489,
+        "name": "wolf-0.2.40-x86_64-unknown-linux-gnu.tar.gz",
+        "size": 86516979
       },
       {
-        "digest": "sha256:6cc429551e34935a1e7b6f3edd77ff034ff5be3fb6b7f399f33fe4132b9f594e",
-        "id": 734837854,
-        "name": "wolf-rt-0.2.39-x86_64-unknown-linux-musl.tar.gz",
-        "size": 10438708
+        "digest": "sha256:6d30737a02f02f9b19f6ef5b8b381802f0d0e2a179c37a4c1f638bca5e05c6da",
+        "id": 742323480,
+        "name": "wolf-rt-0.2.40-x86_64-unknown-linux-musl.tar.gz",
+        "size": 10778076
       }
     ],
-    "commit": "3fc86f77795afbbd6fbe483fef76c08e7f13a840",
-    "id": 441434977,
-    "published_at": "2026-11-11T09:06:11Z",
-    "tag": "v0.2.39"
+    "commit": "b333b9da8560e4e1dfd6e30099d14d98e752f9e1",
+    "id": 443798290,
+    "published_at": "2026-11-13T05:17:15Z",
+    "tag": "v0.2.40"
   }
 }
