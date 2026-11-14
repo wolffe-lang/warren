@@ -67,7 +67,7 @@ fn from_child(path: str) -> str ! {io} {
 
 // A child takes the lock and ends while holding it; the lock must be free
 // afterwards (a crashed server never leaves the start lock held).
-fn after_holder_exit(path: str) -> str ! {io} {
+fn after_holder_exit(path: str) -> str ! {io, unsupported} {
     let f = process.fork() else |e| {
         return "{e}"
     }
@@ -83,7 +83,9 @@ fn after_holder_exit(path: str) -> str ! {io} {
     var ch = process.Child { slot: f.child.slot }
     let st = process.wait_status(take ch)?
     if st != 11 { return "child({st})" }
-    var h = fs.open_mode(path, 3 + fs.NOFOLLOW)?
+    var h = fs.open_mode(path, 3 + fs.NOFOLLOW) else |e| {
+        return "open({e})"
+    }
     let r = lock_row(mut h)
     fs.unlock(mut h)?
     fs.close(take h)?
