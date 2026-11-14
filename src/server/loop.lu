@@ -2255,6 +2255,7 @@ pub fn serve() -> int {
     }
     // The key table: the defaults until the configuration file is read.
     let keys = config.defaults()
+    let help = config.help_lines(keys)
     let waiter = poll.open() else |e| {
         eprint("warren server: no readiness set: {e}")
         finish(take place)
@@ -2267,7 +2268,7 @@ pub fn serve() -> int {
         started: now_ns(), idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
         version: vt.package_version(), again: false, need_slot: false, need_pane: false, want_cols: 0,
         want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, master_read: master_read,
-        budget: budget, uid: env.euid() else 0 - 1, inherited: inherited, keys: keys, help: config.help_lines(keys),
+        budget: budget, uid: env.euid() else 0 - 1, inherited: inherited, keys: keys, help: help,
     }
     net.set_listener_deadline(mut s.place.listener, 1) else |_| {}
     listener_interest(mut s)
