@@ -444,10 +444,12 @@ pub fn hint_text(k: Keys, mode: int, cols: int) -> str {
     hint_line(k, mode, cols).text
 }
 
-const DIRECTIONS: str = "left right up down"
+fn directions() -> List[str] {
+    ["left", "right", "up", "down"]
+}
 
 fn direction_name(d: int) -> str {
-    let names = DIRECTIONS.split(" ")
+    let names = directions()
     if d < 0 || d >= names.len { return "?" }
     names[d]
 }
@@ -548,7 +550,7 @@ fn words(line: str) -> List[str] {
 }
 
 fn direction_of(word: str) -> int {
-    let names = DIRECTIONS.split(" ")
+    let names = directions()
     var i = 0
     while i < names.len {
         if names[i] == word { return i }
