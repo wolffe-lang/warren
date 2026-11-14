@@ -1,8 +1,8 @@
 //! member: true
-//! The configuration file and layout files.
-//!
-//! Stub. Nothing here is implemented; the module exists so that the tree,
-//! the build and the tests have their final shape from the first commit.
+//! The configuration: the key table (keys.lu: the modes, the default
+//! bindings, what a key does in a mode, the hint line and the key list read
+//! from the same table, the command line's verbs), then the configuration
+//! file and layout files, which are still to come.
 
 /// The milestone that fills this module in.
 pub fn milestone() -> str {

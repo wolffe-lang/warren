@@ -1,0 +1,203 @@
+//! member: true
+//! The key table: modes, actions, the default bindings, what one key does in
+//! a mode, the hint line and the key list read from the same table, and the
+//! command line's verbs.
+//!
+//! Pure: no I/O. The server's dispatcher calls `step` and performs the action
+//! it names; the hint line and the key list are generated from `bindings`, so
+//! the three cannot disagree. KEY events arrive as PROTOCOL has them: a scalar
+//! with shift folded in (`H` is 72), `C-p` the scalar `p` with ctrl (4), named
+//! keys by number (1 Up, 2 Down, 3 Right, 4 Left, 11 Backspace, 13 Enter,
+//! 14 Escape).
+
+/// Everything to the focused pane except the prefix.
+pub const MODE_NORMAL: int = 0
+/// One key of the prefix table, then back to normal.
+pub const MODE_PREFIX: int = 1
+/// Sticky: split, focus, close, zoom.
+pub const MODE_PANE: int = 2
+/// Sticky: switch, open, close and rename tabs.
+pub const MODE_TAB: int = 3
+/// Sticky: move borders.
+pub const MODE_RESIZE: int = 4
+/// Sticky: detach.
+pub const MODE_SESSION: int = 5
+/// Everything to the pane, the prefix included; left only with `C-g`.
+pub const MODE_LOCKED: int = 6
+/// A line of the key table's action names, typed on the hint line.
+pub const MODE_COMMAND: int = 7
+/// The active tab's new name, typed on the hint line.
+pub const MODE_RENAME: int = 8
+/// `y` runs the action waiting for it; any other key cancels.
+pub const MODE_CONFIRM: int = 9
+/// The key list over the tab area, for this client only.
+pub const MODE_HELP: int = 10
+/// How many modes there are.
+pub const MODES: int = 11
+/// A step's next mode: the mode the client was in before confirm, help or a
+/// prompt (a sticky mode, or normal). The server keeps it.
+pub const MODE_BACK: int = -1
+
+/// No action: the key is dropped.
+pub const A_NONE: int = 0
+/// Split the focused pane; arg is the axis (0: side by side).
+pub const A_SPLIT: int = 1
+/// Move focus; arg is the direction (0 left, 1 right, 2 up, 3 down).
+pub const A_FOCUS: int = 2
+/// Focus the next pane in tree order.
+pub const A_FOCUS_NEXT: int = 3
+/// Move a border of the focused pane; arg is the direction.
+pub const A_RESIZE: int = 4
+/// Zoom the focused pane, or unzoom.
+pub const A_ZOOM: int = 5
+/// Every split of the tab back to halves.
+pub const A_EQUALIZE: int = 6
+/// Close the focused pane.
+pub const A_CLOSE: int = 7
+/// A new tab with one pane.
+pub const A_NEW_TAB: int = 8
+/// The next tab, wrapping.
+pub const A_NEXT_TAB: int = 9
+/// The previous tab, wrapping.
+pub const A_PREVIOUS_TAB: int = 10
+/// The tab at position arg (1-based).
+pub const A_SELECT_TAB: int = 11
+/// Detach this client.
+pub const A_DETACH: int = 12
+/// Send the prefix itself to the focused pane.
+pub const A_SEND_PREFIX: int = 13
+/// Close the active tab and its panes.
+pub const A_CLOSE_TAB: int = 14
+/// Start the rename prompt, filled with the tab's name.
+pub const A_RENAME_TAB: int = 15
+/// Enter locked mode.
+pub const A_LOCK: int = 16
+/// The key goes to the focused pane.
+pub const A_PASS: int = 17
+/// Ask before the action named by arg (A_CLOSE or A_CLOSE_TAB).
+pub const A_CONFIRM: int = 18
+/// Run the action the confirm question asked about.
+pub const A_YES: int = 19
+/// Start the command prompt, empty.
+pub const A_COMMAND: int = 20
+/// Open the key list at its top.
+pub const A_HELP: int = 21
+/// Scroll the key list by arg lines.
+pub const A_SCROLL: int = 22
+/// Type the scalar arg into the prompt.
+pub const A_TYPE: int = 23
+/// Erase the prompt's last scalar.
+pub const A_ERASE: int = 24
+/// Empty the prompt.
+pub const A_CLEAR: int = 25
+/// Run the prompt's line.
+pub const A_RUN: int = 26
+
+const SHIFT: int = 1
+const ALT: int = 2
+const CTRL: int = 4
+const SCALAR: int = 0
+const NAMED: int = 1
+const UP: int = 1
+const DOWN: int = 2
+const RIGHT: int = 3
+const LEFT: int = 4
+const BACKSPACE: int = 11
+const ENTER: int = 13
+const ESC: int = 14
+
+/// One key in one mode: its action and argument, and the mode after it.
+/// `shows` is the key's text in its hint group and `hint` the group's label;
+/// a binding with an empty `hint` is left off the hint line (arrows beside
+/// `h j k l`, Enter beside Esc) but is in the key list.
+pub struct Binding {
+    mode: int,
+    mods: int,
+    kind: int,
+    code: int,
+    action: int,
+    arg: int,
+    next: int,
+    shows: str,
+    hint: str,
+}
+
+/// The key table.
+pub struct Keys {
+    bindings: List[Binding],
+}
+
+/// What a key does: the action, its argument, and the next mode.
+pub struct Step {
+    action: int,
+    arg: int,
+    mode: int,
+}
+
+/// A hint line: its text, and the columns (0-based, end exclusive) of each key
+/// drawn in inverse, as pairs.
+pub struct HintLine {
+    text: str,
+    keys: List[int],
+}
+
+/// A parsed command line. `count` repeats a resize; `text` is a rename's name;
+/// `why` is the answer shown when the line is refused (empty for an empty line).
+pub struct Command {
+    ok: bool,
+    action: int,
+    arg: int,
+    count: int,
+    text: str,
+    why: str,
+}
+
+/// The default table. Stub: empty until the table lands.
+pub fn defaults() -> Keys {
+    Keys { bindings: List[Binding]() }
+}
+
+/// What a KEY event does in a mode. Stub: nothing.
+pub fn step(k: Keys, mode: int, mods: int, kind: int, code: int) -> Step {
+    Step { action: A_NONE, arg: 0, mode: mode }
+}
+
+/// The mode's name. Stub.
+pub fn mode_name(mode: int) -> str {
+    ""
+}
+
+/// A key's name. Stub.
+pub fn key_name(mods: int, kind: int, code: int) -> str {
+    ""
+}
+
+/// The width of hint and key-list text in columns: one a scalar (the table's
+/// text is ASCII).
+pub fn text_width(text: str) -> int {
+    var n = 0
+    for b in text.bytes() {
+        if (b as int) & 192 != 128 { n += 1 }
+    }
+    n
+}
+
+/// The hint line of a mode at a width. Stub: empty.
+pub fn hint_line(k: Keys, mode: int, cols: int) -> HintLine {
+    HintLine { text: "", keys: List[int]() }
+}
+
+/// The hint line's text alone.
+pub fn hint_text(k: Keys, mode: int, cols: int) -> str {
+    hint_line(k, mode, cols).text
+}
+
+/// The key list. Stub: empty.
+pub fn help_lines(k: Keys) -> List[str] {
+    List[str]()
+}
+
+/// A command line. Stub: refused.
+pub fn command(line: str) -> Command {
+    Command { ok: false, action: A_NONE, arg: 0, count: 1, text: "", why: "" }
+}
