@@ -1,30 +1,33 @@
-# Whole published release archives: wolf release 441434977 (v0.2.39) and lupin
-# release 441174610 (v0.1.61), read twice from the release API on 2026-11-12,
+# Whole published release archives: wolf release 443798290 (v0.2.40) and lupin
+# release 443651522 (v0.1.62), read twice from the release API on 2026-11-14,
 # agreeing on asset ids and digests (tests/pin-read-1.json, -2.json).
 #
-# The std pin is wolf-std trunk 77cf3210, newer than the std the wolf 0.2.39
-# archive bundles: it carries the pseudo-terminal and session surface
-# (std.term.open_pty, std.process.start_session) that warren's server is built
-# on. tools/fetch-toolchain.py stages the std at this pin in place of the
-# bundled tree, never over it.
+# The std pin is wolf-std trunk c339a471, newer than the std the wolf 0.2.40
+# archive bundles. Besides the pseudo-terminal and session surface
+# (std.term.open_pty, std.process.start_session) it carries the one wait over
+# files, sockets and signals (std.poll on the runtime's readiness sets), the
+# one-send socket write (net.write_some) and Unix peer credentials
+# (unix.peer_credentials) that warren's server is built on.
+# tools/fetch-toolchain.py stages the std at this pin in place of the bundled
+# tree, never over it.
 
 [wolf]
-version = "0.2.39"
+version = "0.2.40"
 repo = "wolffe-lang/wolf-lang"
-rev = "3fc86f77795afbbd6fbe483fef76c08e7f13a840"
-aarch64-apple-darwin = "63de947671c240fc8be3e3480bb36321b0a6ac0b5e12e16bdae164d9050cfde0"
-x86_64-unknown-linux-gnu = "53f75d2b2dd79c0532b21920bc9f073098154aa0133caa2405209a1ef2af0457"
-aarch64-unknown-linux-gnu = "390b6548d6bd8c7eac3ae0a1d09099437564418440de782caca45954463dd344"
+rev = "b333b9da8560e4e1dfd6e30099d14d98e752f9e1"
+aarch64-apple-darwin = "3f18a56562fb089da05a50a612e031cd297f20a617b9e6e7ada768fbeb69e72b"
+x86_64-unknown-linux-gnu = "bc2020e0b7400c18162a6072c299c65c0582ea74a0eba22aaa57ca04ae13e7e1"
+aarch64-unknown-linux-gnu = "cea26eea215e7cdba60db2870c0eb4d2c5738065046ec5fe6e0eec7da55e48cd"
 
 [lupin]
-version = "0.1.61"
+version = "0.1.62"
 repo = "wolffe-lang/wolf-interp"
-rev = "a10cbe5745d6092752217932851d3b9c12c66b4d"
-aarch64-apple-darwin = "7236424618f5bbf1e5f7693cd6333df90b715e1401b08b795668cbb1425ed5af"
-x86_64-unknown-linux-gnu = "61ce849eac0b531803e5bdf1fe07d91d3d69ecb57f83c5e7eb7c5d553cbef41b"
-aarch64-unknown-linux-gnu = "3a2b92423e53a6b539e30b8a4f055c09ccac30853f332da3305966550d1ac7d3"
+rev = "72eff3c99b3a9e434b059f5dd3e4b1d29c862ddc"
+aarch64-apple-darwin = "228790ef3aef7605a2f9524abdcb6de5c8a5fa179437d82f3d3af262495a4e7f"
+x86_64-unknown-linux-gnu = "3b3bf9c23a9e545a4a99e65a5183d0c5e71e91d6bfb8a189147e2701c03e177f"
+aarch64-unknown-linux-gnu = "f5391308ad9cd8ae1e31a42e7a17c1453679e2a0ac03f83783c4ac52e650ef2e"
 
 [std]
 repo = "wolffe-lang/wolf-std"
-rev = "77cf3210a82c93dc05ded987c249bb69e79b0a89"
-tree = "8ed51cc10bbe18b2fc7734c802af84422873899f"
+rev = "c339a4716ab30cafa9f05bbb5a39c10f578e4b9e"
+tree = "f617e5aae5254f8b8d4d925646fc91a316dc5cae"

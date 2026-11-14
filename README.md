@@ -80,9 +80,9 @@ implemented diagnostic command.
 | Linux development witness | x86-64, rootless containers, bounded memory and pinned CPUs |
 | macOS development witness | Apple Silicon arm64 |
 | PAX witness | x86-64 under QEMU; real hardware at W6 |
-| Compiler | wolf 0.2.39, whole release archives pinned by SHA-256 |
-| Reference interpreter | lupin 0.1.61, pinned the same way |
-| Standard library | wolf-std at commit `77cf3210`, newer than the one the wolf archive bundles |
+| Compiler | wolf 0.2.40, whole release archives pinned by SHA-256 |
+| Reference interpreter | lupin 0.1.62, pinned the same way |
+| Standard library | wolf-std at commit `c339a471`, newer than the one the wolf archive bundles |
 | Reference emulator | xterm 390 (Ubuntu `390-1ubuntu3`), binary SHA-256 pinned; run headless under Xvfb |
 | Second black box | tmux 3.4 (Ubuntu `3.4-1ubuntu0.2`), binary SHA-256 pinned |
 | Oracle image | Ubuntu 24.04 by digest, packages from the Ubuntu snapshot archive at `20261101T000000Z` |
