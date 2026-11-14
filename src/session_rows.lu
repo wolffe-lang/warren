@@ -1,0 +1,529 @@
+//! member: false
+//! Session rows: a scripted client drives a real server over its socket.
+//! Each row starts its own server in its own runtime directory (under the
+//! working directory), with a lifetime bound so that no server outlives
+//! its row, and ends it with the kill-server command.
+//!
+//!   session_rows WARREN [ROW...]
+//!
+//! Prints `PASS <row>` or `FAIL <row>: <why>` per row, then
+//! `SESSION-ROWS rows=N failed=M`; exits 1 when any row is red.
+use std.env
+use std.fs
+use std.net
+use std.net.unix
+use std.process
+use std.str
+use std.time
+use client
+use proto
+
+struct Rig {
+    warren: str,
+    dir: str,
+    server: int,
+    started: bool,
+}
+
+fn now_ms() -> int {
+    time.monotonic_ns() / 1000000
+}
+
+fn rig(warren: str, row: str) -> Rig {
+    Rig { warren: warren, dir: "rt-" + row, server: 0 - 1, started: false }
+}
+
+fn socket(r: Rig) -> str {
+    r.dir + "/default"
+}
+
+/// Start a server for the row, its environment and runtime directory set
+/// before the spawn; wait until its socket answers (bounded).
+fn start_server(mut r: Rig, pane_command: str) -> str {
+    fs.remove_dir_all(r.dir) else |_| {}
+    env.set("WARREN_RUNTIME_DIR", r.dir) else { return "env" }
+    env.set("WARREN_LIFETIME_MS", "60000") else { return "env" }
+    env.set("WARREN_PANE_COMMAND", pane_command) else { return "env" }
+    var c = process.command(r.warren)
+    process.push_arg(mut c, "server")
+    let ch = process.start(c) else |e| { return "server-start-{e}" }
+    r.server = ch.slot
+    r.started = true
+    let until = now_ms() + 5000
+    while now_ms() < until {
+        var s = unix.connect(socket(r)) else |_| {
+            time.sleep(time.millis(10))
+            continue
+        }
+        net.close(take s) else |_| {}
+        return ""
+    }
+    "server-never-answered"
+}
+
+/// Ask the server to stop and wait for it (bounded by its lifetime).
+fn stop_server(mut r: Rig) -> int {
+    if !r.started { return 0 - 1 }
+    var p = client.dial(socket(r)) else |_| {
+        var ch = process.Child { slot: r.server }
+        r.started = false
+        return process.wait_status(take ch) else 0 - 1
+    }
+    var argv = List[str]()
+    let _h = client.send(p, 1, client.hello_payload(2, 0, 0, "", 0, "", argv, argv))
+    let _w = client.until_kind(mut p, 129, 2000)
+    var b = List[byte]()
+    proto.put(mut b, 1, 4)
+    proto.put(mut b, 1, 2)
+    proto.put_text(mut b, "kill-server")
+    proto.put_text(mut b, "")
+    proto.put_text(mut b, "")
+    let _c = client.send(p, 11, b)
+    let _r = client.until_kind(mut p, 136, 2000)
+    client.hang_up(mut p)
+    var ch = process.Child { slot: r.server }
+    r.started = false
+    process.wait_status(take ch) else 0 - 1
+}
+
+fn env_names() -> List[str] {
+    var n = List[str]()
+    (mut n).push("PS1")
+    (mut n).push("PATH")
+    (mut n).push("HOME")
+    n
+}
+
+fn env_values() -> List[str] {
+    var v = List[str]()
+    (mut v).push("$ ")
+    (mut v).push(env.get("PATH") else "/bin:/usr/bin")
+    (mut v).push(env.get("HOME") else "/")
+    v
+}
+
+fn attach(r: Rig, cols: int, rows: int, target: str, options: int) -> client.Peer ! client.DialErrors {
+    var p = client.dial(socket(r))?
+    let here = env.cwd() else "/"
+    let _h = client.send(p, 1, client.hello_payload(1, cols, rows, target, options, here, env_names(), env_values()))
+    p
+}
+
+// ---------------- rows ----------------
+
+fn row_echo(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut p, 129, 3000) { return "no WELCOME" }
+    if !client.until_text(mut p, "$", 5000) { return "no prompt: " + client.screen_text(p) }
+    let _i = client.input(p, "echo warren-$((6*7))\r")
+    if !client.until_text(mut p, "warren-42", 5000) { return "no echo: " + client.screen_text(p) }
+    if p.full_frames != 1 { return "full images {p.full_frames}, expected 1" }
+    if p.last_base == 0 { return "the last image was full, expected a delta" }
+    if p.image.cols != 80 || p.image.rows != 24 { return "image {p.image.cols}x{p.image.rows}" }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_split_every_byte(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = client.dial(socket(r)) else |e| { return "dial-{e}" }
+    let here = env.cwd() else "/"
+    let hello = proto.encode(1, 0, client.hello_payload(1, 80, 24, "", 1, here, env_names(), env_values()))
+    var i = 0
+    while i < hello.bytes.len {
+        var one = List[byte]()
+        (mut one).push(hello.bytes[i])
+        if !client.send_raw(p, one) { return "write {i}" }
+        i = i + 1
+    }
+    if !client.until_text(mut p, "$", 5000) { return "no prompt after a byte-at-a-time HELLO" }
+    var b = List[byte]()
+    proto.put_bytes(mut b, "echo split-ok\r".bytes())
+    let input = proto.encode(7, 0, b)
+    i = 0
+    while i < input.bytes.len {
+        var one = List[byte]()
+        (mut one).push(input.bytes[i])
+        let _w = client.send_raw(p, one)
+        i = i + 1
+    }
+    if !client.until_text(mut p, "split-ok", 5000) { return "no echo after a byte-at-a-time INPUT" }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn closed_silently(mut p: client.Peer) -> str {
+    let m = client.next(mut p, 3000)
+    if m.kind != 0 { return "a message of kind {m.kind}" }
+    if m.code != 1 { return "not closed (code {m.code})" }
+    ""
+}
+
+fn row_bad_first(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    // A first message that is not HELLO, then a HELLO with bad magic.
+    var p = client.dial(socket(r)) else |e| { return "dial-{e}" }
+    var k = List[byte]()
+    proto.put(mut k, 0, 1)
+    proto.put(mut k, 0, 1)
+    proto.put(mut k, 97, 4)
+    let _s = client.send(p, 2, k)
+    let a = closed_silently(mut p)
+    if a.len > 0 { return "non-HELLO first: " + a }
+    client.hang_up(mut p)
+    var q = client.dial(socket(r)) else |e| { return "dial-{e}" }
+    var bad = List[byte]()
+    for b in "WRX\u{0}".bytes() { (mut bad).push(b) }
+    proto.put(mut bad, 1, 2)
+    proto.put(mut bad, 1, 2)
+    let raw = proto.encode_part(1, 0, bad)
+    let _t = client.send_raw(q, raw.bytes)
+    let b2 = closed_silently(mut q)
+    if b2.len > 0 { return "bad magic: " + b2 }
+    client.hang_up(mut q)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn refusal(mut p: client.Peer) -> int {
+    if !client.until_kind(mut p, 130, 3000) { return 0 - 1 }
+    p.end_code
+}
+
+fn row_refusals(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    // No common version: REFUSE 1 in v1's encoding, before the suffix.
+    var p = client.dial(socket(r)) else |e| { return "dial-{e}" }
+    var v = List[byte]()
+    for b in "WRN\u{0}".bytes() { (mut v).push(b) }
+    proto.put(mut v, 2, 2)
+    proto.put(mut v, 3, 2)
+    let raw = proto.encode_part(1, 0, v)
+    let _t = client.send_raw(p, raw.bytes)
+    let c1 = refusal(mut p)
+    if c1 != 1 { return "version refusal {c1}" }
+    client.hang_up(mut p)
+    var q = attach(r, 80, 24, "missing", 0) else |e| { return "dial-{e}" }
+    let c2 = refusal(mut q)
+    if c2 != 2 { return "no-session refusal {c2}" }
+    client.hang_up(mut q)
+    var ro = attach(r, 80, 24, "", 3) else |e| { return "dial-{e}" }
+    let c3 = refusal(mut ro)
+    if c3 != 3 { return "read-only refusal {c3}" }
+    client.hang_up(mut ro)
+    // Too small: WELCOME, then BYE 7, and no session is created.
+    var small = attach(r, 19, 6, "tiny", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut small, 129, 3000) { return "too small: no WELCOME" }
+    if !client.until_kind(mut small, 135, 3000) || small.end_code != 7 { return "too small: BYE {small.end_code}" }
+    client.hang_up(mut small)
+    var check = attach(r, 80, 24, "tiny", 0) else |e| { return "dial-{e}" }
+    let c4 = refusal(mut check)
+    if c4 != 2 { return "a too-small attach created a session ({c4})" }
+    client.hang_up(mut check)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_hello_timeout(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = client.dial(socket(r)) else |e| { return "dial-{e}" }
+    let t0 = now_ms()
+    let m = client.next(mut p, 8000)
+    let t = now_ms() - t0
+    if m.kind != 0 || m.code != 1 { return "expected a silent close, got kind {m.kind} code {m.code}" }
+    if t < 4500 || t > 7500 { return "closed after {t} ms, expected about 5000" }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_future_ack(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut p, "$", 5000) { return "no prompt" }
+    // A stale ACK (already acknowledged) is ignored.
+    var stale = List[byte]()
+    proto.put(mut stale, 1, 4)
+    let _s = client.send(p, 8, stale)
+    let _i = client.input(p, "echo still-here\r")
+    if !client.until_text(mut p, "still-here", 5000) { return "a stale ACK was not ignored" }
+    // An ACK of an image never sent is a protocol error.
+    var future = List[byte]()
+    proto.put(mut future, p.image.seq + 1000, 4)
+    let _f = client.send(p, 8, future)
+    if !client.until_kind(mut p, 135, 3000) || p.end_code != 6 { return "future ACK: BYE {p.end_code}" }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_fragment_interleave(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut p, "$", 5000) { return "no prompt" }
+    // A PASTE's first fragment, then a PING inside the chain.
+    var part = List[byte]()
+    proto.put(mut part, 5, 4)
+    for b in "ab".bytes() { (mut part).push(b) }
+    let first = proto.encode_part(4, 1, part)
+    let _a = client.send_raw(p, first.bytes)
+    var ping = List[byte]()
+    proto.put(mut ping, 7, 4)
+    let _b = client.send(p, 12, ping)
+    if !client.until_kind(mut p, 135, 3000) || p.end_code != 6 { return "BYE {p.end_code}, expected 6" }
+    client.hang_up(mut p)
+    // A paste in two fragments arrives whole.
+    var q = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut q, "$", 5000) { return "no prompt (second client)" }
+    var head = List[byte]()
+    proto.put(mut head, 18, 4)
+    for b in "echo frag".bytes() { (mut head).push(b) }
+    var tail = List[byte]()
+    for b in "ment-ok\r\n".bytes() { (mut tail).push(b) }
+    let _c = client.send_raw(q, proto.encode_part(4, 1, head).bytes)
+    let _d = client.send_raw(q, proto.encode_part(4, 0, tail).bytes)
+    if !client.until_text(mut q, "fragment-ok", 5000) { return "a fragmented paste did not arrive whole" }
+    client.hang_up(mut q)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_two_sizes(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 100, 30, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    var b = attach(r, 80, 40, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut b, 131, 3000) { return "second client: no image" }
+    if b.image.cols != 80 || b.image.rows != 30 { return "session {b.image.cols}x{b.image.rows}, expected 80x30" }
+    let _w = client.until_kind(mut a, 131, 3000)
+    let _x = client.until_kind(mut a, 131, 500)
+    if a.image.cols != 80 || a.image.rows != 30 { return "first client {a.image.cols}x{a.image.rows}" }
+    // The second leaves: the session returns to the first client's size.
+    client.hang_up(mut b)
+    var n = 0
+    while n < 20 && (a.image.cols != 100 || a.image.rows != 30) {
+        let _k = client.step(mut a, 250)
+        n = n + 1
+    }
+    if a.image.cols != 100 || a.image.rows != 30 { return "after leaving {a.image.cols}x{a.image.rows}" }
+    let _i = client.input(a, "stty size\r")
+    if !client.until_text(mut a, "30 100", 5000) { return "the pane did not hear its size: " + client.screen_text(a) }
+    client.hang_up(mut a)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_never_ack(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var lazy = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    lazy.auto_ack = false
+    if !client.until_kind(mut lazy, 131, 3000) { return "no first image" }
+    var busy = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut busy, "$", 5000) { return "no prompt" }
+    var i = 0
+    while i < 5 {
+        let _i = client.input(busy, "echo round-{i}\r")
+        if !client.until_text(mut busy, "round-{i}", 5000) { return "the active client stalled at round {i}" }
+        i = i + 1
+    }
+    // The client that never ACKs holds one image only.
+    var more = 0
+    while client.step(mut lazy, 300) > 0 {
+        if lazy.frames > 1 { more = more + 1 }
+    }
+    if lazy.frames != 1 { return "a never-ACK client got {lazy.frames} images" }
+    client.hang_up(mut lazy)
+    client.hang_up(mut busy)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_detach_reattach(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let _i = client.input(a, "echo kept-across-detach\r")
+    if !client.until_text(mut a, "kept-across-detach", 5000) { return "no echo" }
+    // Ctrl-Space then d: the server's own detach binding.
+    let _p = client.key(a, 4, 0, 32)
+    let _d = client.key(a, 0, 0, 100)
+    if !client.until_kind(mut a, 135, 3000) || a.end_code != 1 { return "detach: BYE {a.end_code}" }
+    client.hang_up(mut a)
+    var b = attach(r, 80, 24, "work", 0) else |e| { return "dial-{e}" }
+    if !client.until_text(mut b, "kept-across-detach", 5000) { return "the session did not keep its screen" }
+    let _x = client.send(b, 10, List[byte]())
+    if !client.until_kind(mut b, 135, 3000) || b.end_code != 1 { return "DETACH: BYE {b.end_code}" }
+    client.hang_up(mut b)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_ctrl_c(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut p, "$", 5000) { return "no prompt" }
+    let _i = client.input(p, "sleep 30; echo slept-$((1+1))\r")
+    time.sleep(time.millis(300))
+    // Ctrl-C is the byte 03 into the pty, never a signal from the server.
+    let _c = client.key(p, 4, 0, 99)
+    let _e = client.input(p, "echo after-$((40+2))\r")
+    if !client.until_text(mut p, "after-42", 5000) { return "Ctrl-C did not end the foreground command: " + client.screen_text(p) }
+    var row = 1
+    while row <= p.image.rows {
+        if proto.row_text(p.image, row) == "slept-2" { return "the sleep was not interrupted" }
+        row = row + 1
+    }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_session_end(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut p, "$", 5000) { return "no prompt" }
+    let _i = client.input(p, "exit\r")
+    if !client.until_kind(mut p, 135, 5000) || p.end_code != 2 { return "BYE {p.end_code}, expected session-ended" }
+    client.hang_up(mut p)
+    // The last session ended: the server stops by itself.
+    var ch = process.Child { slot: r.server }
+    r.started = false
+    let st = process.wait_status(take ch) else 0 - 1
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_command(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "listed", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    var p = client.dial(socket(r)) else |e| { return "dial-{e}" }
+    var none = List[str]()
+    let _h = client.send(p, 1, client.hello_payload(2, 0, 0, "", 0, "", none, none))
+    if !client.until_kind(mut p, 129, 2000) { return "command: no WELCOME" }
+    var b = List[byte]()
+    proto.put(mut b, 9, 4)
+    proto.put(mut b, 1, 2)
+    proto.put_text(mut b, "list-sessions")
+    proto.put_text(mut b, "")
+    proto.put_text(mut b, "")
+    let _c = client.send(p, 11, b)
+    let m = client.next(mut p, 3000)
+    if m.kind != 136 { return "no REPLY ({m.kind})" }
+    let out_len = (m.body[5] as int) + (m.body[6] as int) * 256 + (m.body[7] as int) * 65536
+    let out = str_from_utf8(m.body[9..9 + out_len]) else ""
+    if !out.contains("listed: 80x24 (1 attached)") { return "list-sessions said {out}" }
+    client.hang_up(mut p)
+    // kill-server: every attached client hears server-stopping.
+    let st = stop_server(mut r)
+    if !client.until_kind(mut a, 135, 3000) || a.end_code != 3 { return "attached: BYE {a.end_code}" }
+    client.hang_up(mut a)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_start_lock(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    // A second server for the same directory sees the first and exits 0;
+    // the first keeps its socket.
+    var c = process.command(r.warren)
+    process.push_arg(mut c, "server")
+    var second = process.start(c) else |e| { return "second start {e}" }
+    let st2 = process.wait_status(take second) else 0 - 1
+    if st2 != 0 { return "the second server exited {st2}" }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "the first server's socket is gone: {e}" }
+    if !client.until_text(mut p, "$", 5000) { return "no prompt from the first server" }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn run_row(warren: str, name: str) -> str {
+    var r = rig(warren, name)
+    var why = "no such row"
+    if name == "echo" { why = row_echo(mut r) }
+    else if name == "split-every-byte" { why = row_split_every_byte(mut r) }
+    else if name == "bad-first-frame" { why = row_bad_first(mut r) }
+    else if name == "refusals" { why = row_refusals(mut r) }
+    else if name == "hello-timeout" { why = row_hello_timeout(mut r) }
+    else if name == "stale-and-future-ack" { why = row_future_ack(mut r) }
+    else if name == "fragment-interleave" { why = row_fragment_interleave(mut r) }
+    else if name == "two-sizes" { why = row_two_sizes(mut r) }
+    else if name == "never-ack-beside-active" { why = row_never_ack(mut r) }
+    else if name == "detach-reattach" { why = row_detach_reattach(mut r) }
+    else if name == "ctrl-c-is-a-byte" { why = row_ctrl_c(mut r) }
+    else if name == "session-end" { why = row_session_end(mut r) }
+    else if name == "command" { why = row_command(mut r) }
+    else if name == "start-lock" { why = row_start_lock(mut r) }
+    if r.started { let _s = stop_server(mut r) }
+    why
+}
+
+fn all_rows() -> List[str] {
+    var x = List[str]()
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte session-end command start-lock".split(" ") {
+        (mut x).push(n)
+    }
+    x
+}
+
+fn main() -> int {
+    let args = env.args()
+    if args.len < 1 {
+        eprint("usage: session_rows WARREN [ROW...]")
+        return 2
+    }
+    let warren = args[0]
+    var rows = List[str]()
+    var i = 1
+    while i < args.len {
+        (mut rows).push(args[i])
+        i = i + 1
+    }
+    if rows.len == 0 { rows = all_rows() }
+    var failed = 0
+    for name in rows {
+        let t0 = now_ms()
+        let why = run_row(warren, name)
+        let t = now_ms() - t0
+        if why.len == 0 {
+            print("PASS {name} ms={t}")
+        } else {
+            failed = failed + 1
+            print("FAIL {name}: {why}")
+        }
+    }
+    print("SESSION-ROWS rows={rows.len} failed={failed}")
+    if failed > 0 { return 1 }
+    let _j = str.join(",", rows)
+    0
+}

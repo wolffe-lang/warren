@@ -1,8 +1,9 @@
 // The dump command reads argv (env) and byte streams (fs). The pure VT
-// module uses neither; server net/exec capabilities remain for later work.
+// module uses neither. The server listens on a Unix socket (net), holds
+// pseudo-terminals and their programs and waits on signals (exec).
 pkg {
     name: "warren",
     version: "0.0.0",
     edition: "1",
-    capabilities: [fs, env],
+    capabilities: [fs, env, net, exec],
 }
