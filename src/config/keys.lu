@@ -152,24 +152,228 @@ pub struct Command {
     why: str,
 }
 
-/// The default table. Stub: empty until the table lands.
+fn bind(mut l: List[Binding], mode: int, mods: int, kind: int, code: int, action: int, arg: int, next: int,
+    shows: str, hint: str) {
+    (mut l).push(Binding { mode: mode, mods: mods, kind: kind, code: code, action: action, arg: arg, next: next,
+        shows: shows, hint: hint })
+}
+
+fn letter(mut l: List[Binding], mode: int, ch: str, action: int, arg: int, next: int, hint: str) {
+    let b = ch.bytes()
+    bind(mut l, mode, 0, SCALAR, b[0] as int, action, arg, next, ch, hint)
+}
+
+fn hidden(mut l: List[Binding], mode: int, mods: int, kind: int, code: int, action: int, arg: int, next: int) {
+    bind(mut l, mode, mods, kind, code, action, arg, next, "", "")
+}
+
+fn sticky(mut l: List[Binding], mode: int) {
+    bind(mut l, mode, 0, NAMED, ESC, A_NONE, 0, MODE_NORMAL, "Esc", "back")
+    hidden(mut l, mode, 0, NAMED, ENTER, A_NONE, 0, MODE_NORMAL)
+    hidden(mut l, mode, CTRL, SCALAR, 32, A_NONE, 0, MODE_PREFIX)
+}
+
+fn focus_keys(mut l: List[Binding], mode: int, next: int) {
+    letter(mut l, mode, "h", A_FOCUS, 0, next, "focus")
+    letter(mut l, mode, "j", A_FOCUS, 3, next, "focus")
+    letter(mut l, mode, "k", A_FOCUS, 2, next, "focus")
+    letter(mut l, mode, "l", A_FOCUS, 1, next, "focus")
+    hidden(mut l, mode, 0, NAMED, LEFT, A_FOCUS, 0, next)
+    hidden(mut l, mode, 0, NAMED, DOWN, A_FOCUS, 3, next)
+    hidden(mut l, mode, 0, NAMED, UP, A_FOCUS, 2, next)
+    hidden(mut l, mode, 0, NAMED, RIGHT, A_FOCUS, 1, next)
+}
+
+fn digits(mut l: List[Binding], mode: int, next: int) {
+    bind(mut l, mode, 0, SCALAR, 49, A_SELECT_TAB, 1, next, "1-9", "go to")
+    var d = 2
+    while d <= 9 {
+        bind(mut l, mode, 0, SCALAR, 48 + d, A_SELECT_TAB, d, next, "", "go to")
+        d += 1
+    }
+}
+
+fn prompt_keys(mut l: List[Binding], mode: int) {
+    bind(mut l, mode, 0, NAMED, ENTER, A_RUN, 0, MODE_BACK, "Enter", "run")
+    bind(mut l, mode, 0, NAMED, ESC, A_NONE, 0, MODE_BACK, "Esc", "cancel")
+    hidden(mut l, mode, 0, NAMED, BACKSPACE, A_ERASE, 0, mode)
+    hidden(mut l, mode, CTRL, SCALAR, 117, A_CLEAR, 0, mode)
+}
+
+/// The default table: the prefix (Ctrl-Space) and its table, the four sticky
+/// modes behind `w t r s`, locked behind `g` (left only with `C-g`), and the
+/// confirm, help and prompt modes. Order is the hint line's order.
 pub fn defaults() -> Keys {
-    Keys { bindings: List[Binding]() }
+    var l = List[Binding]()
+    let n = MODE_NORMAL
+    let p = MODE_PREFIX
+    bind(mut l, n, CTRL, SCALAR, 32, A_NONE, 0, p, "C-Space", "prefix")
+
+    letter(mut l, p, "?", A_HELP, 0, MODE_HELP, "keys")
+    letter(mut l, p, "|", A_SPLIT, 0, n, "split")
+    letter(mut l, p, "-", A_SPLIT, 1, n, "split")
+    focus_keys(mut l, p, n)
+    letter(mut l, p, "x", A_CONFIRM, A_CLOSE, MODE_CONFIRM, "close")
+    letter(mut l, p, "c", A_NEW_TAB, 0, n, "new tab")
+    letter(mut l, p, "n", A_NEXT_TAB, 0, n, "tabs")
+    letter(mut l, p, "p", A_PREVIOUS_TAB, 0, n, "tabs")
+    digits(mut l, p, n)
+    letter(mut l, p, "z", A_ZOOM, 0, n, "zoom")
+    letter(mut l, p, "H", A_RESIZE, 0, n, "resize")
+    letter(mut l, p, "J", A_RESIZE, 3, n, "resize")
+    letter(mut l, p, "K", A_RESIZE, 2, n, "resize")
+    letter(mut l, p, "L", A_RESIZE, 1, n, "resize")
+    letter(mut l, p, "o", A_FOCUS_NEXT, 0, n, "next pane")
+    letter(mut l, p, "=", A_EQUALIZE, 0, n, "equalize")
+    letter(mut l, p, ",", A_RENAME_TAB, 0, MODE_RENAME, "rename")
+    letter(mut l, p, ":", A_COMMAND, 0, MODE_COMMAND, "command")
+    letter(mut l, p, "d", A_DETACH, 0, n, "detach")
+    letter(mut l, p, "w", A_NONE, 0, MODE_PANE, "PANE")
+    letter(mut l, p, "t", A_NONE, 0, MODE_TAB, "TAB")
+    letter(mut l, p, "r", A_NONE, 0, MODE_RESIZE, "RESIZE")
+    letter(mut l, p, "s", A_NONE, 0, MODE_SESSION, "SESSION")
+    letter(mut l, p, "g", A_NONE, 0, MODE_LOCKED, "LOCK")
+    hidden(mut l, p, CTRL, SCALAR, 32, A_SEND_PREFIX, 0, n)
+
+    let w = MODE_PANE
+    letter(mut l, w, "|", A_SPLIT, 0, w, "split")
+    letter(mut l, w, "-", A_SPLIT, 1, w, "split")
+    focus_keys(mut l, w, w)
+    letter(mut l, w, "x", A_CONFIRM, A_CLOSE, MODE_CONFIRM, "close")
+    letter(mut l, w, "z", A_ZOOM, 0, w, "zoom")
+    letter(mut l, w, "o", A_FOCUS_NEXT, 0, w, "next pane")
+    letter(mut l, w, "=", A_EQUALIZE, 0, w, "equalize")
+    sticky(mut l, w)
+
+    let t = MODE_TAB
+    letter(mut l, t, "h", A_PREVIOUS_TAB, 0, t, "prev/next")
+    letter(mut l, t, "l", A_NEXT_TAB, 0, t, "prev/next")
+    hidden(mut l, t, 0, NAMED, LEFT, A_PREVIOUS_TAB, 0, t)
+    hidden(mut l, t, 0, NAMED, RIGHT, A_NEXT_TAB, 0, t)
+    hidden(mut l, t, 0, SCALAR, 112, A_PREVIOUS_TAB, 0, t)
+    hidden(mut l, t, 0, SCALAR, 110, A_NEXT_TAB, 0, t)
+    letter(mut l, t, "c", A_NEW_TAB, 0, t, "new")
+    letter(mut l, t, "x", A_CONFIRM, A_CLOSE_TAB, MODE_CONFIRM, "close")
+    letter(mut l, t, "r", A_RENAME_TAB, 0, MODE_RENAME, "rename")
+    digits(mut l, t, t)
+    sticky(mut l, t)
+
+    let r = MODE_RESIZE
+    letter(mut l, r, "h", A_RESIZE, 0, r, "resize")
+    letter(mut l, r, "j", A_RESIZE, 3, r, "resize")
+    letter(mut l, r, "k", A_RESIZE, 2, r, "resize")
+    letter(mut l, r, "l", A_RESIZE, 1, r, "resize")
+    hidden(mut l, r, 0, SCALAR, 72, A_RESIZE, 0, r)
+    hidden(mut l, r, 0, SCALAR, 74, A_RESIZE, 3, r)
+    hidden(mut l, r, 0, SCALAR, 75, A_RESIZE, 2, r)
+    hidden(mut l, r, 0, SCALAR, 76, A_RESIZE, 1, r)
+    hidden(mut l, r, 0, NAMED, LEFT, A_RESIZE, 0, r)
+    hidden(mut l, r, 0, NAMED, DOWN, A_RESIZE, 3, r)
+    hidden(mut l, r, 0, NAMED, UP, A_RESIZE, 2, r)
+    hidden(mut l, r, 0, NAMED, RIGHT, A_RESIZE, 1, r)
+    letter(mut l, r, "=", A_EQUALIZE, 0, r, "equalize")
+    sticky(mut l, r)
+
+    let s = MODE_SESSION
+    letter(mut l, s, "d", A_DETACH, 0, n, "detach")
+    sticky(mut l, s)
+
+    bind(mut l, MODE_LOCKED, CTRL, SCALAR, 103, A_NONE, 0, n, "C-g", "unlock")
+
+    prompt_keys(mut l, MODE_COMMAND)
+    prompt_keys(mut l, MODE_RENAME)
+
+    let c = MODE_CONFIRM
+    letter(mut l, c, "y", A_YES, 0, MODE_BACK, "yes")
+    letter(mut l, c, "n", A_NONE, 0, MODE_BACK, "no")
+    hidden(mut l, c, 0, NAMED, ESC, A_NONE, 0, MODE_BACK)
+
+    let h = MODE_HELP
+    letter(mut l, h, "j", A_SCROLL, 1, h, "scroll")
+    letter(mut l, h, "k", A_SCROLL, -1, h, "scroll")
+    hidden(mut l, h, 0, NAMED, DOWN, A_SCROLL, 1, h)
+    hidden(mut l, h, 0, NAMED, UP, A_SCROLL, -1, h)
+    bind(mut l, h, 0, NAMED, ESC, A_NONE, 0, MODE_BACK, "Esc", "close")
+    hidden(mut l, h, 0, SCALAR, 113, A_NONE, 0, MODE_BACK)
+    hidden(mut l, h, 0, SCALAR, 63, A_NONE, 0, MODE_BACK)
+    Keys { bindings: l }
 }
 
-/// What a KEY event does in a mode. Stub: nothing.
+fn found(action: int, arg: int, mode: int) -> Step {
+    Step { action: action, arg: arg, mode: mode }
+}
+
+/// What a KEY event (mods, kind, code) does in a mode. Shift is folded into
+/// scalars, so it is ignored on them. Unbound keys: normal and locked pass
+/// them to the pane; prefix mode drops them and goes back to normal; the
+/// sticky modes and help drop them and stay; confirm cancels; the prompts
+/// type a printable scalar and drop anything else.
 pub fn step(k: Keys, mode: int, mods: int, kind: int, code: int) -> Step {
-    Step { action: A_NONE, arg: 0, mode: mode }
+    var m = mods
+    if kind == SCALAR { m = mods & (ALT | CTRL) }
+    for b in k.bindings {
+        if b.mode == mode && b.mods == m && b.kind == kind && b.code == code {
+            return found(b.action, b.arg, b.next)
+        }
+    }
+    if mode == MODE_NORMAL || mode == MODE_LOCKED { return found(A_PASS, 0, mode) }
+    if mode == MODE_PREFIX { return found(A_NONE, 0, MODE_NORMAL) }
+    if mode == MODE_CONFIRM { return found(A_NONE, 0, MODE_BACK) }
+    if mode == MODE_COMMAND || mode == MODE_RENAME {
+        if kind == SCALAR && m == 0 && code >= 32 && code != 127 && !(code >= 128 && code < 160) {
+            return found(A_TYPE, code, mode)
+        }
+        return found(A_NONE, 0, mode)
+    }
+    if mode >= 0 && mode < MODES { return found(A_NONE, 0, mode) }
+    found(A_NONE, 0, MODE_NORMAL)
 }
 
-/// The mode's name. Stub.
+/// The mode's name, as the bar's mode field shows it.
 pub fn mode_name(mode: int) -> str {
-    ""
+    let names = ["NORMAL", "PREFIX", "PANE", "TAB", "RESIZE", "SESSION", "LOCKED", "COMMAND", "RENAME",
+        "CONFIRM", "HELP"]
+    if mode < 0 || mode >= MODES { return "" }
+    names[mode]
 }
 
-/// A key's name. Stub.
+fn scalar_text(cp: int) -> str {
+    var out = List[byte]()
+    if cp < 128 {
+        (mut out).push(cp as byte)
+    } else if cp < 2048 {
+        (mut out).push((192 + cp / 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else if cp < 65536 {
+        (mut out).push((224 + cp / 4096) as byte)
+        (mut out).push((128 + cp / 64 % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else {
+        (mut out).push((240 + cp / 262144) as byte)
+        (mut out).push((128 + cp / 4096 % 64) as byte)
+        (mut out).push((128 + cp / 64 % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    }
+    str_from_utf8(out) else "?"
+}
+
+/// A key's name: `C-Space`, `C-g`, `M-x`, `h`, `Up`, `Esc`, `F5`.
 pub fn key_name(mods: int, kind: int, code: int) -> str {
-    ""
+    var prefix = ""
+    if mods & CTRL != 0 { prefix = prefix + "C-" }
+    if mods & ALT != 0 { prefix = prefix + "M-" }
+    if kind == SCALAR {
+        if code == 32 { return prefix + "Space" }
+        if code < 32 || code == 127 || code < 0 || code > 1114111 { return prefix + "?" }
+        return prefix + scalar_text(code)
+    }
+    if mods & SHIFT != 0 { prefix = prefix + "S-" }
+    let names = ["Up", "Down", "Right", "Left", "Home", "End", "PageUp", "PageDown", "Insert", "Delete",
+        "Backspace", "Tab", "Enter", "Esc"]
+    if code >= 1 && code <= 14 { return prefix + names[code - 1] }
+    if code >= 15 && code <= 38 { return prefix + "F{code - 14}" }
+    if code >= 39 && code <= 48 { return prefix + "KP{code - 39}" }
+    prefix + "key{code}"
 }
 
 /// The width of hint and key-list text in columns: one a scalar (the table's
@@ -182,9 +386,57 @@ pub fn text_width(text: str) -> int {
     n
 }
 
-/// The hint line of a mode at a width. Stub: empty.
+fn in_line(mode: int, line: int) -> bool {
+    if line == MODE_NORMAL || line == MODE_PREFIX { return mode == MODE_NORMAL || mode == MODE_PREFIX }
+    mode == line
+}
+
+/// The hint line of a mode at a width: the mode's bindings grouped by label
+/// in table order, each `keys label`, two spaces apart; normal and prefix
+/// mode share one line (the prefix, then the prefix table). Groups that do not
+/// fit are counted at the end as `+N`.
 pub fn hint_line(k: Keys, mode: int, cols: int) -> HintLine {
-    HintLine { text: "", keys: List[int]() }
+    var labels = List[str]()
+    var shows = List[str]()
+    for b in k.bindings {
+        if b.hint == "" || !in_line(b.mode, mode) { continue }
+        var at = -1
+        var i = 0
+        while i < labels.len {
+            if labels[i] == b.hint { at = i }
+            i += 1
+        }
+        if at < 0 {
+            (mut labels).push(b.hint)
+            (mut shows).push(b.shows)
+        } else {
+            shows[at] = shows[at] + b.shows
+        }
+    }
+    var text = ""
+    var keys = List[int]()
+    var width = 0
+    var shown = 0
+    while shown < labels.len {
+        var gap = "  "
+        if shown == 0 { gap = " " }
+        let group = gap + shows[shown] + " " + labels[shown]
+        let after = width + text_width(group)
+        let left = labels.len - shown - 1
+        var tail = 0
+        if left > 0 { tail = text_width("  +{left}") }
+        if after + tail > cols { break }
+        (mut keys).push(width + text_width(gap))
+        (mut keys).push(width + text_width(gap) + text_width(shows[shown]))
+        text = text + group
+        width = after
+        shown += 1
+    }
+    let left = labels.len - shown
+    if left > 0 {
+        if shown == 0 { text = " +{left}" } else { text = text + "  +{left}" }
+    }
+    HintLine { text: text, keys: keys }
 }
 
 /// The hint line's text alone.
@@ -192,12 +444,205 @@ pub fn hint_text(k: Keys, mode: int, cols: int) -> str {
     hint_line(k, mode, cols).text
 }
 
-/// The key list. Stub: empty.
-pub fn help_lines(k: Keys) -> List[str] {
-    List[str]()
+const DIRECTIONS: str = "left right up down"
+
+fn direction_name(d: int) -> str {
+    let names = DIRECTIONS.split(" ")
+    if d < 0 || d >= names.len { return "?" }
+    names[d]
 }
 
-/// A command line. Stub: refused.
+fn verb(action: int, arg: int) -> str {
+    if action == A_SPLIT {
+        if arg == 0 { return "split-right" }
+        return "split-down"
+    }
+    if action == A_FOCUS { return "focus " + direction_name(arg) }
+    if action == A_FOCUS_NEXT { return "focus-next" }
+    if action == A_RESIZE { return "resize " + direction_name(arg) }
+    if action == A_ZOOM { return "zoom" }
+    if action == A_EQUALIZE { return "equalize" }
+    if action == A_CLOSE { return "close-pane" }
+    if action == A_NEW_TAB { return "new-tab" }
+    if action == A_NEXT_TAB { return "next-tab" }
+    if action == A_PREVIOUS_TAB { return "previous-tab" }
+    if action == A_SELECT_TAB { return "select-tab {arg}" }
+    if action == A_DETACH { return "detach" }
+    if action == A_CLOSE_TAB { return "close-tab" }
+    if action == A_RENAME_TAB { return "rename-tab" }
+    if action == A_LOCK { return "lock" }
+    if action == A_SEND_PREFIX { return "send the prefix" }
+    if action == A_CONFIRM { return verb(arg, 0) + " (asks)" }
+    if action == A_YES { return "yes" }
+    if action == A_COMMAND { return "command line" }
+    if action == A_HELP { return "the key list" }
+    if action == A_SCROLL {
+        if arg > 0 { return "scroll down" }
+        return "scroll up"
+    }
+    if action == A_RUN { return "run" }
+    if action == A_ERASE { return "erase" }
+    if action == A_CLEAR { return "clear the line" }
+    ""
+}
+
+fn describe(b: Binding) -> str {
+    let v = verb(b.action, b.arg)
+    if v != "" { return v }
+    if b.next == MODE_BACK { return "back" }
+    if b.next != b.mode && b.next >= 0 && b.next < MODES {
+        var name = List[byte]()
+        for c in mode_name(b.next).bytes() {
+            var x = c as int
+            if x >= 65 && x <= 90 { x += 32 }
+            (mut name).push(x as byte)
+        }
+        return (str_from_utf8(name) else "") + " mode"
+    }
+    "nothing"
+}
+
+fn pad(text: str, width: int) -> str {
+    var out = text
+    var w = text_width(text)
+    while w < width {
+        out = out + " "
+        w += 1
+    }
+    out
+}
+
+/// The key list `?` shows: one line a binding, `  MODE  KEY  what it does`.
+pub fn help_lines(k: Keys) -> List[str] {
+    var out = List[str]()
+    for b in k.bindings {
+        (mut out).push("  " + pad(mode_name(b.mode), 8) + " " + pad(key_name(b.mods, b.kind, b.code), 10) + " " +
+            describe(b))
+    }
+    out
+}
+
+fn refused(why: str) -> Command {
+    Command { ok: false, action: A_NONE, arg: 0, count: 1, text: "", why: why }
+}
+
+fn command_of(action: int, arg: int) -> Command {
+    Command { ok: true, action: action, arg: arg, count: 1, text: "", why: "" }
+}
+
+fn words(line: str) -> List[str] {
+    var out = List[str]()
+    var cur = List[byte]()
+    for b in line.bytes() {
+        if b == 32 as byte || b == 9 as byte {
+            if cur.len > 0 {
+                (mut out).push(str_from_utf8(cur) else "")
+                cur = List[byte]()
+            }
+        } else {
+            (mut cur).push(b)
+        }
+    }
+    if cur.len > 0 { (mut out).push(str_from_utf8(cur) else "") }
+    out
+}
+
+fn direction_of(word: str) -> int {
+    let names = DIRECTIONS.split(" ")
+    var i = 0
+    while i < names.len {
+        if names[i] == word { return i }
+        i += 1
+    }
+    -1
+}
+
+fn number_of(word: str) -> int {
+    var n = 0
+    if word.len == 0 || word.len > 4 { return -1 }
+    for b in word.bytes() {
+        let d = (b as int) - 48
+        if d < 0 || d > 9 { return -1 }
+        n = n * 10 + d
+    }
+    n
+}
+
+/// The rest of a line after its first word, trimmed: a rename's name.
+fn rest_after_verb(line: str) -> str {
+    var out = List[byte]()
+    var state = 0
+    for b in line.bytes() {
+        let space = b == 32 as byte || b == 9 as byte
+        if state == 0 {
+            if !space { state = 1 }
+        } else if state == 1 {
+            if space { state = 2 }
+        } else if state == 2 {
+            if !space {
+                state = 3
+                (mut out).push(b)
+            }
+        } else {
+            (mut out).push(b)
+        }
+    }
+    while out.len > 0 && (out[out.len - 1] == 32 as byte || out[out.len - 1] == 9 as byte) {
+        let _gone = (mut out).pop() else { break }
+    }
+    str_from_utf8(out) else ""
+}
+
+/// A command line: the key table's action names and their arguments
+/// (`split-right`, `focus left`, `resize up 3`, `select-tab 2`,
+/// `rename-tab NAME`, `lock`, ...). Unknown verbs and bad arguments are
+/// refused with the answer the hint line shows.
 pub fn command(line: str) -> Command {
-    Command { ok: false, action: A_NONE, arg: 0, count: 1, text: "", why: "" }
+    let w = words(line)
+    if w.len == 0 { return refused("") }
+    let v = w[0]
+    let plain = ["split-right", "split-down", "focus-next", "zoom", "equalize", "close-pane", "new-tab", "close-tab",
+        "next-tab", "previous-tab", "detach", "lock"]
+    let acts = [A_SPLIT, A_SPLIT, A_FOCUS_NEXT, A_ZOOM, A_EQUALIZE, A_CLOSE, A_NEW_TAB, A_CLOSE_TAB, A_NEXT_TAB,
+        A_PREVIOUS_TAB, A_DETACH, A_LOCK]
+    var i = 0
+    while i < plain.len {
+        if plain[i] == v {
+            if w.len > 1 { return refused(v + " takes no arguments") }
+            if v == "split-down" { return command_of(A_SPLIT, 1) }
+            return command_of(acts[i], 0)
+        }
+        i += 1
+    }
+    if v == "focus" || v == "resize" {
+        let usage = "usage: " + v + " left|right|up|down"
+        if w.len < 2 { return refused(usage) }
+        let d = direction_of(w[1])
+        if d < 0 { return refused(usage) }
+        if v == "focus" {
+            if w.len > 2 { return refused(usage) }
+            return command_of(A_FOCUS, d)
+        }
+        if w.len > 3 { return refused(usage + " [N]") }
+        var c = command_of(A_RESIZE, d)
+        if w.len == 3 {
+            let n = number_of(w[2])
+            if n < 1 { return refused(usage + " [N]") }
+            c.count = n
+        }
+        return c
+    }
+    if v == "select-tab" {
+        if w.len != 2 { return refused("usage: select-tab N") }
+        let n = number_of(w[1])
+        if n < 1 { return refused("usage: select-tab N") }
+        return command_of(A_SELECT_TAB, n)
+    }
+    if v == "rename-tab" {
+        if w.len < 2 { return refused("usage: rename-tab NAME") }
+        var c = command_of(A_RENAME_TAB, 0)
+        c.text = rest_after_verb(line)
+        return c
+    }
+    refused("unknown command: " + v)
 }
