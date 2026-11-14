@@ -1,0 +1,123 @@
+# Expected lines of the dependency rows, by [row tier host].
+# host: linux, darwin, pax or * (any). The most specific header wins.
+# refuses=NAME: the tier must refuse by that builtin's name (lupin).
+
+[one_wait native linux]
+one_wait=listener:1 master:1 pipe:1 reader:1 writer:2 meaning:child
+deadline_not_early=true
+hangup_seen=true
+master_end=io
+session_child_polled=true
+child_status=3
+
+[one_wait native pax]
+one_wait=listener:1 master:1 pipe:1 reader:1 writer:2 meaning:child
+deadline_not_early=true
+hangup_seen=true
+master_end=io
+session_child_polled=true
+child_status=3
+
+[one_wait native darwin]
+one_wait=listener:1 master:1 pipe:1 reader:1 writer:2 meaning:child
+deadline_not_early=true
+hangup_seen=true
+master_end=eof
+session_child_polled=true
+child_status=3
+
+[one_wait checked linux]
+one_wait=listener:1 master:1 pipe:1 reader:1 writer:2 meaning:child
+deadline_not_early=true
+hangup_seen=true
+master_end=io
+session_child_polled=true
+child_status=3
+
+[one_wait checked darwin]
+one_wait=listener:1 master:1 pipe:1 reader:1 writer:2 meaning:child
+deadline_not_early=true
+hangup_seen=true
+master_end=eof
+session_child_polled=true
+child_status=3
+
+[one_wait lupin *]
+refuses=os_signal_listen
+
+[partial_write native *]
+first_send_prefix=true
+busy_before_reader=true
+no_write_while_full=true
+drained_in_order=true
+write_interest_dropped=true
+gone_peer=closed
+
+[partial_write checked *]
+first_send_prefix=true
+busy_before_reader=true
+no_write_while_full=true
+drained_in_order=true
+write_interest_dropped=true
+gone_peer=closed
+
+[partial_write lupin *]
+refuses=os_ready_open
+
+[start_lock native *]
+dir_mode_0700=true dir_owner=self
+lock_second_open=busy
+lock_from_child=busy
+lock_after_holder_exit=taken
+lock_link_refused=invalid
+bind_taken=exists
+dial_stale=refused
+rebind_after_lock=ok
+
+[start_lock checked *]
+dir_mode_0700=true dir_owner=self
+lock_second_open=busy
+lock_from_child=unsupported
+lock_after_holder_exit=unsupported
+lock_link_refused=invalid
+bind_taken=exists
+dial_stale=refused
+rebind_after_lock=ok
+
+[start_lock lupin *]
+refuses=fs_create_dir_mode
+
+[peer_cred native linux]
+forked_peer=true
+self_peer=true
+other_uid=not-measured
+
+[peer_cred native darwin]
+forked_peer=true
+self_peer=true
+other_uid=not-measured
+
+[peer_cred native pax]
+forked_peer=true
+self_peer=true
+other_uid=denied
+
+[peer_cred checked *]
+forked_peer=unsupported
+self_peer=true
+other_uid=not-measured
+
+[peer_cred lupin *]
+refuses=fs_create_dir_mode
+
+[daemon native *]
+starter_status=0
+reparented=true
+own_session=true
+no_terminal=true
+
+[daemon checked *]
+daemon=unsupported
+
+[daemon lupin *]
+refuses=os_pipe

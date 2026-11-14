@@ -1,0 +1,131 @@
+//! D2: a socket write that says what it took, over a Unix stream whose
+//! reader has stopped reading.
+//!
+//! The server never parks on a client. Here one send of a 1 MiB queue
+//! takes a prefix; further sends take what fits until busy; WRITE is not
+//! answered within 25 ms while the stream is full; the reader then drains
+//! at most 4096 bytes a turn (the PAX stream size) and every byte arrives
+//! once, in order, through write_some alone. A peer that has gone answers
+//! closed, and this process lives to print the next line (no SIGPIPE).
+//!
+//! Expected lines:
+//!   first_send_prefix=true
+//!   busy_before_reader=true
+//!   no_write_while_full=true
+//!   drained_in_order=true
+//!   write_interest_dropped=true
+//!   gone_peer=closed
+//! stderr carries the measured first prefix and the bytes before busy.
+
+use std.fs
+use std.net
+use std.net.unix
+use std.poll
+use std.time
+
+const TOTAL: int = 1048576
+
+fn send(mut s: net.Socket, b: List[byte]) -> int ! {closed, invalid, io} {
+    net.write_some(mut s, b) else |e| match e {
+        busy => -1,
+        closed => { return closed },
+        invalid => { return invalid },
+        io => { return io },
+    }
+}
+
+// A 251-byte ASCII period, so a duplicated or dropped 4096-byte block
+// cannot line up with itself. Built and compared in bulk, so the checked
+// machine's step budget is spent on I/O, not on a byte loop.
+fn payload() -> str {
+    let pattern = "0123456789abcdef".repeat(15) + "abcdefghijk"
+    let whole = pattern.repeat(4178)
+    whole[0..TOTAL]
+}
+
+fn slice(text: str, from: int, most: int) -> List[byte] {
+    let end = if from + most < text.len then from + most else text.len
+    // A bound byte view materializes one bounded list.
+    let b = text[from..end].bytes()
+    b
+}
+
+fn main() -> !int {
+    let path = "d2-partial.sock"
+    fs.remove(path) else |_| {}
+    var srv = unix.listen(path)?
+    var writer = unix.connect(path)?
+    var reader = net.accept(mut srv)?
+    let text = payload()
+    let q = text.bytes()
+    let first = send(mut writer, q)?
+    print("first_send_prefix={first > 0 && first < TOTAL}")
+    var sent = if first > 0 then first else 0
+    var busy = first < 0
+    while !busy && sent < TOTAL {
+        let n = send(mut writer, slice(text, sent, 65536))?
+        if n < 0 { busy = true } else { sent = sent + n }
+    }
+    print("busy_before_reader={busy && sent < TOTAL}")
+    eprint("first_prefix={first} buffered_before_busy={sent}")
+
+    var only = poll.open()?
+    let ko = poll.add_socket(mut only, writer, poll.WRITE)?
+    let t0 = time.monotonic_ns()
+    let full = poll.wait(mut only, 0, 25)?
+    let t1 = time.monotonic_ns()
+    print("no_write_while_full={full.ready.len == 0 && t1 - t0 >= 25000000}")
+    poll.remove(mut only, ko)?
+    poll.close(take only)?
+
+    var w = poll.open()?
+    let kw = poll.add_socket(mut w, writer, poll.WRITE)?
+    let kr = poll.add_socket(mut w, reader, poll.READ)?
+    var received = 0
+    var ordered = true
+    var write_on = true
+    var turns = 0
+    while received < TOTAL && turns < 100000 {
+        let ev = poll.wait(mut w, 0, 2000)?
+        if ev.ready.len == 0 { turns = 100000 }
+        for r in ev.ready {
+            if r.key == kw && r.facts & poll.WRITE != 0 && sent < TOTAL {
+                let n = send(mut writer, slice(text, sent, 65536))?
+                if n > 0 { sent = sent + n }
+            }
+            if r.key == kr && r.facts & poll.READ != 0 {
+                let b = net.read(mut reader, 4096)?
+                if b != text[received..received + b.len] { ordered = false }
+                received = received + b.len
+            }
+        }
+        if sent == TOTAL && write_on {
+            poll.modify(mut w, kw, poll.READ)?
+            write_on = false
+        }
+        turns = turns + 1
+    }
+    print("drained_in_order={ordered && received == TOTAL && sent == TOTAL}")
+    let quiet = poll.wait(mut w, 0, 0)?
+    print("write_interest_dropped={!write_on && quiet.ready.len == 0}")
+    poll.remove(mut w, kw)?
+    poll.remove(mut w, kr)?
+    poll.close(take w)?
+
+    net.close(take reader)?
+    // The peer is gone: a send is a named row, never a signal.
+    var gone = "sent"
+    var tries = 0
+    while gone == "sent" && tries < 100 {
+        let n = net.write_some(mut writer, slice(text, 0, 4096)) else |e| {
+            gone = "{e}"
+            -1
+        }
+        if n < 0 && gone == "sent" { gone = "none" }
+        tries = tries + 1
+    }
+    print("gone_peer={gone}")
+    net.close(take writer)?
+    net.close_listener(take srv)?
+    0
+}

@@ -1,0 +1,92 @@
+//! D4: who is on the other end of the server's socket, and the directory
+//! boundary that keeps another user out.
+//!
+//! A forked client dials the socket inside a 0700 directory; the server's
+//! accepted end reads the client's pid, uid and gid. A same-process dial
+//! is read too (the checked machine has no fork). When this row runs as
+//! the super-user it also asks whether another uid can reach a socket
+//! inside the 0700 directory; otherwise that line says not measured.
+//!
+//! Expected lines:
+//!   forked_peer=true            (checked: forked_peer=unsupported)
+//!   self_peer=true
+//!   other_uid=denied            (non-root hosts: other_uid=not-measured)
+
+use std.env
+use std.fs
+use std.net
+use std.net.unix
+use std.process
+
+fn main() -> !int {
+    let dir = "d4-runtime"
+    fs.remove_dir_all(dir) else |_| {}
+    fs.create_dir_mode(dir, 0o700)?
+    let path = dir + "/s"
+    var srv = unix.listen(path)?
+    fs.set_mode(path, 0o600)?
+    let me = env.euid()?
+    let my_gid = env.egid()?
+
+    var forked = "unsupported"
+    let f = process.fork() else |e| {
+        forked = "{e}"
+        process.Fork { pid: 0 - 1, child: process.Child { slot: 0 - 1 } }
+    }
+    if process.is_child(f) {
+        var c = unix.connect(path) else |_| {
+            process.exit(30)
+            return 1
+        }
+        // Stay connected until the server has read the credentials.
+        let _ack = net.read(mut c, 1) else ""
+        net.close(take c) else |_| {}
+        process.exit(0)
+    }
+    if f.pid > 0 {
+        var peer = net.accept(mut srv)?
+        let cred = unix.peer_credentials(peer)?
+        forked = "{cred.pid == f.pid && cred.uid == me && cred.gid == my_gid}"
+        net.write(mut peer, "k")?
+        var ch = process.Child { slot: f.child.slot }
+        let st = process.wait_status(take ch)?
+        if st != 0 { forked = "child({st})" }
+        net.close(take peer)?
+    }
+    print("forked_peer={forked}")
+
+    var dial = unix.connect(path)?
+    var accepted = net.accept(mut srv)?
+    let own = unix.peer_credentials(accepted)?
+    print("self_peer={own.pid == env.pid() && own.uid == me && own.gid == my_gid}")
+    net.close(take dial)?
+    net.close(take accepted)?
+
+    var other = "not-measured"
+    if me == 0 && f.pid > 0 {
+        let g = process.fork()?
+        if process.is_child(g) {
+            var none = List[int]()
+            process.set_ids(65534, 65534, none) else |_| {
+                process.exit(31)
+                return 1
+            }
+            var c = unix.connect(path) else |e| {
+                if "{e}" == "denied" { process.exit(20) }
+                process.exit(21)
+                return 1
+            }
+            net.close(take c) else |_| {}
+            process.exit(22)
+        }
+        var ch = process.Child { slot: g.child.slot }
+        let st = process.wait_status(take ch)?
+        other = "child({st})"
+        if st == 20 { other = "denied" }
+        if st == 22 { other = "connected" }
+    }
+    print("other_uid={other}")
+    net.close_listener(take srv)?
+    fs.remove_dir_all(dir)?
+    0
+}

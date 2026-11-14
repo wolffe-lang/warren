@@ -1,0 +1,84 @@
+//! D5 (the part a host can show): a server started by fork, a new session
+//! and a second fork outlives the process that started it.
+//!
+//! The starter forks A; A leads a new session, forks B and ends at once.
+//! B waits until it has been reparented away from A, then reports through
+//! a pipe: its session is A's (B is not a session leader, so it can never
+//! acquire a terminal), it has no controlling terminal, and it was alive
+//! after its starter ended. Surviving a console LOGOUT is a different
+//! promise and is measured only on PAX after pid 1 stays (not here).
+//!
+//! Expected lines:
+//!   starter_status=0
+//!   reparented=true
+//!   own_session=true
+//!   no_terminal=true
+//! (checked: daemon=unsupported)
+
+use std.env
+use std.fs
+use std.process
+use std.time
+
+fn report(mut w: fs.File, a_pid: int) {
+    var n = 0
+    while (env.ppid() else 0) == a_pid && n < 400 {
+        time.sleep(time.millis(5))
+        n = n + 1
+    }
+    let ppid = env.ppid() else 0 - 1
+    let sid = process.own_session() else 0 - 1
+    var tty = "none"
+    var t = fs.open("/dev/tty") else |e| {
+        tty = "{e}"
+        fs.File { fd: 0 - 1 }
+    }
+    if tty == "none" {
+        tty = "opened"
+        fs.close(take t) else |_| {}
+    }
+    fs.write(mut w, "{ppid} {sid} {tty}\n") else |_| {}
+    fs.close(take w) else |_| {}
+    process.exit(0)
+}
+
+fn main() -> !int {
+    let pp = process.pipe()?
+    var r = pp.read
+    var w = pp.write
+    let a = process.fork() else |e| {
+        print("daemon={e}")
+        return 0
+    }
+    if process.is_child(a) {
+        fs.close(take r) else |_| {}
+        process.lead_session() else |_| { process.exit(40) }
+        let my = env.pid()
+        let b = process.fork() else |_| {
+            process.exit(41)
+            return 1
+        }
+        if process.is_child(b) {
+            report(mut w, my)
+        }
+        process.exit(0)
+    }
+    fs.close(take w)?
+    var ch = process.Child { slot: a.child.slot }
+    let st = process.wait_status(take ch)?
+    print("starter_status={st}")
+    let line = fs.read(mut r, 256) else "eof"
+    fs.close(take r)?
+    let parts = line.trim().split(" ")
+    if parts.len != 3 {
+        print("reparented=false line={line}")
+        return 1
+    }
+    let ppid = parts[0].to_int() else 0 - 1
+    let sid = parts[1].to_int() else 0 - 1
+    eprint("daemon-row b_ppid={ppid} a_pid={a.pid} b_sid={sid} tty={parts[2]}")
+    print("reparented={ppid != a.pid && ppid > 0}")
+    print("own_session={sid == a.pid}")
+    print("no_terminal={parts[2] != "opened"}")
+    0
+}
