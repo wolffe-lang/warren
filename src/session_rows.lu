@@ -673,7 +673,25 @@ fn row_pane_proc(mut r: Rig) -> str {
     let _st = process.wait_status(take ch) else 0 - 1
     if screen.contains("proc=absent") { return "no /proc on this host" }
     if !screen.contains("SigBlk:0000000000000000") { return "blocked signals inherited: " + screen }
-    if !screen.contains("SigIgn:0000000000000000") { return "ignored signals inherited: " + screen }
+    // Every signal the runtime can reset must be at its default; one it
+    // refuses (the C library's own, glibc's 32 and 33) keeps what the server
+    // inherited, and is named rather than failed.
+    let ignored = mask_of(screen, "SigIgn:")
+    if ignored < 0 { return "no SigIgn line: " + screen }
+    var allowed = 0
+    var kept = ""
+    for n in numbers_of(screen, "unresettable") {
+        var bit = 1
+        var k = 1
+        while k < n {
+            bit = bit * 2
+            k += 1
+        }
+        allowed = allowed | bit
+        if ignored & bit != 0 { kept = if kept.len == 0 then "{n}" else kept + ",{n}" }
+    }
+    if kept.len > 0 { print("MEASURE pane-inherits-unresettable signals={kept}") }
+    if ignored & (0 - 1 - allowed) != 0 { return "ignored signals inherited: " + screen }
     if !screen.contains("inherited-handles=0") { return "handles inherited: " + screen }
     ""
 }
@@ -942,7 +960,59 @@ fn print_proc() -> int {
         }
     }
     print("inherited-handles={leaked}")
+    // The numbers this runtime cannot reset (it refuses them by name): read
+    // after the masks above, since probing changes this process's own.
+    var refused = ""
+    let last = signal.last() else 0
+    let kill_n = signal.number(signal.kill()) else 0
+    let stop_n = signal.number(signal.stop()) else 0
+    var n = 1
+    while n <= last {
+        var no = false
+        signal.reset_one(signal.host(n)) else |e| { no = "{e}" == "invalid" }
+        // KILL and STOP are refused because nothing can ignore them.
+        if no && n != kill_n && n != stop_n {
+            refused = if refused.len == 0 then "{n}" else refused + ",{n}"
+        }
+        n += 1
+    }
+    print("unresettable={refused}")
     0
+}
+
+// The hexadecimal mask after `name` on the helper's screen, -1 if absent.
+fn mask_of(screen: str, name: str) -> int {
+    let at = screen.find(name) else 0 - 1
+    if at < 0 { return 0 - 1 }
+    var v = 0
+    var i = at + name.len
+    let b = screen.bytes()
+    while i < b.len {
+        let c = b[i] as int
+        var d = 0 - 1
+        if c >= 48 && c <= 57 { d = c - 48 }
+        if c >= 97 && c <= 102 { d = c - 87 }
+        if d < 0 { return v }
+        v = v * 16 + d
+        i += 1
+    }
+    v
+}
+
+// The comma list after `name=` on the screen, as numbers.
+fn numbers_of(screen: str, name: str) -> List[int] {
+    var out = List[int]()
+    let at = screen.find(name + "=") else 0 - 1
+    if at < 0 { return out }
+    var rest = screen[at + name.len + 1..screen.len]
+    let end = rest.find(" ") else rest.len
+    let nl = rest.find("\n") else rest.len
+    let stop = if end < nl then end else nl
+    for part in rest[0..stop].split(",") {
+        let v = part.trim().to_int() else 0
+        if v > 0 { (mut out).push(v) }
+    }
+    out
 }
 
 fn self_path() -> str {
