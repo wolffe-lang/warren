@@ -1,0 +1,6 @@
+//! member: false
+//! The layout rows under the reference interpreter: every golden and 50
+//! sequences per size.
+use layout_rows
+
+fn main() -> int { layout_rows.all(50) }

@@ -1,0 +1,47 @@
+//! member: true
+//! The layout rows: goldens and properties, one PASS or FAIL line per row.
+//! FAIL lines start at column 0 with the row's name; detail is indented.
+use layout
+
+fn show_difference(want: str, got: str) {
+    let a = want.split("\n")
+    let b = got.split("\n")
+    var i = 0
+    while i < a.len || i < b.len {
+        let x = if i < a.len then a[i] else "<end>"
+        let y = if i < b.len then b[i] else "<end>"
+        if x != y {
+            print("  line {i + 1} want: {x}")
+            print("  line {i + 1} got:  {y}")
+            return
+        }
+        i += 1
+    }
+}
+
+/// Every golden; answers how many failed.
+pub fn goldens() -> int {
+    let cs = cases()
+    var failed = 0
+    for c in cs {
+        region one {
+            let got = run(c)
+            if got == c.want {
+                print("PASS layout-golden-{c.name}")
+            } else {
+                print("FAIL layout-golden-{c.name}")
+                show_difference(c.want, got)
+                failed += 1
+            }
+        }
+    }
+    print("LAYOUT-GOLDENS cases={cs.len} failed={failed}")
+    failed
+}
+
+/// The goldens and `count` property sequences per size; the exit status.
+pub fn all(count: int) -> int {
+    let bad = goldens() + properties(count)
+    if bad > 0 { return 1 }
+    0
+}

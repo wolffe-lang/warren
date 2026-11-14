@@ -1,0 +1,5 @@
+//! member: false
+//! The layout rows natively: every golden and 2000 sequences per size.
+use layout_rows
+
+fn main() -> int { layout_rows.all(2000) }
