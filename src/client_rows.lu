@@ -24,6 +24,7 @@ use std.term
 use std.time
 use client
 use proto
+use server
 use vt
 
 struct Run {
@@ -51,8 +52,9 @@ fn row_dir(name: str) -> str {
 
 // A pty at cols x rows, a known cooked mode on it, the client started
 // on it as its controlling terminal with `args`.
-fn launch(warren: str, name: str, args: List[str], cols: int, rows: int) -> Run ! {io} {
+fn launch(warren: str, name: str, args: List[str], cols: int, rows: int) -> Run ! {io, invalid} {
     let dir = row_dir(name)
+    if server.socket_path_problem(server.socket_path(dir)).len > 0 { return invalid }
     let pty = term.open_pty() else { return io }
     let tty_name = term.pty_name(pty.master) else { return io }
     term.set_size(pty.slave, term.Size { rows: rows, columns: cols }, 0, 0) else { return io }
@@ -71,7 +73,11 @@ fn launch(warren: str, name: str, args: List[str], cols: int, rows: int) -> Run 
     env.set("TERM", "xterm-256color") else { return io }
     env.set("COLORTERM", "truecolor") else { return io }
     let pid_file = dir + "-pid"
+    let status_file = dir + "-status"
+    let done_file = dir + "-done"
     fs.remove(pid_file) else |_| {}
+    fs.remove(status_file) else |_| {}
+    fs.remove(done_file) else |_| {}
     // As under a shell: a session leader with the terminal starts the
     // client as a foreground job of its own group (so a stop signal stops
     // it), writes its pid, and ends with its status (128 + N for signal N).
@@ -96,7 +102,17 @@ fn launch(warren: str, name: str, args: List[str], cols: int, rows: int) -> Run 
         let bpid = process.pid(process.Child { slot: b.slot }) else 0
         fs.write_text(pid_file, "{bpid}") else |_| {}
         let st = process.wait_status(take b) else 0 - 1
-        process.exit(if st >= 0 then st else 128 - st)
+        let code = if st >= 0 then st else 128 - st
+        // Stay the terminal's session leader until the row has read the
+        // terminal's mode: on macOS the terminal is taken away from every
+        // holder when its session leader exits.
+        fs.write_text(status_file, "{code}") else |_| {}
+        var waited = 0
+        while !fs.exists(done_file) && waited < 10000 {
+            time.sleep(time.millis(10))
+            waited += 10
+        }
+        process.exit(code)
     }
     var pid = 0
     let t0 = now_ms()
@@ -125,6 +141,13 @@ fn pump(mut r: Run, ms: int) {
             vt.feed(mut r.screen, got)
         }
         if !r.ended {
+            let st = fs.read_text(r.dir + "-status") else ""
+            if st.len > 0 {
+                r.ended = true
+                r.status = st.trim().to_int() else 0 - 1
+            }
+        }
+        if false {
             var seen = false
             let c = process.poll() else |_| {
                 seen = true
@@ -202,10 +225,26 @@ fn stop_server() {
     let _s = client.command(words("kill-server"))
 }
 
-fn close_run(r: Run) {
-    stop_server()
+// Let the session leader go (the row has read what it needed) and reap it.
+fn release(r: Run) {
+    fs.write_text(r.dir + "-done", "1") else |_| {}
+    let t0 = now_ms()
+    while now_ms() - t0 < 5000 {
+        let c = process.poll() else { return }
+        if c.changed && c.child.slot == r.slot { return }
+        if !c.changed { time.sleep(time.millis(10)) }
+    }
+}
+
+fn close_quiet(r: Run) {
+    release(r)
     fs.close(take copy r.master) else |_| {}
     fs.close(take copy r.slave) else |_| {}
+}
+
+fn close_run(r: Run) {
+    stop_server()
+    close_quiet(r)
 }
 
 fn ends_with(mut r: Run, code: int, line: str) -> str {
@@ -235,8 +274,7 @@ fn row_detach_reattach(warren: str) -> str {
         close_run(r)
         return "detach: " + why
     }
-    fs.close(take copy r.master) else |_| {}
-    fs.close(take copy r.slave) else |_| {}
+    close_quiet(r)
     var a = launch(warren, "detach", words("attach"), 80, 24) else |e| { return "relaunch: {e}" }
     if !until_screen(mut a, "hi-42", 10000) { return "the session's screen was not kept: " + screen_text(a.screen) }
     type_text(mut a, "exit\r")
@@ -269,8 +307,7 @@ fn row_refused(warren: str) -> str {
     if !until_screen(mut s, "$", 10000) { return "no prompt" }
     var r = launch(warren, "refused", words("attach -t missing"), 80, 24) else |e| { return "launch: {e}" }
     let why = ends_with(mut r, 1, "refused")
-    fs.close(take copy r.master) else |_| {}
-    fs.close(take copy r.slave) else |_| {}
+    close_quiet(r)
     close_run(s)
     why
 }
@@ -305,8 +342,7 @@ fn fake(warren: str, name: str, bad: bool) -> str {
     net.close(take s) else |_| {}
     net.close_listener(take l) else |_| {}
     let why = ends_with(mut r, 1, if bad then "does not apply" else "closed the connection")
-    fs.close(take copy r.master) else |_| {}
-    fs.close(take copy r.slave) else |_| {}
+    close_quiet(r)
     why
 }
 
@@ -430,6 +466,15 @@ fn main() -> int {
         rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported")
     }
     if !fs.exists("/proc") { print("NOTE leftovers unchecked here: no /proc to read") }
+    // Every row's socket lives in a short directory under this one; a
+    // working directory too deep for the host's socket paths is refused
+    // by name here, not left to a hang or `io` in a row.
+    let long = server.socket_path_problem(server.socket_path(row_dir("stopping")))
+    if long.len > 0 {
+        print("FAIL client-rows the working directory is too deep: the {long}")
+        print("CLIENT-ROWS rows={rows.len} failed={rows.len}")
+        return 1
+    }
     var failed = 0
     for name in rows {
         let t0 = now_ms()
