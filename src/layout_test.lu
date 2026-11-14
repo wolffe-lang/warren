@@ -1,6 +1,7 @@
 //! member: false
-//! The layout module in the ordinary `wolf test` gate: every golden and a
-//! few property sequences per size.
+//! The layout module in the ordinary `wolf test` gate: every golden, and
+//! four property sequences with the constructed grids at each size, one
+//! test a size so that each fits the checked machine's step budget.
 
 use layout_rows
 
@@ -8,6 +9,22 @@ fn test_layout_goldens() {
     assert(layout_rows.goldens() == 0)
 }
 
-fn test_layout_properties() {
-    assert(layout_rows.properties(5) == 0)
+fn test_layout_properties_20x6() {
+    assert(layout_rows.properties_at(0, 0, 4, true) == 0)
+}
+
+fn test_layout_properties_80x24() {
+    assert(layout_rows.properties_at(1, 0, 4, true) == 0)
+}
+
+fn test_layout_properties_81x25() {
+    assert(layout_rows.properties_at(2, 0, 4, true) == 0)
+}
+
+fn test_layout_properties_320x90() {
+    assert(layout_rows.properties_at(3, 0, 4, true) == 0)
+}
+
+fn test_layout_properties_512x512() {
+    assert(layout_rows.properties_at(4, 0, 4, true) == 0)
 }
