@@ -50,9 +50,9 @@ columns for `cols`, its rows for `rows`) with minimum `m` (2 for `cols`,
 
 The minimum binds along a split's axis only. A hidden pane has the
 zero-area rect `0,0 0x0`; nothing about it changes, so it comes back with
-its share intact when the area grows. Because each child's extent never
-shrinks as its parent's grows, a pane visible at one size is visible at
-every larger one.
+its share intact when the area grows. Growing the area only reveals: a pane
+visible at one size is visible at every larger one. (It is not always as
+large: when a split's second child appears, the first gives up its share.)
 
 When a tab is **zoomed**, the focused pane's rect is the whole area, every
 other pane is hidden, and there are no borders.
@@ -209,8 +209,7 @@ The invariants:
    holds each of its panes once; the active tab exists; the arena's parent
    and child links agree.
 3. Shares stay in 1..9999; only `resize` (one split) and `equalize` change
-   an existing share; a pane visible at a size is visible, no smaller, at
-   every larger size.
+   an existing share; a pane visible at a size is visible at larger sizes.
 4. A split then the close of the new pane gives back the original layout
    (unzoomed, since a split unzooms).
 5. A resize by `+n` then `-n` that the clamp did not touch gives back the
