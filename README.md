@@ -5,8 +5,9 @@ for PAX first, and measured on x86-64 Linux and macOS arm64 from the first
 pull request. It takes its ideas from tmux, zellij and herdr, and none of
 their code.
 
-**Status: a working server and terminal client with sessions, panes and tabs;
-modes, the hint bar, configuration, the mouse and copy mode are still to come.** The repository holds the pins,
+**Status: a working server and terminal client with sessions, panes, tabs,
+modes and the hint bar; configuration, the mouse and copy mode are still to
+come.** The repository holds the pins,
 tiered CI, a pinned reference emulator with a cell-for-cell harness, a survey,
 recorded corpus, and reference contracts for the emulator and protocol.
 `src/vt/parser.lu` decodes split UTF-8 and recognises bounded terminal
@@ -73,7 +74,7 @@ diagnostic command.
 | W0 | the map: pins, CI, the oracle, the survey, the prediction | in progress |
 | W1 | the emulator | pure core/history/reflow, diagnostic CLI and full-frame/property gates |
 | W2 | one pane; detach and attach | server, terminal client, new, attach, detach and a second client, with rows on Linux, macOS and PAX under QEMU; surviving a PAX console logout waits on PAX |
-| W3 | panes, tabs, the bar, keys | pure layout module; panes and tabs in the server, borders and the focus mark, the bar's lines, a fixed prefix table; modes, hints and configuration planned |
+| W3 | panes, tabs, the bar, keys | pure layout module; panes and tabs in the server, borders and the focus mark, the bar's lines; modes per client, the hint line and the key list from one key table, a minimal command line; configuration planned |
 | W4 | mouse, scrollback, copy | planned |
 | W5 | layouts, commands, persistence | planned |
 | W6 | on the PAX image, on real hardware | planned |

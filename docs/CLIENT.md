@@ -75,8 +75,8 @@ several) and focus reports. A lone ESC waits 30 ms for the rest of a sequence
 before it is the Escape key; an unfinished sequence at that point, or one
 longer than 64 bytes, goes to the pane unchanged. The server's own encoding of
 every named key and modifier parses back to the same event (a row). What a key
-does after the prefix (split, focus, tabs, zoom, close, detach) is the
-server's table (SERVER.md §8).
+does (the prefix, the modes, the prompts) is the server's key table, per client
+(SERVER.md §8); the client sends every key as it is.
 
 ## Rendering
 
