@@ -32,6 +32,8 @@ pub struct Conn {
     image_seq: int,
     ack: proto.AckState,
     force_full: bool,
+    ending: bool,
+    ending_gen: int,
     stale: bool,
     stale_since: int,
     last_frame: int,
@@ -71,7 +73,7 @@ pub fn new_conn() -> Conn {
         id: 0, deadline: 0,
         rx: List[byte](), rx_off: 0, rx_len: 0, paste: List[byte](), paste_len: 0, paste_active: false,
         tx: List[byte](), tx_off: 0, tx_len: 0, image_start: 0, image_end: 0 - 1, image_seq: 0,
-        ack: proto.ack_state(), force_full: true, stale: false, stale_since: 0, last_frame: 0,
+        ack: proto.ack_state(), force_full: true, ending: false, ending_gen: 0, stale: false, stale_since: 0, last_frame: 0,
         shadow: no_shadow(), cols: 0, rows: 0, depth: 0, features: 0, write_on: false, read_on: false,
         prefix: false, hello: List[byte](), hello_len: 0, hello_ready: false,
         resize_ready: false, resize_cols: 0, resize_rows: 0, command_ready: false, stop_after: false,
@@ -102,6 +104,8 @@ pub fn reset_conn(mut c: Conn, fd: int, id: int, now: int) {
     c.ack.last_ack = 0
     c.ack.pending = 0
     c.force_full = true
+    c.ending = false
+    c.ending_gen = 0
     c.stale = false
     c.stale_since = 0
     c.last_frame = 0
