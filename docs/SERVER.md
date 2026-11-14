@@ -456,7 +456,9 @@ Measured on Linux (`MEASURE` in the pane rows): a focus change between two
 panes side by side at 80x24 is a 600-byte image and among three panes 314
 bytes; a keystroke's image holds only the focused pane's cells; a split's new
 prompt is drawn 18 ms after the key; a keystroke in a split is drawn in 2.4 ms
-(p50) and 13.6 ms beside a flooding neighbour in the same tab.
+(p50) and 13.6 ms beside a flooding neighbour in the same tab. A client's mode
+change repaints only its own bar: the prefix's image (the mode field) is 94
+bytes, and entering pane mode (the field and the hint line) 864 bytes.
 
 **Rows.** `src/pane_rows.lu` drives a real server through key events: split
 sizes, keys reaching the focused pane, the window change a pane's program hears
@@ -465,8 +467,15 @@ a closed pane's program hears and its reaping (`--hup`), a pane's own end,
 tabs, a resize reaching a tab that is not shown, zoom, the too-small, memory and
 pane-count refusals, the frame's borders and bar cell for cell, a keystroke's
 image held to the focused pane's rect, the bytes of a focus change, keystrokes
-in a split and beside a flooding neighbour, the time of a split, and a flat
-resident size over 200 splits and closes. Differences from tmux, by ruling:
+in a split and beside a flooding neighbour, the time of a split, a flat
+resident size over 200 splits and closes, and the keys: the mode field and its
+bytes, the hint lines, the prefix sent twice and locked mode reaching the pane
+(`--read-bytes`), the four sticky modes, a close that asks, the rename and
+command prompts, modes held per client, INPUT and PASTE dropped outside normal
+and locked mode, and the key list drawn for one client and closed back to the
+exact frame. The key table itself is held by `src/keys_test.lu` (every binding's
+step, the hint lines at 80 and 40 columns, the key list, the command line),
+natively, on the checked machine and under lupin. Differences from tmux, by ruling:
 warren's split gives the first pane the smaller half (39 and 40 columns at 80,
 where tmux gives 40 and 39), and a pane under its minimum is hidden where tmux
 keeps 1-row panes.
