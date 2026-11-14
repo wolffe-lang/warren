@@ -1,0 +1,268 @@
+//! member: false
+//! The default key table, its modes and the hint line, held by hand-written
+//! expectations (written before the table): every binding steps to its action,
+//! argument and next mode; the hint lines at 80 and 40 columns; the command
+//! line's verbs. Pure: native, the checked machine and lupin.
+
+use config
+use std.io
+
+fn key_is(s: config.Step, action: int, arg: int, mode: int) -> bool {
+    s.action == action && s.arg == arg && s.mode == mode
+}
+
+fn scalar(k: config.Keys, mode: int, code: int) -> config.Step {
+    config.step(k, mode, 0, 0, code)
+}
+
+fn ctrl(k: config.Keys, mode: int, code: int) -> config.Step {
+    config.step(k, mode, 4, 0, code)
+}
+
+fn named(k: config.Keys, mode: int, code: int) -> config.Step {
+    config.step(k, mode, 0, 1, code)
+}
+
+fn test_the_prefix_enters_and_sends_itself() {
+    let k = config.defaults()
+    assert(key_is(ctrl(k, config.MODE_NORMAL, 32), config.A_NONE, 0, config.MODE_PREFIX), "prefix from normal")
+    assert(key_is(ctrl(k, config.MODE_PREFIX, 32), config.A_SEND_PREFIX, 0, config.MODE_NORMAL), "prefix twice")
+    assert(key_is(scalar(k, config.MODE_NORMAL, 97), config.A_PASS, 0, config.MODE_NORMAL), "a key in normal")
+    assert(key_is(ctrl(k, config.MODE_NORMAL, 112), config.A_PASS, 0, config.MODE_NORMAL), "C-p in normal")
+    assert(key_is(named(k, config.MODE_NORMAL, 14), config.A_PASS, 0, config.MODE_NORMAL), "Esc in normal")
+}
+
+fn test_the_prefix_table() {
+    let k = config.defaults()
+    let p = config.MODE_PREFIX
+    let n = config.MODE_NORMAL
+    assert(key_is(scalar(k, p, 124), config.A_SPLIT, 0, n), "|")
+    assert(key_is(scalar(k, p, 45), config.A_SPLIT, 1, n), "-")
+    assert(key_is(scalar(k, p, 104), config.A_FOCUS, 0, n), "h")
+    assert(key_is(scalar(k, p, 106), config.A_FOCUS, 3, n), "j")
+    assert(key_is(scalar(k, p, 107), config.A_FOCUS, 2, n), "k")
+    assert(key_is(scalar(k, p, 108), config.A_FOCUS, 1, n), "l")
+    assert(key_is(named(k, p, 1), config.A_FOCUS, 2, n), "Up")
+    assert(key_is(named(k, p, 2), config.A_FOCUS, 3, n), "Down")
+    assert(key_is(named(k, p, 3), config.A_FOCUS, 1, n), "Right")
+    assert(key_is(named(k, p, 4), config.A_FOCUS, 0, n), "Left")
+    assert(key_is(scalar(k, p, 72), config.A_RESIZE, 0, n), "H")
+    assert(key_is(scalar(k, p, 74), config.A_RESIZE, 3, n), "J")
+    assert(key_is(scalar(k, p, 75), config.A_RESIZE, 2, n), "K")
+    assert(key_is(scalar(k, p, 76), config.A_RESIZE, 1, n), "L")
+    assert(key_is(scalar(k, p, 99), config.A_NEW_TAB, 0, n), "c")
+    assert(key_is(scalar(k, p, 110), config.A_NEXT_TAB, 0, n), "n")
+    assert(key_is(scalar(k, p, 112), config.A_PREVIOUS_TAB, 0, n), "p")
+    var d = 1
+    while d <= 9 {
+        assert(key_is(scalar(k, p, 48 + d), config.A_SELECT_TAB, d, n), "digit")
+        d += 1
+    }
+    assert(key_is(scalar(k, p, 122), config.A_ZOOM, 0, n), "z")
+    assert(key_is(scalar(k, p, 120), config.A_CONFIRM, config.A_CLOSE, config.MODE_CONFIRM), "x")
+    assert(key_is(scalar(k, p, 111), config.A_FOCUS_NEXT, 0, n), "o")
+    assert(key_is(scalar(k, p, 61), config.A_EQUALIZE, 0, n), "=")
+    assert(key_is(scalar(k, p, 100), config.A_DETACH, 0, n), "d")
+    assert(key_is(scalar(k, p, 119), config.A_NONE, 0, config.MODE_PANE), "w")
+    assert(key_is(scalar(k, p, 116), config.A_NONE, 0, config.MODE_TAB), "t")
+    assert(key_is(scalar(k, p, 114), config.A_NONE, 0, config.MODE_RESIZE), "r")
+    assert(key_is(scalar(k, p, 115), config.A_NONE, 0, config.MODE_SESSION), "s")
+    assert(key_is(scalar(k, p, 103), config.A_NONE, 0, config.MODE_LOCKED), "g")
+    assert(key_is(scalar(k, p, 44), config.A_RENAME_TAB, 0, config.MODE_RENAME), ",")
+    assert(key_is(scalar(k, p, 58), config.A_COMMAND, 0, config.MODE_COMMAND), ":")
+    assert(key_is(scalar(k, p, 63), config.A_HELP, 0, config.MODE_HELP), "?")
+    // Unbound after the prefix: dropped, back to normal. No scroll mode yet.
+    assert(key_is(scalar(k, p, 113), config.A_NONE, 0, n), "q unbound")
+    assert(key_is(scalar(k, p, 91), config.A_NONE, 0, n), "[ unbound")
+    assert(key_is(named(k, p, 14), config.A_NONE, 0, n), "Esc")
+    assert(key_is(ctrl(k, p, 112), config.A_NONE, 0, n), "C-p is no mode key")
+}
+
+fn test_the_sticky_modes() {
+    let k = config.defaults()
+    let w = config.MODE_PANE
+    assert(key_is(scalar(k, w, 124), config.A_SPLIT, 0, w), "pane |")
+    assert(key_is(scalar(k, w, 45), config.A_SPLIT, 1, w), "pane -")
+    assert(key_is(scalar(k, w, 104), config.A_FOCUS, 0, w), "pane h")
+    assert(key_is(named(k, w, 3), config.A_FOCUS, 1, w), "pane Right")
+    assert(key_is(scalar(k, w, 120), config.A_CONFIRM, config.A_CLOSE, config.MODE_CONFIRM), "pane x")
+    assert(key_is(scalar(k, w, 122), config.A_ZOOM, 0, w), "pane z")
+    assert(key_is(scalar(k, w, 111), config.A_FOCUS_NEXT, 0, w), "pane o")
+    assert(key_is(scalar(k, w, 61), config.A_EQUALIZE, 0, w), "pane =")
+    assert(key_is(named(k, w, 14), config.A_NONE, 0, config.MODE_NORMAL), "pane Esc")
+    assert(key_is(named(k, w, 13), config.A_NONE, 0, config.MODE_NORMAL), "pane Enter")
+    assert(key_is(ctrl(k, w, 32), config.A_NONE, 0, config.MODE_PREFIX), "pane prefix")
+    assert(key_is(scalar(k, w, 113), config.A_NONE, 0, w), "pane q unbound")
+    let t = config.MODE_TAB
+    assert(key_is(scalar(k, t, 104), config.A_PREVIOUS_TAB, 0, t), "tab h")
+    assert(key_is(scalar(k, t, 108), config.A_NEXT_TAB, 0, t), "tab l")
+    assert(key_is(named(k, t, 4), config.A_PREVIOUS_TAB, 0, t), "tab Left")
+    assert(key_is(named(k, t, 3), config.A_NEXT_TAB, 0, t), "tab Right")
+    assert(key_is(scalar(k, t, 110), config.A_NEXT_TAB, 0, t), "tab n")
+    assert(key_is(scalar(k, t, 112), config.A_PREVIOUS_TAB, 0, t), "tab p")
+    assert(key_is(scalar(k, t, 99), config.A_NEW_TAB, 0, t), "tab c")
+    assert(key_is(scalar(k, t, 120), config.A_CONFIRM, config.A_CLOSE_TAB, config.MODE_CONFIRM), "tab x")
+    assert(key_is(scalar(k, t, 114), config.A_RENAME_TAB, 0, config.MODE_RENAME), "tab r")
+    assert(key_is(scalar(k, t, 51), config.A_SELECT_TAB, 3, t), "tab 3")
+    assert(key_is(named(k, t, 14), config.A_NONE, 0, config.MODE_NORMAL), "tab Esc")
+    let r = config.MODE_RESIZE
+    assert(key_is(scalar(k, r, 104), config.A_RESIZE, 0, r), "resize h")
+    assert(key_is(scalar(k, r, 108), config.A_RESIZE, 1, r), "resize l")
+    assert(key_is(scalar(k, r, 107), config.A_RESIZE, 2, r), "resize k")
+    assert(key_is(scalar(k, r, 106), config.A_RESIZE, 3, r), "resize j")
+    assert(key_is(scalar(k, r, 76), config.A_RESIZE, 1, r), "resize L")
+    assert(key_is(named(k, r, 2), config.A_RESIZE, 3, r), "resize Down")
+    assert(key_is(scalar(k, r, 61), config.A_EQUALIZE, 0, r), "resize =")
+    assert(key_is(named(k, r, 14), config.A_NONE, 0, config.MODE_NORMAL), "resize Esc")
+    let s = config.MODE_SESSION
+    assert(key_is(scalar(k, s, 100), config.A_DETACH, 0, config.MODE_NORMAL), "session d")
+    assert(key_is(named(k, s, 14), config.A_NONE, 0, config.MODE_NORMAL), "session Esc")
+    assert(key_is(scalar(k, s, 113), config.A_NONE, 0, s), "session q unbound")
+}
+
+fn test_locked_passes_everything_but_its_one_key() {
+    let k = config.defaults()
+    let g = config.MODE_LOCKED
+    assert(key_is(ctrl(k, g, 32), config.A_PASS, 0, g), "the prefix passes")
+    assert(key_is(scalar(k, g, 124), config.A_PASS, 0, g), "| passes")
+    assert(key_is(named(k, g, 14), config.A_PASS, 0, g), "Esc passes")
+    assert(key_is(ctrl(k, g, 112), config.A_PASS, 0, g), "C-p passes")
+    assert(key_is(ctrl(k, g, 103), config.A_NONE, 0, config.MODE_NORMAL), "C-g unlocks")
+}
+
+fn test_confirm_and_help() {
+    let k = config.defaults()
+    // Confirm, help and the two prompts go back to the mode they came from
+    // (MODE_BACK: the server keeps it); any key but y cancels a confirm.
+    let c = config.MODE_CONFIRM
+    let back = config.MODE_BACK
+    assert(key_is(scalar(k, c, 121), config.A_YES, 0, back), "y")
+    assert(key_is(scalar(k, c, 110), config.A_NONE, 0, back), "n")
+    assert(key_is(named(k, c, 14), config.A_NONE, 0, back), "Esc")
+    assert(key_is(scalar(k, c, 120), config.A_NONE, 0, back), "x cancels")
+    assert(key_is(ctrl(k, c, 32), config.A_NONE, 0, back), "the prefix cancels")
+    let h = config.MODE_HELP
+    assert(key_is(scalar(k, h, 106), config.A_SCROLL, 1, h), "help j")
+    assert(key_is(scalar(k, h, 107), config.A_SCROLL, 0 - 1, h), "help k")
+    assert(key_is(named(k, h, 2), config.A_SCROLL, 1, h), "help Down")
+    assert(key_is(named(k, h, 1), config.A_SCROLL, 0 - 1, h), "help Up")
+    assert(key_is(named(k, h, 14), config.A_NONE, 0, back), "help Esc")
+    assert(key_is(scalar(k, h, 113), config.A_NONE, 0, back), "help q")
+    assert(key_is(scalar(k, h, 63), config.A_NONE, 0, back), "help ?")
+    assert(key_is(scalar(k, h, 120), config.A_NONE, 0, h), "help x unbound")
+}
+
+fn test_the_prompts() {
+    let k = config.defaults()
+    for m in [config.MODE_COMMAND, config.MODE_RENAME] {
+        assert(key_is(scalar(k, m, 97), config.A_TYPE, 97, m), "a printable key types")
+        assert(key_is(scalar(k, m, 32), config.A_TYPE, 32, m), "space types")
+        assert(key_is(scalar(k, m, 233), config.A_TYPE, 233, m), "a non-ASCII scalar types")
+        assert(key_is(config.step(k, m, 1, 0, 72), config.A_TYPE, 72, m), "shift is folded")
+        assert(key_is(named(k, m, 11), config.A_ERASE, 0, m), "Backspace")
+        assert(key_is(ctrl(k, m, 117), config.A_CLEAR, 0, m), "C-u")
+        assert(key_is(named(k, m, 13), config.A_RUN, 0, config.MODE_BACK), "Enter")
+        assert(key_is(named(k, m, 14), config.A_NONE, 0, config.MODE_BACK), "Esc")
+        assert(key_is(ctrl(k, m, 120), config.A_NONE, 0, m), "C-x dropped")
+        assert(key_is(ctrl(k, m, 32), config.A_NONE, 0, m), "the prefix dropped")
+        assert(key_is(named(k, m, 1), config.A_NONE, 0, m), "Up dropped")
+    }
+}
+
+fn test_the_hint_lines() {
+    let k = config.defaults()
+    let normal = " C-Space prefix  ? keys  |- split  hjkl focus  x close  c new tab  np tabs  +13"
+    assert(config.hint_text(k, config.MODE_NORMAL, 80) == normal, "normal at 80")
+    assert(config.hint_text(k, config.MODE_PREFIX, 80) == normal, "prefix at 80, the same line")
+    assert(config.hint_text(k, config.MODE_NORMAL, 40) == " C-Space prefix  ? keys  |- split  +17", "normal at 40")
+    assert(config.hint_text(k, config.MODE_PANE, 80) == " |- split  hjkl focus  x close  z zoom  o next pane  = equalize  Esc back", "pane")
+    assert(config.hint_text(k, config.MODE_TAB, 80) == " hl prev/next  c new  x close  r rename  1-9 go to  Esc back", "tab")
+    assert(config.hint_text(k, config.MODE_RESIZE, 80) == " hjkl resize  = equalize  Esc back", "resize")
+    assert(config.hint_text(k, config.MODE_SESSION, 80) == " d detach  Esc back", "session")
+    assert(config.hint_text(k, config.MODE_LOCKED, 80) == " C-g unlock", "locked")
+    assert(config.hint_text(k, config.MODE_HELP, 80) == " jk scroll  Esc close", "help")
+    assert(config.mode_name(config.MODE_NORMAL) == "NORMAL" && config.mode_name(config.MODE_SESSION) == "SESSION", "names")
+    // Every hint line fits: nothing wider than the line at the minimum width.
+    var m = 0
+    while m < config.MODES {
+        for cols in [20, 40, 80] {
+            assert(config.text_width(config.hint_text(k, m, cols)) <= cols, "hint fits")
+        }
+        m += 1
+    }
+}
+
+fn test_the_key_list() {
+    let lines = config.help_lines(config.defaults())
+    var seen = 0
+    for line in lines {
+        if line == "  NORMAL   C-Space    prefix mode" { seen += 1 }
+        if line == "  PREFIX   x          close-pane (asks)" { seen += 1 }
+        if line == "  PREFIX   w          pane mode" { seen += 1 }
+        if line == "  TAB      3          select-tab 3" { seen += 1 }
+        if line == "  LOCKED   C-g        normal mode" { seen += 1 }
+        if line == "  RESIZE   Left       resize left" { seen += 1 }
+        if line == "  CONFIRM  y          yes" { seen += 1 }
+        if line == "  HELP     Esc        back" { seen += 1 }
+    }
+    assert(seen == 8, "the key list's lines")
+    assert(lines.len == config.defaults().bindings.len, "one line a binding")
+}
+
+fn test_key_names() {
+    assert(config.key_name(4, 0, 32) == "C-Space", "C-Space")
+    assert(config.key_name(4, 0, 103) == "C-g", "C-g")
+    assert(config.key_name(0, 0, 104) == "h", "h")
+    assert(config.key_name(0, 0, 124) == "|", "|")
+    assert(config.key_name(0, 1, 1) == "Up", "Up")
+    assert(config.key_name(0, 1, 14) == "Esc", "Esc")
+    assert(config.key_name(0, 1, 13) == "Enter", "Enter")
+}
+
+fn test_the_command_line() {
+    let a = config.command("split-right")
+    assert(a.ok && a.action == config.A_SPLIT && a.arg == 0, "split-right")
+    let b = config.command("split-down")
+    assert(b.ok && b.action == config.A_SPLIT && b.arg == 1, "split-down")
+    let c = config.command("focus left")
+    assert(c.ok && c.action == config.A_FOCUS && c.arg == 0, "focus left")
+    let d = config.command("resize up")
+    assert(d.ok && d.action == config.A_RESIZE && d.arg == 2 && d.count == 1, "resize up")
+    let d3 = config.command("resize down 3")
+    assert(d3.ok && d3.action == config.A_RESIZE && d3.arg == 3 && d3.count == 3, "resize down 3")
+    let e = config.command("  select-tab 3 ")
+    assert(e.ok && e.action == config.A_SELECT_TAB && e.arg == 3, "select-tab 3")
+    let f = config.command("rename-tab work notes")
+    assert(f.ok && f.action == config.A_RENAME_TAB && f.text == "work notes", "rename-tab")
+    let g = config.command("close-pane")
+    assert(g.ok && g.action == config.A_CLOSE, "close-pane")
+    let h = config.command("lock")
+    assert(h.ok && h.action == config.A_LOCK, "lock")
+    for verb in "focus-next zoom equalize new-tab next-tab previous-tab close-tab detach".split(" ") {
+        assert(config.command(verb).ok, "a verb without arguments")
+    }
+    let x = config.command("bogus")
+    assert(!x.ok && x.why == "unknown command: bogus", "unknown")
+    assert(!config.command("focus sideways").ok, "a bad direction")
+    assert(!config.command("select-tab x").ok, "a bad number")
+    assert(!config.command("zoom now").ok, "an argument too many")
+    assert(!config.command("select-tab 0").ok, "tabs count from 1")
+    assert(!config.command("resize up 0").ok, "a count from 1")
+    assert(!config.command("rename-tab").ok, "a rename needs a name")
+    assert(!config.command("").ok, "empty")
+}
+
+fn main() -> int {
+    test_the_prefix_enters_and_sends_itself()
+    test_the_prefix_table()
+    test_the_sticky_modes()
+    test_locked_passes_everything_but_its_one_key()
+    test_confirm_and_help()
+    test_the_prompts()
+    test_the_hint_lines()
+    test_the_key_list()
+    test_key_names()
+    test_the_command_line()
+    io.write_line("PASS keys-table")
+    0
+}
