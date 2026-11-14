@@ -1,0 +1,219 @@
+//! member: true
+//! Operation scripts for the golden rows. A script is `;`-separated
+//! operations; its first must be `new PANE NAME`. A name is the rest of the
+//! operation's words joined by one space, with `%HH` for any byte.
+//!
+//!   split TAB PANE cols|rows NEW after|before    close PANE
+//!   focus TAB left|right|up|down                 focus-pane PANE
+//!   next TAB    prev TAB                         resize PANE DIRECTION CELLS
+//!   zoom TAB    equalize TAB                     tab NEW NAME
+//!   close-tab TAB    select N    select-id TAB   next-tab    prev-tab
+//!   rename TAB NAME    size COLSxROWS    at COL ROW    plain
+//!
+//! A refusal reports `refused: OP: TAG`, a resize `resized: OP: CELLS` and
+//! `at` its pane; the text ends with `dump_at` at the current size, or
+//! `dump` after `plain`.
+use layout
+
+/// One golden: a name, the starting size, the script and the whole
+/// expected text.
+pub struct Case {
+    name: str,
+    cols: int,
+    rows: int,
+    script: str,
+    want: str,
+}
+
+fn number(w: str) -> int {
+    w.to_int() else -999999
+}
+
+fn direction(w: str) -> int {
+    if w == "left" { return layout.LEFT }
+    if w == "right" { return layout.RIGHT }
+    if w == "up" { return layout.UP }
+    if w == "down" { return layout.DOWN }
+    -1
+}
+
+fn axis(w: str) -> int {
+    if w == "cols" { return layout.COLS }
+    if w == "rows" { return layout.ROWS }
+    -1
+}
+
+fn hex(b: int) -> int {
+    if b >= 48 && b <= 57 { return b - 48 }
+    if b >= 97 && b <= 102 { return b - 87 }
+    if b >= 65 && b <= 70 { return b - 55 }
+    -1
+}
+
+/// The words from `from` on, joined by one space, `%HH` decoded.
+fn name_of(words: List[str], from: int) -> str {
+    var bytes = List[byte]()
+    var i = from
+    while i < words.len {
+        if i > from { (mut bytes).push(32 as byte) }
+        let w = words[i].bytes()
+        var j = 0
+        while j < w.len {
+            let b = w[j] as int
+            if b == 37 && j + 2 < w.len && hex(w[j + 1] as int) >= 0 && hex(w[j + 2] as int) >= 0 {
+                (mut bytes).push((hex(w[j + 1] as int) * 16 + hex(w[j + 2] as int)) as byte)
+                j += 3
+            } else {
+                (mut bytes).push(w[j])
+                j += 1
+            }
+        }
+        i += 1
+    }
+    str_from_utf8(bytes) else "<not utf-8>"
+}
+
+fn do_split(mut l: layout.Layout, op: str, w: List[str], cols: int, rows: int) -> str {
+    if w.len != 6 { return "bad op: {op}" }
+    let after = w[5] == "after"
+    layout.split(mut l, number(w[1]), number(w[2]), axis(w[3]), number(w[4]), after, cols, rows) else |e| {
+        return "refused: {op}: {e}"
+    }
+    ""
+}
+
+fn do_close(mut l: layout.Layout, op: str, w: List[str]) -> str {
+    layout.close(mut l, number(w[1])) else |e| { return "refused: {op}: {e}" }
+    ""
+}
+
+fn do_focus(mut l: layout.Layout, op: str, w: List[str], cols: int, rows: int) -> str {
+    layout.focus(mut l, number(w[1]), direction(w[2]), cols, rows) else |e| { return "refused: {op}: {e}" }
+    ""
+}
+
+fn do_focus_pane(mut l: layout.Layout, op: str, w: List[str]) -> str {
+    layout.focus_pane(mut l, number(w[1])) else |e| { return "refused: {op}: {e}" }
+    ""
+}
+
+fn do_next(mut l: layout.Layout, op: str, w: List[str], forward: bool) -> str {
+    if forward {
+        layout.focus_next(mut l, number(w[1])) else |e| { return "refused: {op}: {e}" }
+    } else {
+        layout.focus_previous(mut l, number(w[1])) else |e| { return "refused: {op}: {e}" }
+    }
+    ""
+}
+
+fn do_resize(mut l: layout.Layout, op: str, w: List[str], cols: int, rows: int) -> str {
+    let moved = layout.resize(mut l, number(w[1]), direction(w[2]), number(w[3]), cols, rows) else |e| {
+        return "refused: {op}: {e}"
+    }
+    "resized: {op}: {moved}"
+}
+
+fn do_zoom(mut l: layout.Layout, op: str, w: List[str]) -> str {
+    layout.zoom(mut l, number(w[1])) else |e| { return "refused: {op}: {e}" }
+    ""
+}
+
+fn do_equalize(mut l: layout.Layout, op: str, w: List[str]) -> str {
+    layout.equalize(mut l, number(w[1])) else |e| { return "refused: {op}: {e}" }
+    ""
+}
+
+fn do_tab(mut l: layout.Layout, op: str, w: List[str]) -> str {
+    let id = layout.new_tab(mut l, number(w[1]), name_of(w, 2)) else |e| { return "refused: {op}: {e}" }
+    if id < 1 { return "bad tab id {id}: {op}" }
+    ""
+}
+
+fn do_close_tab(mut l: layout.Layout, op: str, w: List[str]) -> str {
+    layout.close_tab(mut l, number(w[1])) else |e| { return "refused: {op}: {e}" }
+    ""
+}
+
+fn do_select(mut l: layout.Layout, op: str, w: List[str], by_id: bool) -> str {
+    if by_id {
+        layout.select_tab_id(mut l, number(w[1])) else |e| { return "refused: {op}: {e}" }
+    } else {
+        layout.select_tab(mut l, number(w[1])) else |e| { return "refused: {op}: {e}" }
+    }
+    ""
+}
+
+fn do_rename(mut l: layout.Layout, op: str, w: List[str]) -> str {
+    layout.rename_tab(mut l, number(w[1]), name_of(w, 2)) else |e| { return "refused: {op}: {e}" }
+    ""
+}
+
+/// Run a case's script; answer its whole text.
+pub fn run(c: Case) -> str {
+    var cols = c.cols
+    var rows = c.rows
+    var plain = false
+    var out = ""
+    let ops = c.script.split(";")
+    if ops.len == 0 { return "empty script" }
+    let head = ops[0].trim()
+    let first = head.words()
+    if first.len < 2 || first[0] != "new" { return "a script starts with new" }
+    var l = layout.new(number(first[1]), name_of(first, 2)) else |e| { return "refused: {head}: {e}" }
+    var i = 1
+    while i < ops.len {
+        let op = ops[i].trim()
+        let w = op.words()
+        var line = ""
+        if w.len == 0 {
+            line = "empty op"
+        } else if w[0] == "split" {
+            line = do_split(mut l, op, w, cols, rows)
+        } else if w[0] == "close" {
+            line = do_close(mut l, op, w)
+        } else if w[0] == "focus" {
+            line = do_focus(mut l, op, w, cols, rows)
+        } else if w[0] == "focus-pane" {
+            line = do_focus_pane(mut l, op, w)
+        } else if w[0] == "next" {
+            line = do_next(mut l, op, w, true)
+        } else if w[0] == "prev" {
+            line = do_next(mut l, op, w, false)
+        } else if w[0] == "resize" {
+            line = do_resize(mut l, op, w, cols, rows)
+        } else if w[0] == "zoom" {
+            line = do_zoom(mut l, op, w)
+        } else if w[0] == "equalize" {
+            line = do_equalize(mut l, op, w)
+        } else if w[0] == "tab" {
+            line = do_tab(mut l, op, w)
+        } else if w[0] == "close-tab" {
+            line = do_close_tab(mut l, op, w)
+        } else if w[0] == "select" {
+            line = do_select(mut l, op, w, false)
+        } else if w[0] == "select-id" {
+            line = do_select(mut l, op, w, true)
+        } else if w[0] == "next-tab" {
+            layout.next_tab(mut l)
+        } else if w[0] == "prev-tab" {
+            layout.previous_tab(mut l)
+        } else if w[0] == "rename" {
+            line = do_rename(mut l, op, w)
+        } else if w[0] == "size" {
+            let dims = w[1].split("x")
+            cols = number(dims[0])
+            rows = number(dims[1])
+        } else if w[0] == "at" {
+            let pane = layout.pane_at(l, l.active, cols, rows, number(w[1]), number(w[2]))
+            line = "{op}: {pane}"
+        } else if w[0] == "plain" {
+            plain = true
+        } else {
+            line = "unknown op: {op}"
+        }
+        if line.len > 0 { out = out + line + "\n" }
+        i += 1
+    }
+    if plain { return out + layout.dump(l) }
+    out + layout.dump_at(l, cols, rows)
+}
