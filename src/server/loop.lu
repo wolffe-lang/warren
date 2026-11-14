@@ -45,6 +45,7 @@ pub struct Server {
     turns: int,
     master_read: int,
     uid: int,
+    inherited: List[int],
 }
 
 fn now_ns() -> int {
@@ -292,7 +293,10 @@ fn end_session(mut s: Server, si: int) {
     var i = 0
     while i < s.conns.len {
         if s.conns[i].live && s.conns[i].member && s.conns[i].session == si {
-            terminal(mut s, i, 135, 2, "session ended")
+            // The pane's last output reaches a client that can take an image
+            // now; one still waiting on its ACK keeps the image it has.
+            if s.conns[i].image_end < 0 && s.conns[i].ack.pending == 0 { compose_now(mut s, i, now_ns()) }
+            if s.conns[i].live { terminal(mut s, i, 135, 2, "session ended") }
         }
         i += 1
     }
@@ -646,7 +650,7 @@ fn hello(mut s: Server, index: int) {
         s.sessions[slot].members = 0
         fresh_screen(mut s.sessions[slot], h.cols, h.rows)
         let sp = Spawn { cols: h.cols, rows: h.rows, cwd: h.cwd, names: h.names, values: h.values, pane_id: slot }
-        let why = start_pane(mut s.sessions[slot], sp, shell_argv())
+        let why = start_pane(mut s.sessions[slot], sp, shell_argv(), s.inherited)
         if why.len > 0 {
             trace(s, "spawn failed: {why}")
             terminal(mut s, index, 130, 6, "the pane's program did not start: {why}")
@@ -779,6 +783,12 @@ fn reap(mut s: Server) {
 fn compose_for(mut s: Server, index: int, now: int) {
     let due = frame_due(s, index)
     if due < 0 || due > now { return }
+    compose_now(mut s, index, now)
+}
+
+// Compose and queue the next image for a client now, whatever the pacing;
+// the caller has checked that no image is outstanding.
+fn compose_now(mut s: Server, index: int, now: int) {
     let seq = s.conns[index].ack.last_sent + 1
     if seq > SEQ_MAX {
         terminal(mut s, index, 135, 4, "sequence space used: reconnect")
@@ -1064,6 +1074,7 @@ fn turn(mut s: Server) -> bool {
 /// Run a server in the foreground until it stops. Exit codes: 0 stopped,
 /// 1 a named refusal at start, 0 when another server answers already.
 pub fn serve() -> int {
+    let inherited = inherited_descriptors()
     let dir = runtime_dir()
     let place = start(dir)
     if place.code == 2 {
@@ -1103,6 +1114,7 @@ pub fn serve() -> int {
         idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
         version: vt.package_version(), again: false, need_slot: false, rotate: 0,
         trace: env.has("WARREN_TRACE"), turns: 0, master_read: master_read, uid: env.euid() else 0 - 1,
+        inherited: inherited,
     }
     net.set_listener_deadline(mut s.place.listener, 1) else |_| {}
     listener_interest(mut s)
