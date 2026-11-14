@@ -101,13 +101,15 @@ fn remove_tab(mut l: Layout, ti: int) {
             l.active = l.tabs[ti - 1].id
         }
     }
-    var kept = List[Tab]()
-    var i = 0
-    while i < l.tabs.len {
-        if i != ti { (mut kept).push(copy l.tabs[i]) }
+    // In place: the tabs after it move down one and the last slot goes,
+    // each store a copy made in the list's own region, so a caller's
+    // region may apply this (nothing of it is kept in the layout).
+    var i = ti
+    while i + 1 < l.tabs.len {
+        l.tabs[i] = copy l.tabs[i + 1]
         i += 1
     }
-    l.tabs = kept
+    let _gone = (mut l.tabs).pop() else { return }
 }
 
 /// Close a pane: its sibling subtree takes its parent's place; the last
@@ -303,7 +305,7 @@ pub fn new_tab(mut l: Layout, new_pane: int, name: str) -> int ! NewTabRefusal {
     if locate(l, new_pane).tab >= 0 { return duplicate_id }
     let id = l.next_id
     l.next_id += 1
-    (mut l.tabs).push(one_pane_tab(id, new_pane, name))
+    (mut l.tabs).push(copy one_pane_tab(id, new_pane, name))
     l.active = id
     id
 }
@@ -344,5 +346,7 @@ pub fn previous_tab(mut l: Layout) {
 pub fn rename_tab(mut l: Layout, tab: int, name: str) -> () ! {no_tab} {
     let ti = tab_index(l, tab)
     if ti < 0 { return no_tab }
-    l.tabs[ti].name = name_bytes(name)
+    // The name's bytes go into the list the tab already owns.
+    (mut l.tabs[ti].name).reset()
+    for b in name.bytes() { (mut l.tabs[ti].name).push(b) }
 }
