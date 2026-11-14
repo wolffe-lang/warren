@@ -341,22 +341,29 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
     End { code: 1, line: "", gone: false }
 }
 
-/// Run one command on the server (`kill-server`, `list-sessions`) and
-/// print its reply; the exit code is the reply's status.
-pub fn command(argv: List[str]) -> int {
+/// A command's reply: its status (0 done, 1 refused, 2 usage, 3 no
+/// server) and what it printed to each stream.
+pub struct Reply {
+    status: int,
+    out: List[byte],
+    err: List[byte],
+}
+
+fn no_reply(status: int, why: str) -> Reply {
+    Reply { status: status, out: List[byte](), err: "warren: {why}\n".bytes() }
+}
+
+/// Run one command on the server and return its reply. `cols` and `rows`
+/// are the size a session it creates starts at (both zero otherwise).
+pub fn command_sized(argv: List[str], cols: int, rows: int, with_env: bool) -> Reply {
     let long = server.socket_path_problem(server.socket_path(server.runtime_dir()))
-    if long.len > 0 {
-        eprint("warren: the {long}")
-        return 1
-    }
-    var p = dial(server.socket_path(server.runtime_dir())) else |_| {
-        eprint("warren: no server is running")
-        return 1
-    }
+    if long.len > 0 { return no_reply(1, "the {long}") }
+    var p = dial(server.socket_path(server.runtime_dir())) else |_| { return no_reply(3, "no server is running") }
     var names = List[str]()
     var values = List[str]()
+    if with_env { env_lists(mut names, mut values) }
     let cwd = env.cwd() else "/"
-    let _h = send(p, 1, hello_with(2, 0, 0, 0, 0, env.get("TERM") else "", "", 0, cwd, names, values))
+    let _h = send(p, 1, hello_with(2, cols, rows, 0, 0, env.get("TERM") else "", "", 0, cwd, names, values))
     var b = number(1, 4)
     proto.put(mut b, argv.len, 2)
     for a in argv { proto.put_text(mut b, a) }
@@ -372,19 +379,32 @@ pub fn command(argv: List[str]) -> int {
             let out = m.body[9..9 + out_len]
             let err_len = le(m.body, 9 + out_len, 4)
             let err = m.body[13 + out_len..13 + out_len + err_len]
-            var so = fs.stdout()
-            var se = fs.stderr()
-            fs.write_chunk(mut so, out) else |_| {}
-            fs.write_chunk(mut se, err) else |_| {}
             hang_up(mut p)
-            return status
+            return Reply { status: status, out: out, err: err }
         }
         if m.kind == 130 || m.kind == 135 || (m.kind == 0 && m.code != 0) {
             hang_up(mut p)
-            eprint("warren: the server did not answer the command")
-            return 1
+            return no_reply(1, "the server did not answer the command")
         }
     }
     hang_up(mut p)
-    1
+    no_reply(1, "the server did not answer the command in 10 s")
+}
+
+/// Run one command on the server and return its reply, sending no size.
+pub fn command_reply(argv: List[str]) -> Reply {
+    command_sized(argv, 0, 0, false)
+}
+
+/// Run one command on the server (`kill-server`, `list-sessions`) and
+/// print its reply; the exit code is the reply's status (1 when there is
+/// no server, as before).
+pub fn command(argv: List[str]) -> int {
+    let r = command_reply(argv)
+    var so = fs.stdout()
+    var se = fs.stderr()
+    fs.write_chunk(mut so, r.out) else |_| {}
+    fs.write_chunk(mut se, r.err) else |_| {}
+    if r.status == 3 { return 1 }
+    r.status
 }
