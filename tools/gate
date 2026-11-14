@@ -166,6 +166,14 @@ step compose-build "$WOLF" build --deny-warnings src/compose_rows.lu -o "$root/t
 step compose-native "$root/target/native/compose-rows"
 step session-build "$WOLF" build --deny-warnings src/session_rows.lu -o "$root/target/native/session-rows"
 step session-rows session_rows
+# The terminal client in a pseudo-terminal: every way it ends gives the
+# terminal back, and nothing a row starts outlives it.
+client_rows() (
+  rm -rf target/crows && mkdir -p target/crows && cd target/crows
+  "$root/target/native/client-rows" "$root/target/native/warren"
+)
+step client-build "$WOLF" build --deny-warnings src/client_rows.lu -o "$root/target/native/client-rows"
+step client-rows client_rows
 [ "$mode" = linux ] || exit 0
 # The oracle rows. No step here skips: without the pinned binaries it is red.
 oracle_identity() {

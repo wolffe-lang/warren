@@ -421,6 +421,7 @@ fn main() -> int {
     if rows.len == 0 {
         rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported")
     }
+    if !fs.exists("/proc") { print("NOTE leftovers unchecked here: no /proc to read") }
     var failed = 0
     for name in rows {
         let t0 = now_ms()
