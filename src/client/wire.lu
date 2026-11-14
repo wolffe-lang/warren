@@ -61,6 +61,13 @@ pub fn hang_up(mut p: Peer) {
 /// A HELLO payload. role 1 attach, 2 command.
 pub fn hello_payload(role: int, cols: int, rows: int, target: str, options: int, cwd: str,
     names: List[str], values: List[str]) -> List[byte] {
+    hello_with(role, cols, rows, 3, 0, "xterm-256color", target, options, cwd, names, values)
+}
+
+/// A HELLO payload naming the outer terminal: its colour depth (0..3),
+/// its features (bit 0 bracketed paste, 1 focus, 2 SGR mouse) and TERM.
+pub fn hello_with(role: int, cols: int, rows: int, depth: int, features: int, term: str, target: str,
+    options: int, cwd: str, names: List[str], values: List[str]) -> List[byte] {
     var b = List[byte]()
     proto.put(mut b, 87, 1)
     proto.put(mut b, 82, 1)
@@ -71,9 +78,9 @@ pub fn hello_payload(role: int, cols: int, rows: int, target: str, options: int,
     proto.put(mut b, role, 1)
     proto.put(mut b, cols, 2)
     proto.put(mut b, rows, 2)
-    proto.put(mut b, 3, 1)
-    proto.put(mut b, 0, 4)
-    proto.put_text(mut b, "xterm-256color")
+    proto.put(mut b, depth, 1)
+    proto.put(mut b, features, 4)
+    proto.put_text(mut b, term)
     proto.put_text(mut b, target)
     proto.put(mut b, options, 1)
     proto.put_text(mut b, cwd)
@@ -137,6 +144,12 @@ fn fill(mut p: Peer, wait_ms: int) -> int {
         p.rx_len = p.rx_len + 1
     }
     3
+}
+
+/// Read what the socket holds now, once, without waiting: 0 nothing,
+/// 1 the connection ended, 2 an error, 3 bytes were read.
+pub fn pull(mut p: Peer) -> int {
+    fill(mut p, 0)
 }
 
 /// The next whole logical message, waiting at most deadline_ms in all.
