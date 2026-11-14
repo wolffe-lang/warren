@@ -1,0 +1,306 @@
+//! member: true
+//! The compositor for a session: one client's frame made of every shown
+//! pane's grid in its rect, the borders between them with the focused
+//! pane's marked, and the bar's two lines below the tab area. Composed as
+//! a delta against the client's shadow over the regions that may have
+//! changed (a pane's rect when its grid changed, the bar's rows, all of it
+//! after a layout change), so a keystroke's image holds that pane's cells.
+use proto
+use vt
+
+/// A blank cell in the default rendition.
+pub fn blank_cell() -> vt.Cell {
+    vt.Cell { base: 32, mark1: 0, mark2: 0, width: 1, flags: 0, foreground: 0 - 1, background: 0 - 1, written: false }
+}
+
+/// A border or bar cell: a scalar of width one with a rendition.
+pub fn chrome_cell(base: int, flags: int, fg: int) -> vt.Cell {
+    vt.Cell { base: base, mark1: 0, mark2: 0, width: 1, flags: flags, foreground: fg, background: 0 - 1, written: true }
+}
+
+/// The frame's cell at row-major index `i`: a bar cell below the tab area,
+/// else the owner map's pane (its active screen at the rect offset) or the
+/// border cell. A wide glyph on a pane's last column (which the emulator
+/// does not make) would cross a border: it is sent one column wide.
+fn frame_cell(panes: List[Pane], ses: Session, bar: List[vt.Cell], i: int) -> vt.Cell {
+    let cols = ses.cols
+    let area = ses.rows - BAR_LINES
+    let r0 = i / cols
+    if r0 >= area {
+        let j = i - area * cols
+        if j >= 0 && j < bar.len { return bar[j] }
+        return blank_cell()
+    }
+    if i >= ses.owner.len { return blank_cell() }
+    let o = ses.owner[i]
+    if o < 0 || o >= panes.len {
+        if i < ses.border.len { return ses.border[i] }
+        return blank_cell()
+    }
+    let c0 = i % cols
+    let pr = r0 - (panes[o].at_row - 1)
+    let pc = c0 - (panes[o].at_col - 1)
+    let pcols = panes[o].screen.cols
+    if pr < 0 || pc < 0 || pc >= pcols || pr >= panes[o].screen.rows { return blank_cell() }
+    let cell = active_cell(panes[o].screen, pr * pcols + pc)
+    if cell.width == 2 && pc == pcols - 1 {
+        return vt.Cell { base: cell.base, mark1: cell.mark1, mark2: cell.mark2, width: 1, flags: cell.flags,
+            foreground: cell.foreground, background: cell.background, written: cell.written }
+    }
+    cell
+}
+
+// Emit the runs covering columns a..b (1-based, inclusive) of one row of
+// the frame; as `emit_span` for one pane.
+fn emit_frame_span(mut body: List[byte], panes: List[Pane], ses: Session, bar: List[vt.Cell], row: int, a: int,
+    b: int) -> int {
+    let cols = ses.cols
+    var runs = 0
+    var col = a
+    while col <= b {
+        let lead = frame_cell(panes, ses, bar, (row - 1) * cols + col - 1)
+        var records = List[byte]()
+        var record_count = 0
+        var covered = 0
+        var c = col
+        while c <= b {
+            let cell = frame_cell(panes, ses, bar, (row - 1) * cols + c - 1)
+            if !same_rendition(cell, lead) && c > col { break }
+            let orphan = cell.width == 0
+            let w = sent_width(cell, c, cols)
+            var times = 1
+            var next = c + w
+            while next + w - 1 <= b && times < 65535 && !orphan {
+                let other = frame_cell(panes, ses, bar, (row - 1) * cols + next - 1)
+                if !same_glyph(other, cell) || !same_rendition(other, lead) || sent_width(other, next, cols) != w { break }
+                times += 1
+                next += w
+            }
+            put_record(mut records, cell, w, times, orphan)
+            record_count += 1
+            covered += w * times
+            c = next
+        }
+        proto.put(mut body, row, 2)
+        proto.put(mut body, col, 2)
+        proto.put(mut body, lead.flags, 2)
+        proto.put(mut body, wire_colour(lead.foreground), 4)
+        proto.put(mut body, wire_colour(lead.background), 4)
+        proto.put(mut body, covered, 2)
+        proto.put(mut body, record_count, 2)
+        for x in records { (mut body).push(x) }
+        runs += 1
+        col = c
+    }
+    runs
+}
+
+fn store_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[vt.Cell], row: int, a: int, b: int) {
+    var c = a
+    while c <= b {
+        let i = (row - 1) * ses.cols + c - 1
+        sh.cells[i] = frame_cell(panes, ses, bar, i)
+        c += 1
+    }
+}
+
+/// Compose a client's next image of the session's frame into a FRAME
+/// payload, updating its shadow. A full image (base 0) when `full` is set
+/// or the shadow is not of this size; otherwise a delta on seq - 1 over
+/// the scanned regions: every cell when `all`, else the rects in `scans`
+/// (col, row, cols, rows, four ints each). Empty when nothing changed.
+/// The cursor is the caller's (`cursor`: row, col, shape, visible).
+pub fn compose_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[vt.Cell], seq: int, full: bool,
+    all: bool, scans: List[int], cursor: List[int]) -> List[byte] {
+    let cols = ses.cols
+    let rows = ses.rows
+    let whole = full || !sh.valid || sh.cols != cols || sh.rows != rows
+    if whole { reshape(mut sh, cols, rows) }
+    var body = List[byte]()
+    var runs = 0
+    var changed = List[bool]()
+    var scan = List[bool]()
+    var k = 0
+    while k <= cols + 1 {
+        (mut changed).push(false)
+        (mut scan).push(false)
+        k += 1
+    }
+    var row = 1
+    while row <= rows {
+        if whole {
+            runs += emit_frame_span(mut body, panes, ses, bar, row, 1, cols)
+            store_frame(mut sh, panes, ses, bar, row, 1, cols)
+        } else {
+            var any_scan = all
+            var c = 1
+            while c <= cols {
+                scan[c] = all
+                c += 1
+            }
+            if !all {
+                var q = 0
+                while q + 3 < scans.len {
+                    let rr = scans[q + 1]
+                    if row >= rr && row < rr + scans[q + 3] {
+                        var c2 = scans[q]
+                        while c2 < scans[q] + scans[q + 2] && c2 <= cols {
+                            if c2 >= 1 { scan[c2] = true }
+                            c2 += 1
+                        }
+                        any_scan = true
+                    }
+                    q += 4
+                }
+            }
+            if any_scan {
+                var any = false
+                c = 1
+                while c <= cols {
+                    changed[c] = false
+                    if scan[c] {
+                        let i = (row - 1) * cols + c - 1
+                        changed[c] = !same(frame_cell(panes, ses, bar, i), sh.cells[i])
+                        if changed[c] { any = true }
+                    }
+                    c += 1
+                }
+                if any {
+                    // Both halves of every wide pair a change touches, old or new.
+                    var moved = true
+                    while moved {
+                        moved = false
+                        c = 1
+                        while c <= cols {
+                            if changed[c] {
+                                let i = (row - 1) * cols + c - 1
+                                let live = frame_cell(panes, ses, bar, i)
+                                let old = copy sh.cells[i]
+                                if (live.width == 0 || old.width == 0) && c > 1 && !changed[c - 1] {
+                                    changed[c - 1] = true
+                                    moved = true
+                                }
+                                if (live.width == 2 || old.width == 2) && c < cols && !changed[c + 1] {
+                                    changed[c + 1] = true
+                                    moved = true
+                                }
+                            }
+                            c += 1
+                        }
+                    }
+                    c = 1
+                    while c <= cols {
+                        if changed[c] {
+                            var e = c
+                            while e + 1 <= cols && changed[e + 1] { e += 1 }
+                            runs += emit_frame_span(mut body, panes, ses, bar, row, c, e)
+                            store_frame(mut sh, panes, ses, bar, row, c, e)
+                            c = e + 1
+                        } else {
+                            c += 1
+                        }
+                    }
+                }
+            }
+        }
+        row += 1
+    }
+    let cr = clamp(cursor[0], 1, rows)
+    let cc = clamp(cursor[1], 1, cols)
+    let shape = clamp(cursor[2], 0, 6)
+    let visible = if cursor[3] == 1 then 1 else 0
+    let cursor_same = sh.valid && sh.cursor_row == cr && sh.cursor_col == cc && sh.shape == shape && sh.visible == visible
+    sh.cursor_row = cr
+    sh.cursor_col = cc
+    sh.shape = shape
+    sh.visible = visible
+    sh.valid = true
+    if !whole && runs == 0 && cursor_same { return List[byte]() }
+    var payload = List[byte]()
+    (mut payload).reserve(22 + body.len)
+    proto.put(mut payload, seq, 4)
+    proto.put(mut payload, if whole then 0 else seq - 1, 4)
+    proto.put(mut payload, cols, 2)
+    proto.put(mut payload, rows, 2)
+    proto.put(mut payload, cr, 2)
+    proto.put(mut payload, cc, 2)
+    proto.put(mut payload, shape, 1)
+    proto.put(mut payload, visible, 1)
+    proto.put(mut payload, runs, 4)
+    for x in body { (mut payload).push(x) }
+    payload
+}
+
+// ---- the chrome: borders, the focus mark, the bar ----
+
+const V_LINE: int = 9474
+const H_LINE: int = 9472
+const T_RIGHT: int = 9500
+const T_LEFT: int = 9508
+const T_DOWN: int = 9516
+const T_UP: int = 9524
+const CROSS: int = 9532
+/// The focused pane's border cells are drawn in this palette colour.
+pub const FOCUS_COLOUR: int = 2
+/// Rendition flag: inverse.
+pub const INVERSE: int = 64
+
+fn is_border(owner: List[int], cols: int, area: int, c: int, r: int) -> bool {
+    if c < 1 || r < 1 || c > cols || r > area { return false }
+    owner[(r - 1) * cols + c - 1] < 0
+}
+
+/// A border cell's glyph from its neighbours: a junction where a border
+/// meets a perpendicular one, else the line of its own axis.
+fn glyph_at(owner: List[int], cols: int, area: int, c: int, r: int, axis: int) -> int {
+    let up = is_border(owner, cols, area, c, r - 1)
+    let down = is_border(owner, cols, area, c, r + 1)
+    let left = is_border(owner, cols, area, c - 1, r)
+    let right = is_border(owner, cols, area, c + 1, r)
+    let vertical = up || down
+    let horizontal = left || right
+    if vertical && horizontal {
+        if up && down && left && right { return CROSS }
+        if up && down { return if right then T_RIGHT else T_LEFT }
+        if left && right { return if down then T_DOWN else T_UP }
+        return if right then T_RIGHT else T_LEFT
+    }
+    if axis == 0 { return V_LINE }
+    H_LINE
+}
+
+/// Decode a name's bytes into cells from `col` on, with a rendition; wide
+/// glyphs take two cells, marks are dropped, controls drawn as `?`.
+/// Returns the column after the text.
+fn put_text(mut line: List[vt.Cell], col: int, cols: int, text: str, flags: int) -> int {
+    var c = col
+    for cp in text.code_points() {
+        var base = cp
+        if base < 32 || (base >= 127 && base < 160) { base = 63 }
+        let w = vt.scalar_width(base)
+        if w == 0 { continue }
+        if c + w - 1 > cols { return c }
+        if w == 2 {
+            line[c - 1] = vt.Cell { base: base, mark1: 0, mark2: 0, width: 2, flags: flags, foreground: 0 - 1,
+                background: 0 - 1, written: true }
+            line[c] = vt.Cell { base: 32, mark1: 0, mark2: 0, width: 0, flags: flags, foreground: 0 - 1,
+                background: 0 - 1, written: true }
+            c += 2
+        } else {
+            line[c - 1] = chrome_cell(base, flags, 0 - 1)
+            c += 1
+        }
+    }
+    c
+}
+
+/// The width of a label as `put_text` draws it.
+fn text_width(text: str) -> int {
+    var n = 0
+    for cp in text.code_points() {
+        var base = cp
+        if base < 32 || (base >= 127 && base < 160) { base = 63 }
+        n += vt.scalar_width(base)
+    }
+    n
+}
