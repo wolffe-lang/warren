@@ -1,0 +1,82 @@
+//! member: true
+//! The prefix table: what a key does after the prefix (Ctrl-Space). This
+//! is the fixed table panes and tabs start with; the modes and the key
+//! table as data (with the hint line read from it) replace it.
+
+/// No action: the key is dropped.
+pub const ACT_NONE: int = 0
+/// Split the focused pane; arg is the axis (layout.COLS: side by side).
+pub const ACT_SPLIT: int = 1
+/// Move focus; arg is the direction.
+pub const ACT_FOCUS: int = 2
+/// Focus the next pane in tree order.
+pub const ACT_FOCUS_NEXT: int = 3
+/// Move a border of the focused pane; arg is the direction it moves.
+pub const ACT_RESIZE: int = 4
+/// Zoom the focused pane, or unzoom.
+pub const ACT_ZOOM: int = 5
+/// Every split of the tab back to halves.
+pub const ACT_EQUALIZE: int = 6
+/// Close the focused pane.
+pub const ACT_CLOSE: int = 7
+/// A new tab with one pane.
+pub const ACT_NEW_TAB: int = 8
+/// The next tab, wrapping.
+pub const ACT_NEXT_TAB: int = 9
+/// The previous tab, wrapping.
+pub const ACT_PREVIOUS_TAB: int = 10
+/// The tab at position arg (1-based).
+pub const ACT_SELECT_TAB: int = 11
+/// Detach this client.
+pub const ACT_DETACH: int = 12
+/// Send the prefix itself to the focused pane.
+pub const ACT_SEND_PREFIX: int = 13
+
+/// A key's action after the prefix: (action, arg).
+pub struct Bound {
+    action: int,
+    arg: int,
+}
+
+fn bound(action: int, arg: int) -> Bound {
+    Bound { action: action, arg: arg }
+}
+
+/// Is this KEY the prefix (Ctrl-Space)?
+pub fn is_prefix(mods: int, kind: int, code: int) -> bool {
+    kind == 0 && code == 32 && mods & 4 != 0 && mods & 2 == 0
+}
+
+/// The action of a KEY event after the prefix. Scalars arrive with shift
+/// folded in (`H` is 72), so shift is ignored on them.
+pub fn prefix_action(mods: int, kind: int, code: int) -> Bound {
+    if is_prefix(mods, kind, code) { return bound(ACT_SEND_PREFIX, 0) }
+    if kind == 1 && mods == 0 {
+        if code == 1 { return bound(ACT_FOCUS, 2) }
+        if code == 2 { return bound(ACT_FOCUS, 3) }
+        if code == 3 { return bound(ACT_FOCUS, 1) }
+        if code == 4 { return bound(ACT_FOCUS, 0) }
+        return bound(ACT_NONE, 0)
+    }
+    if kind != 0 || mods & 6 != 0 { return bound(ACT_NONE, 0) }
+    if code == 124 { return bound(ACT_SPLIT, 0) }
+    if code == 45 { return bound(ACT_SPLIT, 1) }
+    if code == 104 { return bound(ACT_FOCUS, 0) }
+    if code == 106 { return bound(ACT_FOCUS, 3) }
+    if code == 107 { return bound(ACT_FOCUS, 2) }
+    if code == 108 { return bound(ACT_FOCUS, 1) }
+    if code == 72 { return bound(ACT_RESIZE, 0) }
+    if code == 74 { return bound(ACT_RESIZE, 3) }
+    if code == 75 { return bound(ACT_RESIZE, 2) }
+    if code == 76 { return bound(ACT_RESIZE, 1) }
+    if code == 111 { return bound(ACT_FOCUS_NEXT, 0) }
+    if code == 122 { return bound(ACT_ZOOM, 0) }
+    if code == 61 { return bound(ACT_EQUALIZE, 0) }
+    if code == 120 { return bound(ACT_CLOSE, 0) }
+    if code == 99 { return bound(ACT_NEW_TAB, 0) }
+    if code == 110 { return bound(ACT_NEXT_TAB, 0) }
+    if code == 112 { return bound(ACT_PREVIOUS_TAB, 0) }
+    if code >= 49 && code <= 57 { return bound(ACT_SELECT_TAB, code - 48) }
+    if code == 100 { return bound(ACT_DETACH, 0) }
+    bound(ACT_NONE, 0)
+}
