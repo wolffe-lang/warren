@@ -4,6 +4,7 @@
 //! continuations, rendition, cursor), for full images and for deltas,
 //! including overwrites of half a wide pair; and the applier refuses a
 //! delta whose base is not its image or that would split an old pair.
+//! The event queue's cap counts only what a client has yet to take.
 //! Also measures compose, encode and apply time and image bytes at 80x24
 //! and 320x90 (stderr; a measurement, never a bound).
 use std.time
@@ -228,10 +229,55 @@ fn measure(cols: int, rows: int) {
     eprint("MEASURE compose {cols}x{rows} full-compose+encode-ns={best_compose} full-apply-ns={best_apply} full-wire-bytes={bytes} one-cell-delta-compose-ns={t4 - t3} one-cell-delta-wire-bytes={dwire.len}")
 }
 
+fn bytes_of(n: int) -> List[byte] {
+    var b = List[byte]()
+    var i = 0
+    while i < n {
+        proto.put(mut b, 65, 1)
+        i += 1
+    }
+    b
+}
+
+fn take_some(mut c: server.Conn, budget: int) {
+    let q = server.queued(c)
+    server.wrote(mut c, if q < budget then q else budget)
+}
+
+// The event queue's cap counts what the client has yet to take. A small
+// socket under a steady pane never empties the queue; a stalled client
+// fills it; the one image in the queue never counts.
+fn test_event_queue() {
+    let event = bytes_of(4000)
+    var steady = server.new_conn()
+    assert(server.enqueue(mut steady, event, false), "event-queue-steady-first")
+    var n = 0
+    while n < 200 {
+        assert(server.enqueue(mut steady, event, false), "event-queue-steady-accepted")
+        take_some(mut steady, 4000)
+        assert(server.queued(steady) == 4000 && server.events_queued(steady) == 4000, "event-queue-steady-never-empty")
+        n += 1
+    }
+    var stalled = server.new_conn()
+    var taken = 0
+    while server.enqueue(mut stalled, event, false) { taken += 1 }
+    assert(taken == server.EVENT_QUEUE / 4000, "event-queue-stalled-cap")
+    var mixed = server.new_conn()
+    assert(server.enqueue(mut mixed, bytes_of(100000), true), "event-queue-image")
+    taken = 0
+    while server.enqueue(mut mixed, event, false) { taken += 1 }
+    assert(taken == server.EVENT_QUEUE / 4000, "event-queue-image-not-counted")
+    take_some(mut mixed, 50000)
+    assert(server.events_queued(mixed) == taken * 4000, "event-queue-half-image")
+    take_some(mut mixed, 54000)
+    assert(server.events_queued(mixed) == (taken - 1) * 4000, "event-queue-past-image")
+}
+
 fn main() -> int {
     test_full_and_deltas()
     test_applier_refusals()
     test_seeded_soak()
+    test_event_queue()
     measure(80, 24)
     measure(320, 90)
     0
