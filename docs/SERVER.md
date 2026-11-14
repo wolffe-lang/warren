@@ -63,7 +63,11 @@ resize that keeps it, are the emulator's to do.
 thread and two the runtime starts for signals and children; measured under
 QEMU), and every wolf program inside a pane takes two (pax#354 is the
 machine-wide limit). A Unix stream holds 4096 bytes in each direction, so a
-repaint always spans several writes. Surviving a console logout depends on
+repaint always spans several writes, and a client takes those bytes a wake
+at a time: a pane that writes titles (or other events) as fast as it can
+outruns every client there, and each is detached as too slow (the too-slow
+row is red on PAX). Keeping the title as state, not queuing each one as an
+event, would remove the title case; this version does not. Surviving a console logout depends on
 pid 1 staying (pax#358, not merged): until an image with it proves the
 logout case, the server's promise on PAX is that it outlives the client
 process that started it.
