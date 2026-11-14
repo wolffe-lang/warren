@@ -197,13 +197,22 @@ hold. The layout files of a later milestone build on this form.
 
 | row | what it holds | where |
 |---|---|---|
-| goldens | about fifty operation scripts, each with the expected `dump_at` and every refusal, resize answer and `pane_at` query, computed by hand from this file | `src/layout_rows/goldens.lu` |
-| properties | seeded random sequences of 50 operations at 20x6, 80x24, 81x25, 320x90 and 512x512, the invariants below held after every operation | `src/layout_rows/properties.lu` |
+| goldens | 59 operation scripts, each with the expected `dump_at` and every refusal, resize answer and `pane_at` query, computed by hand from this file | `src/layout_rows/goldens.lu` |
+| properties | seeded random sequences of 50 operations at 20x6, 80x24, 81x25, 320x90 and 512x512, the invariants below held after every operation, and grids of every shape up to 4x4 built at each size | `src/layout_rows/properties.lu` |
+
+The entries: `src/layout_native.lu` runs every golden and 2000 sequences
+at each size; `src/layout_slice.lu` runs the goldens, or a slice of
+sequences at one size (`SIZE FIRST COUNT`, the same seeds), for the checked
+machine and the reference interpreter, whose step budgets hold a few dozen
+sequences a run (`tests/layout/rig/slices.py` sums 200 a size on the first
+and 50 on the second); `src/layout_test.lu` puts the goldens and five
+sequences a size in the ordinary `wolf test` gate.
 
 The invariants:
 
 1. The rects of the visible panes and the borders tile the area exactly,
-   and `rects` names every pane of the tab once.
+   `rects` names every pane of the tab once, and `pane_at` agrees: a
+   rect's corner cells answer its pane, a border's first cell -1.
 2. Every pane id appears once across all tabs; every tab has a pane; each
    tab's focus is one of its panes and first in its focus order, which
    holds each of its panes once; the active tab exists; the arena's parent
@@ -213,7 +222,8 @@ The invariants:
 4. A split then the close of the new pane gives back the original layout
    (unzoomed, since a split unzooms).
 5. A resize by `+n` then `-n` that the clamp did not touch gives back the
-   same rects.
+   same rects; every resize answers a growth of the sign it was asked for,
+   and no more cells than asked.
 6. In a grid (every column span meets every row span), focus in a direction
    then in the opposite one comes back.
 
