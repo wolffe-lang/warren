@@ -135,10 +135,11 @@ fn shell_of(s: Spawn) -> str {
 }
 
 /// Start the pane's program on a new pseudo-terminal of the session's
-/// size, in a session of its own with every signal at its default. The
-/// parent's slave is closed as soon as the child has it. On a failure
+/// size, in a session of its own with every signal at its default and
+/// none of the descriptors the server inherited above 2. The parent's
+/// slave is closed as soon as the child has it. On a failure
 /// every acquired descriptor is closed and the reason returned.
-pub fn start_pane(mut s: Session, sp: Spawn, argv: List[str]) -> str {
+pub fn start_pane(mut s: Session, sp: Spawn, argv: List[str], inherited: List[int]) -> str {
     let p = term.open_pty() else |e| { return "open-pty-{e}" }
     var master = p.master
     var slave = p.slave
@@ -162,6 +163,8 @@ pub fn start_pane(mut s: Session, sp: Spawn, argv: List[str]) -> str {
     process.set_stdin(mut c, slave)
     process.set_stdout(mut c, slave)
     process.set_stderr(mut c, slave)
+    // What the server itself inherited above 2 is not the pane's.
+    for n in inherited { process.close_fd(mut c, n) }
     if sp.cwd.len > 0 { env.set_cwd(sp.cwd) else |_| {} }
     var started = "ok"
     var child = process.start_session(c, ALL_MEANINGS) else |e| {
@@ -248,4 +251,17 @@ pub fn term_size(f: fs.File, cols: int, rows: int) {
 /// The meaning set the server listens for.
 pub fn listened() -> int {
     signal.child() | signal.terminate() | signal.interrupt()
+}
+
+/// The descriptors above 2 this process inherited, read before it opens
+/// anything of its own (the host's descriptor directory; none where it
+/// has no such directory). Only those a spawn map can name (up to 255).
+pub fn inherited_descriptors() -> List[int] {
+    var out = List[int]()
+    let names = fs.read_dir("/dev/fd") else { return out }
+    for n in names {
+        let fd = n.to_int() else 0 - 1
+        if fd > 2 && fd <= 255 { (mut out).push(fd) }
+    }
+    out
 }
