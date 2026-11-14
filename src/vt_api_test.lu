@@ -1,0 +1,80 @@
+//! member: false
+//! D6: the emulator surface the server consumes, held as rows. The server
+//! reads the active screen's cells (row * cols + col), the cursor and its
+//! shape, takes answers for the pty and coalesced events for clients, and
+//! resizes; it never edits the emulator or computes a width itself.
+use vt
+
+fn active(pane: vt.Vt, row: int, col: int) -> vt.Cell {
+    if pane.active_alternate {
+        return pane.alternate.cells[(row - 1) * pane.cols + col - 1]
+    }
+    pane.primary.cells[(row - 1) * pane.cols + col - 1]
+}
+
+fn test_cells_widths_marks_and_rendition() {
+    var pane = vt.new(20, 6, 4096)
+    // Bold, palette red on a true-colour background, then a wide scalar,
+    // then e with a combining acute, then a plain cell.
+    vt.feed(mut pane, "\u{1b}[1;31;48;2;1;2;3mA\u{4e2d}e\u{301}\u{1b}[mz".bytes())
+    let a = active(pane, 1, 1)
+    assert(a.base == 65 && a.width == 1 && a.flags == 1, "api-cell-a")
+    assert(a.foreground == 1 && a.background == 16777216 + 65536 + 2 * 256 + 3, "api-colours")
+    let lead = active(pane, 1, 2)
+    let cont = active(pane, 1, 3)
+    assert(lead.base == 20013 && lead.width == 2, "api-wide-lead")
+    assert(cont.width == 0, "api-wide-continuation")
+    let e = active(pane, 1, 4)
+    assert(e.base == 101 && e.mark1 == 769 && e.mark2 == 0 && e.width == 1, "api-combining")
+    let z = active(pane, 1, 5)
+    assert(z.base == 122 && z.flags == 0 && z.foreground == 0 - 1 && z.background == 0 - 1, "api-reset")
+    let blank = active(pane, 2, 1)
+    assert(blank.base == 32 && blank.width == 1, "api-blank")
+    assert(pane.cursor_row == 1 && pane.cursor_col == 6, "api-cursor")
+    assert(pane.modes.cursor_visible, "api-cursor-visible")
+}
+
+fn test_cursor_shape_and_alternate_screen() {
+    var pane = vt.new(10, 4, 0)
+    vt.feed(mut pane, "\u{1b}[5 q\u{1b}[?25l\u{1b}[?1049hX".bytes())
+    assert(pane.cursor_shape == 5 && !pane.modes.cursor_visible, "api-shape")
+    assert(pane.active_alternate && active(pane, 1, 1).base == 88, "api-alternate")
+    vt.feed(mut pane, "\u{1b}[?1049l".bytes())
+    assert(!pane.active_alternate && active(pane, 1, 1).base == 32, "api-primary")
+}
+
+fn equal(data: List[byte], text: str) -> bool {
+    if data.len != text.len { return false }
+    var i = 0
+    for b in text.bytes() {
+        if data[i] != b { return false }
+        i += 1
+    }
+    true
+}
+
+fn test_answers_and_events() {
+    var pane = vt.new(80, 24, 0)
+    vt.feed(mut pane, "\u{1b}[c\u{1b}[5n\u{1b}]2;pane\u{7}\u{7}".bytes())
+    assert(equal(vt.take_answers(mut pane), "\u{1b}[?62;22c\u{1b}[0n"), "api-answers")
+    assert(vt.take_answers(mut pane).len == 0, "api-answers-drained")
+    let events = vt.take_events(mut pane)
+    assert(events.len == 2 && events[0].kind == 1 && events[1].kind == 2, "api-events")
+    assert(pane.title_length == 4 && pane.title_storage[0] as int == 112, "api-title")
+}
+
+fn test_resize() {
+    var pane = vt.new(10, 4, 4096)
+    vt.feed(mut pane, "hello".bytes())
+    assert(vt.resize(mut pane, 20, 6) == "", "api-resize")
+    assert(pane.cols == 20 && pane.rows == 6 && active(pane, 1, 1).base == 104, "api-resized")
+    assert(vt.resize(mut pane, 600, 600) == "vt-size-area", "api-resize-area")
+}
+
+fn main() -> int {
+    test_cells_widths_marks_and_rendition()
+    test_cursor_shape_and_alternate_screen()
+    test_answers_and_events()
+    test_resize()
+    0
+}

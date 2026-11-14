@@ -1,0 +1,214 @@
+//! D1: the server's whole readiness set in ONE wait.
+//!
+//! A pseudo-terminal master with output, a pipe with a byte, a Unix
+//! listener with a dial in its backlog, an accepted client with bytes and
+//! an accepted client registered for WRITE: one std.poll wait answers
+//! every entry once, and a child's end (signal.child) beside them in the
+//! same return. Then a quiet set is not answered before its deadline, and
+//! a master whose child ended reads READ with HANGUP until its end.
+//!
+//! Expected lines (tests/deps/expect.txt holds them per host):
+//!   one_wait=listener:1 master:1 pipe:1 reader:1 writer:2 meaning:child
+//!   deadline_not_early=true
+//!   hangup_seen=true
+//!   master_end=io (Linux, PAX) | eof (macOS)
+//!   child_status=3
+
+use std.fs
+use std.net
+use std.net.unix
+use std.poll
+use std.process
+use std.signal
+use std.sort
+use std.str
+use std.term
+use std.time
+
+fn named(ev: poll.Events, names: List[str]) -> str {
+    var parts = List[str]()
+    for r in ev.ready {
+        (mut parts).push("{names[r.key]}:{r.facts}")
+    }
+    sort.sort_strs(mut parts)
+    if ev.meaning == signal.child() {
+        (mut parts).push("meaning:child")
+    } else if ev.meaning != 0 {
+        (mut parts).push("meaning:{ev.meaning}")
+    }
+    if parts.len == 0 {
+        return "none"
+    }
+    str.join(" ", parts)
+}
+
+// Wait on one entry alone, consuming nothing, so that a byte written by
+// this process has been published before the measured wait.
+fn barrier_file(f: fs.File) -> () ! {invalid, io, unsupported} {
+    var b = poll.open()?
+    let k = poll.add_file(mut b, f, poll.READ)?
+    let _r = poll.wait(mut b, 0, 2000)?
+    poll.remove(mut b, k)?
+    poll.close(take b)?
+}
+
+fn barrier_socket(s: net.Socket) -> () ! {invalid, io, unsupported} {
+    var b = poll.open()?
+    let k = poll.add_socket(mut b, s, poll.READ)?
+    let _r = poll.wait(mut b, 0, 2000)?
+    poll.remove(mut b, k)?
+    poll.close(take b)?
+}
+
+// Reap the child that exits 3, without blocking: its SIGCHLD is queued
+// before the poll can report it, so the meaning is pending afterwards.
+fn reap_one() -> int ! {io} {
+    var n = 0
+    while n < 400 {
+        let c = process.poll()?
+        if c.changed {
+            return c.status.value
+        }
+        time.sleep(time.millis(5))
+        n = n + 1
+    }
+    -1
+}
+
+fn hangup_row() -> () ! {invalid, io, unsupported, not_found, denied} {
+    let p = term.open_pty()?
+    var master = p.master
+    var slave = p.slave
+    var c = process.command("/bin/sh")
+    process.push_arg(mut c, "-c")
+    process.push_arg(mut c, "printf x")
+    process.set_stdin(mut c, slave)
+    process.set_stdout(mut c, slave)
+    process.set_stderr(mut c, slave)
+    var ch = process.start_session(c, 0)?
+    fs.close(take slave)?
+    fs.set_nonblock(mut master, true)?
+    var w = poll.open()?
+    let k = poll.add_file(mut w, master, poll.READ)?
+    var hangup = false
+    var end = "none"
+    var got = 0
+    var turns = 0
+    while end == "none" && turns < 200 {
+        let ev = poll.wait(mut w, 0, 2000)?
+        for r in ev.ready {
+            if r.key == k && r.facts & poll.HANGUP != 0 { hangup = true }
+            if r.key == k && r.facts & poll.READ != 0 {
+                let b = fs.read_chunk(mut master, 4096) else |e| match e {
+                    eof => {
+                        end = "eof"
+                        List[byte]()
+                    },
+                    io => {
+                        end = "io"
+                        List[byte]()
+                    },
+                }
+                got = got + b.len
+            }
+        }
+        turns = turns + 1
+    }
+    poll.remove(mut w, k)?
+    poll.close(take w)?
+    fs.close(take master)?
+    // The server reaps its session children without blocking: the poll
+    // must report this start_session child and retire its handle.
+    var reaped = false
+    var st = -1
+    var n = 0
+    while !reaped && n < 400 {
+        let change = process.poll()?
+        if change.changed && change.child.slot == ch.slot {
+            reaped = true
+            st = change.status.value
+        } else if !change.changed {
+            time.sleep(time.millis(5))
+        }
+        n = n + 1
+    }
+    print("hangup_seen={hangup}")
+    print("master_end={end}")
+    print("session_child_polled={reaped && st == 0}")
+    eprint("hangup-row bytes={got} turns={turns} status={st}")
+}
+
+fn main() -> !int {
+    signal.listen(signal.child())?
+    let p = term.open_pty()?
+    var master = p.master
+    var slave = p.slave
+    var pp = process.pipe()?
+    var pr = pp.read
+    var pw = pp.write
+    let path = "d1-one-wait.sock"
+    fs.remove(path) else |_| {}
+    var srv = unix.listen(path)?
+    var reader_peer = unix.connect(path)?
+    var reader = net.accept(mut srv)?
+    var writer_peer = unix.connect(path)?
+    var writer = net.accept(mut srv)?
+    var pending = unix.connect(path)?
+    fs.write(mut slave, "a")?
+    fs.write(mut pw, "p")?
+    net.write(mut reader_peer, "r")?
+    barrier_file(master)?
+    barrier_file(pr)?
+    barrier_socket(reader)?
+
+    var c = process.command("/bin/sh")
+    process.push_arg(mut c, "-c")
+    process.push_arg(mut c, "exit 3")
+    let _ch = process.start(c)?
+    let status = reap_one()?
+
+    var w = poll.open()?
+    var names = List[str]()
+    let _k0 = poll.add_file(mut w, master, poll.READ)?
+    (mut names).push("master")
+    let _k1 = poll.add_file(mut w, pr, poll.READ)?
+    (mut names).push("pipe")
+    let _k2 = poll.add_listener(mut w, srv)?
+    (mut names).push("listener")
+    let _k3 = poll.add_socket(mut w, reader, poll.READ)?
+    (mut names).push("reader")
+    let _k4 = poll.add_socket(mut w, writer, poll.WRITE)?
+    (mut names).push("writer")
+    let ev = poll.wait(mut w, signal.child(), 2000)?
+    print("one_wait={named(ev, names)}")
+    poll.close(take w)?
+
+    // A quiet set: drain what was ready, then nothing may answer early.
+    let _m = fs.read_chunk(mut master, 64)?
+    let _p = fs.read_chunk(mut pr, 64)?
+    let _r = net.read_bytes(mut reader, 64)?
+    var q = poll.open()?
+    let _q0 = poll.add_file(mut q, master, poll.READ)?
+    let _q1 = poll.add_file(mut q, pr, poll.READ)?
+    let _q2 = poll.add_socket(mut q, reader, poll.READ)?
+    let t0 = time.monotonic_ns()
+    let quiet = poll.wait(mut q, signal.child(), 25)?
+    let t1 = time.monotonic_ns()
+    print("deadline_not_early={quiet.ready.len == 0 && quiet.meaning == 0 && t1 - t0 >= 25000000}")
+    poll.close(take q)?
+
+    hangup_row()?
+    print("child_status={status}")
+
+    net.close(take pending)?
+    net.close(take reader_peer)?
+    net.close(take writer_peer)?
+    net.close(take reader)?
+    net.close(take writer)?
+    net.close_listener(take srv)?
+    fs.close(take pr)?
+    fs.close(take pw)?
+    fs.close(take slave)?
+    fs.close(take master)?
+    0
+}

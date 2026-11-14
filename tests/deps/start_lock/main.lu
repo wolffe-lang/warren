@@ -1,0 +1,156 @@
+//! D3: an atomic start lock and an exclusive socket path, so a starting
+//! server never replaces a live one's socket.
+//!
+//! The runtime directory is made 0700 and read back with its owner. The
+//! start lock is an exclusive fs.lock on a file opened without following
+//! a final link: a second open in this process is busy, a forked child's
+//! own open is busy, and a child that took the lock and ended released
+//! it. Binding a taken socket path is exists; dialling a path whose
+//! listener died is refused; only after holding the lock and seeing that
+//! refusal may the stale path be removed and bound again.
+//!
+//! Expected lines:
+//!   dir_mode_0700=true dir_owner=self
+//!   lock_second_open=busy
+//!   lock_from_child=busy
+//!   lock_after_holder_exit=taken
+//!   lock_link_refused=invalid
+//!   bind_taken=exists
+//!   dial_stale=refused
+//!   rebind_after_lock=ok
+//! The checked machine has no fork: its two child lines read
+//! unsupported, and the expectation file says so.
+
+use std.env
+use std.fs
+use std.net
+use std.net.unix
+use std.process
+
+fn lock_row(mut f: fs.File) -> str {
+    fs.lock(mut f, fs.LOCK_EXCLUSIVE) else |e| {
+        return "{e}"
+    }
+    "taken"
+}
+
+// The child's verdict travels back as its exit code: 10 busy, 11 taken,
+// 12 anything else. A child ends with exit, never by returning.
+fn child_try(path: str) {
+    var f = fs.open_mode(path, 3 + fs.NOFOLLOW) else |_| {
+        process.exit(12)
+        return
+    }
+    let r = lock_row(mut f)
+    if r == "busy" { process.exit(10) }
+    if r == "taken" { process.exit(11) }
+    process.exit(12)
+}
+
+fn code_name(code: int) -> str {
+    if code == 10 { return "busy" }
+    if code == 11 { return "taken" }
+    "other({code})"
+}
+
+fn from_child(path: str) -> str ! {io} {
+    let f = process.fork() else |e| {
+        return "{e}"
+    }
+    if process.is_child(f) {
+        child_try(path)
+    }
+    var ch = process.Child { slot: f.child.slot }
+    let st = process.wait_status(take ch)?
+    code_name(st)
+}
+
+// A child takes the lock and ends while holding it; the lock must be free
+// afterwards (a crashed server never leaves the start lock held).
+fn after_holder_exit(path: str) -> str ! {io} {
+    let f = process.fork() else |e| {
+        return "{e}"
+    }
+    if process.is_child(f) {
+        var g = fs.open_mode(path, 3 + fs.NOFOLLOW) else |_| {
+            process.exit(12)
+            return
+        }
+        let r = lock_row(mut g)
+        if r == "taken" { process.exit(11) }
+        process.exit(12)
+    }
+    var ch = process.Child { slot: f.child.slot }
+    let st = process.wait_status(take ch)?
+    if st != 11 { return "child({st})" }
+    var h = fs.open_mode(path, 3 + fs.NOFOLLOW)?
+    let r = lock_row(mut h)
+    fs.unlock(mut h)?
+    fs.close(take h)?
+    r
+}
+
+fn main() -> !int {
+    let dir = "d3-runtime"
+    fs.remove_dir_all(dir) else |_| {}
+    fs.create_dir_mode(dir, 0o700)?
+    let info = fs.lstat(dir)?
+    let me = env.euid()?
+    let owner = if info.uid == me then "self" else "uid{info.uid}"
+    print("dir_mode_0700={(info.mode & 511) == 448} dir_owner={owner}")
+
+    let lock_path = dir + "/start.lock"
+    var held = fs.open_mode(lock_path, 3 + fs.NOFOLLOW)?
+    fs.lock(mut held, fs.LOCK_EXCLUSIVE)?
+    var second = fs.open_mode(lock_path, 3 + fs.NOFOLLOW)?
+    print("lock_second_open={lock_row(mut second)}")
+    fs.close(take second)?
+    print("lock_from_child={from_child(lock_path)?}")
+    fs.unlock(mut held)?
+    print("lock_after_holder_exit={after_holder_exit(lock_path)?}")
+
+    let link_path = dir + "/link.lock"
+    fs.symlink("start.lock", link_path)?
+    var link_row = "opened"
+    var via = fs.open_mode(link_path, 3 + fs.NOFOLLOW) else |e| {
+        link_row = "{e}"
+        fs.File { fd: 0 - 1 }
+    }
+    if link_row == "opened" { fs.close(take via)? }
+    print("lock_link_refused={link_row}")
+
+    let sock = dir + "/s"
+    var live = unix.listen(sock)?
+    var bind_row = "bound"
+    var dup = unix.listen(sock) else |e| {
+        bind_row = "{e}"
+        net.Listener { fd: 0 - 1 }
+    }
+    if bind_row == "bound" { net.close_listener(take dup)? }
+    print("bind_taken={bind_row}")
+
+    // A listener that died without closing leaves its path. Simulate the
+    // crash's leftover by renaming a live listener's path away, closing
+    // it (best-effort unlink of the old name), and putting the file back.
+    let moved = dir + "/s.old"
+    fs.move_file(sock, moved)?
+    net.close_listener(take live)?
+    fs.move_file(moved, sock)?
+    var dial_row = "connected"
+    var c = unix.connect(sock) else |e| {
+        dial_row = "{e}"
+        net.Socket { fd: 0 - 1 }
+    }
+    if dial_row == "connected" { net.close(take c)? }
+    print("dial_stale={dial_row}")
+
+    fs.lock(mut held, fs.LOCK_EXCLUSIVE)?
+    fs.remove(sock)?
+    var again = unix.listen(sock)?
+    print("rebind_after_lock=ok")
+    net.close_listener(take again)?
+    fs.unlock(mut held)?
+    fs.close(take held)?
+    fs.remove_dir_all(dir)?
+    0
+}
