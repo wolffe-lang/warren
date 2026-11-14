@@ -1,0 +1,457 @@
+//! member: true
+//! The outer terminal's input bytes to protocol events: keys (scalars and
+//! named keys with their modifiers), SGR mouse reports, bracketed paste and
+//! focus reports. Pure: the attach loop feeds it what the terminal sends and
+//! asks it, at its deadline, for a lone ESC that no sequence followed.
+
+const ESC: int = 27
+
+/// How long a lone ESC (or an unfinished sequence) waits for the rest
+/// before it is taken as it stands.
+pub const ESC_MS: int = 30
+/// The longest sequence kept while it is unfinished; past it the bytes go
+/// to the pane unchanged.
+pub const SEQUENCE_MAX: int = 64
+/// The most one PASTE carries; a longer paste goes as several.
+pub const PASTE_MAX: int = 65536
+
+/// One event for the server: `kind` is the client message type (2 KEY,
+/// 3 MOUSE, 4 PASTE, 5 FOCUS, 7 INPUT). KEY uses `mods`, `key` (0 scalar,
+/// 1 named) and `code`; MOUSE `mods`, `key` (its kind), `code` (button),
+/// `col` and `row`; FOCUS `code` (1 gained); PASTE and INPUT `data`.
+pub struct Event {
+    kind: int,
+    mods: int,
+    key: int,
+    code: int,
+    col: int,
+    row: int,
+    data: List[byte],
+}
+
+/// The parser's state between reads.
+pub struct Parser {
+    pending: List[byte],
+    since: int,
+    pasting: bool,
+    paste: List[byte],
+}
+
+/// A parser with nothing pending.
+pub fn parser() -> Parser {
+    Parser { pending: List[byte](), since: 0, pasting: false, paste: List[byte]() }
+}
+
+fn event(kind: int, mods: int, key: int, code: int) -> Event {
+    Event { kind: kind, mods: mods, key: key, code: code, col: 0, row: 0, data: List[byte]() }
+}
+
+fn bytes_event(kind: int, take data: List[byte]) -> Event {
+    Event { kind: kind, mods: 0, key: 0, code: 0, col: 0, row: 0, data: data }
+}
+
+/// When `expire` has something to give, in the caller's milliseconds;
+/// -1 when nothing waits.
+pub fn deadline(p: Parser) -> int {
+    if p.pending.len == 0 || p.pasting { return 0 - 1 }
+    p.since + ESC_MS
+}
+
+/// Feed bytes read at `now_ms`; returns the events they complete.
+pub fn feed(mut p: Parser, data: List[byte], now_ms: int) -> List[Event] {
+    var out = List[Event]()
+    for b in data { (mut p.pending).push(b) }
+    drain(mut p, mut out, false)
+    // What still waits is timed from this read.
+    p.since = now_ms
+    out
+}
+
+/// At or past the deadline: what waits is taken as it stands (a lone ESC
+/// is the Escape key; ESC then a byte is that key with Alt; an unfinished
+/// sequence goes to the pane unchanged).
+pub fn expire(mut p: Parser, now_ms: int) -> List[Event] {
+    var out = List[Event]()
+    let d = deadline(p)
+    if d < 0 || now_ms < d { return out }
+    drain(mut p, mut out, true)
+    out
+}
+
+fn take_front(mut p: Parser, n: int) {
+    var rest = List[byte]()
+    var i = n
+    while i < p.pending.len {
+        (mut rest).push(p.pending[i])
+        i += 1
+    }
+    p.pending = rest
+}
+
+fn at(p: Parser, i: int) -> int {
+    p.pending[i] as int
+}
+
+fn slice(p: Parser, from: int, to: int) -> List[byte] {
+    var b = List[byte]()
+    var i = from
+    while i < to {
+        (mut b).push(p.pending[i])
+        i += 1
+    }
+    b
+}
+
+// Decode what is complete; `force` takes an unfinished sequence as it
+// stands.
+fn drain(mut p: Parser, mut out: List[Event], force: bool) {
+    while p.pending.len > 0 {
+        if p.pasting {
+            if !paste_step(mut p, mut out) { return }
+            continue
+        }
+        let n = one(mut p, mut out, force)
+        if n == 0 { return }
+        take_front(mut p, n)
+    }
+}
+
+fn flush_paste(mut p: Parser, mut out: List[Event]) {
+    if p.paste.len == 0 { return }
+    (mut out).push(bytes_event(4, take copy p.paste))
+    p.paste = List[byte]()
+}
+
+fn add_paste(mut p: Parser, mut out: List[Event], n: int) {
+    var i = 0
+    while i < n {
+        (mut p.paste).push(p.pending[i])
+        if p.paste.len == PASTE_MAX { flush_paste(mut p, mut out) }
+        i += 1
+    }
+    take_front(mut p, n)
+}
+
+// Inside a paste, `ESC [ 2 0 1 ~` ends it; everything before is content.
+// True when the paste ended (the caller goes on decoding).
+fn paste_step(mut p: Parser, mut out: List[Event]) -> bool {
+    let end = "\u{1b}[201~".bytes()
+    var i = 0
+    while i < p.pending.len {
+        if at(p, i) == ESC {
+            var k = 0
+            while k < end.len && i + k < p.pending.len && p.pending[i + k] == end[k] { k += 1 }
+            if k == end.len {
+                add_paste(mut p, mut out, i)
+                flush_paste(mut p, mut out)
+                p.pasting = false
+                take_front(mut p, end.len)
+                return true
+            }
+            if i + k == p.pending.len {
+                // An end marker the read cut: keep it for the next read.
+                add_paste(mut p, mut out, i)
+                return false
+            }
+        }
+        i += 1
+    }
+    add_paste(mut p, mut out, p.pending.len)
+    false
+}
+
+// Bytes of one UTF-8 scalar starting with `b`, 0 for an invalid lead.
+fn utf8_len(b: int) -> int {
+    if b < 128 { return 1 }
+    if b >= 194 && b <= 223 { return 2 }
+    if b >= 224 && b <= 239 { return 3 }
+    if b >= 240 && b <= 244 { return 4 }
+    0
+}
+
+// The scalar at `i` (length already known complete), or -1 if invalid.
+fn scalar_at(p: Parser, i: int, n: int) -> int {
+    let b = at(p, i)
+    if n == 1 { return b }
+    var cp = if n == 2 then b % 32 else if n == 3 then b % 16 else b % 8
+    var k = 1
+    while k < n {
+        let c = at(p, i + k)
+        if c < 128 || c > 191 { return 0 - 1 }
+        cp = cp * 64 + c % 64
+        k += 1
+    }
+    if (n == 3 && cp < 2048) || (n == 4 && (cp < 65536 || cp > 1114111)) { return 0 - 1 }
+    if cp >= 55296 && cp <= 57343 { return 0 - 1 }
+    cp
+}
+
+// One key from a byte or scalar: C0 controls as Ctrl keys, DEL as
+// Backspace, CR as Enter, Tab as Tab.
+fn key_of(cp: int, mods: int) -> Event {
+    if cp == 13 { return event(2, mods, 1, 13) }
+    if cp == 9 { return event(2, mods, 1, 12) }
+    if cp == 127 { return event(2, mods, 1, 11) }
+    if cp == 8 { return event(2, mods | 4, 1, 11) }
+    if cp == 0 { return event(2, mods | 4, 0, 32) }
+    if cp >= 1 && cp <= 26 { return event(2, mods | 4, 0, cp + 96) }
+    if cp >= 28 && cp <= 31 { return event(2, mods | 4, 0, cp + 64) }
+    event(2, mods, 0, cp)
+}
+
+// A scalar (with `mods`) at `i`; returns bytes used, 0 if incomplete (and
+// not forced), and emits INPUT for an invalid byte.
+fn scalar_key(p: Parser, mut out: List[Event], i: int, mods: int, force: bool) -> int {
+    let n = utf8_len(at(p, i))
+    if n == 0 {
+        (mut out).push(bytes_event(7, take slice(p, i, i + 1)))
+        return 1
+    }
+    if i + n > p.pending.len {
+        if !force { return 0 }
+        (mut out).push(bytes_event(7, take slice(p, i, p.pending.len)))
+        return p.pending.len - i
+    }
+    let cp = scalar_at(p, i, n)
+    if cp < 0 {
+        (mut out).push(bytes_event(7, take slice(p, i, i + n)))
+        return n
+    }
+    (mut out).push(key_of(cp, mods))
+    n
+}
+
+// Decode one item at the front; returns bytes used (0: wait for more).
+fn one(mut p: Parser, mut out: List[Event], force: bool) -> int {
+    let b = at(p, 0)
+    if b != ESC { return scalar_key(p, mut out, 0, 0, force) }
+    if p.pending.len == 1 {
+        if !force { return 0 }
+        (mut out).push(event(2, 0, 1, 14))
+        return 1
+    }
+    let c = at(p, 1)
+    if c == 91 || c == 79 {
+        let n = sequence(mut p, mut out, c == 79)
+        if n > 0 { return n }
+        if n < 0 {
+            // Too long or malformed: unchanged to the pane, up to the end.
+            let used = 0 - n
+            (mut out).push(bytes_event(7, take slice(p, 0, used)))
+            return used
+        }
+        if !force { return 0 }
+        if p.pending.len == 2 {
+            // ESC [ or ESC O alone: Alt with that key.
+            (mut out).push(key_of(c, 2))
+            return 2
+        }
+        (mut out).push(bytes_event(7, take slice(p, 0, p.pending.len)))
+        return p.pending.len
+    }
+    if c == ESC {
+        // ESC ESC: Escape with Alt when nothing follows, else Escape.
+        if p.pending.len == 2 && !force { return 0 }
+        if p.pending.len == 2 {
+            (mut out).push(event(2, 2, 1, 14))
+            return 2
+        }
+        (mut out).push(event(2, 0, 1, 14))
+        return 1
+    }
+    // ESC then a key: that key with Alt.
+    let n = scalar_key(p, mut out, 1, 2, force)
+    if n == 0 { return 0 }
+    n + 1
+}
+
+// A CSI (`ESC [`) or SS3 (`ESC O`) sequence at the front. Returns its
+// length when complete, 0 when unfinished, -length when it cannot be
+// decoded (the bytes go unchanged).
+fn sequence(mut p: Parser, mut out: List[Event], ss3: bool) -> int {
+    if ss3 {
+        if p.pending.len < 3 { return 0 }
+        let f = at(p, 2)
+        let e = ss3_key(f)
+        if e.kind == 0 { return 0 - 3 }
+        (mut out).push(e)
+        return 3
+    }
+    var i = 2
+    while i < p.pending.len {
+        let x = at(p, i)
+        if x >= 64 && x <= 126 {
+            let n = i + 1
+            if !csi(mut p, mut out, n) { return 0 - n }
+            return n
+        }
+        if x < 32 || x > 63 { return 0 - (i + 1) }
+        if i + 1 >= SEQUENCE_MAX { return 0 - (i + 1) }
+        i += 1
+    }
+    0
+}
+
+fn ss3_key(f: int) -> Event {
+    let named = "ABCDHF"
+    var k = 0
+    while k < 6 {
+        if (named.bytes()[k] as int) == f { return event(2, 0, 1, k + 1) }
+        k += 1
+    }
+    if f >= 80 && f <= 83 { return event(2, 0, 1, 15 + f - 80) }
+    if f >= 112 && f <= 121 { return event(2, 0, 1, 39 + f - 112) }
+    if f == 110 { return event(2, 0, 1, 49) }
+    if f == 111 { return event(2, 0, 1, 50) }
+    if f == 106 { return event(2, 0, 1, 51) }
+    if f == 109 { return event(2, 0, 1, 52) }
+    if f == 107 { return event(2, 0, 1, 53) }
+    if f == 77 { return event(2, 0, 1, 54) }
+    if f == 88 { return event(2, 0, 1, 55) }
+    event(0, 0, 0, 0)
+}
+
+// Parameters of the CSI in pending[2..n-1]: numbers split at ';', -1 for
+// an empty one; `private` is its leading '<', '?', '=' or '>' (0 if none).
+struct Params {
+    private: int,
+    values: List[int],
+    ok: bool,
+}
+
+fn params(p: Parser, n: int) -> Params {
+    var r = Params { private: 0, values: List[int](), ok: true }
+    var i = 2
+    if i < n - 1 {
+        let x = at(p, i)
+        if x >= 60 && x <= 63 {
+            r.private = x
+            i += 1
+        }
+    }
+    var v = 0 - 1
+    while i < n - 1 {
+        let x = at(p, i)
+        if x == 59 {
+            (mut r.values).push(v)
+            v = 0 - 1
+        } else if x >= 48 && x <= 57 {
+            if v < 0 { v = 0 }
+            if v < 100000 { v = v * 10 + x - 48 }
+        } else {
+            r.ok = false
+        }
+        i += 1
+    }
+    (mut r.values).push(v)
+    r
+}
+
+fn param(r: Params, k: int, missing: int) -> int {
+    if k >= r.values.len || r.values[k] < 0 { return missing }
+    r.values[k]
+}
+
+// xterm's modifier parameter (1 + shift 1 + alt 2 + ctrl 4) to KEY mods.
+fn mods_of(m: int) -> int {
+    if m < 2 { return 0 }
+    (m - 1) & 7
+}
+
+fn tilde_code(n: int) -> int {
+    match n {
+        1 => 5,
+        2 => 9,
+        3 => 10,
+        4 => 6,
+        5 => 7,
+        6 => 8,
+        7 => 5,
+        8 => 6,
+        11 => 15,
+        12 => 16,
+        13 => 17,
+        14 => 18,
+        15 => 19,
+        17 => 20,
+        18 => 21,
+        19 => 22,
+        20 => 23,
+        21 => 24,
+        23 => 25,
+        24 => 26,
+        _ => 0,
+    }
+}
+
+// Decode a complete CSI of length n; false when it means nothing here.
+fn csi(mut p: Parser, mut out: List[Event], n: int) -> bool {
+    let f = at(p, n - 1)
+    let r = params(p, n)
+    if !r.ok { return false }
+    if r.private == 60 && (f == 77 || f == 109) {
+        // SGR mouse: CSI < b ; col ; row M (press, motion, wheel) or m.
+        if r.values.len != 3 { return false }
+        let b = param(r, 0, 0 - 1)
+        let col = param(r, 1, 0)
+        let row = param(r, 2, 0)
+        if b < 0 || col < 1 || row < 1 { return false }
+        var mods = 0
+        if b & 4 != 0 { mods = mods | 1 }
+        if b & 8 != 0 { mods = mods | 2 }
+        if b & 16 != 0 { mods = mods | 4 }
+        let low = b & 3
+        var kind = if f == 109 then 1 else 0
+        var button = low + 1
+        if b & 64 != 0 {
+            if low > 1 { return false }
+            kind = if low == 0 then 3 else 4
+            button = 0
+        } else if b & 32 != 0 {
+            kind = 2
+            if low == 3 { button = 0 }
+        } else if low == 3 {
+            // A legacy release without a button: report it as left's.
+            if f != 109 { return false }
+            button = 1
+        }
+        (mut out).push(Event { kind: 3, mods: mods, key: kind, code: button, col: col, row: row, data: List[byte]() })
+        return true
+    }
+    if r.private != 0 { return false }
+    if f == 73 || f == 79 {
+        if r.values.len != 1 || r.values[0] >= 0 { return false }
+        (mut out).push(event(5, 0, 0, if f == 73 then 1 else 0))
+        return true
+    }
+    if f == 126 {
+        let k = param(r, 0, 0 - 1)
+        if k == 200 {
+            p.pasting = true
+            return true
+        }
+        if k == 201 { return true }
+        let code = tilde_code(k)
+        if code == 0 { return false }
+        (mut out).push(event(2, mods_of(param(r, 1, 1)), 1, code))
+        return true
+    }
+    if f == 90 {
+        (mut out).push(event(2, 1 | mods_of(param(r, 1, 1)), 1, 12))
+        return true
+    }
+    let named = "ABCDHF"
+    var k = 0
+    while k < 6 {
+        if (named.bytes()[k] as int) == f {
+            (mut out).push(event(2, mods_of(param(r, 1, 1)), 1, k + 1))
+            return true
+        }
+        k += 1
+    }
+    if f >= 80 && f <= 83 {
+        (mut out).push(event(2, mods_of(param(r, 1, 1)), 1, 15 + f - 80))
+        return true
+    }
+    false
+}
