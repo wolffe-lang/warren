@@ -107,22 +107,24 @@ fn dropped(name: str) -> bool {
         name == "ZELLIJ_SESSION_NAME" || name == "ZELLIJ_PANE_ID" || name == "LINES" || name == "COLUMNS"
 }
 
-fn apply_environment(s: Spawn, session: str) -> () ! {invalid} {
-    for entry in env.vars() {
-        let name = env.entry_key(entry)
-        env.unset(name)?
-    }
+// The pane's whole environment as NAME=VALUE entries.
+fn environment(s: Spawn, session: str) -> List[str] {
+    var out = List[str]()
     var i = 0
     while i < s.names.len {
-        if !dropped(s.names[i]) { env.set(s.names[i], s.values[i])? }
+        let n = s.names[i]
+        let ours = n == "TERM" || n == "COLORTERM" || n == "TERM_PROGRAM" || n == "TERM_PROGRAM_VERSION" ||
+            n == "WARREN" || n == "WARREN_PANE"
+        if !dropped(n) && !ours { (mut out).push(n + "=" + s.values[i]) }
         i += 1
     }
-    env.set("TERM", "xterm-256color")?
-    env.set("COLORTERM", "truecolor")?
-    env.set("TERM_PROGRAM", "warren")?
-    env.set("TERM_PROGRAM_VERSION", vt.package_version())?
-    env.set("WARREN", session)?
-    env.set("WARREN_PANE", "%{s.pane_id}")?
+    (mut out).push("TERM=xterm-256color")
+    (mut out).push("COLORTERM=truecolor")
+    (mut out).push("TERM_PROGRAM=warren")
+    (mut out).push("TERM_PROGRAM_VERSION=" + vt.package_version())
+    (mut out).push("WARREN=" + session)
+    (mut out).push("WARREN_PANE=%{s.pane_id}")
+    out
 }
 
 fn shell_of(s: Spawn) -> str {
@@ -134,11 +136,36 @@ fn shell_of(s: Spawn) -> str {
     "/bin/sh"
 }
 
+// In the fork's child: a session of its own with the terminal as its
+// controlling terminal (so its keys' signals and its hangup reach the
+// program), every signal at its default, then the program. Never returns.
+fn become_pane(name: str, c: process.Command, environ: List[str], cwd: str, inherited: List[int]) {
+    process.lead_session() else { process.exit(126) }
+    var tty = term.open_controlling(name) else |_| {
+        process.exit(126)
+        return
+    }
+    signal.reset(ALL_MEANINGS) else |_| {}
+    var cmd = copy c
+    process.set_stdin(mut cmd, tty)
+    process.set_stdout(mut cmd, tty)
+    process.set_stderr(mut cmd, tty)
+    for n in inherited { process.close_fd(mut cmd, n) }
+    if cwd.len > 0 { env.set_cwd(cwd) else |_| {} }
+    process.exec(cmd, environ) else |e| {
+        fs.write(mut tty, "warren: the pane's program did not start: {e}\r\n") else |_| {}
+    }
+    process.exit(127)
+}
+
 /// Start the pane's program on a new pseudo-terminal of the session's
-/// size, in a session of its own with every signal at its default and
-/// none of the descriptors the server inherited above 2. The parent's
-/// slave is closed as soon as the child has it. On a failure
-/// every acquired descriptor is closed and the reason returned.
+/// size: a forked child leads a session of its own, takes the terminal as
+/// its controlling terminal, sets every signal to its default, keeps none
+/// of the descriptors the server inherited above 2, and execs the program
+/// with the session's environment (docs/TERM.md). The parent's slave is
+/// closed after the fork. Where fork is unavailable the program starts in
+/// a session of its own without a controlling terminal. On a failure every
+/// acquired descriptor is closed and the reason returned.
 pub fn start_pane(mut s: Session, sp: Spawn, argv: List[str], inherited: List[int]) -> str {
     let p = term.open_pty() else |e| { return "open-pty-{e}" }
     var master = p.master
@@ -148,30 +175,48 @@ pub fn start_pane(mut s: Session, sp: Spawn, argv: List[str], inherited: List[in
         fs.close(take slave) else |_| {}
         return "set-size-{e}"
     }
-    let here = env.cwd() else "/"
-    apply_environment(sp, name_of(s)) else |e| {
+    let name = term.pty_name(master) else |e| {
         fs.close(take master) else |_| {}
         fs.close(take slave) else |_| {}
-        return "environment-{e}"
+        return "pty-name-{e}"
     }
+    let environ = environment(sp, name_of(s))
     var c = process.command(if argv.len > 0 then argv[0] else shell_of(sp))
     var i = 1
     while i < argv.len {
         process.push_arg(mut c, argv[i])
         i += 1
     }
-    process.set_stdin(mut c, slave)
-    process.set_stdout(mut c, slave)
-    process.set_stderr(mut c, slave)
-    // What the server itself inherited above 2 is not the pane's.
-    for n in inherited { process.close_fd(mut c, n) }
-    if sp.cwd.len > 0 { env.set_cwd(sp.cwd) else |_| {} }
     var started = "ok"
-    var child = process.start_session(c, ALL_MEANINGS) else |e| {
-        started = "start-{e}"
-        process.Child { slot: 0 - 1 }
+    var child_slot = 0 - 1
+    var pid = 0 - 1
+    var forked = true
+    let f = process.fork() else |e| {
+        if "{e}" == "unsupported" { forked = false } else { started = "fork-{e}" }
+        process.Fork { pid: 0 - 1, child: process.Child { slot: 0 - 1 } }
     }
-    env.set_cwd(here) else |_| {}
+    if forked && started == "ok" {
+        if process.is_child(f) { become_pane(name, c, environ, sp.cwd, inherited) }
+        child_slot = f.child.slot
+        pid = f.pid
+    }
+    if !forked {
+        let here = env.cwd() else "/"
+        for entry in env.vars() { env.unset(env.entry_key(entry)) else |_| {} }
+        for entry in environ { env.set(env.entry_key(entry), env.entry_value(entry)) else |_| {} }
+        process.set_stdin(mut c, slave)
+        process.set_stdout(mut c, slave)
+        process.set_stderr(mut c, slave)
+        for n in inherited { process.close_fd(mut c, n) }
+        if sp.cwd.len > 0 { env.set_cwd(sp.cwd) else |_| {} }
+        let child = process.start_session(c, ALL_MEANINGS) else |e| {
+            started = "start-{e}"
+            process.Child { slot: 0 - 1 }
+        }
+        env.set_cwd(here) else |_| {}
+        child_slot = child.slot
+        pid = process.pid(child) else 0 - 1
+    }
     fs.close(take slave) else |_| {}
     if started != "ok" {
         fs.close(take master) else |_| {}
@@ -179,13 +224,13 @@ pub fn start_pane(mut s: Session, sp: Spawn, argv: List[str], inherited: List[in
     }
     fs.set_nonblock(mut master, true) else |e| {
         fs.close(take master) else |_| {}
-        s.pane.child = child.slot
+        s.pane.child = child_slot
         s.pane.child_live = true
         return "nonblock-{e}"
     }
     s.pane.master = master.fd
-    s.pane.child = child.slot
-    s.pane.pid = process.pid(child) else 0 - 1
+    s.pane.child = child_slot
+    s.pane.pid = pid
     s.pane.child_live = true
     s.pane.status = 0 - 1
     s.pane.ended = false
