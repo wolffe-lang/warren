@@ -5,13 +5,13 @@
 | W0 | pins, tiered CI, the oracle, the survey, the prediction | the repository half is here; the PAX readiness half is measured in PAX |
 | W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | pure core, CLI/replay and frozen complete-frame comparisons; final measurements pending |
 | W2 | server, client, protocol v1; one pane; detach and attach | pure protocol codec and server contract; I/O planned |
-| W3 | split tree, tabs, modes, the hint bar, configuration v1 | planned |
+| W3 | split tree, tabs, modes, the hint bar, configuration v1 | pure layout module (tabs, split tree, geometry, operations) with golden and property rows; compositor, modes, bar and configuration planned |
 | W4 | mouse, scrollback, copy mode, search, OSC 52 | planned |
 | W5 | command socket, CLI verbs, layout files, save and restore | planned |
 | W6 | static on the PAX image; rows in PAX's own suites | planned |
 
-The incremental parser, initial grid and protocol codec are implemented;
-server and client remain planned here. A statement is marked *planned* or
+The incremental parser, initial grid, protocol codec and layout module are
+implemented; server and client remain planned here. A statement is marked *planned* or
 names its measuring rows. `src/vt_parser_test.lu` exercises parsing alone;
 `vt_grid_test`, `vt_unicode_test`, `vt_ops_test`, `vt_screen_state_test`,
 `vt_graphics_test`, `vt_answers_test`, `vt_history_test`, `vt_resize_test` and
@@ -53,7 +53,7 @@ width/resource/platform evidence remain separate pending measurements.
 |---|---|---|---|
 | `src/vt` | yes | W1 | pure screen/history/reflow, bounded events/answers, native/lupin operation rows and complete frozen corpus comparisons with named policies |
 | `src/proto` | yes | W2 | bounded framing, payload validation, encode, assembly and ACK model (`protocol_rows`, `protocol_fuzz`) |
-| `src/layout` | yes | W3 | exists and compiles |
+| `src/layout` | yes | W3 | tabs and split trees, geometry (`rects`, `borders`, `pane_at`), every operation with named refusals, the canonical dump ([LAYOUT](LAYOUT.md)); 59 hand-written goldens and seeded properties at five sizes (`layout_native`, `layout_slice` on the checked machine and lupin, `layout_test`) |
 | `src/server` | no | W2 | exists and compiles |
 | `src/client` | no | W2 | exists and compiles |
 | `src/cmd` | no | W1/W5 | bounded raw/file/stdin and recording-replay `vt-dump`; other verbs planned |
