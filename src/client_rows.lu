@@ -7,7 +7,10 @@
 //! session ending, the server stopping, too small, a refusal, a server
 //! that closes or sends an image that does not apply (a fake server here),
 //! terminate and hangup signals, suspend and continue, and KILL (which
-//! runs nothing and is reported, not promised).
+//! runs nothing and is reported, not promised). Lifecycle rows: a session
+//! made by `new` (detached, a duplicate refused, attached), a second
+//! client at a smaller size, the server outliving the client that started
+//! it, and a verb the server does not know.
 //!
 //! After every row nothing it started may still run (Linux reads /proc; a
 //! process whose environment names the row's runtime directory is red).
@@ -30,6 +33,7 @@ use vt
 struct Run {
     warren: str,
     dir: str,
+    files: str,
     master: fs.File,
     slave: fs.File,
     pid: int,
@@ -53,7 +57,14 @@ fn row_dir(name: str) -> str {
 // A pty at cols x rows, a known cooked mode on it, the client started
 // on it as its controlling terminal with `args`.
 fn launch(warren: str, name: str, args: List[str], cols: int, rows: int) -> Run ! {io, invalid} {
+    launch_as(warren, name, "", args, cols, rows)
+}
+
+// As launch, for one of several clients of the same server at once: `tag`
+// keeps each client's pid, status and trace files apart.
+fn launch_as(warren: str, name: str, tag: str, args: List[str], cols: int, rows: int) -> Run ! {io, invalid} {
     let dir = row_dir(name)
+    let files = if tag.len > 0 then dir + "-" + tag else dir
     if server.socket_path_problem(server.socket_path(dir)).len > 0 { return invalid }
     let pty = term.open_pty() else { return io }
     let tty_name = term.pty_name(pty.master) else { return io }
@@ -70,13 +81,13 @@ fn launch(warren: str, name: str, args: List[str], cols: int, rows: int) -> Run 
     env.set("ENV", "") else { return io }
     // The prompt the rows wait for, whoever runs them (root's is `#`).
     env.set("PS1", "$ ") else { return io }
-    env.set("WARREN_CLIENT_TRACE", dir + "-trace") else { return io }
-    fs.remove(dir + "-trace") else |_| {}
+    env.set("WARREN_CLIENT_TRACE", files + "-trace") else { return io }
+    fs.remove(files + "-trace") else |_| {}
     env.set("TERM", "xterm-256color") else { return io }
     env.set("COLORTERM", "truecolor") else { return io }
-    let pid_file = dir + "-pid"
-    let status_file = dir + "-status"
-    let done_file = dir + "-done"
+    let pid_file = files + "-pid"
+    let status_file = files + "-status"
+    let done_file = files + "-done"
     fs.remove(pid_file) else |_| {}
     fs.remove(status_file) else |_| {}
     fs.remove(done_file) else |_| {}
@@ -129,7 +140,7 @@ fn launch(warren: str, name: str, args: List[str], cols: int, rows: int) -> Run 
             }
         }
         if !ended {
-            fs.write_text(dir + "-bound", "the client outlived the row's 60 s bound") else |_| {}
+            fs.write_text(files + "-bound", "the client outlived the row's 60 s bound") else |_| {}
             if bpid2 > 0 { signal.send(bpid2, signal.kill()) else |_| {} }
             st = 0 - 9
         }
@@ -152,7 +163,7 @@ fn launch(warren: str, name: str, args: List[str], cols: int, rows: int) -> Run 
         pid = text.trim().to_int() else 0
         if pid == 0 { time.sleep(time.millis(10)) }
     }
-    Run { warren: warren, dir: dir, master: pty.master, slave: pty.slave, pid: pid, slot: a.child.slot,
+    Run { warren: warren, dir: dir, files: files, master: pty.master, slave: pty.slave, pid: pid, slot: a.child.slot,
         out: List[byte](), screen: vt.new(cols, rows, 0), before: before, status: 0, ended: false }
 }
 
@@ -172,7 +183,7 @@ fn pump(mut r: Run, ms: int) {
             vt.feed(mut r.screen, got)
         }
         if !r.ended {
-            let st = fs.read_text(r.dir + "-status") else ""
+            let st = fs.read_text(r.files + "-status") else ""
             if st.len > 0 {
                 r.ended = true
                 r.status = st.trim().to_int() else 0 - 1
@@ -258,7 +269,7 @@ fn stop_server() {
 
 // Let the session leader go (the row has read what it needed) and reap it.
 fn release(r: Run) {
-    fs.write_text(r.dir + "-done", "1") else |_| {}
+    fs.write_text(r.files + "-done", "1") else |_| {}
     let t0 = now_ms()
     while now_ms() - t0 < 5000 {
         let c = process.poll() else { return }
@@ -476,17 +487,262 @@ fn row_terminal_gone(warren: str) -> str {
     let t0 = now_ms()
     var status = ""
     while status.len == 0 && now_ms() - t0 < 10000 {
-        status = fs.read_text(r.dir + "-status") else ""
+        status = fs.read_text(r.files + "-status") else ""
         if status.len == 0 { time.sleep(time.millis(20)) }
     }
-    let trace = fs.read_text(r.dir + "-trace") else ""
-    let bound = fs.read_text(r.dir + "-bound") else ""
+    let trace = fs.read_text(r.files + "-trace") else ""
+    let bound = fs.read_text(r.files + "-bound") else ""
     release(r)
     fs.close(take copy r.slave) else |_| {}
     stop_server()
     if status.len == 0 { return "the client did not end within 10 s of its terminal going away; trace: " + trace.replace("\n", " | ") }
     if bound.len > 0 { return bound }
     print("MEASURE terminal-gone ended-ms={now_ms() - t0} status={status.trim()}")
+    ""
+}
+
+// ---------------- lifecycle rows ----------------
+
+fn self_path() -> str {
+    let a0 = env.arg0()
+    if a0.starts_with("/") { return a0 }
+    let here = env.cwd() else "."
+    here + "/" + a0
+}
+
+// Pump two clients until both screens show `text`.
+fn until_both(mut a: Run, mut b: Run, text: str, ms: int) -> bool {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        if screen_text(a.screen).contains(text) && screen_text(b.screen).contains(text) { return true }
+        pump(mut a, 25)
+        pump(mut b, 25)
+    }
+    screen_text(a.screen).contains(text) && screen_text(b.screen).contains(text)
+}
+
+// A command that takes no terminal: it ends with `code`, prints `text`,
+// and leaves the terminal's mode as it was.
+fn ends_plain(mut r: Run, code: int, text: str) -> str {
+    if !until_end(mut r, 10000) { return "the command did not end" }
+    pump(mut r, 100)
+    if r.status != code { return "it ended {r.status}, not {code}: " + output_text(r).trim() }
+    if text.len > 0 && !output_text(r).contains(text) { return "no '{text}' in '" + output_text(r).trim() + "'" }
+    let after = term.pack(term.mode(r.slave) else { return "the mode cannot be read" })
+    if after != r.before { return "the mode was {after}, not {r.before} as before" }
+    ""
+}
+
+fn reply_out(argv: str) -> str {
+    let r = client.command_reply(words(argv))
+    str_from_utf8(r.out) else ""
+}
+
+// `new`: a detached session (named, then numbered), a duplicate refused,
+// a session made and attached at once, and attach to the detached one.
+fn row_new_session(warren: str) -> str {
+    var d = launch_as(warren, "new", "d", words("new -d -s work"), 80, 24) else |e| { return "launch: {e}" }
+    let why = ends_plain(mut d, 0, "work")
+    close_quiet(d)
+    if why.len > 0 {
+        stop_server()
+        return "new -d -s work: " + why
+    }
+    var again = launch_as(warren, "new", "d", words("new -d -s work"), 80, 24) else |e| { return "launch: {e}" }
+    let why2 = ends_plain(mut again, 1, "already exists")
+    close_quiet(again)
+    if why2.len > 0 {
+        stop_server()
+        return "a second work: " + why2
+    }
+    let t0 = now_ms()
+    var n = launch_as(warren, "new", "d", words("new -d"), 80, 24) else |e| { return "launch: {e}" }
+    let why3 = ends_plain(mut n, 0, "")
+    let took = now_ms() - t0
+    let printed = output_text(n).trim()
+    close_quiet(n)
+    if why3.len > 0 || printed != "1" {
+        stop_server()
+        return "new -d with no name: " + (if why3.len > 0 then why3 else "printed '{printed}', not 1")
+    }
+    print("MEASURE new-detached ms={took} (a running server; launch to exit)")
+    let list = reply_out("list-sessions")
+    if !list.contains("work: 80x24 (0 attached)") || !list.contains("1: 80x24 (0 attached)") {
+        stop_server()
+        return "list-sessions: " + list.replace("\n", " | ")
+    }
+    var o = launch_as(warren, "new", "o", words("new -s other"), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut o, "$", 10000) {
+        close_run(o)
+        return "new -s other drew no prompt: " + screen_text(o.screen).trim()
+    }
+    type_text(mut o, "\u{0}d")
+    let why4 = ends_with(mut o, 0, "[detached from other]")
+    close_quiet(o)
+    if why4.len > 0 {
+        stop_server()
+        return "new -s other: " + why4
+    }
+    var w = launch_as(warren, "new", "w", words("attach -t work"), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut w, "$", 10000) {
+        close_run(w)
+        return "attach -t work drew no prompt"
+    }
+    type_text(mut w, "exit\r")
+    let why5 = ends_with(mut w, 0, "[work ended]")
+    close_run(w)
+    if why5.len > 0 { return "attach -t work: " + why5 }
+    ""
+}
+
+// Two terminal clients of one session: the pane is sized to the smaller,
+// both draw what is typed, either may go without closing the pane or the
+// other, and with nobody attached the session keeps its last size.
+fn row_second_client(warren: str) -> str {
+    let me = self_path()
+    var a = launch_as(warren, "second", "a", List[str](), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut a, "$", 10000) {
+        close_run(a)
+        return "no prompt in the first client"
+    }
+    var b = launch_as(warren, "second", "b", words("attach"), 60, 20) else |e| {
+        close_run(a)
+        return "launch: {e}"
+    }
+    if !until_screen(mut b, "$", 10000) {
+        close_quiet(b)
+        close_run(a)
+        return "no prompt in the second client"
+    }
+    let t0 = now_ms()
+    type_text(mut a, "{me} --print-size s1\r")
+    let both = until_both(mut a, mut b, "s1 20 60", 5000)
+    let took = now_ms() - t0
+    if !both {
+        close_quiet(b)
+        close_run(a)
+        return "with a 60x20 client beside an 80x24 one the pane did not read 20 60 in both: " +
+            screen_text(a.screen).trim().replace("\n", " | ")
+    }
+    print("MEASURE second-client typed-to-both-ms={took}")
+    // The second detaches: the pane returns to the first client's size.
+    type_text(mut b, "\u{0}d")
+    let why = ends_with(mut b, 0, "[detached")
+    close_quiet(b)
+    if why.len > 0 {
+        close_run(a)
+        return "the second client's detach: " + why
+    }
+    type_text(mut a, "{me} --print-size s2\r")
+    if !until_screen(mut a, "s2 24 80", 5000) {
+        close_run(a)
+        return "after the second detached the pane did not read 24 80"
+    }
+    // A third client's terminal goes away: the first and the pane go on.
+    var c = launch_as(warren, "second", "c", words("attach"), 60, 20) else |e| {
+        close_run(a)
+        return "launch: {e}"
+    }
+    if !until_screen(mut c, "$", 10000) {
+        close_quiet(c)
+        close_run(a)
+        return "no prompt in the third client"
+    }
+    fs.close(take copy c.master) else |_| {}
+    let tc = now_ms()
+    var status = ""
+    while status.len == 0 && now_ms() - tc < 10000 {
+        status = fs.read_text(c.files + "-status") else ""
+        if status.len == 0 { pump(mut a, 20) }
+    }
+    release(c)
+    fs.close(take copy c.slave) else |_| {}
+    if status.len == 0 {
+        close_run(a)
+        return "the third client did not end when its terminal went away"
+    }
+    type_text(mut a, "{me} --print-size s3\r")
+    if !until_screen(mut a, "s3 24 80", 5000) {
+        close_run(a)
+        return "after a client's terminal went away the first did not go on: " +
+            screen_text(a.screen).trim().replace("\n", " | ")
+    }
+    type_text(mut a, "\u{0}d")
+    let why2 = ends_with(mut a, 0, "[detached")
+    close_quiet(a)
+    if why2.len > 0 {
+        stop_server()
+        return "the first client's detach: " + why2
+    }
+    let list = reply_out("list-sessions")
+    stop_server()
+    if !list.contains("default: 80x24 (0 attached)") { return "with nobody attached: " + list.replace("\n", " | ") }
+    ""
+}
+
+// The client that started the server goes (its terminal closed under
+// it): the server and the session stay, and a new client finds the screen.
+fn row_server_outlives_client(warren: str) -> str {
+    let t0 = now_ms()
+    var a = launch(warren, "outlive", List[str](), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut a, "$", 10000) {
+        close_run(a)
+        return "no prompt"
+    }
+    print("MEASURE cold-start prompt-ms={now_ms() - t0} (no server: launch to the first prompt drawn)")
+    type_text(mut a, "echo kept-$((6*7))\r")
+    if !until_screen(mut a, "kept-42", 5000) {
+        close_run(a)
+        return "the echo was not drawn"
+    }
+    fs.close(take copy a.master) else |_| {}
+    let tc = now_ms()
+    var status = ""
+    while status.len == 0 && now_ms() - tc < 10000 {
+        status = fs.read_text(a.files + "-status") else ""
+        if status.len == 0 { time.sleep(time.millis(20)) }
+    }
+    release(a)
+    fs.close(take copy a.slave) else |_| {}
+    if status.len == 0 {
+        stop_server()
+        return "the client did not end when its terminal went away"
+    }
+    let list = reply_out("list-sessions")
+    if !list.contains("default: 80x24 (0 attached)") {
+        stop_server()
+        return "the server or the session did not outlive the client that started it: '" + list.trim() + "'"
+    }
+    var b = launch(warren, "outlive", words("attach"), 80, 24) else |e| {
+        stop_server()
+        return "relaunch: {e}"
+    }
+    if !until_screen(mut b, "kept-42", 10000) {
+        close_run(b)
+        return "a new client did not find the screen: " + screen_text(b.screen).trim().replace("\n", " | ")
+    }
+    type_text(mut b, "exit\r")
+    let why = ends_with(mut b, 0, "ended]")
+    close_run(b)
+    why
+}
+
+// A verb this server does not know (a newer client's) is refused by name
+// with the usage status, and the server goes on.
+fn row_unknown_verb(warren: str) -> str {
+    var r = launch(warren, "verb", List[str](), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut r, "$", 10000) {
+        close_run(r)
+        return "no prompt"
+    }
+    let reply = client.command_reply(words("split-window -h"))
+    let err = str_from_utf8(reply.err) else ""
+    type_text(mut r, "echo still-$((3+4))\r")
+    let alive = until_screen(mut r, "still-7", 5000)
+    close_run(r)
+    if reply.status != 2 { return "an unknown verb got status {reply.status}, not 2 (usage): " + err.trim() }
+    if !err.contains("split-window: not implemented") { return "an unknown verb was not refused by name: '" + err.trim() + "'" }
+    if !alive { return "the session did not go on after the refusal" }
     ""
 }
 
@@ -502,11 +758,24 @@ fn run_row(warren: str, name: str) -> str {
     if name == "suspend-continue" { return row_suspend_continue(warren) }
     if name == "kill-reported" { return row_kill_reported(warren) }
     if name == "terminal-gone" { return row_terminal_gone(warren) }
+    if name == "new-session" { return row_new_session(warren) }
+    if name == "second-client" { return row_second_client(warren) }
+    if name == "server-outlives-client" { return row_server_outlives_client(warren) }
+    if name == "unknown-verb" { return row_unknown_verb(warren) }
     "no such row"
 }
 
 fn main() -> int {
     let args = env.args()
+    // The pane-side helper: the size of the terminal it runs in, tagged.
+    if args.len == 2 && args[0] == "--print-size" {
+        let size = term.size(fs.stdin()) else |e| {
+            print("size-{e}")
+            return 1
+        }
+        print("{args[1]} {size.rows} {size.columns}")
+        return 0
+    }
     if args.len < 1 {
         eprint("usage: client_rows WARREN [ROW...]")
         return 2
@@ -518,7 +787,7 @@ fn main() -> int {
         i += 1
     }
     if rows.len == 0 {
-        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone")
+        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb")
     }
     if !fs.exists("/proc") { print("NOTE leftovers unchecked here: no /proc to read") }
     // Every row's socket lives in a short directory under this one; a
