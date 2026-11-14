@@ -1,0 +1,271 @@
+//! member: true
+//! The compositor for one pane: the active screen of a pane's emulator to
+//! one protocol image, as a full image or as a delta against the shadow of
+//! what a client holds. The emulator is the only width authority: a cell's
+//! stored width is sent, never recomputed. Damage includes both halves of
+//! every wide pair it touches, old and new.
+use proto
+use vt
+
+/// What one client holds: the cells and cursor of the last image it was
+/// sent, which it must apply before it may ACK.
+pub struct Shadow {
+    valid: bool,
+    cols: int,
+    rows: int,
+    cells: List[vt.Cell],
+    cursor_row: int,
+    cursor_col: int,
+    shape: int,
+    visible: int,
+}
+
+/// A shadow holding nothing: the next image is full.
+pub fn no_shadow() -> Shadow {
+    Shadow { valid: false, cols: 0, rows: 0, cells: List[vt.Cell](), cursor_row: 0, cursor_col: 0,
+        shape: 0, visible: 0 }
+}
+
+/// The wire colour of an emulator colour: default, palette or RGB.
+pub fn wire_colour(c: int) -> int {
+    if c < 0 { return 0 }
+    if c < 256 { return 16777216 + c }
+    33554432 + (c - 16777216)
+}
+
+fn active_cell(pane: vt.Vt, index: int) -> vt.Cell {
+    if pane.active_alternate { return pane.alternate.cells[index] }
+    pane.primary.cells[index]
+}
+
+fn same(a: vt.Cell, b: vt.Cell) -> bool {
+    a.base == b.base && a.mark1 == b.mark1 && a.mark2 == b.mark2 && a.width == b.width &&
+        a.flags == b.flags && a.foreground == b.foreground && a.background == b.background
+}
+
+fn same_glyph(a: vt.Cell, b: vt.Cell) -> bool {
+    a.base == b.base && a.mark1 == b.mark1 && a.mark2 == b.mark2 && a.width == b.width
+}
+
+fn same_rendition(a: vt.Cell, b: vt.Cell) -> bool {
+    a.flags == b.flags && a.foreground == b.foreground && a.background == b.background
+}
+
+fn clamp(v: int, low: int, high: int) -> int {
+    if v < low { return low }
+    if v > high { return high }
+    v
+}
+
+// The width a cell is sent with at column col of cols: a continuation is
+// never sent; a leader with no room is sent one column wide (PROTOCOL's
+// one-column rule); an orphan continuation is sent as a blank.
+fn sent_width(c: vt.Cell, col: int, cols: int) -> int {
+    if c.width == 2 && col < cols { return 2 }
+    1
+}
+
+fn scalars_of(c: vt.Cell) -> int {
+    var n = 1
+    if c.mark1 != 0 { n += 1 }
+    if c.mark2 != 0 { n += 1 }
+    n
+}
+
+fn put_record(mut body: List[byte], c: vt.Cell, width: int, times: int, orphan: bool) {
+    proto.put(mut body, width, 1)
+    proto.put(mut body, times, 2)
+    if orphan {
+        proto.put(mut body, 1, 1)
+        proto.put(mut body, 32, 4)
+        return
+    }
+    proto.put(mut body, scalars_of(c), 1)
+    proto.put(mut body, c.base, 4)
+    if c.mark1 != 0 { proto.put(mut body, c.mark1, 4) }
+    if c.mark2 != 0 { proto.put(mut body, c.mark2, 4) }
+}
+
+// Emit the runs covering columns a..b (1-based, inclusive) of one row.
+// A run keeps one rendition; its records repeat equal glyphs. Returns the
+// number of runs emitted.
+fn emit_span(mut body: List[byte], pane: vt.Vt, row: int, a: int, b: int) -> int {
+    let cols = pane.cols
+    var runs = 0
+    var col = a
+    while col <= b {
+        let lead = active_cell(pane, (row - 1) * cols + col - 1)
+        // One run: as far as the rendition stays the same.
+        var records = List[byte]()
+        var record_count = 0
+        var covered = 0
+        var c = col
+        while c <= b {
+            let cell = active_cell(pane, (row - 1) * cols + c - 1)
+            if !same_rendition(cell, lead) && c > col { break }
+            let orphan = cell.width == 0
+            let w = sent_width(cell, c, cols)
+            var times = 1
+            var next = c + w
+            while next + w - 1 <= b && times < 65535 && !orphan {
+                let other = active_cell(pane, (row - 1) * cols + next - 1)
+                if !same_glyph(other, cell) || !same_rendition(other, lead) || sent_width(other, next, cols) != w { break }
+                times += 1
+                next += w
+            }
+            put_record(mut records, cell, w, times, orphan)
+            record_count += 1
+            covered += w * times
+            c = next
+        }
+        proto.put(mut body, row, 2)
+        proto.put(mut body, col, 2)
+        proto.put(mut body, lead.flags, 2)
+        proto.put(mut body, wire_colour(lead.foreground), 4)
+        proto.put(mut body, wire_colour(lead.background), 4)
+        proto.put(mut body, covered, 2)
+        proto.put(mut body, record_count, 2)
+        for x in records { (mut body).push(x) }
+        runs += 1
+        col = c
+    }
+    runs
+}
+
+fn store(mut sh: Shadow, pane: vt.Vt, row: int, a: int, b: int) {
+    var c = a
+    while c <= b {
+        let i = (row - 1) * pane.cols + c - 1
+        sh.cells[i] = active_cell(pane, i)
+        c += 1
+    }
+}
+
+fn cursor_of(pane: vt.Vt) -> (int, int, int, int) {
+    let row = clamp(pane.cursor_row, 1, pane.rows)
+    let col = clamp(pane.cursor_col, 1, pane.cols)
+    let visible = if pane.modes.cursor_visible then 1 else 0
+    (row, col, clamp(pane.cursor_shape, 0, 6), visible)
+}
+
+fn reshape(mut sh: Shadow, cols: int, rows: int) {
+    while sh.cells.len < cols * rows {
+        (mut sh.cells).push(vt.Cell { base: 32, mark1: 0, mark2: 0, width: 1, flags: 0,
+            foreground: 0 - 1, background: 0 - 1, written: false })
+    }
+    sh.cols = cols
+    sh.rows = rows
+}
+
+/// Compose the next image for a client into a FRAME payload, updating its
+/// shadow to what it will hold. A full image (base 0) when `full` is set
+/// or the shadow is not of this size; otherwise a delta on seq - 1, which
+/// is empty (nothing to send) when no cell and no cursor field changed.
+pub fn compose(mut sh: Shadow, pane: vt.Vt, seq: int, full: bool) -> List[byte] {
+    let cols = pane.cols
+    let rows = pane.rows
+    let whole = full || !sh.valid || sh.cols != cols || sh.rows != rows
+    if whole { reshape(mut sh, cols, rows) }
+    var body = List[byte]()
+    var runs = 0
+    var row = 1
+    var changed = List[bool]()
+    var k = 0
+    while k <= cols + 1 {
+        (mut changed).push(false)
+        k += 1
+    }
+    while row <= rows {
+        if whole {
+            runs += emit_span(mut body, pane, row, 1, cols)
+            store(mut sh, pane, row, 1, cols)
+        } else {
+            var any = false
+            var c = 1
+            while c <= cols {
+                let i = (row - 1) * cols + c - 1
+                let live = active_cell(pane, i)
+                changed[c] = !same(live, sh.cells[i])
+                if changed[c] { any = true }
+                c += 1
+            }
+            if any {
+                // Both halves of every wide pair a change touches, old or new.
+                var moved = true
+                while moved {
+                    moved = false
+                    c = 1
+                    while c <= cols {
+                        if changed[c] {
+                            let i = (row - 1) * cols + c - 1
+                            let live = active_cell(pane, i)
+                            let old = copy sh.cells[i]
+                            if (live.width == 0 || old.width == 0) && c > 1 && !changed[c - 1] {
+                                changed[c - 1] = true
+                                moved = true
+                            }
+                            if (live.width == 2 || old.width == 2) && c < cols && !changed[c + 1] {
+                                changed[c + 1] = true
+                                moved = true
+                            }
+                        }
+                        c += 1
+                    }
+                }
+                c = 1
+                while c <= cols {
+                    if changed[c] {
+                        var e = c
+                        while e + 1 <= cols && changed[e + 1] { e += 1 }
+                        runs += emit_span(mut body, pane, row, c, e)
+                        store(mut sh, pane, row, c, e)
+                        c = e + 1
+                    } else {
+                        c += 1
+                    }
+                }
+            }
+        }
+        row += 1
+    }
+    let (cr, cc, shape, visible) = cursor_of(pane)
+    let cursor_same = sh.valid && sh.cursor_row == cr && sh.cursor_col == cc && sh.shape == shape && sh.visible == visible
+    sh.cursor_row = cr
+    sh.cursor_col = cc
+    sh.shape = shape
+    sh.visible = visible
+    sh.valid = true
+    if !whole && runs == 0 && cursor_same { return List[byte]() }
+    var payload = List[byte]()
+    (mut payload).reserve(22 + body.len)
+    proto.put(mut payload, seq, 4)
+    proto.put(mut payload, if whole then 0 else seq - 1, 4)
+    proto.put(mut payload, cols, 2)
+    proto.put(mut payload, rows, 2)
+    proto.put(mut payload, cr, 2)
+    proto.put(mut payload, cc, 2)
+    proto.put(mut payload, shape, 1)
+    proto.put(mut payload, visible, 1)
+    proto.put(mut payload, runs, 4)
+    for x in body { (mut payload).push(x) }
+    payload
+}
+
+/// The wire bytes of a FRAME payload: one physical frame, or a chain of
+/// fragments of at most 1 MiB each, MORE on all but the last. The whole
+/// payload is validated once first; empty when it is invalid.
+pub fn frame_wire(payload: List[byte]) -> List[byte] {
+    if proto.validate(131, payload) != 0 { return List[byte]() }
+    var wire = List[byte]()
+    var at = 0
+    while true {
+        let end = if payload.len - at > proto.PHYSICAL_MAX then at + proto.PHYSICAL_MAX else payload.len
+        let more = if end < payload.len then 1 else 0
+        let part = proto.encode_part(131, more, payload[at..end])
+        if part.code != 0 { return List[byte]() }
+        for x in part.bytes { (mut wire).push(x) }
+        at = end
+        if more == 0 { break }
+    }
+    wire
+}
