@@ -121,3 +121,10 @@ daemon=unsupported
 
 [daemon lupin *]
 refuses=os_fork
+
+# The consumed emulator surface: its rows assert; a pass prints nothing.
+[vt_api native *]
+
+[vt_api checked *]
+
+[vt_api lupin *]

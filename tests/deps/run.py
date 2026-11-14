@@ -32,7 +32,18 @@ import subprocess
 import sys
 
 HERE = Path(__file__).resolve().parent
-ROWS = ('one_wait', 'partial_write', 'start_lock', 'peer_cred', 'daemon')
+ROOT = HERE.parents[1]
+ROWS = ('one_wait', 'partial_write', 'start_lock', 'peer_cred', 'daemon', 'vt_api')
+# Rows that are entries of warren's own package run from the repository
+# root with their package; the others are standalone programs.
+IN_PACKAGE = {'vt_api': 'src/vt_api_test.lu'}
+
+
+def source(row):
+    """(directory to run the build from, the entry's path from there)."""
+    if row in IN_PACKAGE:
+        return ROOT, IN_PACKAGE[row]
+    return HERE / row, 'main.lu'
 
 
 def expectations():
@@ -92,8 +103,9 @@ def run(command, cwd, bound, env=None):
 def native(args, row, out):
     exe = out / 'bin' / row
     exe.parent.mkdir(parents=True, exist_ok=True)
-    build = [args.wolf, 'build', '--deny-warnings', '--std-root', args.std, str(HERE / row / 'main.lu'), '-o', str(exe)]
-    p = run(build, HERE / row, 600)
+    where, entry = source(row)
+    build = [args.wolf, 'build', '--deny-warnings', '--std-root', args.std, entry, '-o', str(exe)]
+    p = run(build, where, 600)
     if p is None or p.returncode:
         return None, 'build exit=%s %s' % (None if p is None else p.returncode,
                                             (p.stderr.decode(errors='replace')[-600:] if p else 'timeout'))
@@ -112,9 +124,11 @@ def native(args, row, out):
 
 
 def checked(args, row, out):
-    d = scratch(out, row, 'checked')
-    shutil.copy(HERE / row / 'main.lu', d / 'main.lu')
-    p = run([args.wolf, 'conform-run', 'main.lu', '--json', '--checked', '--deny-warnings', '--std-root', args.std],
+    d, entry = source(row)
+    if row not in IN_PACKAGE:
+        d = scratch(out, row, 'checked')
+        shutil.copy(HERE / row / 'main.lu', d / 'main.lu')
+    p = run([args.wolf, 'conform-run', entry, '--json', '--checked', '--deny-warnings', '--std-root', args.std],
             d, args.bound)
     if p is None:
         return None, 'timeout after %ss' % args.bound
@@ -139,10 +153,12 @@ def checked(args, row, out):
 
 
 def lupin(args, row, out, want):
-    d = scratch(out, row, 'lupin')
-    shutil.copy(HERE / row / 'main.lu', d / 'main.lu')
+    d, entry = source(row)
+    if row not in IN_PACKAGE:
+        d = scratch(out, row, 'lupin')
+        shutil.copy(HERE / row / 'main.lu', d / 'main.lu')
     env = dict(os.environ, LUPIN_STD=args.std)
-    p = run([args.lupin, 'run', 'main.lu'], d, args.bound, env)
+    p = run([args.lupin, 'run', entry], d, args.bound, env)
     if p is None:
         return None, 'timeout after %ss' % args.bound
     text = (p.stdout + p.stderr).decode(errors='replace')
@@ -222,7 +238,7 @@ def main():
     parser.add_argument('--host', default='darwin' if platform.system() == 'Darwin' else 'linux')
     parser.add_argument('--tiers', default='native,checked,lupin')
     parser.add_argument('--rows', default=','.join(ROWS))
-    parser.add_argument('--out', type=Path, default=HERE.parents[1] / 'target' / 'deps')
+    parser.add_argument('--out', type=Path, default=ROOT / 'target' / 'deps')
     parser.add_argument('--bound', type=int, default=120, help='seconds per run')
     parser.add_argument('--build-only', action='store_true', help='build native binaries, run nothing')
     args = parser.parse_args()
