@@ -13,6 +13,7 @@ use std.fs
 use std.net
 use std.net.unix
 use std.process
+use std.sort
 use std.str
 use std.time
 use client
@@ -467,6 +468,109 @@ fn row_start_lock(mut r: Rig) -> str {
     ""
 }
 
+
+fn percentile(sorted: List[int], pct: int) -> int {
+    if sorted.len == 0 { return 0 - 1 }
+    var i = sorted.len * pct / 100
+    if i >= sorted.len { i = sorted.len - 1 }
+    sorted[i]
+}
+
+// Type count characters at the quiet session's prompt, one at a time, each
+// timed from the KEY's send to the image showing it; Ctrl-U every 40.
+fn keystrokes(mut q: client.Peer, count: int, gap_ms: int) -> List[int] {
+    var times = List[int]()
+    var typed = ""
+    var n = 0
+    while n < count {
+        if gap_ms > 0 { time.sleep(time.millis(gap_ms)) }
+        let ch = "abcdefghijklmnopqrstuvwxyz"[n % 26..n % 26 + 1]
+        let t0 = time.monotonic_ns()
+        let _k = client.key(q, 0, 0, 97 + n % 26)
+        typed = typed + ch
+        if !client.until_line(mut q, "$ " + typed, 10000) { return List[int]() }
+        (mut times).push((time.monotonic_ns() - t0) / 1000)
+        if typed.len == 40 {
+            let _u = client.key(q, 4, 0, 117)
+            if !client.until_line(mut q, "$", 10000) { return List[int]() }
+            typed = ""
+        }
+        n = n + 1
+    }
+    times
+}
+
+fn report(label: str, times: List[int]) -> int {
+    var sorted = copy times
+    sort.sort_ints(mut sorted)
+    let worst = percentile(sorted, 100)
+    print("MEASURE {label} keys={times.len} p50-us={percentile(sorted, 50)} p90-us={percentile(sorted, 90)} p99-us={percentile(sorted, 99)} max-us={worst}")
+    worst
+}
+
+fn row_flood(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var q = attach(r, 80, 24, "quiet", 1) else |e| { return "dial-{e}" }
+    if !client.until_line(mut q, "$", 5000) { return "no quiet prompt: " + client.screen_text(q) }
+    let quiet = keystrokes(mut q, 120, 25)
+    if quiet.len == 0 { return "a quiet keystroke was not shown" }
+    let _b = report("keys-quiet gap-ms=25", quiet)
+    var f = attach(r, 80, 24, "flood", 1) else |e| { return "dial-{e}" }
+    if !client.until_line(mut f, "$", 5000) { return "no flood prompt" }
+    let _i = client.input(f, "while :; do echo 0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopq; done\r")
+    if !client.until_text(mut f, "0123456789abcdefghijklmnopqrstuvwxyz0123456789", 5000) { return "the flood did not start" }
+    let _d = client.send(f, 10, List[byte]())
+    client.hang_up(mut f)
+    time.sleep(time.millis(200))
+    let flooded = keystrokes(mut q, 120, 25)
+    if flooded.len == 0 { return "a keystroke beside the flood was not shown" }
+    let budget = env.get("WARREN_MEASURE_MASTER_READ") else "65536"
+    let worst = report("keys-beside-flood master-read={budget}", flooded)
+    client.hang_up(mut q)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    if worst > 2000000 { return "a keystroke beside the flood took {worst} us (bound 2 s)" }
+    ""
+}
+
+fn rss_kb(pid: int) -> int {
+    let text = fs.read_text("/proc/{pid}/status") else { return 0 - 1 }
+    for line in text.lines() {
+        if line.starts_with("VmRSS:") {
+            let parts = line.words()
+            if parts.len >= 2 { return parts[1].to_int() else 0 - 1 }
+        }
+    }
+    0 - 1
+}
+
+fn row_rss_flat(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    let pid = process.pid(process.Child { slot: r.server }) else 0 - 1
+    if rss_kb(pid) < 0 { return "no /proc status for the server" }
+    var q = attach(r, 80, 24, "quiet", 1) else |e| { return "dial-{e}" }
+    if !client.until_line(mut q, "$", 5000) { return "no prompt" }
+    var f = attach(r, 80, 24, "flood", 1) else |e| { return "dial-{e}" }
+    if !client.until_line(mut f, "$", 5000) { return "no flood prompt" }
+    let _i = client.input(f, "while :; do echo 0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopq; done\r")
+    let _d = client.send(f, 10, List[byte]())
+    client.hang_up(mut f)
+    let warm = keystrokes(mut q, 1000, 0)
+    if warm.len == 0 { return "warm-up keystrokes failed" }
+    let before = rss_kb(pid)
+    let more = keystrokes(mut q, 10000, 0)
+    if more.len == 0 { return "keystrokes failed" }
+    let after = rss_kb(pid)
+    print("MEASURE server-rss before-kb={before} after-kb={after} keys=10000 beside-a-flood")
+    client.hang_up(mut q)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    if after - before > 1024 { return "server RSS grew {after - before} kB over 10000 keystrokes" }
+    ""
+}
+
 fn run_row(warren: str, name: str) -> str {
     var r = rig(warren, name)
     var why = "no such row"
@@ -484,6 +588,8 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "session-end" { why = row_session_end(mut r) }
     else if name == "command" { why = row_command(mut r) }
     else if name == "start-lock" { why = row_start_lock(mut r) }
+    else if name == "flood-beside-quiet" { why = row_flood(mut r) }
+    else if name == "rss-flat" { why = row_rss_flat(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
