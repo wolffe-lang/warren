@@ -1,0 +1,188 @@
+//! member: false
+//! The client's input parser: what the outer terminal sends becomes the
+//! events the server takes, whatever the reads' boundaries; a lone ESC
+//! waits ESC_MS; the server's own key encoding parses back to its event.
+use client
+use server
+use vt
+
+fn show(e: client.Event) -> str {
+    if e.kind == 2 { return "K{e.mods}:{e.key}:{e.code}" }
+    if e.kind == 3 { return "M{e.mods}:{e.key}:{e.code}:{e.col}:{e.row}" }
+    if e.kind == 5 { return "F{e.code}" }
+    var t = if e.kind == 4 then "P" else "I"
+    t = t + "{e.data.len}"
+    for b in e.data { t = t + ":{b as int}" }
+    t
+}
+
+fn shows(events: List[client.Event]) -> str {
+    var t = ""
+    for e in events {
+        if t.len > 0 { t = t + " " }
+        t = t + show(e)
+    }
+    t
+}
+
+fn bytes_of(text: str) -> List[byte] {
+    text.bytes()
+}
+
+// All at once, then whatever waits taken at its deadline.
+fn parse(data: List[byte]) -> str {
+    var p = client.parser()
+    var all = client.feed(mut p, data, 0)
+    for e in client.expire(mut p, 1000) { (mut all).push(e) }
+    shows(all)
+}
+
+// A byte a read.
+fn parse_split(data: List[byte]) -> str {
+    var p = client.parser()
+    var all = List[client.Event]()
+    for b in data {
+        var one = List[byte]()
+        (mut one).push(b)
+        for e in client.feed(mut p, one, 0) { (mut all).push(e) }
+    }
+    for e in client.expire(mut p, 1000) { (mut all).push(e) }
+    shows(all)
+}
+
+fn check(text: str, want: str) {
+    let got = parse(bytes_of(text))
+    if got != want { print("input-table: {got} != {want}") }
+    assert(got == want, "input-table")
+    assert(parse_split(bytes_of(text)) == want, "input-table-split")
+}
+
+fn test_table() {
+    check("a", "K0:0:97")
+    check("é中", "K0:0:233 K0:0:20013")
+    check("\r\t\u{7f}\u{8}", "K0:1:13 K0:1:12 K0:1:11 K4:1:11")
+    check("\u{0}\u{1}\u{1a}\u{1c}\u{1f}\n", "K4:0:32 K4:0:97 K4:0:122 K4:0:92 K4:0:95 K4:0:106")
+    check("\u{1b}", "K0:1:14")
+    check("\u{1b}x", "K2:0:120")
+    check("\u{1b}\u{1}", "K6:0:97")
+    check("\u{1b}\u{1b}", "K2:1:14")
+    check("\u{1b}[A\u{1b}[B\u{1b}[C\u{1b}[D\u{1b}[H\u{1b}[F", "K0:1:1 K0:1:2 K0:1:3 K0:1:4 K0:1:5 K0:1:6")
+    check("\u{1b}OA\u{1b}OH\u{1b}OP\u{1b}OS", "K0:1:1 K0:1:5 K0:1:15 K0:1:18")
+    check("\u{1b}[1;5A\u{1b}[1;2D\u{1b}[1;8F", "K4:1:1 K1:1:4 K7:1:6")
+    check("\u{1b}[2~\u{1b}[3~\u{1b}[5~\u{1b}[6~\u{1b}[1~\u{1b}[4~", "K0:1:9 K0:1:10 K0:1:7 K0:1:8 K0:1:5 K0:1:6")
+    check("\u{1b}[15~\u{1b}[24;3~\u{1b}[1;5P", "K0:1:19 K2:1:26 K4:1:15")
+    check("\u{1b}[Z", "K1:1:12")
+    check("\u{1b}Op\u{1b}Oy\u{1b}OM\u{1b}OX", "K0:1:39 K0:1:48 K0:1:54 K0:1:55")
+    check("\u{1b}[I\u{1b}[O", "F1 F0")
+    check("\u{1b}[<0;10;5M\u{1b}[<0;10;5m", "M0:0:1:10:5 M0:1:1:10:5")
+    check("\u{1b}[<2;1;1M\u{1b}[<64;3;4M\u{1b}[<65;3;4M", "M0:0:3:1:1 M0:3:0:3:4 M0:4:0:3:4")
+    check("\u{1b}[<35;7;8M\u{1b}[<32;7;8M\u{1b}[<20;2;2M", "M0:2:0:7:8 M0:2:1:7:8 M5:0:1:2:2")
+    check("\u{1b}[200~hi\u{1b}[A\r\u{1b}[201~x", "P6:104:105:27:91:65:13 K0:0:120")
+    // Undecodable sequences reach the pane unchanged; invalid UTF-8 too.
+    check("\u{1b}[99q", "I5:27:91:57:57:113")
+    check("\u{1b}Oz", "I3:27:79:122")
+}
+
+fn test_invalid_utf8() {
+    var b = List[byte]()
+    (mut b).push(255 as byte)
+    (mut b).push(97 as byte)
+    assert(parse(b) == "I1:255 K0:0:97", "input-invalid-byte")
+    var cut = List[byte]()
+    (mut cut).push(228 as byte)
+    (mut cut).push(184 as byte)
+    assert(parse(cut) == "I2:228:184", "input-cut-scalar-at-deadline")
+}
+
+fn test_escape_waits() {
+    var p = client.parser()
+    assert(client.feed(mut p, bytes_of("\u{1b}"), 100).len == 0, "escape-held")
+    assert(client.deadline(p) == 100 + client.ESC_MS, "escape-deadline")
+    assert(client.expire(mut p, 100 + client.ESC_MS - 1).len == 0, "escape-not-early")
+    assert(shows(client.expire(mut p, 100 + client.ESC_MS)) == "K0:1:14", "escape-at-deadline")
+    assert(client.deadline(p) == 0 - 1, "escape-nothing-left")
+    // The rest of a sequence inside the wait completes it.
+    assert(client.feed(mut p, bytes_of("\u{1b}["), 200).len == 0, "csi-held")
+    assert(shows(client.feed(mut p, bytes_of("A"), 210)) == "K0:1:1", "csi-completed")
+    // ESC [ alone at the deadline is Alt with '['.
+    let _f = client.feed(mut p, bytes_of("\u{1b}["), 300)
+    assert(shows(client.expire(mut p, 400)) == "K2:0:91", "esc-bracket-alt")
+}
+
+fn test_overlong_sequence() {
+    var t = "\u{1b}["
+    var i = 0
+    while i < 70 {
+        t = t + "1"
+        i += 1
+    }
+    let got = parse(bytes_of(t + "A"))
+    assert(got.starts_with("I{client.SEQUENCE_MAX}:27:91"), "overlong-to-pane")
+}
+
+fn test_long_paste() {
+    var t = "\u{1b}[200~"
+    let body = "x".repeat(70000)
+    var p = client.parser()
+    let events = client.feed(mut p, bytes_of(t + body + "\u{1b}[201~"), 0)
+    assert(events.len == 2 && events[0].kind == 4 && events[1].kind == 4, "paste-split")
+    assert(events[0].data.len == client.PASTE_MAX && events[1].data.len == 70000 - client.PASTE_MAX, "paste-sizes")
+}
+
+fn test_paste_end_cut_everywhere() {
+    let text = bytes_of("\u{1b}[200~ab\u{1b}[201~c")
+    var cut = 1
+    while cut < text.len {
+        var p = client.parser()
+        var all = client.feed(mut p, text[0..cut], 0)
+        for e in client.feed(mut p, text[cut..text.len], 0) { (mut all).push(e) }
+        assert(shows(all) == "P2:97:98 K0:0:99", "paste-cut")
+        cut += 1
+    }
+}
+
+// The server's own encoding of every named key, with every modifier, in
+// the normal cursor and keypad modes, parses back to the same event
+// (F13..F24 come back as F1..F12 with shift, as xterm sends them).
+fn test_round_trip_named() {
+    let pane = vt.new(20, 6, 0)
+    var code = 1
+    while code <= 38 {
+        if code == 11 || code == 12 || code == 13 || code == 14 {
+            code += 1
+            continue
+        }
+        var mods = 0
+        while mods < 8 {
+            let bytes = server.key_bytes(pane, mods, 1, code)
+            var want_code = code
+            var want_mods = mods
+            if code >= 27 {
+                want_code = code - 12
+                want_mods = mods | 1
+            }
+            let got = parse(bytes)
+            let want = "K{want_mods}:1:{want_code}"
+            if got != want { print("round-trip {code} {mods}: {got} != {want}") }
+            assert(got == want, "round-trip-named")
+            mods += 1
+        }
+        code += 1
+    }
+}
+
+fn test_round_trip_scalars() {
+    let pane = vt.new(20, 6, 0)
+    var cp = 97
+    while cp <= 122 {
+        assert(parse(server.key_bytes(pane, 0, 0, cp)) == "K0:0:{cp}", "round-trip-plain")
+        assert(parse(server.key_bytes(pane, 2, 0, cp)) == "K2:0:{cp}", "round-trip-alt")
+        if cp != 104 && cp != 105 && cp != 109 {
+            // Ctrl-H, Ctrl-I and Ctrl-M are Backspace, Tab and Enter's bytes.
+            assert(parse(server.key_bytes(pane, 4, 0, cp)) == "K4:0:{cp}", "round-trip-ctrl")
+            assert(parse(server.key_bytes(pane, 6, 0, cp)) == "K6:0:{cp}", "round-trip-ctrl-alt")
+        }
+        cp += 1
+    }
+    assert(parse(server.key_bytes(pane, 4, 0, 32)) == "K4:0:32", "round-trip-ctrl-space")
+}
