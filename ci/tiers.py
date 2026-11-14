@@ -6,8 +6,27 @@ import json
 import os
 from pathlib import Path
 import sys
+import time
 
 JOBS = ['plan-test', 'linux', 'macos']
+# Each gate step's limit, in minutes: at least twice the slowest green job
+# measured with this gate's steps, so that a slower hosted runner (single
+# steps have run 1.5 times slower) still has room. `.github/workflows/ci.yml`
+# holds the same numbers on the gate steps and ten minutes more on their
+# jobs; tiers-test.py holds the two together.
+#   macos: green jobs took 847 s and 913 s before the server's steps (runs
+#          43563124431 and 43556256934); on run 43575973926 a slower runner
+#          reached the old 20-minute limit with every finished step green.
+#          The server's steps took 29 s of a 685 s gate on a second
+#          Apple-silicon machine, so about 960 s: 40 minutes is 2.5 times it.
+#   linux: green jobs took 1,686 s, 1,879 s and 2,106 s (runs 43575973926,
+#          43563124431 and 43231544049). The server's steps took 229 s in the
+#          pinned image on two CPUs (compose rows 80 s, session rows 141 s),
+#          so about 2,340 s: 80 minutes is twice it.
+LIMITS = {'linux': 80, 'macos': 40}
+# A gate step that ended this close to its limit, red or cancelled, ran
+# into it.
+LIMIT_SLACK_SECONDS = 30
 
 
 def main():
@@ -21,7 +40,15 @@ def main():
     plan.add_argument('--label', default=os.environ.get('LABEL', '') or '-')
     plan.add_argument('--github-output')
     sub.add_parser('verdict')
+    limit = sub.add_parser('limit')
+    limit.add_argument('--job', required=True, choices=sorted(LIMITS))
+    limit.add_argument('--outcome', required=True)
+    limit.add_argument('--since-file')
+    limit.add_argument('--now', type=int)
+    limit.add_argument('--github-output')
     args = p.parse_args()
+    if args.command == 'limit':
+        return limit_step(args)
     if args.command == 'verdict':
         needs = json.loads(os.environ['NEEDS'])
         if needs['plan']['result'] != 'success':
@@ -30,8 +57,14 @@ def main():
         if not isinstance(chosen, list) or set(chosen) - set(JOBS):
             raise ValueError('invalid planned jobs')
         for job in chosen:
-            if needs.get(job, {}).get('result') != 'success':
-                raise ValueError('selected job did not succeed: ' + job)
+            result = needs.get(job, {}).get('result')
+            if result == 'success':
+                continue
+            if (needs.get(job, {}).get('outputs') or {}).get('limit') == 'hit':
+                raise ValueError('selected job hit its time limit: %s (gate step %d minutes)' % (job, LIMITS[job]))
+            if result == 'cancelled':
+                raise ValueError('selected job was cancelled: %s (a cancel, or its job limit)' % job)
+            raise ValueError('selected job did not succeed: ' + job)
         for job in JOBS:
             if job not in chosen and needs.get(job, {}).get('result', 'skipped') != 'skipped':
                 raise ValueError('unselected job ran: ' + job)
@@ -63,6 +96,36 @@ def main():
         with Path(args.github_output).open('a') as f:
             f.write('tier=' + result['tier'] + '\n')
             f.write('jobs=' + json.dumps(result['jobs']) + '\n')
+    return 0
+
+
+def limit_step(args):
+    """After a gate step, whatever its outcome: did it run into its limit?
+    Prints one line and writes `limit=hit|held|unknown`; never fails."""
+    since = None
+    if args.since_file:
+        try:
+            since = int(Path(args.since_file).read_text().strip())
+        except (OSError, ValueError):
+            since = None
+    now = args.now if args.now is not None else int(time.time())
+    minutes = LIMITS[args.job]
+    if since is None:
+        verdict = 'unknown'
+        print('limit %s: the gate step never started (outcome %s)' % (args.job, args.outcome))
+    else:
+        ran = now - since
+        if args.outcome in ('failure', 'cancelled') and ran >= minutes * 60 - LIMIT_SLACK_SECONDS:
+            verdict = 'hit'
+            print('TIME-LIMIT %s: the gate step ran %d s against its %d-minute limit (outcome %s)' % (
+                args.job, ran, minutes, args.outcome))
+        else:
+            verdict = 'held'
+            print('limit %s: the gate step ran %d s of its %d minutes (outcome %s)' % (
+                args.job, ran, minutes, args.outcome))
+    if args.github_output:
+        with Path(args.github_output).open('a') as f:
+            f.write('limit=' + verdict + '\n')
     return 0
 
 
