@@ -1,0 +1,6 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# leaves the close key out of the hint line while the dispatcher keeps it.
+floor 15
+rig w3-modes-plant-step.sh sha256=102555e829b8c3e76568cf231d9efd6ba41cd990d02e2ed37bdab6be5ab64e6d
+step w3-modes-plant-build tools=python3,cc script=w3-modes-plant-step.sh -- build
+step hint-line needs=w3-modes-plant-build tools=python3 script=w3-modes-plant-step.sh -- rows
