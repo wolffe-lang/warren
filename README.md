@@ -30,13 +30,15 @@ measurement entries; PAX replay remains unavailable without a boot fixture.
 `src/proto` implements bounded transport framing, message validation/encoding,
 fragment assembly and connection-wide image acknowledgement sequencing;
 [PROTOCOL](docs/PROTOCOL.md) fixes the bytes and [SERVER](docs/SERVER.md) is
-the event-loop contract and its blocking library dependencies. `src/layout`
-holds tabs and split trees as data: their geometry, every operation with its
-named refusals, and a canonical text dump ([LAYOUT](docs/LAYOUT.md)), held by
-hand-written goldens and seeded invariants at five sizes. No server,
-client, socket or pty is implemented. With no arguments the `warren` binary
-still prints its executable scaffold status and exits 1; `vt-dump` is the
-implemented diagnostic command.
+the event-loop contract, with the server it describes in `src/server`.
+`src/layout` holds tabs and split trees as data: their geometry, every
+operation with its named refusals, and a canonical text dump
+([LAYOUT](docs/LAYOUT.md)), held by hand-written goldens and seeded invariants
+at five sizes. `src/client` is the terminal client ([CLIENT](docs/CLIENT.md)):
+with no arguments `warren` attaches the terminal to the default session,
+starting the server and the session when there are none; `warren attach -t
+NAME`, `kill-server` and `list-sessions` work; `vt-dump` is a diagnostic
+command.
 [MAP](docs/MAP.md) separates what is planned from what is measured.
 
 ## What is planned
@@ -67,7 +69,7 @@ implemented diagnostic command.
 |---|---|---|
 | W0 | the map: pins, CI, the oracle, the survey, the prediction | in progress |
 | W1 | the emulator | pure core/history/reflow, diagnostic CLI and full-frame/property gates |
-| W2 | one pane; detach and attach | pure protocol codec and server contract; I/O planned |
+| W2 | one pane; detach and attach | server, terminal client and session rows on Linux, macOS and PAX under QEMU; lifecycle verbs in progress |
 | W3 | panes, tabs, the bar, keys | pure layout module; compositor, keys and bar planned |
 | W4 | mouse, scrollback, copy | planned |
 | W5 | layouts, commands, persistence | planned |
