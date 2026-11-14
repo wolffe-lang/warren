@@ -68,6 +68,7 @@ step origin-fixture-rows python3 -I tests/vt/origin_fixture_rows.py
 step report-forms python3 -I tests/vt/report_form_rows.py
 step prefix-tool-rows python3 -I tests/vt/prefix_tool_rows.py
 step assigned-scalar-rows python3 -I tests/vt/assigned_rows.py
+step combining-data-rows python3 -I tests/vt/combining_data_rows.py
 step width-sweep-framing python3 -I tests/vt/width_sweep_rows.py
 step width-policy-rows python3 -I tests/vt/width_policy_rows.py
 step oracle-zero-width-clusters python3 -I tests/vt/oracle_zero_width_rows.py

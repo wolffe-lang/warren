@@ -19,10 +19,10 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-import unicodedata
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import screen as S  # noqa: E402
+from unicode_combining import normal_combining  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 RESOURCES = {
@@ -140,8 +140,7 @@ def is_combining(cp):
     if (0x1160 <= cp <= 0x11FF or 0xD7B0 <= cp <= 0xD7C6 or
             0xD7CB <= cp <= 0xD7FB or 0x13430 <= cp <= 0x1343F):
         return True
-    ch = chr(cp)
-    return unicodedata.combining(ch) != 0 or unicodedata.category(ch) in ('Mn', 'Me')
+    return normal_combining(cp)
 
 
 def decode(data):

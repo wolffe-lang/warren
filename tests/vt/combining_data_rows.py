@@ -18,6 +18,17 @@ def main():
         row(0x200D, 'JOINER', 'Cf', 0), row(0x13440, 'EGYPTIAN', 'Mn', 0)]).encode()
     result = combining(data)
     assert result == {'ranges': [[0x300, 0x301], [0x488, 0x488], [0x1715, 0x1715], [0x13440, 0x13440]], 'scalars': 5}
+    ranged = (row(0x1000, '<Mark, First>', 'Mn', 0) + '\n' +
+              row(0x1002, '<Mark, Last>', 'Mn', 0)).encode()
+    assert combining(ranged) == {'ranges': [[0x1000, 0x1002]], 'scalars': 3}
+    mismatch = (row(0x1000, '<Mark, First>', 'Mn', 0) + '\n' +
+                row(0x1002, '<Mark, Last>', 'Mn', 230)).encode()
+    try:
+        combining(mismatch)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError('mismatched First/Last combining class accepted')
     for bad in (row(0x301, 'BAD', 'Mn', -1), row(0x301, 'BAD', 'Mn', 256), row(0x301, 'BAD', 'Mn', 'x')):
         try:
             combining(bad.encode())

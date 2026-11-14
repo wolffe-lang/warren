@@ -13,7 +13,9 @@ def main():
     pins = json.loads((ROOT / 'tests/vt/unicode-sources.json').read_text())
     assigned = json.loads((ROOT / 'tests/vt/assigned-ranges.json').read_text())
     exceptions = json.loads((ROOT / 'tests/vt/width-exceptions.json').read_text())
-    assert pins['version'] == assigned['version'] == exceptions['unicode'] == '15.1.0'
+    normal = json.loads((ROOT / 'tests/vt/combining-ranges.json').read_text())
+    assert pins['version'] == assigned['version'] == exceptions['unicode'] == normal['version'] == '15.1.0'
+    assert normal['source_sha256'] == assigned['source_sha256']
     assert assigned['source_sha256'] == next(source['sha256'] for source in pins['sources'] if source['name'] == 'UnicodeData.txt')
 
     def category(cp):
@@ -36,7 +38,8 @@ def main():
     # data too. U13440 is Mn in15.1, not the Cn of Python3.11's Unicode14 data.
     for cp in (0x115F, 0x1200, 0xD7AF, 0xD7C7, 0xD7CA, 0xD7FC,
                0xFFF9, 0xFFFA, 0xFFFB, 0x1342F, 0x13440, 0x13441, 0x200D, 0x301):
-        expected = category(cp) in ('Mn', 'Me')
+        expected = any(low <= cp <= high for low, high in normal['ranges'])
+        assert expected == (category(cp) in ('Mn', 'Me')), ('covered-control-category', hex(cp))
         assert oracle.is_combining(cp) == expected, ('pinned-nonexception-class', hex(cp), category(cp))
     assert category(0x13440) == 'Mn' and oracle.is_combining(0x13440)
     clusters = oracle.parse_print('a\U00013440\r\n'.encode(), 1)[0]
