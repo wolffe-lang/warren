@@ -2,7 +2,10 @@
 //! The event loop: one wait a turn over the listener, every connection,
 //! every pane's master, the listened signals and the nearest deadline.
 //! A turn's scratch lives in a region that ends with the turn; long-lived
-//! state is changed in place. No helper process and no thread.
+//! state is changed in place. No helper process and no thread. Slots the
+//! turn cannot make in place (a session, a pane and its emulator) are made
+//! between turns, and the action that asked for one is taken again on the
+//! next turn, which follows at once.
 use std.env
 use std.fs
 use std.net
@@ -11,6 +14,7 @@ use std.poll
 use std.process
 use std.signal
 use std.time
+use layout
 use proto
 use vt
 
@@ -27,10 +31,13 @@ pub struct Server {
     listening: bool,
     conns: List[Conn],
     sessions: List[Session],
+    panes: List[Pane],
+    orphans: List[int],
     key_kind: List[int],
     key_owner: List[int],
     key_gen: List[int],
     next_id: int,
+    next_pane: int,
     stopping: bool,
     stop_deadline: int,
     started: int,
@@ -40,6 +47,9 @@ pub struct Server {
     version: str,
     again: bool,
     need_slot: bool,
+    need_pane: bool,
+    want_cols: int,
+    want_rows: int,
     rotate: int,
     trace: bool,
     turns: int,
@@ -114,6 +124,7 @@ fn close_conn(mut s: Server, index: int) {
     s.conns[index].phase = CLOSED
     s.conns[index].key = 0 - 1
     s.conns[index].fd = 0 - 1
+    s.conns[index].pending = 0
     trace(s, "conn {index} closed")
 }
 
@@ -131,6 +142,7 @@ fn leave(mut s: Server, index: int) {
 /// queued whole, close at once.
 fn terminal(mut s: Server, index: int, kind: int, code: int, text: str) {
     leave(mut s, index)
+    s.conns[index].pending = 0
     let ok = send(mut s.conns[index], kind, coded(code, text))
     if !ok {
         close_conn(mut s, index)
@@ -220,11 +232,12 @@ fn pending_conns(s: Server) -> int {
     n
 }
 
-/// The projected memory of what is held now, plus an addition.
+/// The projected memory of what is held now, plus an addition: every
+/// pane slot (a free one keeps its emulator) and every connection.
 fn projected(s: Server, extra: int) -> int {
     var total = extra
-    for x in s.sessions {
-        if x.live { total += pane_bytes(x.cols, x.rows) }
+    for p in s.panes {
+        total += pane_bytes(p.screen.cols, p.screen.rows)
     }
     for c in s.conns {
         if c.live {
@@ -238,8 +251,18 @@ fn projected(s: Server, extra: int) -> int {
     total
 }
 
+/// Whether a pane of this size fits the budget beside `extra`: a free slot
+/// (which would be reused) is already counted.
+fn pane_fits(s: Server, cols: int, rows: int, extra: int) -> bool {
+    for p in s.panes {
+        if !p.live { return projected(s, extra) <= s.budget }
+    }
+    projected(s, pane_bytes(cols, rows) + extra) <= s.budget
+}
+
 /// The session's size: the smallest columns and, independently, rows of
-/// its attached members; unchanged when nobody is attached.
+/// its attached members; unchanged when nobody is attached. A change
+/// resizes every shown pane of every tab to its rect.
 fn recompute_size(mut s: Server, si: int) {
     var cols = 0
     var rows = 0
@@ -253,11 +276,7 @@ fn recompute_size(mut s: Server, si: int) {
     if cols == s.sessions[si].cols && rows == s.sessions[si].rows { return }
     s.sessions[si].cols = cols
     s.sessions[si].rows = rows
-    let _r = vt.resize(mut s.sessions[si].pane.screen, cols, rows)
-    if s.sessions[si].pane.master >= 0 {
-        let f = master_file(s.sessions[si].pane)
-        term_size(f, cols, rows)
-    }
+    layout_changed(mut s, si)
     var i = 0
     while i < s.conns.len {
         if s.conns[i].live && s.conns[i].member && s.conns[i].session == si {
@@ -276,7 +295,7 @@ fn mark_stale(mut c: Conn, now: int) {
     }
 }
 
-/// The session's pane changed: every member has damage to compose.
+/// The session's frame changed: every member has damage to compose.
 fn session_changed(mut s: Server, si: int, now: int) {
     var i = 0
     while i < s.conns.len {
@@ -287,8 +306,10 @@ fn session_changed(mut s: Server, si: int, now: int) {
     }
 }
 
-/// A session ends: members are told, the master is closed, the child
-/// stays in process.poll's care, the slot keeps its emulator for reuse.
+/// A session ends: members are told (after the last image where they
+/// can take it), every pane's master is closed and its child left in
+/// process.poll's care; the panes stay as they are until no client is
+/// owed the last image, and the slots are then free for reuse.
 fn end_session(mut s: Server, si: int) {
     trace(s, "session {si} ended")
     var i = 0
@@ -309,42 +330,589 @@ fn end_session(mut s: Server, si: int) {
         }
         i += 1
     }
-    let key = s.sessions[si].pane.key
-    forget_key(mut s, key)
-    s.sessions[si].pane.key = 0 - 1
-    close_master(mut s.sessions[si].pane)
+    var k = 0
+    while k < s.panes.len {
+        if s.panes[k].live && s.panes[k].session == si && s.panes[k].session_gen == s.sessions[si].generation {
+            let key = s.panes[k].key
+            forget_key(mut s, key)
+            s.panes[k].key = 0 - 1
+            close_master(mut s.panes[k])
+            orphan_child(mut s, k)
+        }
+        k += 1
+    }
     s.sessions[si].live = false
     s.sessions[si].members = 0
     if live_sessions(s) == 0 { begin_stop(mut s, "the last session ended") }
 }
 
+// ---- panes ----
+
+/// The slot of the live pane with this id, or -1.
+fn slot_of(s: Server, id: int) -> int {
+    var k = 0
+    while k < s.panes.len {
+        if s.panes[k].live && s.panes[k].id == id { return k }
+        k += 1
+    }
+    0 - 1
+}
+
+/// The focused pane's id in the session's active tab, or -1.
+fn focus_id(s: Server, si: int) -> int {
+    var t = 0
+    while t < s.sessions[si].layout.tabs.len {
+        if s.sessions[si].layout.tabs[t].id == s.sessions[si].layout.active { return s.sessions[si].layout.tabs[t].focus }
+        t += 1
+    }
+    0 - 1
+}
+
+fn focused_slot(s: Server, si: int) -> int {
+    let id = focus_id(s, si)
+    if id < 0 { return 0 - 1 }
+    slot_of(s, id)
+}
+
+/// How many panes the session's tabs hold.
+fn pane_count(s: Server, si: int) -> int {
+    var n = 0
+    for t in s.sessions[si].layout.tabs {
+        n += t.focus_order.len
+    }
+    n
+}
+
+/// A child whose pane goes: it stays tracked until it is reaped.
+fn orphan_child(mut s: Server, k: int) {
+    if !s.panes[k].child_live { return }
+    let child = s.panes[k].child
+    s.panes[k].child_live = false
+    s.panes[k].child = 0 - 1
+    var i = 0
+    while i < s.orphans.len {
+        if s.orphans[i] < 0 {
+            s.orphans[i] = child
+            return
+        }
+        i += 1
+    }
+    (mut s.orphans).push(child)
+}
+
+/// A free pane slot whose emulator is reset to a size, or -1 after asking
+/// for one to be made between turns.
+fn acquire_pane(mut s: Server, cols: int, rows: int) -> int {
+    var k = 0
+    while k < s.panes.len {
+        if !s.panes[k].live {
+            fresh_screen(mut s.panes[k], cols, rows)
+            return k
+        }
+        k += 1
+    }
+    s.need_pane = true
+    s.want_cols = cols
+    s.want_rows = rows
+    0 - 1
+}
+
+/// Start a pane's program in slot k for the session, at a size: the
+/// session's working directory and environment, the pane's id. "" or why
+/// it did not start (the slot is then free again).
+fn spawn_pane(mut s: Server, si: int, k: int, id: int, cols: int, rows: int) -> str {
+    s.panes[k].live = true
+    s.panes[k].id = id
+    s.panes[k].session = si
+    s.panes[k].session_gen = s.sessions[si].generation
+    s.panes[k].gen = s.panes[k].gen + 1
+    s.panes[k].damage = s.panes[k].damage + 1
+    s.panes[k].shown = false
+    s.panes[k].sync_since = 0
+    let sp = Spawn { cols: cols, rows: rows, cwd: cwd_of(s.sessions[si]), names: copy s.sessions[si].env_names,
+        values: copy s.sessions[si].env_values, pane_id: id }
+    let why = start_pane(mut s.panes[k], name_of(s.sessions[si]), sp, shell_argv(), s.inherited)
+    if why.len > 0 {
+        trace(s, "spawn failed: {why}")
+        orphan_child(mut s, k)
+        s.panes[k].live = false
+        return why
+    }
+    let key = poll.add_file(mut s.w, master_file(s.panes[k]), poll.READ) else |e| {
+        close_master(mut s.panes[k])
+        orphan_child(mut s, k)
+        s.panes[k].live = false
+        return "readiness set: {e}"
+    }
+    record_key(mut s, key, KEY_MASTER, k, s.panes[k].gen)
+    s.panes[k].key = key
+    s.panes[k].last_output = now_ns()
+    ""
+}
+
+/// A pane leaves its session's layout: its master is closed (its program
+/// hears the hangup), its child stays tracked until reaped, its slot is
+/// free at once.
+fn drop_pane(mut s: Server, k: int) {
+    let key = s.panes[k].key
+    forget_key(mut s, key)
+    s.panes[k].key = 0 - 1
+    close_master(mut s.panes[k])
+    orphan_child(mut s, k)
+    s.panes[k].live = false
+    s.panes[k].shown = false
+    s.panes[k].in_off = 0
+    s.panes[k].in_len = 0
+    s.panes[k].damage = s.panes[k].damage + 1
+}
+
+/// Close a pane: it leaves the layout and its slot; the last pane of the
+/// last tab ends the session instead.
+fn close_pane(mut s: Server, si: int, k: int) {
+    let id = s.panes[k].id
+    var empty = false
+    layout.close(mut s.sessions[si].layout, id) else |e| {
+        empty = "{e}" == "session_empty"
+    }
+    if empty {
+        end_session(mut s, si)
+        return
+    }
+    drop_pane(mut s, k)
+    layout_changed(mut s, si)
+    title_to_members(mut s, si)
+}
+
+/// After any change of the layout or the session's size: every pane at
+/// its rect's size, the frame's owner map to rebuild, every member to
+/// rescan its frame.
+fn layout_changed(mut s: Server, si: int) {
+    sync_sizes(mut s, si)
+    s.sessions[si].layout_gen = s.sessions[si].layout_gen + 1
+    session_changed(mut s, si, now_ns())
+}
+
+/// Every pane of the session whose rect (in any tab) is not empty gets
+/// that rect's size: the emulator first, then the terminal (its program
+/// hears the window change and redraws into the resized emulator). A
+/// hidden pane keeps its size. `shown` marks the active tab's visible
+/// panes.
+fn sync_sizes(mut s: Server, si: int) {
+    let cols = s.sessions[si].cols
+    let area = s.sessions[si].rows - BAR_LINES
+    var k = 0
+    while k < s.panes.len {
+        if s.panes[k].live && s.panes[k].session == si && s.panes[k].session_gen == s.sessions[si].generation {
+            s.panes[k].shown = false
+        }
+        k += 1
+    }
+    if cols < 1 || area < 1 { return }
+    let active = s.sessions[si].layout.active
+    var t = 0
+    while t < s.sessions[si].layout.tabs.len {
+        let tab = s.sessions[si].layout.tabs[t].id
+        let rs = layout.rects(s.sessions[si].layout, tab, cols, area)
+        for r in rs {
+            if r.cols > 0 && r.rows > 0 {
+                let p = slot_of(s, r.pane)
+                if p >= 0 {
+                    s.panes[p].at_col = r.col
+                    s.panes[p].at_row = r.row
+                    if tab == active { s.panes[p].shown = true }
+                    if s.panes[p].screen.cols != r.cols || s.panes[p].screen.rows != r.rows {
+                        let _r = vt.resize(mut s.panes[p].screen, r.cols, r.rows)
+                        if s.panes[p].master >= 0 { term_size(master_file(s.panes[p]), r.cols, r.rows) }
+                        s.panes[p].damage = s.panes[p].damage + 1
+                    }
+                }
+            }
+        }
+        t += 1
+    }
+}
+
+/// The owner map (which pane slot draws each tab-area cell, -1 for a
+/// border) and the border cells, rebuilt in place when the layout or the
+/// size moved. Border cells beside the focused pane (within one cell of
+/// its rect) are drawn in the focus colour; with exactly two panes shown
+/// they share one border, and the half beside the focused pane is marked.
+fn ensure_chrome(mut s: Server, si: int) {
+    if s.sessions[si].chrome_gen == s.sessions[si].layout_gen { return }
+    let cols = s.sessions[si].cols
+    let area = s.sessions[si].rows - BAR_LINES
+    let n = if cols > 0 && area > 0 then cols * area else 0
+    while s.sessions[si].owner.len < n { (mut s.sessions[si].owner).push(0 - 1) }
+    while s.sessions[si].border.len < n { (mut s.sessions[si].border).push(blank_cell()) }
+    var i = 0
+    while i < n {
+        s.sessions[si].owner[i] = 0 - 1
+        s.sessions[si].border[i] = blank_cell()
+        i += 1
+    }
+    s.sessions[si].chrome_gen = s.sessions[si].layout_gen
+    if n == 0 { return }
+    let tab = s.sessions[si].layout.active
+    let rs = layout.rects(s.sessions[si].layout, tab, cols, area)
+    let focus = focus_id(s, si)
+    var fc = 0
+    var fr = 0
+    var fw = 0
+    var fh = 0
+    var shown = 0
+    var first = 0 - 1
+    for r in rs {
+        if r.cols > 0 && r.rows > 0 {
+            shown += 1
+            if first < 0 { first = r.pane }
+            if r.pane == focus {
+                fc = r.col
+                fr = r.row
+                fw = r.cols
+                fh = r.rows
+            }
+            let k = slot_of(s, r.pane)
+            var row = r.row
+            while row < r.row + r.rows {
+                var c = r.col
+                while c < r.col + r.cols {
+                    s.sessions[si].owner[(row - 1) * cols + c - 1] = k
+                    c += 1
+                }
+                row += 1
+            }
+        }
+    }
+    let bs = layout.borders(s.sessions[si].layout, tab, cols, area)
+    let halves = shown == 2 && bs.len == 1
+    for b in bs {
+        var j = 0
+        while j < b.length {
+            let c = if b.axis == layout.COLS then b.col else b.col + j
+            let row = if b.axis == layout.COLS then b.row + j else b.row
+            let glyph = glyph_at(s.sessions[si].owner, cols, area, c, row, b.axis)
+            var lit = fw > 0 && c >= fc - 1 && c <= fc + fw && row >= fr - 1 && row <= fr + fh
+            if halves {
+                let half = (b.length + 1) / 2
+                lit = if focus == first then j < half else j >= half
+            }
+            s.sessions[si].border[(row - 1) * cols + c - 1] = chrome_cell(glyph, 0, if lit then FOCUS_COLOUR else 0 - 1)
+            j += 1
+        }
+    }
+}
+
+/// A tab's label on the bar: ` N ` or ` N:NAME `.
+fn tab_label(t: layout.Tab, n: int) -> str {
+    let name = str_from_utf8(t.name[0..t.name.len]) else ""
+    if name.len == 0 { return " {n} " }
+    " {n}:{name} "
+}
+
+/// The bar's two lines for one client: line one the session's name and
+/// its tabs (the active one inverse; tabs that do not fit are left out on
+/// the far side of the active one, marked `<` and `>`); line two the
+/// client's message while it lasts, else blank.
+fn bar_cells(s: Server, si: int, index: int, now: int) -> List[vt.Cell] {
+    let cols = s.sessions[si].cols
+    var bar = List[vt.Cell]()
+    var i = 0
+    while i < BAR_LINES * cols {
+        (mut bar).push(blank_cell())
+        i += 1
+    }
+    var line = List[vt.Cell]()
+    i = 0
+    while i < cols {
+        (mut line).push(blank_cell())
+        i += 1
+    }
+    var col = put_text(mut line, 1, cols, " " + name_of(s.sessions[si]) + " ", INVERSE)
+    var labels = List[str]()
+    var active = 0
+    var t = 0
+    while t < s.sessions[si].layout.tabs.len {
+        (mut labels).push(tab_label(s.sessions[si].layout.tabs[t], t + 1))
+        if s.sessions[si].layout.tabs[t].id == s.sessions[si].layout.active { active = t }
+        t += 1
+    }
+    if labels.len > 0 {
+        // The widest run of labels that fits and holds the active one: from
+        // the active label back as far as fits, then forward.
+        let room = cols - col + 1 - 2
+        var from = active
+        var to = active
+        var used = text_width(labels[active])
+        while from > 0 && used + text_width(labels[from - 1]) <= room {
+            from -= 1
+            used += text_width(labels[from])
+        }
+        while to + 1 < labels.len && used + text_width(labels[to + 1]) <= room {
+            to += 1
+            used += text_width(labels[to])
+        }
+        if from > 0 { col = put_text(mut line, col, cols, "<", 0) }
+        t = from
+        while t <= to {
+            col = put_text(mut line, col, cols, labels[t], if t == active then INVERSE else 0)
+            t += 1
+        }
+        if to + 1 < labels.len { col = put_text(mut line, col, cols, ">", 0) }
+    }
+    i = 0
+    while i < cols {
+        bar[i] = line[i]
+        i += 1
+    }
+    if s.conns[index].message_until > now && s.conns[index].message.len > 0 {
+        var msg = List[vt.Cell]()
+        i = 0
+        while i < cols {
+            (mut msg).push(blank_cell())
+            i += 1
+        }
+        let text = str_from_utf8(s.conns[index].message[0..s.conns[index].message.len]) else ""
+        let _m = put_text(mut msg, 1, cols, text, 0)
+        i = 0
+        while i < cols {
+            bar[cols + i] = msg[i]
+            i += 1
+        }
+    }
+    bar
+}
+
+/// Show a message on one client's hint line for MESSAGE_MS.
+fn tell(mut s: Server, index: int, text: str) {
+    (mut s.conns[index].message).reset()
+    for b in text.bytes() { (mut s.conns[index].message).push(b) }
+    s.conns[index].message_until = now_ns() + MESSAGE_MS * 1000000
+    s.conns[index].seen_bar = 0 - 1
+    mark_stale(mut s.conns[index], now_ns())
+}
+
+/// The focused pane's title to every member (after focus or a tab moved).
+fn title_to_members(mut s: Server, si: int) {
+    let k = focused_slot(s, si)
+    if k < 0 { return }
+    let title = s.panes[k].screen.title_storage[0..s.panes[k].screen.title_length]
+    var i = 0
+    while i < s.conns.len {
+        if s.conns[i].live && s.conns[i].member && s.conns[i].session == si && !s.conns[i].ending {
+            if !send(mut s.conns[i], 134, title_payload(title)) { terminal(mut s, i, 135, 5, "too slow") }
+        }
+        i += 1
+    }
+}
+
+/// Focus reports to the pane losing focus and the one taking it, when
+/// they asked for them; the new focused pane's title to the members.
+fn focus_moved(mut s: Server, si: int, from: int) {
+    let to = focused_slot(s, si)
+    if from == to { return }
+    if from >= 0 && s.panes[from].live { queue_to(mut s, from, focus_bytes(s.panes[from].screen, false)) }
+    if to >= 0 { queue_to(mut s, to, focus_bytes(s.panes[to].screen, true)) }
+    title_to_members(mut s, si)
+}
+
+// ---- actions ----
+
+const DONE: int = 0
+const LATER: int = 1
+
+/// Split the focused pane along an axis; the new pane goes second and
+/// takes focus. LATER when its slot is made between turns.
+fn act_split(mut s: Server, index: int, si: int, axis: int) -> int {
+    let tab = s.sessions[si].layout.active
+    let focus = focus_id(s, si)
+    let cols = s.sessions[si].cols
+    let area = s.sessions[si].rows - BAR_LINES
+    if pane_count(s, si) >= MAX_PANES {
+        tell(mut s, index, "split refused: {MAX_PANES} panes a session")
+        return DONE
+    }
+    let id = s.next_pane
+    var trial = copy s.sessions[si].layout
+    var refusal = ""
+    layout.split(mut trial, tab, focus, axis, id, true, cols, area) else |e| { refusal = "{e}" }
+    if refusal.len > 0 {
+        if refusal == "too_small" { tell(mut s, index, "too small to split") } else { tell(mut s, index, "split refused: {refusal}") }
+        return DONE
+    }
+    var nc = 0
+    var nr = 0
+    for r in layout.rects(trial, tab, cols, area) {
+        if r.pane == id {
+            nc = r.cols
+            nr = r.rows
+        }
+    }
+    if nc < 1 || nr < 1 {
+        tell(mut s, index, "too small to split")
+        return DONE
+    }
+    if !pane_fits(s, nc, nr, 0) {
+        tell(mut s, index, "split refused: memory budget")
+        return DONE
+    }
+    let k = acquire_pane(mut s, nc, nr)
+    if k < 0 { return LATER }
+    let from = focused_slot(s, si)
+    s.next_pane = s.next_pane + 1
+    layout.split(mut s.sessions[si].layout, tab, focus, axis, id, true, cols, area) else |_| {}
+    let why = spawn_pane(mut s, si, k, id, nc, nr)
+    if why.len > 0 {
+        layout.close(mut s.sessions[si].layout, id) else |_| {}
+        tell(mut s, index, "split refused: the program did not start: {why}")
+        layout_changed(mut s, si)
+        return DONE
+    }
+    layout_changed(mut s, si)
+    focus_moved(mut s, si, from)
+    DONE
+}
+
+/// A new tab with one pane at the whole area; it becomes active.
+fn act_new_tab(mut s: Server, index: int, si: int) -> int {
+    let cols = s.sessions[si].cols
+    let area = s.sessions[si].rows - BAR_LINES
+    if pane_count(s, si) >= MAX_PANES {
+        tell(mut s, index, "new tab refused: {MAX_PANES} panes a session")
+        return DONE
+    }
+    if !pane_fits(s, cols, area, 0) {
+        tell(mut s, index, "new tab refused: memory budget")
+        return DONE
+    }
+    let k = acquire_pane(mut s, cols, area)
+    if k < 0 { return LATER }
+    let from = focused_slot(s, si)
+    let id = s.next_pane
+    s.next_pane = s.next_pane + 1
+    let _t = layout.new_tab(mut s.sessions[si].layout, id, "") else |_| { 0 }
+    let why = spawn_pane(mut s, si, k, id, cols, area)
+    if why.len > 0 {
+        layout.close(mut s.sessions[si].layout, id) else |_| {}
+        tell(mut s, index, "new tab refused: the program did not start: {why}")
+        layout_changed(mut s, si)
+        return DONE
+    }
+    layout_changed(mut s, si)
+    focus_moved(mut s, si, from)
+    DONE
+}
+
+fn opposite(direction: int) -> int {
+    if direction == layout.LEFT { return layout.RIGHT }
+    if direction == layout.RIGHT { return layout.LEFT }
+    if direction == layout.UP { return layout.DOWN }
+    layout.UP
+}
+
+/// Move a border of the focused pane one step in a direction: its own
+/// border on that side, or else the one on the other side, moving the
+/// same way.
+fn act_resize(mut s: Server, si: int, direction: int) {
+    let focus = focus_id(s, si)
+    let cols = s.sessions[si].cols
+    let area = s.sessions[si].rows - BAR_LINES
+    let step = if direction == layout.LEFT || direction == layout.RIGHT then RESIZE_COLS else RESIZE_ROWS
+    var none = false
+    let _g = layout.resize(mut s.sessions[si].layout, focus, direction, step, cols, area) else |e| {
+        none = "{e}" == "no_border"
+        0
+    }
+    if none {
+        let _h = layout.resize(mut s.sessions[si].layout, focus, opposite(direction), 0 - step, cols, area) else |_| { 0 }
+    }
+    layout_changed(mut s, si)
+}
+
+/// Do a key's action for a client. LATER when it waits for a pane slot
+/// made between turns (it is taken again on the next turn).
+fn do_action(mut s: Server, index: int, action: int, arg: int) -> int {
+    let si = s.conns[index].session
+    if si < 0 || !s.sessions[si].live { return DONE }
+    let cols = s.sessions[si].cols
+    let area = s.sessions[si].rows - BAR_LINES
+    let tab = s.sessions[si].layout.active
+    let from = focused_slot(s, si)
+    if action == ACT_SPLIT { return act_split(mut s, index, si, arg) }
+    if action == ACT_NEW_TAB { return act_new_tab(mut s, index, si) }
+    if action == ACT_DETACH {
+        terminal(mut s, index, 135, 1, "detached")
+        return DONE
+    }
+    if action == ACT_SEND_PREFIX {
+        if from >= 0 { queue_to(mut s, from, key_bytes(s.panes[from].screen, 4, 0, 32)) }
+        return DONE
+    }
+    if action == ACT_CLOSE {
+        if from >= 0 { close_pane(mut s, si, from) }
+        return DONE
+    }
+    if action == ACT_RESIZE {
+        act_resize(mut s, si, arg)
+        return DONE
+    }
+    var refused = false
+    if action == ACT_FOCUS {
+        layout.focus(mut s.sessions[si].layout, tab, arg, cols, area) else |_| { refused = true }
+    } else if action == ACT_FOCUS_NEXT {
+        layout.focus_next(mut s.sessions[si].layout, tab) else |_| { refused = true }
+    } else if action == ACT_ZOOM {
+        layout.zoom(mut s.sessions[si].layout, tab) else |_| { refused = true }
+    } else if action == ACT_EQUALIZE {
+        layout.equalize(mut s.sessions[si].layout, tab) else |_| { refused = true }
+    } else if action == ACT_NEXT_TAB {
+        layout.next_tab(mut s.sessions[si].layout)
+    } else if action == ACT_PREVIOUS_TAB {
+        layout.previous_tab(mut s.sessions[si].layout)
+    } else if action == ACT_SELECT_TAB {
+        layout.select_tab(mut s.sessions[si].layout, arg) else |_| { refused = true }
+    } else {
+        refused = true
+    }
+    if refused { return DONE }
+    layout_changed(mut s, si)
+    focus_moved(mut s, si, from)
+    DONE
+}
+
 // ---- input from clients ----
 
+/// Queue bytes for a pane's program and write what the pty takes now.
+fn queue_to(mut s: Server, k: int, data: List[byte]) {
+    if k < 0 || !s.panes[k].live || data.len == 0 { return }
+    if !queue_input(mut s.panes[k], data) {
+        trace(s, "pane {k} input queue full: dropped {data.len}")
+        return
+    }
+    write_pane(mut s, k)
+}
+
+/// Bytes from a client for its session's focused pane.
 fn to_pane(mut s: Server, index: int, data: List[byte]) {
     let si = s.conns[index].session
     if si < 0 || !s.sessions[si].live || data.len == 0 { return }
-    if !queue_input(mut s.sessions[si].pane, data) {
-        trace(s, "session {si} input queue full: dropped {data.len}")
-        return
-    }
-    write_pane(mut s, si)
+    queue_to(mut s, focused_slot(s, si), data)
 }
 
-fn write_pane(mut s: Server, si: int) {
-    if s.sessions[si].pane.ended || s.sessions[si].pane.master < 0 { return }
-    let off = s.sessions[si].pane.in_off
-    let len = s.sessions[si].pane.in_len
+fn write_pane(mut s: Server, k: int) {
+    if s.panes[k].ended || s.panes[k].master < 0 { return }
+    let off = s.panes[k].in_off
+    let len = s.panes[k].in_len
     if len > off {
-        var f = fs.File { fd: s.sessions[si].pane.master }
+        var f = fs.File { fd: s.panes[k].master }
         let end = if len - off > WRITE_BUDGET then off + WRITE_BUDGET else len
-        let n = fs.write_some(mut f, s.sessions[si].pane.input[off..end]) else |_| { 0 }
-        s.sessions[si].pane.in_off = off + n
+        let n = fs.write_some(mut f, s.panes[k].input[off..end]) else |_| { 0 }
+        s.panes[k].in_off = off + n
     }
-    let want = s.sessions[si].pane.in_len > s.sessions[si].pane.in_off
-    if want != s.sessions[si].pane.write_on && s.sessions[si].pane.key >= 0 {
+    let want = s.panes[k].in_len > s.panes[k].in_off
+    if want != s.panes[k].write_on && s.panes[k].key >= 0 {
         let i = if want then poll.READ | poll.WRITE else poll.READ
-        poll.modify(mut s.w, s.sessions[si].pane.key, i) else |_| {}
-        s.sessions[si].pane.write_on = want
+        poll.modify(mut s.w, s.panes[k].key, i) else |_| {}
+        s.panes[k].write_on = want
     }
 }
 
@@ -360,8 +928,9 @@ fn u(b: List[byte], at: int, width: int) -> int {
     n
 }
 
-// A client whose session ended while it owed an ACK: the ended pane's last
-// image (when the slot still holds that pane), then BYE session-ended.
+// A client whose session ended while it owed an ACK: the ended session's
+// last image (when its panes are still those of that session), then BYE
+// session-ended.
 fn finish_ending(mut s: Server, index: int) {
     let si = s.conns[index].session
     s.conns[index].ending = false
@@ -379,31 +948,49 @@ fn attached_message(mut s: Server, index: int, kind: int, body: List[byte]) {
         let mods = u(body, 0, 1)
         let k = u(body, 1, 1)
         let code = u(body, 2, 4)
-        // The prefix (Ctrl-Space) and its detach binding are the server's.
+        // The prefix (Ctrl-Space) and its table are the server's.
         if s.conns[index].prefix {
             s.conns[index].prefix = false
-            if k == 0 && code == 100 && mods == 0 {
-                terminal(mut s, index, 135, 1, "detached")
-                return
+            let b = prefix_action(mods, k, code)
+            if b.action == ACT_NONE { return }
+            if do_action(mut s, index, b.action, b.arg) == LATER {
+                s.conns[index].pending = b.action
+                s.conns[index].pending_arg = b.arg
             }
-            if !(k == 0 && code == 32 && mods & 4 != 0) { return }
-        } else if k == 0 && code == 32 && mods & 4 != 0 {
+            return
+        }
+        if is_prefix(mods, k, code) {
             s.conns[index].prefix = true
             return
         }
-        if si >= 0 { to_pane(mut s, index, key_bytes(s.sessions[si].pane.screen, mods, k, code)) }
-    } else if kind == 3 {
         if si >= 0 {
+            let f = focused_slot(s, si)
+            if f >= 0 { queue_to(mut s, f, key_bytes(s.panes[f].screen, mods, k, code)) }
+        }
+    } else if kind == 3 {
+        // A mouse event inside the focused pane goes to it, relative to
+        // its rect; any other is dropped.
+        if si >= 0 {
+            let f = focused_slot(s, si)
             let col = u(body, 3, 2)
             let row = u(body, 5, 2)
-            if col <= s.sessions[si].cols && row <= s.sessions[si].rows {
-                to_pane(mut s, index, mouse_bytes(s.sessions[si].pane.screen, u(body, 0, 1), u(body, 1, 1), u(body, 2, 1), col, row))
+            if f >= 0 && s.panes[f].shown && col >= s.panes[f].at_col && col < s.panes[f].at_col + s.panes[f].screen.cols &&
+                row >= s.panes[f].at_row && row < s.panes[f].at_row + s.panes[f].screen.rows {
+                let pc = col - s.panes[f].at_col + 1
+                let pr = row - s.panes[f].at_row + 1
+                queue_to(mut s, f, mouse_bytes(s.panes[f].screen, u(body, 0, 1), u(body, 1, 1), u(body, 2, 1), pc, pr))
             }
         }
     } else if kind == 4 {
-        if si >= 0 { to_pane(mut s, index, paste_bytes(s.sessions[si].pane.screen, body[4..body.len])) }
+        if si >= 0 {
+            let f = focused_slot(s, si)
+            if f >= 0 { queue_to(mut s, f, paste_bytes(s.panes[f].screen, body[4..body.len])) }
+        }
     } else if kind == 5 {
-        if si >= 0 { to_pane(mut s, index, focus_bytes(s.sessions[si].pane.screen, u(body, 0, 1) == 1)) }
+        if si >= 0 {
+            let f = focused_slot(s, si)
+            if f >= 0 { queue_to(mut s, f, focus_bytes(s.panes[f].screen, u(body, 0, 1) == 1)) }
+        }
     } else if kind == 6 {
         let cols = u(body, 0, 2)
         let rows = u(body, 2, 2)
@@ -580,10 +1167,12 @@ fn message(mut s: Server, index: int, kind: int, body: List[byte]) {
     }
 }
 
-/// Parse at most PARSE_BUDGET bytes of complete frames already received.
+/// Parse at most PARSE_BUDGET bytes of complete frames already received;
+/// an action waiting for a pane slot holds the client's later input.
 fn parse(mut s: Server, index: int) {
     var spent = 0
-    while s.conns[index].live && spent < PARSE_BUDGET && !s.conns[index].hello_ready && !s.conns[index].command_ready {
+    while s.conns[index].live && spent < PARSE_BUDGET && !s.conns[index].hello_ready && !s.conns[index].command_ready &&
+        s.conns[index].pending == 0 {
         if s.conns[index].phase == DRAINING {
             s.conns[index].rx_off = s.conns[index].rx_len
             return
@@ -630,7 +1219,7 @@ fn parse(mut s: Server, index: int) {
 
 fn next_complete(c: Conn) -> bool {
     let have = c.rx_len - c.rx_off
-    if have < 6 || c.hello_ready || c.command_ready { return false }
+    if have < 6 || c.hello_ready || c.command_ready || c.pending != 0 { return false }
     let n = (c.rx[c.rx_off] as int) + (c.rx[c.rx_off + 1] as int) * 256 + (c.rx[c.rx_off + 2] as int) * 65536 + (c.rx[c.rx_off + 3] as int) * 16777216
     have >= 6 + n
 }
@@ -679,14 +1268,15 @@ struct Made {
     later: bool,
 }
 
-// Make session `name` at cols x rows, its pane's program started in `cwd`
-// with the given environment. `extra` is what the asking connection adds
-// to the projected memory beside the pane.
+// Make session `name` at cols x rows, its first pane's program started in
+// `cwd` with the given environment. `extra` is what the asking connection
+// adds to the projected memory beside the pane.
 fn make_session(mut s: Server, name: str, cols: int, rows: int, cwd: str, names: List[str], values: List[str],
     extra: int) -> Made {
     let problem = name_problem(name)
     if problem.len > 0 { return Made { si: 0 - 1, code: 6, why: problem, later: false } }
-    if s.stopping || live_sessions(s) >= MAX_SESSIONS || projected(s, pane_bytes(cols, rows) + extra) > s.budget {
+    let area = rows - BAR_LINES
+    if s.stopping || live_sessions(s) >= MAX_SESSIONS || !pane_fits(s, cols, area, extra) {
         return Made { si: 0 - 1, code: 7, why: "resource limit", later: false }
     }
     var slot = 0 - 1
@@ -699,27 +1289,38 @@ fn make_session(mut s: Server, name: str, cols: int, rows: int, cwd: str, names:
         s.need_slot = true
         return Made { si: 0 - 1, code: 0, why: "", later: true }
     }
+    let k = acquire_pane(mut s, cols, area)
+    if k < 0 { return Made { si: 0 - 1, code: 0, why: "", later: true } }
+    let id = s.next_pane
+    let fresh = layout.new(id, "") else |_| { return Made { si: 0 - 1, code: 6, why: "no layout", later: false } }
+    s.next_pane = s.next_pane + 1
+    s.sessions[slot].generation = s.sessions[slot].generation + 1
     set_name(mut s.sessions[slot], name)
     s.sessions[slot].cols = cols
     s.sessions[slot].rows = rows
     s.sessions[slot].members = 0
-    fresh_screen(mut s.sessions[slot], cols, rows)
-    let sp = Spawn { cols: cols, rows: rows, cwd: cwd, names: names, values: values, pane_id: slot }
-    let why = start_pane(mut s.sessions[slot], sp, shell_argv(), s.inherited)
+    s.sessions[slot].layout.tabs = copy fresh.tabs
+    s.sessions[slot].layout.active = fresh.active
+    s.sessions[slot].layout.next_id = fresh.next_id
+    (mut s.sessions[slot].cwd).reset()
+    for b in cwd.bytes() { (mut s.sessions[slot].cwd).push(b) }
+    (mut s.sessions[slot].env_names).reset()
+    (mut s.sessions[slot].env_values).reset()
+    i = 0
+    while i < names.len {
+        (mut s.sessions[slot].env_names).push(copy names[i])
+        (mut s.sessions[slot].env_values).push(copy values[i])
+        i += 1
+    }
+    s.sessions[slot].layout_gen = s.sessions[slot].layout_gen + 1
+    s.sessions[slot].chrome_gen = 0 - 1
+    s.sessions[slot].last_output = now_ns()
+    let why = spawn_pane(mut s, slot, k, id, cols, area)
     if why.len > 0 {
-        trace(s, "spawn failed: {why}")
         return Made { si: 0 - 1, code: 6, why: "the pane's program did not start: {why}", later: false }
     }
-    let key = poll.add_file(mut s.w, master_file(s.sessions[slot].pane), poll.READ) else |e| {
-        close_master(mut s.sessions[slot].pane)
-        return Made { si: 0 - 1, code: 7, why: "readiness set: {e}", later: false }
-    }
-    s.sessions[slot].generation = s.sessions[slot].generation + 1
-    let generation = s.sessions[slot].generation
-    record_key(mut s, key, KEY_MASTER, slot, generation)
-    s.sessions[slot].pane.key = key
-    s.sessions[slot].pane.last_output = now_ns()
     s.sessions[slot].live = true
+    sync_sizes(mut s, slot)
     trace(s, "session {slot} created: {name}")
     Made { si: slot, code: 0, why: "", later: false }
 }
@@ -806,6 +1407,8 @@ fn hello(mut s: Server, index: int) {
     s.conns[index].features = h.features
     s.conns[index].force_full = true
     s.conns[index].shadow.valid = false
+    s.conns[index].seen_layout = 0 - 1
+    s.conns[index].seen_bar = 0 - 1
     s.sessions[si].members = s.sessions[si].members + 1
     mark_stale(mut s.conns[index], now_ns())
     recompute_size(mut s, si)
@@ -823,10 +1426,24 @@ fn shell_argv() -> List[str] {
     argv
 }
 
-// ---- panes ----
+// ---- panes' masters ----
 
-fn read_master(mut s: Server, si: int, now: int) {
-    var f = master_file(s.sessions[si].pane)
+/// Whether the pane is the focused pane of its session's active tab.
+fn is_focused(s: Server, k: int) -> bool {
+    let si = s.panes[k].session
+    if si < 0 || !s.sessions[si].live { return false }
+    focus_id(s, si) == s.panes[k].id
+}
+
+/// Whether the pane is in its session's active tab.
+fn in_active_tab(s: Server, k: int) -> bool {
+    let si = s.panes[k].session
+    if si < 0 || !s.sessions[si].live { return false }
+    layout.tab_of(s.sessions[si].layout, s.panes[k].id) == s.sessions[si].layout.active
+}
+
+fn read_master(mut s: Server, k: int, now: int) {
+    var f = master_file(s.panes[k])
     var end = false
     var nothing = false
     let got = fs.read_chunk(mut f, s.master_read) else |e| {
@@ -834,29 +1451,39 @@ fn read_master(mut s: Server, si: int, now: int) {
         if "{e}" == "io" && (n == 11 || n == 35) { nothing = true } else { end = true }
         List[byte]()
     }
+    let si = s.panes[k].session
     if end {
-        trace(s, "session {si} master ended")
-        end_session(mut s, si)
+        trace(s, "pane {k} master ended")
+        let key = s.panes[k].key
+        forget_key(mut s, key)
+        s.panes[k].key = 0 - 1
+        close_master(mut s.panes[k])
+        if si >= 0 && s.sessions[si].live && s.sessions[si].generation == s.panes[k].session_gen {
+            close_pane(mut s, si, k)
+        }
         return
     }
     if nothing || got.len == 0 { return }
-    vt.feed(mut s.sessions[si].pane.screen, got)
-    s.sessions[si].pane.last_output = now
-    let answers = vt.take_answers(mut s.sessions[si].pane.screen)
+    vt.feed(mut s.panes[k].screen, got)
+    s.panes[k].last_output = now
+    s.panes[k].damage = s.panes[k].damage + 1
+    let answers = vt.take_answers(mut s.panes[k].screen)
     if answers.len > 0 {
-        let _q = queue_input(mut s.sessions[si].pane, answers)
-        write_pane(mut s, si)
+        let _q = queue_input(mut s.panes[k], answers)
+        write_pane(mut s, k)
     }
-    let events = vt.take_events(mut s.sessions[si].pane.screen)
+    let events = vt.take_events(mut s.panes[k].screen)
+    let focused = is_focused(s, k)
+    let active = in_active_tab(s, k)
     for ev in events {
         var i = 0
         while i < s.conns.len {
             if s.conns[i].live && s.conns[i].member && s.conns[i].session == si {
                 var ok = true
-                if ev.kind == 1 {
-                    let title = s.sessions[si].pane.screen.title_storage[0..s.sessions[si].pane.screen.title_length]
+                if ev.kind == 1 && focused {
+                    let title = s.panes[k].screen.title_storage[0..s.panes[k].screen.title_length]
                     ok = send(mut s.conns[i], 134, title_payload(title))
-                } else if ev.kind == 2 {
+                } else if ev.kind == 2 && active {
                     ok = send(mut s.conns[i], 132, List[byte]())
                 } else if ev.kind == 4 && ev.payload.len <= 65536 {
                     ok = send(mut s.conns[i], 133, bytes_payload(ev.payload))
@@ -866,12 +1493,15 @@ fn read_master(mut s: Server, si: int, now: int) {
             i += 1
         }
     }
-    if s.sessions[si].pane.screen.mode_values[15] == 1 {
-        if s.sessions[si].pane.sync_since == 0 { s.sessions[si].pane.sync_since = now }
+    if s.panes[k].screen.mode_values[15] == 1 {
+        if s.panes[k].sync_since == 0 { s.panes[k].sync_since = now }
     } else {
-        s.sessions[si].pane.sync_since = 0
+        s.panes[k].sync_since = 0
     }
-    session_changed(mut s, si, now)
+    if s.panes[k].shown && si >= 0 {
+        s.sessions[si].last_output = now
+        session_changed(mut s, si, now)
+    }
 }
 
 fn reap(mut s: Server) {
@@ -879,18 +1509,50 @@ fn reap(mut s: Server) {
     while n < 1024 {
         let c = process.poll() else { return }
         if !c.changed { return }
-        var i = 0
-        while i < s.sessions.len {
-            if s.sessions[i].pane.child == c.child.slot && s.sessions[i].pane.child_live {
-                if !process.is_stopped(c.status) {
-                    s.sessions[i].pane.child_live = false
-                    s.sessions[i].pane.status = c.status.value
-                    trace(s, "session {i} child ended status {c.status.value}")
+        if !process.is_stopped(c.status) {
+            var i = 0
+            while i < s.panes.len {
+                if s.panes[i].child == c.child.slot && s.panes[i].child_live {
+                    s.panes[i].child_live = false
+                    s.panes[i].status = c.status.value
+                    trace(s, "pane {i} child ended status {c.status.value}")
                 }
+                i += 1
             }
-            i += 1
+            i = 0
+            while i < s.orphans.len {
+                if s.orphans[i] == c.child.slot {
+                    s.orphans[i] = 0 - 1
+                    trace(s, "a closed pane's child ended status {c.status.value}")
+                }
+                i += 1
+            }
         }
         n += 1
+    }
+}
+
+/// Panes of an ended session are free once no client is owed its last
+/// image.
+fn release_held(mut s: Server) {
+    var k = 0
+    while k < s.panes.len {
+        if s.panes[k].live {
+            let si = s.panes[k].session
+            let gone = si < 0 || !s.sessions[si].live || s.sessions[si].generation != s.panes[k].session_gen
+            if gone {
+                var owed = false
+                for c in s.conns {
+                    if c.live && c.ending && c.session == si && c.ending_gen == s.panes[k].session_gen { owed = true }
+                }
+                if !owed {
+                    orphan_child(mut s, k)
+                    s.panes[k].live = false
+                    s.panes[k].shown = false
+                }
+            }
+        }
+        k += 1
     }
 }
 
@@ -911,9 +1573,56 @@ fn compose_now(mut s: Server, index: int, now: int) {
         return
     }
     let si = s.conns[index].session
+    ensure_chrome(mut s, si)
     let full = s.conns[index].force_full
-    let payload = compose(mut s.conns[index].shadow, s.sessions[si].pane.screen, seq, full)
+    let gen = s.sessions[si].layout_gen
+    let all = s.conns[index].seen_layout != gen
+    // What else may have changed: the bar (its generation, or this
+    // client's message), and the shown panes whose grids moved.
+    var scans = List[int]()
+    let area = s.sessions[si].rows - BAR_LINES
+    if s.conns[index].seen_bar != s.sessions[si].bar_gen || s.conns[index].message_until != 0 {
+        (mut scans).push(1)
+        (mut scans).push(area + 1)
+        (mut scans).push(s.sessions[si].cols)
+        (mut scans).push(BAR_LINES)
+    }
+    while s.conns[index].seen_damage.len < s.panes.len { (mut s.conns[index].seen_damage).push(0 - 1) }
+    var k = 0
+    while k < s.panes.len {
+        if s.panes[k].live && s.panes[k].shown && s.panes[k].session == si && s.conns[index].seen_damage[k] != s.panes[k].damage {
+            (mut scans).push(s.panes[k].at_col)
+            (mut scans).push(s.panes[k].at_row)
+            (mut scans).push(s.panes[k].screen.cols)
+            (mut scans).push(s.panes[k].screen.rows)
+        }
+        k += 1
+    }
+    var cursor = List[int]()
+    let f = focused_slot(s, si)
+    if f >= 0 && s.panes[f].shown {
+        let (cr, cc, shape, visible) = cursor_of(s.panes[f].screen)
+        (mut cursor).push(s.panes[f].at_row + cr - 1)
+        (mut cursor).push(s.panes[f].at_col + cc - 1)
+        (mut cursor).push(shape)
+        (mut cursor).push(visible)
+    } else {
+        (mut cursor).push(1)
+        (mut cursor).push(1)
+        (mut cursor).push(0)
+        (mut cursor).push(0)
+    }
+    let bar = bar_cells(s, si, index, now)
+    let payload = compose_frame(mut s.conns[index].shadow, s.panes, s.sessions[si], bar, seq, full, all, scans, cursor)
     s.conns[index].stale = false
+    s.conns[index].seen_layout = gen
+    s.conns[index].seen_bar = s.sessions[si].bar_gen
+    if s.conns[index].message_until != 0 && s.conns[index].message_until <= now { s.conns[index].message_until = 0 }
+    k = 0
+    while k < s.panes.len {
+        if s.panes[k].live && s.panes[k].shown && s.panes[k].session == si { s.conns[index].seen_damage[k] = s.panes[k].damage }
+        k += 1
+    }
     if payload.len == 0 { return }
     let wire = frame_wire(payload)
     if wire.len == 0 {
@@ -929,8 +1638,9 @@ fn compose_now(mut s: Server, index: int, now: int) {
 }
 
 // When the next frame for a client may be composed (monotonic ns), or -1:
-// damage at least 8 ms old or its pane quiet 2 ms, at most one frame per
-// 8 ms, one image outstanding, synchronized output held up to 150 ms.
+// damage at least 8 ms old or its session's shown panes quiet 2 ms, at
+// most one frame per 8 ms, one image outstanding, synchronized output in
+// a shown pane held up to 150 ms.
 fn frame_due(s: Server, index: int) -> int {
     if !s.conns[index].live || s.conns[index].phase != ATTACHED || s.conns[index].session < 0 || s.conns[index].ending { return 0 - 1 }
     if !s.conns[index].stale && !s.conns[index].force_full { return 0 - 1 }
@@ -939,9 +1649,14 @@ fn frame_due(s: Server, index: int) -> int {
     if !s.conns[index].force_full {
         let si = s.conns[index].session
         let by_age = s.conns[index].stale_since + FRAME_AGE_MS * 1000000
-        let by_quiet = s.sessions[si].pane.last_output + FRAME_QUIET_MS * 1000000
+        let by_quiet = s.sessions[si].last_output + FRAME_QUIET_MS * 1000000
         var ready = if by_age < by_quiet then by_age else by_quiet
-        let sync_since = s.sessions[si].pane.sync_since
+        var sync_since = 0
+        for p in s.panes {
+            if p.live && p.shown && p.session == si && p.sync_since > 0 && (sync_since == 0 || p.sync_since < sync_since) {
+                sync_since = p.sync_since
+            }
+        }
         if sync_since > 0 {
             let sync_end = sync_since + SYNC_MS * 1000000
             if sync_end > ready { ready = sync_end }
@@ -1022,22 +1737,29 @@ fn begin_stop(mut s: Server, why: str) {
         }
         i += 1
     }
+    var k = 0
+    while k < s.panes.len {
+        if s.panes[k].master >= 0 {
+            let key = s.panes[k].key
+            forget_key(mut s, key)
+            s.panes[k].key = 0 - 1
+            close_master(mut s.panes[k])
+        }
+        k += 1
+    }
     i = 0
     while i < s.sessions.len {
-        if s.sessions[i].live {
-            let key = s.sessions[i].pane.key
-            forget_key(mut s, key)
-            s.sessions[i].pane.key = 0 - 1
-            close_master(mut s.sessions[i].pane)
-            s.sessions[i].live = false
-        }
+        s.sessions[i].live = false
         i += 1
     }
 }
 
 fn children_live(s: Server) -> bool {
-    for x in s.sessions {
-        if x.pane.child_live { return true }
+    for p in s.panes {
+        if p.child_live { return true }
+    }
+    for o in s.orphans {
+        if o >= 0 { return true }
     }
     false
 }
@@ -1063,6 +1785,11 @@ fn timers(mut s: Server, now: int) {
                 close_conn(mut s, i)
             }
         }
+        // A message's time is up: its client's bar is drawn again.
+        if s.conns[i].live && s.conns[i].message_until > 0 && now >= s.conns[i].message_until {
+            s.conns[i].seen_bar = 0 - 1
+            mark_stale(mut s.conns[i], now)
+        }
         i += 1
     }
     if s.lifetime > 0 && now - s.started >= s.lifetime { begin_stop(mut s, "lifetime bound") }
@@ -1081,6 +1808,8 @@ fn next_deadline_ms(s: Server, now: int) -> int {
     while i < s.conns.len {
         let d = s.conns[i].deadline
         if s.conns[i].live && d > 0 && (at < 0 || d < at) { at = d }
+        let m = s.conns[i].message_until
+        if s.conns[i].live && m > 0 && (at < 0 || m < at) { at = m }
         let due = frame_due(s, i)
         if due >= 0 && (at < 0 || due < at) { at = due }
         i += 1
@@ -1149,10 +1878,12 @@ fn turn(mut s: Server) -> bool {
             let r = copy ev.ready[at]
             let kind = kinds[at]
             let owner = owners[at]
-            if pass == 0 && kind == KEY_MASTER && owner >= 0 && s.sessions[owner].live &&
-                s.sessions[owner].generation == gens[at] && s.sessions[owner].pane.key == r.key {
+            if pass == 0 && kind == KEY_MASTER && owner >= 0 && owner < s.panes.len && s.panes[owner].live &&
+                s.panes[owner].gen == gens[at] && s.panes[owner].key == r.key {
                 if r.facts & poll.WRITE != 0 { write_pane(mut s, owner) }
-                if r.facts & (poll.READ | poll.HANGUP | poll.ERROR) != 0 && s.sessions[owner].live { read_master(mut s, owner, now) }
+                if r.facts & (poll.READ | poll.HANGUP | poll.ERROR) != 0 && s.panes[owner].live && s.panes[owner].key == r.key {
+                    read_master(mut s, owner, now)
+                }
             } else if pass == 1 && kind == KEY_CONN && owner >= 0 && s.conns[owner].live &&
                 s.conns[owner].gen == gens[at] && s.conns[owner].key == r.key {
                 if r.facts & poll.WRITE != 0 { flush(mut s, owner) }
@@ -1167,9 +1898,15 @@ fn turn(mut s: Server) -> bool {
         pass += 1
     }
     s.rotate = s.rotate + 1
-    // Messages already buffered, HELLOs, timers, frames, writes.
+    // Actions waiting for a slot, messages already buffered, HELLOs,
+    // timers, frames, writes.
     var i = 0
     while i < s.conns.len {
+        if s.conns[i].live && s.conns[i].pending != 0 && s.conns[i].phase == ATTACHED {
+            let action = s.conns[i].pending
+            s.conns[i].pending = 0
+            if do_action(mut s, i, action, s.conns[i].pending_arg) == LATER { s.conns[i].pending = action }
+        }
         if s.conns[i].live && s.conns[i].hello_ready { hello(mut s, i) }
         if s.conns[i].live && s.conns[i].command_ready {
             s.conns[i].command_ready = false
@@ -1180,6 +1917,7 @@ fn turn(mut s: Server) -> bool {
         i += 1
     }
     timers(mut s, now)
+    release_held(mut s)
     i = 0
     while i < s.conns.len {
         compose_for(mut s, i, now_ns())
@@ -1187,8 +1925,8 @@ fn turn(mut s: Server) -> bool {
         i += 1
     }
     i = 0
-    while i < s.sessions.len {
-        if s.sessions[i].live && s.sessions[i].pane.in_len > s.sessions[i].pane.in_off && !s.sessions[i].pane.write_on {
+    while i < s.panes.len {
+        if s.panes[i].live && s.panes[i].in_len > s.panes[i].in_off && !s.panes[i].write_on {
             write_pane(mut s, i)
         }
         i += 1
@@ -1241,12 +1979,12 @@ pub fn serve() -> int {
     }
     var s = Server {
         place: place, w: waiter, listen_key: 0 - 1, listening: false,
-        conns: conns, sessions: List[Session](), key_kind: List[int](), key_owner: List[int](),
-        key_gen: List[int](), next_id: 0, stopping: false, stop_deadline: 0, started: now_ns(),
-        idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
-        version: vt.package_version(), again: false, need_slot: false, rotate: 0,
-        trace: env.has("WARREN_TRACE"), turns: 0, master_read: master_read, budget: budget, uid: env.euid() else 0 - 1,
-        inherited: inherited,
+        conns: conns, sessions: List[Session](), panes: List[Pane](), orphans: List[int](), key_kind: List[int](),
+        key_owner: List[int](), key_gen: List[int](), next_id: 0, next_pane: 1, stopping: false, stop_deadline: 0,
+        started: now_ns(), idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
+        version: vt.package_version(), again: false, need_slot: false, need_pane: false, want_cols: 0,
+        want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, master_read: master_read,
+        budget: budget, uid: env.euid() else 0 - 1, inherited: inherited,
     }
     net.set_listener_deadline(mut s.place.listener, 1) else |_| {}
     listener_interest(mut s)
@@ -1261,6 +1999,11 @@ pub fn serve() -> int {
             s.again = true
         }
         s.need_slot = false
+        if s.need_pane {
+            (mut s.panes).push(idle_pane(s.want_cols, s.want_rows))
+            s.again = true
+        }
+        s.need_pane = false
     }
     trace(s, "stopped after {s.turns} turns")
     var k = 0
