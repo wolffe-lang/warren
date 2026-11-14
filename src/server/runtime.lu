@@ -36,6 +36,18 @@ pub fn socket_path(dir: str) -> str {
     dir + "/default"
 }
 
+/// The longest socket path every host takes: macOS keeps 104 bytes for
+/// it, the terminating NUL included (Linux 108). A longer path is refused
+/// by name before any bind or dial, never left to the host's `io`.
+pub const SOCKET_PATH_MAX: int = 103
+
+/// "" when the socket path fits, else why not.
+pub fn socket_path_problem(path: str) -> str {
+    let n = path.bytes().len
+    if n > SOCKET_PATH_MAX { return "socket path is {n} bytes, over the {SOCKET_PATH_MAX} every host takes: {path}" }
+    ""
+}
+
 fn refused(code: int, reason: str, dir: str) -> Start {
     Start { code: code, reason: reason, dir: dir, socket: socket_path(dir),
         lock: fs.File { fd: 0 - 1 }, listener: net.Listener { fd: 0 - 1 } }
@@ -77,6 +89,8 @@ pub fn start(dir: str) -> Start {
     let why = private_dir(dir)
     if why.len > 0 { return refused(1, why, dir) }
     let path = socket_path(dir)
+    let long = socket_path_problem(path)
+    if long.len > 0 { return refused(1, long, dir) }
     var lock = fs.open_mode(dir + "/start.lock", 3 + fs.NOFOLLOW) else |e| {
         return refused(1, "start-lock-open-{e}", dir)
     }
