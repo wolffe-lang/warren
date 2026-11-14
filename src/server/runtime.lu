@@ -1,0 +1,131 @@
+//! member: true
+//! The server's place: a private runtime directory, an exclusive start
+//! lock, and the listening socket inside it. A starting server never
+//! removes a path that a live server may own: it takes the lock first, and
+//! only then treats a refused dial as a stale socket of its own user.
+use std.env
+use std.fs
+use std.net
+use std.net.unix
+
+/// The outcome of a start: code 0 means listening; 1 a named refusal
+/// (the reason says which); 2 another server answers or another starter
+/// holds the lock (the caller exits 0 and dials).
+pub struct Start {
+    code: int,
+    reason: str,
+    dir: str,
+    socket: str,
+    lock: fs.File,
+    listener: net.Listener,
+}
+
+/// The runtime directory: WARREN_RUNTIME_DIR when set (rows use it), else
+/// XDG_RUNTIME_DIR's `warren`, else a per-user directory under /tmp.
+pub fn runtime_dir() -> str {
+    let own = env.get("WARREN_RUNTIME_DIR") else ""
+    if own.len > 0 { return own }
+    let xdg = env.get("XDG_RUNTIME_DIR") else ""
+    if xdg.len > 0 { return xdg + "/warren" }
+    let uid = env.euid() else 0 - 1
+    "/tmp/warren-{uid}"
+}
+
+/// The socket a client dials in a runtime directory.
+pub fn socket_path(dir: str) -> str {
+    dir + "/default"
+}
+
+fn refused(code: int, reason: str, dir: str) -> Start {
+    Start { code: code, reason: reason, dir: dir, socket: socket_path(dir),
+        lock: fs.File { fd: 0 - 1 }, listener: net.Listener { fd: 0 - 1 } }
+}
+
+/// Check (and, when missing, make) the directory: a directory, not a
+/// link, owned by this user, with no group or other permission bits.
+/// Returns "" when private, else the refusal's name.
+pub fn private_dir(dir: str) -> str {
+    if !fs.exists(dir) {
+        fs.create_dir_mode(dir, 0o700) else |e| {
+            if "{e}" != "exists" { return "runtime-dir-create-{e}" }
+        }
+    }
+    let info = fs.lstat(dir) else |e| { return "runtime-dir-stat-{e}" }
+    if info.kind == 3 { return "runtime-dir-is-a-link" }
+    if info.kind != 1 { return "runtime-dir-not-a-directory" }
+    let me = env.euid() else 0 - 1
+    if info.uid != me { return "runtime-dir-owner-{info.uid}" }
+    if info.mode & 63 != 0 { return "runtime-dir-mode-open" }
+    ""
+}
+
+/// Is something answering at path? A dial is closed at once.
+pub fn answers(path: str) -> bool {
+    var c = unix.connect(path) else { return false }
+    net.close(take c) else |_| {}
+    true
+}
+
+fn release(take lock: fs.File) {
+    var l = lock
+    fs.unlock(mut l) else |_| {}
+    fs.close(take l) else |_| {}
+}
+
+/// Take the start lock and bind the socket, or say why not.
+pub fn start(dir: str) -> Start {
+    let why = private_dir(dir)
+    if why.len > 0 { return refused(1, why, dir) }
+    let path = socket_path(dir)
+    var lock = fs.open_mode(dir + "/start.lock", 3 + fs.NOFOLLOW) else |e| {
+        return refused(1, "start-lock-open-{e}", dir)
+    }
+    var held = "taken"
+    fs.lock(mut lock, fs.LOCK_EXCLUSIVE) else |e| { held = "{e}" }
+    if held == "busy" {
+        fs.close(take lock) else |_| {}
+        return refused(2, "start-lock-held", dir)
+    }
+    if held != "taken" {
+        fs.close(take lock) else |_| {}
+        return refused(1, "start-lock-{held}", dir)
+    }
+    if answers(path) {
+        release(take lock)
+        return refused(2, "server-answers", dir)
+    }
+    if fs.exists(path) {
+        // Under the lock nobody else may bind here, and the dial was
+        // refused: a socket of this user's at this path is stale.
+        let info = fs.lstat(path) else |e| {
+            release(take lock)
+            return refused(1, "stale-stat-{e}", dir)
+        }
+        let me = env.euid() else 0 - 1
+        if info.kind != 5 || info.uid != me {
+            release(take lock)
+            return refused(1, "socket-path-not-ours", dir)
+        }
+        fs.remove(path) else |e| {
+            release(take lock)
+            return refused(1, "stale-remove-{e}", dir)
+        }
+    }
+    var listener = unix.listen(path) else |e| {
+        release(take lock)
+        return refused(1, "bind-{e}", dir)
+    }
+    fs.set_mode(path, 0o600) else |e| {
+        net.close_listener(take listener) else |_| {}
+        release(take lock)
+        return refused(1, "socket-mode-{e}", dir)
+    }
+    Start { code: 0, reason: "", dir: dir, socket: path, lock: lock, listener: listener }
+}
+
+/// Close the listener (which unlinks its path) and release the lock.
+pub fn finish(take s: Start) {
+    var t = s
+    if t.listener.fd >= 0 { net.close_listener(take t.listener) else |_| {} }
+    if t.lock.fd >= 0 { release(take t.lock) }
+}
