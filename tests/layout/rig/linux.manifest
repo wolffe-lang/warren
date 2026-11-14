@@ -1,0 +1,13 @@
+# The layout lane's canonical Linux take: run the recorder inside the pinned
+# oracle image from a clean committed checkout, with --preflight running
+# preflight-inside.sh. The whole gate first, then the layout rows natively,
+# on the checked machine and under lupin.
+floor 35 ../../..
+rig linux.manifest committed=../../..:HEAD:tests/layout/rig/linux.manifest
+rig step.sh committed=../../..:HEAD:tests/layout/rig/step.sh
+rig slices.py committed=../../..:HEAD:tests/layout/rig/slices.py
+rig preflight-inside.sh committed=../../..:HEAD:tests/layout/rig/preflight-inside.sh
+step gate-linux tools=bash,python3,cc,git,xterm,Xvfb,tmux script=step.sh -- gate-linux
+step layout-native tools=bash,python3 script=step.sh -- native
+step layout-checked tools=bash,python3 script=step.sh -- checked
+step layout-lupin tools=bash,python3 script=step.sh -- lupin

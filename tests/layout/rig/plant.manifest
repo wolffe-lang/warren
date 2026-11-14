@@ -1,0 +1,6 @@
+# The plant's take: the native layout rows alone, whose FAIL lines name the
+# planted rows (run with --base GREEN --plant ROW...).
+floor 35 ../../..
+rig plant.manifest committed=../../..:HEAD:tests/layout/rig/plant.manifest
+rig step.sh committed=../../..:HEAD:tests/layout/rig/step.sh
+step layout-native tools=bash,python3 script=step.sh -- native
