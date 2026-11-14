@@ -33,6 +33,18 @@ def profile_settings(name):
     return profiles[name]['seeds'], profiles[name]['bytes']
 
 
+def failure_name(error):
+    """A reference terminal that never opened its display is not a bound violation."""
+    return getattr(error, 'failure_name', 'reference-observation-or-bound')
+
+
+def note_display_retries(manifest, entry, name, retries):
+    """Every retried reference launch is kept by name in its case and in the manifest."""
+    entry['display_retries'] = [dict(retry) for retry in retries]
+    manifest['display_retries'].extend({'case': name, **retry} for retry in retries)
+    return len(retries)
+
+
 def select_cases(cases, names):
     if names is None:
         return cases
@@ -83,7 +95,7 @@ def main():
              'tools/vt/report_fixture.py', 'tools/vt/erase_extent_fixture.py')},
         'rule_counts': {rule: {'source_cases': 0, 'cases_with_permitted_delta': 0,
                                'fully_resolved_at_stage': 0} for rule in rules},
-        'cases': {}, 'failed': 0}
+        'cases': {}, 'failed': 0, 'display_retries': []}
     started = time.monotonic()
     source_models = {name: trace(data) for name, data in selected.items()}
     excluded = {name: model['reference_exclusions'] for name, model in source_models.items()
@@ -120,6 +132,7 @@ def main():
                      'failures': [], 'rules': {}, 'reference_exclusion': excluded.get(name, [])}
             written = None
             stages = []
+            retries_before = len(display.retries)
 
             def stage(rule, frame, detail, triggered, changed):
                 entry['rules'][rule] = detail
@@ -178,7 +191,7 @@ def main():
                 if entry['reference_exclusion']:
                     entry['excluded_reference_observation_error'] = str(error)
                 else:
-                    entry['failures'].append({'name': 'reference-observation-or-bound', 'error': str(error)})
+                    entry['failures'].append({'name': failure_name(error), 'error': str(error)})
                 written = None
             command = [args.warren, 'vt-dump', '--history-bytes', '1048576']
             native = subprocess.run(command, input=data, capture_output=True, cwd=ROOT, timeout=30)
@@ -212,6 +225,11 @@ def main():
                     entry['failures'].append({'name': 'R1-R3-R8', 'exit': result.returncode})
                     (work / 'properties.stdout').write_bytes(result.stdout)
                     (work / 'properties.stderr').write_bytes(result.stderr)
+            retried = note_display_retries(manifest, entry, name, display.retries[retries_before:])
+            if retried:
+                print('RETRIED fresh-fuzz %s reference-display-unavailable launches=%d %s' % (
+                    name, retried, ' '.join('%s/%s' % (Path(retry['work']).name, retry['pass'])
+                                            for retry in entry['display_retries'])), flush=True)
             failed = bool(entry['failures'])
             manifest['failed'] += failed
             manifest['cases'][name] = entry
@@ -222,8 +240,9 @@ def main():
             (args.out / 'progress.json').write_text(json.dumps({'completed': len(manifest['cases']), 'failed': manifest['failed']}) + '\n')
     (args.out / 'result.json').write_text(json.dumps(manifest, indent=2) + '\n')
     print('FRESH-RULE-COUNTS ' + json.dumps(manifest['rule_counts'], sort_keys=True), flush=True)
-    print('FRESH-FUZZ completed=%d requested=%d failed=%d reference-excluded=%d' %
-          (len(manifest['cases']), len(selected), manifest['failed'], len(excluded)), flush=True)
+    print('FRESH-FUZZ completed=%d requested=%d failed=%d reference-excluded=%d display-retries=%d' %
+          (len(manifest['cases']), len(selected), manifest['failed'], len(excluded),
+           len(manifest['display_retries'])), flush=True)
     return bool(manifest['failed'])
 
 
