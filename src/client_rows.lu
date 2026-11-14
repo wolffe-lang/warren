@@ -555,19 +555,41 @@ fn row_new_session(warren: str) -> str {
         stop_server()
         return "a second work: " + why2
     }
-    let t0 = now_ms()
     var n = launch_as(warren, "new", "d", words("new -d"), 80, 24) else |e| { return "launch: {e}" }
     let why3 = ends_plain(mut n, 0, "")
-    let took = now_ms() - t0
     let printed = output_text(n).trim()
     close_quiet(n)
     if why3.len > 0 || printed != "1" {
         stop_server()
         return "new -d with no name: " + (if why3.len > 0 then why3 else "printed '{printed}', not 1")
     }
-    print("MEASURE new-detached ms={took} (a running server; launch to exit)")
+    // Timed apart from the rows' terminal: `new -d` with no terminal (80x24),
+    // from its start to its exit, against the running server.
+    let null = fs.open_mode("/dev/null", 2) else {
+        stop_server()
+        return "/dev/null"
+    }
+    var c = process.command(warren)
+    for x in words("new -d -s timed") { process.push_arg(mut c, x) }
+    process.set_stdin(mut c, null)
+    process.set_stdout(mut c, null)
+    process.set_stderr(mut c, null)
+    let t1 = time.monotonic_ns()
+    let ch = process.start(c) else |e| {
+        stop_server()
+        return "start: {e}"
+    }
+    let st = process.wait_status(take ch) else 0 - 1
+    let us = (time.monotonic_ns() - t1) / 1000
+    fs.close(take null) else |_| {}
+    if st != 0 {
+        stop_server()
+        return "new -d -s timed with no terminal ended {st}"
+    }
+    print("MEASURE new-detached start-to-exit-us={us} (a running server, no terminal)")
     let list = reply_out("list-sessions")
-    if !list.contains("work: 80x24 (0 attached)") || !list.contains("1: 80x24 (0 attached)") {
+    if !list.contains("work: 80x24 (0 attached)") || !list.contains("1: 80x24 (0 attached)") ||
+        !list.contains("timed: 80x24 (0 attached)") {
         stop_server()
         return "list-sessions: " + list.replace("\n", " | ")
     }
