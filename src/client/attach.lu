@@ -1,0 +1,352 @@
+//! member: true
+//! The terminal client: attach to a session (starting the server when
+//! there is none and creation is asked for), draw its images, send what is
+//! typed, and give the terminal back on every way out.
+use std.env
+use std.fs
+use std.net
+use std.poll
+use std.process
+use std.signal
+use std.term
+use std.time
+use proto
+use server
+
+/// How long a client waits for a server it started to answer.
+pub const START_MS: int = 5000
+
+fn now_ms() -> int {
+    time.monotonic_ns() / 1000000
+}
+
+fn ms_since(start: int) -> int {
+    now_ms() - start
+}
+
+/// This program's own path, for starting the server: argv[0] when it
+/// names a file, else the first match on PATH.
+pub fn self_path() -> str {
+    let a0 = env.arg0()
+    if a0.starts_with("/") { return a0 }
+    if a0.contains("/") {
+        let here = env.cwd() else "."
+        return here + "/" + a0
+    }
+    let path = env.get("PATH") else ""
+    for dir in path.split(":") {
+        if dir.len == 0 { continue }
+        let candidate = dir + "/" + a0
+        let info = fs.stat(candidate) else { continue }
+        if info.kind == 0 { return candidate }
+    }
+    a0
+}
+
+// Start `warren server` detached: a session of its own, reparented, its
+// standard streams on /dev/null, the client's terminal not inherited.
+fn start_server() -> str {
+    let a = process.fork() else |e| { return "fork: {e}" }
+    if process.is_child(a) {
+        process.lead_session() else |_| { process.exit(40) }
+        let b = process.fork() else |_| {
+            process.exit(41)
+            return ""
+        }
+        if process.is_child(b) {
+            let null = fs.open_mode("/dev/null", 2) else |_| {
+                process.exit(42)
+                return ""
+            }
+            var c = process.command(self_path())
+            process.push_arg(mut c, "server")
+            process.set_stdin(mut c, null)
+            process.set_stdout(mut c, null)
+            process.set_stderr(mut c, null)
+            process.exec(c, env.vars()) else |_| {}
+            process.exit(127)
+        }
+        process.exit(0)
+    }
+    var ch = process.Child { slot: a.child.slot }
+    let st = process.wait_status(take ch) else 0 - 1
+    if st != 0 { return "the server's starter ended {st}" }
+    ""
+}
+
+/// Dial the server; when there is none and `create`, start it and dial
+/// until it answers (START_MS).
+pub fn dial_or_start(create: bool) -> Peer ! DialErrors {
+    let sock = server.socket_path(server.runtime_dir())
+    var why = ""
+    var first = dial(sock) else |e| {
+        why = "{e}"
+        Peer { fd: 0 - 1, rx: List[byte](), rx_off: 0, rx_len: 0, image: proto.image(), frames: 0,
+            full_frames: 0, last_base: 0, title: "", bells: 0, ended: false, end_kind: 0, end_code: 0,
+            end_text: "", welcome_session: "", auto_ack: true, pongs: 0 }
+    }
+    if why.len == 0 { return first }
+    if why == "denied" { return denied }
+    if why == "unsupported" { return unsupported }
+    if why == "io" { return io }
+    if !create {
+        if why == "not_found" { return not_found }
+        return refused
+    }
+    if start_server().len > 0 { return io }
+    let t0 = now_ms()
+    while ms_since(t0) < START_MS {
+        var p = dial(sock) else |_| {
+            time.sleep(time.millis(20))
+            continue
+        }
+        return p
+    }
+    refused
+}
+
+fn env_lists(mut names: List[str], mut values: List[str]) {
+    for kv in env.vars() {
+        let at = kv.find("=") else 0 - 1
+        if at < 0 { continue }
+        if at == 0 { continue }
+        (mut names).push(kv[0..at])
+        (mut values).push(kv[at + 1..kv.len])
+    }
+}
+
+fn number(n: int, width: int) -> List[byte] {
+    var b = List[byte]()
+    proto.put(mut b, n, width)
+    b
+}
+
+fn send_event(p: Peer, e: Event) -> bool {
+    var b = List[byte]()
+    if e.kind == 2 {
+        proto.put(mut b, e.mods, 1)
+        proto.put(mut b, e.key, 1)
+        proto.put(mut b, e.code, 4)
+    } else if e.kind == 3 {
+        proto.put(mut b, e.key, 1)
+        proto.put(mut b, e.code, 1)
+        proto.put(mut b, e.mods, 1)
+        proto.put(mut b, e.col, 2)
+        proto.put(mut b, e.row, 2)
+    } else if e.kind == 5 {
+        proto.put(mut b, e.code, 1)
+    } else {
+        proto.put(mut b, e.data.len, 4)
+        for x in e.data { (mut b).push(x) }
+    }
+    send(p, e.kind, b)
+}
+
+fn sanitize(t: str) -> str {
+    var out = List[byte]()
+    for b in t.bytes() {
+        let v = b as int
+        if v >= 32 && v != 127 { (mut out).push(b) }
+    }
+    str_from_utf8(out) else ""
+}
+
+/// How a client ended: its exit code and the line it prints.
+pub struct End {
+    code: int,
+    line: str,
+}
+
+fn bye_end(code: int, text: str, session: str) -> End {
+    if code == 1 { return End { code: 0, line: "[detached from {session}]" } }
+    if code == 2 { return End { code: 0, line: "[{session} ended]" } }
+    if code == 3 { return End { code: 0, line: "[the server stopped]" } }
+    if code == 7 { return End { code: 1, line: "warren: the terminal is too small ({text})" } }
+    End { code: 1, line: "warren: {text} (BYE {code})" }
+}
+
+const LISTENED: int = 2 + 1 + 4 + 16 + 16384 + 32 + 8192
+
+/// Attach this terminal to `target` (empty: the default session),
+/// creating it (and the server) when `create`. Returns the exit code.
+pub fn attach(target: str, create: bool) -> int {
+    var out = fs.stdout()
+    let file = fs.stdin()
+    let size = term.size(file) else |_| {
+        eprint("warren: not a terminal: attach needs one on standard input")
+        return 1
+    }
+    let console = (env.get("WARREN_RENDER") else "") == "console"
+    let termname = env.get("TERM") else ""
+    let pol = policy_for(termname, env.get("COLORTERM") else "", console)
+    let features = if console then 0 else 7
+    var p = dial_or_start(create) else |e| {
+        if "{e}" == "not_found" || "{e}" == "refused" {
+            eprint("warren: no server is running")
+        } else {
+            eprint("warren: cannot reach the server: {e}")
+        }
+        return 1
+    }
+    p.auto_ack = false
+    var names = List[str]()
+    var values = List[str]()
+    env_lists(mut names, mut values)
+    let cwd = env.cwd() else "/"
+    var t = take_terminal(file, features) else |e| {
+        hang_up(mut p)
+        eprint("warren: cannot set up the terminal: {e}")
+        return 1
+    }
+    let end = run(mut p, mut t, mut out, size.columns, size.rows, pol, features,
+        hello_with(1, size.columns, size.rows, pol.depth, features, termname, target,
+            if create then 1 else 0, cwd, names, values))
+    give_back(mut t)
+    hang_up(mut p)
+    if end.line.len > 0 { eprint(end.line) }
+    end.code
+}
+
+fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Policy, features: int,
+    hello: List[byte]) -> End {
+    if !send(p, 1, hello) { return End { code: 1, line: "warren: the server closed the connection" } }
+    signal.listen(LISTENED) else |e| { return End { code: 1, line: "warren: signals: {e}" } }
+    var w = poll.open() else |e| { return End { code: 1, line: "warren: readiness set: {e}" } }
+    let tty_key = poll.add_file(mut w, t.file, poll.READ) else |e| {
+        return End { code: 1, line: "warren: readiness set: {e}" }
+    }
+    let sock_key = poll.add_socket(mut w, net.Socket { fd: p.fd }, poll.READ) else |e| {
+        return End { code: 1, line: "warren: readiness set: {e}" }
+    }
+    var drawn = proto.image()
+    var par = parser()
+    var session = if p.welcome_session.len > 0 then p.welcome_session else "the session"
+    var last_cols = cols
+    var last_rows = rows
+    var in_file = copy t.file
+    while true {
+        var wait = 0 - 1
+        let d = deadline(par)
+        if d >= 0 {
+            wait = d - now_ms()
+            if wait < 0 { wait = 0 }
+        }
+        let ev = poll.wait(mut w, LISTENED, wait) else |e| {
+            return End { code: 1, line: "warren: wait failed: {e}" }
+        }
+        let m = ev.meaning
+        if m == signal.terminate() || m == signal.reload() || m == signal.quit() || m == signal.interrupt() {
+            return End { code: 1, line: "warren: ended by a signal" }
+        }
+        if m == signal.suspend() {
+            give_back(mut t)
+            signal.reset_one(signal.suspend()) else |_| {}
+            signal.raise(signal.stop()) else |_| {}
+            signal.listen(LISTENED) else |_| {}
+            take_again(mut t)
+            drawn = proto.image()
+            let _r = send(p, 9, List[byte]())
+        }
+        if m == signal.continued() {
+            take_again(mut t)
+            drawn = proto.image()
+            let _r = send(p, 9, List[byte]())
+        }
+        if m == signal.resize() {
+            let s = term.size(t.file) else |_| term.Size { rows: last_rows, columns: last_cols }
+            if s.columns != last_cols || s.rows != last_rows {
+                last_cols = s.columns
+                last_rows = s.rows
+                var b = number(s.columns, 2)
+                proto.put(mut b, s.rows, 2)
+                let _r = send(p, 6, b)
+            }
+        }
+        for r in ev.ready {
+            if r.key == tty_key {
+                let got = fs.read_chunk(mut in_file, 4096) else |_| {
+                    return End { code: 1, line: "warren: the terminal closed" }
+                }
+                if got.len == 0 { return End { code: 1, line: "warren: the terminal closed" } }
+                for e in feed(mut par, got, now_ms()) {
+                    if !send_event(p, e) { return End { code: 1, line: "warren: the server closed the connection" } }
+                }
+            } else if r.key == sock_key {
+                let pulled = pull(mut p)
+                while true {
+                    let k = step(mut p, 0)
+                    if k == 0 { break }
+                    if k == 0 - 2 {
+                        return End { code: 1, line: "warren: the server sent an image that does not apply" }
+                    }
+                    if k == 0 - 1 { return End { code: 1, line: "warren: the server closed the connection" } }
+                    if k == 129 && p.welcome_session.len > 0 { session = p.welcome_session }
+                    if k == 131 {
+                        let bytes = render(mut drawn, p.image, pol)
+                        fs.write_chunk(mut out, bytes) else |_| {
+                            return End { code: 1, line: "warren: the terminal cannot be written" }
+                        }
+                        let _a = send(p, 8, number(p.image.seq, 4))
+                    } else if k == 132 {
+                        fs.write_chunk(mut out, "\u{7}".bytes()) else |_| {}
+                    } else if k == 134 && !pol.explicit_wide {
+                        fs.write_chunk(mut out, "\u{1b}]2;{sanitize(p.title)}\u{7}".bytes()) else |_| {}
+                    } else if k == 135 {
+                        return bye_end(p.end_code, p.end_text, session)
+                    } else if k == 130 {
+                        return End { code: 1, line: "warren: refused: {p.end_text}" }
+                    }
+                }
+                if pulled == 1 { return End { code: 1, line: "warren: the server closed the connection" } }
+                if pulled == 2 { return End { code: 1, line: "warren: the connection failed" } }
+            }
+        }
+        for e in expire(mut par, now_ms()) {
+            if !send_event(p, e) { return End { code: 1, line: "warren: the server closed the connection" } }
+        }
+    }
+    End { code: 1, line: "" }
+}
+
+/// Run one command on the server (`kill-server`, `list-sessions`) and
+/// print its reply; the exit code is the reply's status.
+pub fn command(argv: List[str]) -> int {
+    var p = dial(server.socket_path(server.runtime_dir())) else |_| {
+        eprint("warren: no server is running")
+        return 1
+    }
+    var names = List[str]()
+    var values = List[str]()
+    let cwd = env.cwd() else "/"
+    let _h = send(p, 1, hello_with(2, 0, 0, 0, 0, env.get("TERM") else "", "", 0, cwd, names, values))
+    var b = number(1, 4)
+    proto.put(mut b, argv.len, 2)
+    for a in argv { proto.put_text(mut b, a) }
+    proto.put_text(mut b, cwd)
+    proto.put_text(mut b, "")
+    let _c = send(p, 11, b)
+    let t0 = now_ms()
+    while ms_since(t0) < 10000 {
+        let m = next(mut p, 1000)
+        if m.kind == 136 {
+            let status = m.body[4] as int
+            let out_len = le(m.body, 5, 4)
+            let out = m.body[9..9 + out_len]
+            let err_len = le(m.body, 9 + out_len, 4)
+            let err = m.body[13 + out_len..13 + out_len + err_len]
+            var so = fs.stdout()
+            var se = fs.stderr()
+            fs.write_chunk(mut so, out) else |_| {}
+            fs.write_chunk(mut se, err) else |_| {}
+            hang_up(mut p)
+            return status
+        }
+        if m.kind == 130 || m.kind == 135 || (m.kind == 0 && m.code != 0) {
+            hang_up(mut p)
+            eprint("warren: the server did not answer the command")
+            return 1
+        }
+    }
+    hang_up(mut p)
+    1
+}

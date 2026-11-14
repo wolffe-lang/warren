@@ -1,8 +1,8 @@
 //! member: true
-//! The client: one attached terminal, its input parser and renderer.
-//!
-//! Stub. Nothing here is implemented; the module exists so that the tree,
-//! the build and the tests have their final shape from the first commit.
+//! The client: one attached terminal, its input parser and renderer. The
+//! parser (`input.lu`) and the renderer (`render.lu`) are pure; the wire
+//! (`wire.lu`), the terminal (`tty.lu`) and the attach loop (`attach.lu`)
+//! are the host half.
 
 /// The milestone that fills this module in.
 pub fn milestone() -> str {
@@ -10,7 +10,8 @@ pub fn milestone() -> str {
 }
 
 /// Whether the module is pure: no I/O, so it runs on every host and under
-/// the reference interpreter.
+/// the reference interpreter. The client is not (its pure parts are rows
+/// natively and on the checked machine, never alone under lupin).
 pub fn pure() -> bool {
     false
 }
