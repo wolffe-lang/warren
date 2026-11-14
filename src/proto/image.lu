@@ -1,0 +1,218 @@
+//! member: true
+//! Applying FRAME images to a client's copy of the screen (PROTOCOL M3).
+//! Pure: the stateless codec validates bytes first; this checks what only
+//! the previous image can show, that a delta applies to the image its base
+//! names and never leaves half of an old wide pair, and refuses instead of
+//! guessing. Widths come from the wire, never from a Unicode table.
+
+/// A client's image: cells in row-major order, each a base scalar, up to
+/// two marks, a width (1, 2, or 0 for a continuation) and its rendition.
+pub struct Image {
+    valid: bool,
+    seq: int,
+    cols: int,
+    rows: int,
+    base: List[int],
+    mark1: List[int],
+    mark2: List[int],
+    width: List[int],
+    flags: List[int],
+    fg: List[int],
+    bg: List[int],
+    cursor_row: int,
+    cursor_col: int,
+    shape: int,
+    visible: int,
+}
+
+/// An image holding nothing: only a full image (base 0) applies to it.
+pub fn image() -> Image {
+    Image { valid: false, seq: 0, cols: 0, rows: 0, base: List[int](), mark1: List[int](),
+        mark2: List[int](), width: List[int](), flags: List[int](), fg: List[int](), bg: List[int](),
+        cursor_row: 1, cursor_col: 1, shape: 0, visible: 1 }
+}
+
+fn le(b: List[byte], at: int, width: int) -> int {
+    var n: int = 0
+    var f: int = 1
+    var i = 0
+    while i < width {
+        n = n + (b[at + i] as int) * f
+        f = f * 256
+        i = i + 1
+    }
+    n
+}
+
+fn ensure(mut xs: List[int], n: int) {
+    while xs.len < n { (mut xs).push(0) }
+}
+
+struct Span { row: int, col: int, columns: int }
+
+/// Apply one validated-or-not FRAME payload. 0 on success; a codec code
+/// for bytes that do not decode; MALFORMED for a delta whose base is not
+/// this image, whose size differs, or that splits an old wide pair. On a
+/// refusal the image is unchanged.
+pub fn apply(mut img: Image, payload: List[byte]) -> int {
+    let code = validate(131, payload)
+    if code != 0 { return code }
+    let seq = le(payload, 0, 4)
+    let base = le(payload, 4, 4)
+    let cols = le(payload, 8, 2)
+    let rows = le(payload, 10, 2)
+    if base != 0 && (!img.valid || base != img.seq || cols != img.cols || rows != img.rows) { return MALFORMED }
+    let count = le(payload, 18, 4)
+    // First pass: the spans, to check old pairs against the whole delta.
+    var spans = List[Span]()
+    var at = 22
+    var k = 0
+    while k < count {
+        let row = le(payload, at, 2)
+        let col = le(payload, at + 2, 2)
+        let columns = le(payload, at + 14, 2)
+        let records = le(payload, at + 16, 2)
+        (mut spans).push(Span { row: row, col: col, columns: columns })
+        at = at + 18
+        var j = 0
+        while j < records {
+            let scalars = le(payload, at + 3, 1)
+            at = at + 4 + 4 * scalars
+            j = j + 1
+        }
+        k = k + 1
+    }
+    if base != 0 {
+        var i = 0
+        while i < spans.len {
+            let sp = copy spans[i]
+            let first = (sp.row - 1) * cols + sp.col - 1
+            let last = first + sp.columns - 1
+            // An old continuation at the start needs its leader in the
+            // previous span; an old leader at the end needs the next span.
+            if img.width[first] == 0 {
+                if i == 0 || spans[i - 1].row != sp.row || spans[i - 1].col + spans[i - 1].columns != sp.col { return MALFORMED }
+            }
+            if img.width[last] == 2 && sp.col + sp.columns - 1 < cols {
+                if i + 1 >= spans.len || spans[i + 1].row != sp.row || spans[i + 1].col != sp.col + sp.columns { return MALFORMED }
+            }
+            i = i + 1
+        }
+    } else {
+        let area = cols * rows
+        ensure(mut img.base, area)
+        ensure(mut img.mark1, area)
+        ensure(mut img.mark2, area)
+        ensure(mut img.width, area)
+        ensure(mut img.flags, area)
+        ensure(mut img.fg, area)
+        ensure(mut img.bg, area)
+        img.cols = cols
+        img.rows = rows
+    }
+    at = 22
+    k = 0
+    while k < count {
+        let row = le(payload, at, 2)
+        let col = le(payload, at + 2, 2)
+        let flags = le(payload, at + 4, 2)
+        let fg = le(payload, at + 6, 4)
+        let bg = le(payload, at + 10, 4)
+        let records = le(payload, at + 16, 2)
+        at = at + 18
+        var cell = (row - 1) * cols + col - 1
+        var j = 0
+        while j < records {
+            let width = le(payload, at, 1)
+            let times = le(payload, at + 1, 2)
+            let scalars = le(payload, at + 3, 1)
+            let b = le(payload, at + 4, 4)
+            let m1 = if scalars > 1 then le(payload, at + 8, 4) else 0
+            let m2 = if scalars > 2 then le(payload, at + 12, 4) else 0
+            at = at + 4 + 4 * scalars
+            var t = 0
+            while t < times {
+                img.base[cell] = b
+                img.mark1[cell] = m1
+                img.mark2[cell] = m2
+                img.width[cell] = width
+                img.flags[cell] = flags
+                img.fg[cell] = fg
+                img.bg[cell] = bg
+                if width == 2 {
+                    img.base[cell + 1] = 32
+                    img.mark1[cell + 1] = 0
+                    img.mark2[cell + 1] = 0
+                    img.width[cell + 1] = 0
+                    img.flags[cell + 1] = flags
+                    img.fg[cell + 1] = fg
+                    img.bg[cell + 1] = bg
+                }
+                cell = cell + width
+                t = t + 1
+            }
+            j = j + 1
+        }
+        k = k + 1
+    }
+    img.cursor_row = le(payload, 12, 2)
+    img.cursor_col = le(payload, 14, 2)
+    img.shape = le(payload, 16, 1)
+    img.visible = le(payload, 17, 1)
+    img.seq = seq
+    img.valid = true
+    0
+}
+
+fn push_utf8(mut out: List[byte], cp: int) {
+    if cp < 128 {
+        (mut out).push(cp as byte)
+    } else if cp < 2048 {
+        (mut out).push((192 + cp / 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else if cp < 65536 {
+        (mut out).push((224 + cp / 4096) as byte)
+        (mut out).push((128 + cp / 64 % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else {
+        (mut out).push((240 + cp / 262144) as byte)
+        (mut out).push((128 + cp / 4096 % 64) as byte)
+        (mut out).push((128 + cp / 64 % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    }
+}
+
+/// One row's text: every leading cell's scalars, continuations skipped,
+/// trailing blanks trimmed. A NUL base reads as a space.
+pub fn row_text(img: Image, row: int) -> str {
+    if !img.valid || row < 1 || row > img.rows { return "" }
+    var out = List[byte]()
+    var c = 0
+    while c < img.cols {
+        let i = (row - 1) * img.cols + c
+        if img.width[i] != 0 {
+            push_utf8(mut out, if img.base[i] == 0 then 32 else img.base[i])
+            if img.mark1[i] != 0 { push_utf8(mut out, img.mark1[i]) }
+            if img.mark2[i] != 0 { push_utf8(mut out, img.mark2[i]) }
+        }
+        c = c + 1
+    }
+    var end = out.len
+    while end > 0 && out[end - 1] == 32 as byte { end = end - 1 }
+    str_from_utf8(out[0..end]) else ""
+}
+
+/// The cells one image holds that another does not, counted for rows.
+pub fn differing(a: Image, b: Image) -> int {
+    if a.cols != b.cols || a.rows != b.rows { return a.cols * a.rows + b.cols * b.rows }
+    var n = 0
+    var i = 0
+    while i < a.cols * a.rows {
+        if a.base[i] != b.base[i] || a.mark1[i] != b.mark1[i] || a.mark2[i] != b.mark2[i] ||
+            a.width[i] != b.width[i] || a.flags[i] != b.flags[i] || a.fg[i] != b.fg[i] || a.bg[i] != b.bg[i] {
+            n = n + 1
+        }
+        i = i + 1
+    }
+    n
+}
