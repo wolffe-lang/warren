@@ -205,8 +205,9 @@ at each size; `src/layout_slice.lu` runs the goldens, or a slice of
 sequences at one size (`SIZE FIRST COUNT`, the same seeds), for the checked
 machine and the reference interpreter, whose step budgets hold a few dozen
 sequences a run (`tests/layout/rig/slices.py` sums 200 a size on the first
-and 50 on the second); `src/layout_test.lu` puts the goldens and five
-sequences a size in the ordinary `wolf test` gate.
+and 50 on the second); `src/layout_test.lu` puts the goldens, and four
+sequences with the constructed grids at each size (one test a size, each
+inside the checked machine's budget), in the ordinary `wolf test` gate.
 
 The invariants:
 
