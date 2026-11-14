@@ -293,11 +293,19 @@ fn end_session(mut s: Server, si: int) {
     trace(s, "session {si} ended")
     var i = 0
     while i < s.conns.len {
-        if s.conns[i].live && s.conns[i].member && s.conns[i].session == si {
-            // The pane's last output reaches a client that can take an image
-            // now; one still waiting on its ACK keeps the image it has.
-            if s.conns[i].image_end < 0 && s.conns[i].ack.pending == 0 { compose_now(mut s, i, now_ns()) }
-            if s.conns[i].live { terminal(mut s, i, 135, 2, "session ended") }
+        if s.conns[i].live && s.conns[i].member && s.conns[i].session == si && !s.conns[i].ending {
+            if s.conns[i].image_end < 0 && s.conns[i].ack.pending == 0 {
+                // The pane's last output reaches a client that can take an
+                // image now, then its BYE.
+                compose_now(mut s, i, now_ns())
+                if s.conns[i].live { terminal(mut s, i, 135, 2, "session ended") }
+            } else {
+                // One still owing its ACK gets the last image after it (or
+                // its BYE alone at the closing deadline).
+                s.conns[i].ending = true
+                s.conns[i].ending_gen = s.sessions[si].generation
+                s.conns[i].deadline = now_ns() + CLOSING_MS * 1000000
+            }
         }
         i += 1
     }
@@ -352,8 +360,21 @@ fn u(b: List[byte], at: int, width: int) -> int {
     n
 }
 
+// A client whose session ended while it owed an ACK: the ended pane's last
+// image (when the slot still holds that pane), then BYE session-ended.
+fn finish_ending(mut s: Server, index: int) {
+    let si = s.conns[index].session
+    s.conns[index].ending = false
+    if si >= 0 && si < s.sessions.len && s.sessions[si].generation == s.conns[index].ending_gen {
+        compose_now(mut s, index, now_ns())
+    }
+    if s.conns[index].live { terminal(mut s, index, 135, 2, "session ended") }
+}
+
 fn attached_message(mut s: Server, index: int, kind: int, body: List[byte]) {
     let si = s.conns[index].session
+    // A client whose session ended takes only its ACK.
+    if s.conns[index].ending && kind != 8 { return }
     if kind == 2 {
         let mods = u(body, 0, 1)
         let k = u(body, 1, 1)
@@ -400,6 +421,8 @@ fn attached_message(mut s: Server, index: int, kind: int, body: List[byte]) {
     } else if kind == 8 {
         if proto.ack(mut s.conns[index].ack, u(body, 0, 4)) != 0 {
             protocol_error(mut s, index, "ack of an image not sent")
+        } else if s.conns[index].ending && s.conns[index].image_end < 0 && s.conns[index].ack.pending == 0 {
+            finish_ending(mut s, index)
         }
     } else if kind == 9 {
         s.conns[index].force_full = true
@@ -817,7 +840,7 @@ fn compose_now(mut s: Server, index: int, now: int) {
 // damage at least 8 ms old or its pane quiet 2 ms, at most one frame per
 // 8 ms, one image outstanding, synchronized output held up to 150 ms.
 fn frame_due(s: Server, index: int) -> int {
-    if !s.conns[index].live || s.conns[index].phase != ATTACHED || s.conns[index].session < 0 { return 0 - 1 }
+    if !s.conns[index].live || s.conns[index].phase != ATTACHED || s.conns[index].session < 0 || s.conns[index].ending { return 0 - 1 }
     if !s.conns[index].stale && !s.conns[index].force_full { return 0 - 1 }
     if s.conns[index].image_end >= 0 || s.conns[index].ack.pending != 0 { return 0 - 1 }
     var at = s.conns[index].last_frame + FRAME_AGE_MS * 1000000
@@ -900,7 +923,9 @@ fn begin_stop(mut s: Server, why: str) {
     listener_interest(mut s)
     var i = 0
     while i < s.conns.len {
-        if s.conns[i].live && s.conns[i].phase != DRAINING {
+        // A client owed its session's last image keeps it (its BYE follows
+        // its ACK or the closing deadline, inside the stopping bound).
+        if s.conns[i].live && s.conns[i].phase != DRAINING && !s.conns[i].ending {
             terminal(mut s, i, 135, 3, "server stopping")
         }
         i += 1
@@ -938,7 +963,13 @@ fn timers(mut s: Server, now: int) {
     while i < s.conns.len {
         if s.conns[i].live && s.conns[i].deadline > 0 && now >= s.conns[i].deadline {
             trace(s, "conn {i} deadline in phase {s.conns[i].phase}")
-            close_conn(mut s, i)
+            if s.conns[i].ending {
+                s.conns[i].ending = false
+                s.conns[i].deadline = 0
+                terminal(mut s, i, 135, 2, "session ended")
+            } else {
+                close_conn(mut s, i)
+            }
         }
         i += 1
     }
