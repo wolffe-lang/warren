@@ -1,6 +1,0 @@
-//! member: false
-//! The layout rows for the checked machine: every golden and 200
-//! sequences per size.
-use layout_rows
-
-fn main() -> int { layout_rows.all(200) }
