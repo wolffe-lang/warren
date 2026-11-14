@@ -201,7 +201,13 @@ Start with `term.open_pty`, `process.command`, argument/environment setup,
 `process.set_stdin`, `set_stdout`, `set_stderr`, and
 `process.start_session` with the pty slave. Startup must reset signal
 ignore/blocked state and inherit no unrelated masters or sockets; this is
-an end-to-end row, not inferred from the function name. Reap using
+an end-to-end row, not inferred from the function name. The pane's child
+resets every meaning the runtime names and every real-time signal by its
+host number. The C library's own numbers (glibc's 32 and 33) the runtime
+refuses to reset (wolf-lang#1116): one the server inherited ignored stays
+ignored in its panes. A hosted CI runner starts its jobs with 32 ignored;
+the row names such a signal (`MEASURE pane-inherits-unresettable`) and is
+red for any other. Reap using
 `process.poll()` until `Change.changed` is false. A reported ended child is
 already reaped and its runtime handle closed; match `Change.child.slot` to
 the saved owner and retire that handle without calling `wait_status` again
