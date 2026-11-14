@@ -1,0 +1,348 @@
+//! member: true
+//! One accepted connection: its receive buffer and fragment assembly, its
+//! single outbound queue (whole messages only, so a terminal message never
+//! interrupts a frame or a fragment chain), its image sequencing and the
+//! shadow of what its client holds. Buffers are kept across reuse of the
+//! slot and grow only to their caps.
+use proto
+
+/// A connection slot. `gen` changes at every reuse, so a readiness event
+/// taken for an earlier occupant is discarded.
+pub struct Conn {
+    live: bool,
+    fd: int,
+    key: int,
+    gen: int,
+    phase: int,
+    member: bool,
+    session: int,
+    id: int,
+    deadline: int,
+    rx: List[byte],
+    rx_off: int,
+    rx_len: int,
+    paste: List[byte],
+    paste_len: int,
+    paste_active: bool,
+    tx: List[byte],
+    tx_off: int,
+    tx_len: int,
+    events_bytes: int,
+    image_end: int,
+    image_seq: int,
+    ack: proto.AckState,
+    force_full: bool,
+    stale: bool,
+    stale_since: int,
+    last_frame: int,
+    shadow: Shadow,
+    cols: int,
+    rows: int,
+    depth: int,
+    features: int,
+    write_on: bool,
+    read_on: bool,
+    prefix: bool,
+    hello: List[byte],
+    hello_len: int,
+    hello_ready: bool,
+    resize_ready: bool,
+    resize_cols: int,
+    resize_rows: int,
+    command_ready: bool,
+    stop_after: bool,
+}
+
+/// Phase 0, as server_model numbers it: accepted, before HELLO.
+pub const ACCEPTED: int = 0
+/// Phase 1: attached to a session, a member of its size set.
+pub const ATTACHED: int = 1
+/// Phase 2: a command connection, before its one COMMAND.
+pub const COMMANDING: int = 2
+/// Phase 3: finishing queued bytes after a terminal message.
+pub const DRAINING: int = 3
+/// Phase 4: closed; the slot is free.
+pub const CLOSED: int = 4
+
+/// A new slot.
+pub fn new_conn() -> Conn {
+    Conn {
+        live: false, fd: 0 - 1, key: 0 - 1, gen: 0, phase: CLOSED, member: false, session: 0 - 1,
+        id: 0, deadline: 0,
+        rx: List[byte](), rx_off: 0, rx_len: 0, paste: List[byte](), paste_len: 0, paste_active: false,
+        tx: List[byte](), tx_off: 0, tx_len: 0, events_bytes: 0, image_end: 0 - 1, image_seq: 0,
+        ack: proto.ack_state(), force_full: true, stale: false, stale_since: 0, last_frame: 0,
+        shadow: no_shadow(), cols: 0, rows: 0, depth: 0, features: 0, write_on: false, read_on: false,
+        prefix: false, hello: List[byte](), hello_len: 0, hello_ready: false,
+        resize_ready: false, resize_cols: 0, resize_rows: 0, command_ready: false, stop_after: false,
+    }
+}
+
+/// Make a slot ready for a newly accepted socket, keeping its buffers.
+pub fn reset_conn(mut c: Conn, fd: int, id: int, now: int) {
+    c.live = true
+    c.fd = fd
+    c.key = 0 - 1
+    c.gen = c.gen + 1
+    c.phase = ACCEPTED
+    c.member = false
+    c.session = 0 - 1
+    c.id = id
+    c.deadline = now + HELLO_MS * 1000000
+    c.rx_off = 0
+    c.rx_len = 0
+    c.paste_len = 0
+    c.paste_active = false
+    c.tx_off = 0
+    c.tx_len = 0
+    c.events_bytes = 0
+    c.image_end = 0 - 1
+    c.image_seq = 0
+    c.ack.last_sent = 0
+    c.ack.last_ack = 0
+    c.ack.pending = 0
+    c.force_full = true
+    c.stale = false
+    c.stale_since = 0
+    c.last_frame = 0
+    c.shadow.valid = false
+    c.cols = 0
+    c.rows = 0
+    c.write_on = false
+    c.read_on = true
+    c.prefix = false
+    c.hello_len = 0
+    c.hello_ready = false
+    c.resize_ready = false
+    c.command_ready = false
+    c.stop_after = false
+}
+
+fn place(mut buf: List[byte], at: int, b: byte) {
+    if at < buf.len { buf[at] = b } else { (mut buf).push(b) }
+}
+
+/// Append received bytes. The buffer holds at most one physical frame
+/// plus one read; the parser consumes before the next read.
+pub fn take_bytes(mut c: Conn, data: List[byte]) {
+    if c.rx_off == c.rx_len {
+        c.rx_off = 0
+        c.rx_len = 0
+    } else if c.rx_off > 0 && c.rx_len + data.len > c.rx.len {
+        var j = 0
+        while c.rx_off + j < c.rx_len {
+            c.rx[j] = c.rx[c.rx_off + j]
+            j += 1
+        }
+        c.rx_len = c.rx_len - c.rx_off
+        c.rx_off = 0
+    }
+    for b in data {
+        place(mut c.rx, c.rx_len, b)
+        c.rx_len += 1
+    }
+}
+
+/// One parsed physical frame, or the reason there is none yet.
+pub struct Parsed {
+    code: int,
+    kind: int,
+    flags: int,
+    body: List[byte],
+}
+
+/// Parse the next physical frame from the receive buffer: SHORT when more
+/// bytes are needed; another code for a header that can never be valid.
+pub fn next_frame(mut c: Conn) -> Parsed {
+    let have = c.rx_len - c.rx_off
+    if have < 6 { return Parsed { code: proto.SHORT, kind: 0, flags: 0, body: List[byte]() } }
+    var head = List[byte]()
+    var i = 0
+    while i < 6 {
+        (mut head).push(c.rx[c.rx_off + i])
+        i += 1
+    }
+    let n = (head[0] as int) + (head[1] as int) * 256 + (head[2] as int) * 65536 + (head[3] as int) * 16777216
+    let probe = proto.decode(head)
+    if probe.code != 0 && probe.code != proto.SHORT {
+        return Parsed { code: probe.code, kind: 0, flags: 0, body: List[byte]() }
+    }
+    if have < 6 + n { return Parsed { code: proto.SHORT, kind: 0, flags: 0, body: List[byte]() } }
+    let body = c.rx[c.rx_off + 6..c.rx_off + 6 + n]
+    c.rx_off = c.rx_off + 6 + n
+    Parsed { code: 0, kind: head[4] as int, flags: head[5] as int, body: body }
+}
+
+/// Bytes waiting to be written.
+pub fn queued(c: Conn) -> int {
+    c.tx_len - c.tx_off
+}
+
+/// Append whole wire bytes to the outbound queue. Non-FRAME bytes count
+/// against the event queue's cap; false means the client is too slow
+/// and nothing was appended.
+pub fn enqueue(mut c: Conn, wire: List[byte], frame: bool) -> bool {
+    if !frame && c.events_bytes + wire.len > EVENT_QUEUE { return false }
+    if c.tx_off == c.tx_len {
+        c.tx_off = 0
+        c.tx_len = 0
+        c.events_bytes = 0
+        c.image_end = if c.image_end >= 0 then 0 else 0 - 1
+    } else if c.tx_off > 0 && c.tx_len + wire.len > c.tx.len {
+        var j = 0
+        while c.tx_off + j < c.tx_len {
+            c.tx[j] = c.tx[c.tx_off + j]
+            j += 1
+        }
+        if c.image_end >= 0 { c.image_end = c.image_end - c.tx_off }
+        c.tx_len = c.tx_len - c.tx_off
+        c.tx_off = 0
+    }
+    for b in wire {
+        place(mut c.tx, c.tx_len, b)
+        c.tx_len += 1
+    }
+    if !frame { c.events_bytes = c.events_bytes + wire.len }
+    true
+}
+
+/// Encode and queue one unfragmented message. False when it is invalid
+/// (a bug, never sent) or the event queue is full.
+pub fn send(mut c: Conn, kind: int, payload: List[byte]) -> bool {
+    let r = proto.encode(kind, 0, payload)
+    if r.code != 0 { return false }
+    enqueue(mut c, r.bytes, false)
+}
+
+/// The bytes of the next write: at most WRITE_BUDGET from the queue.
+pub fn next_write(c: Conn) -> List[byte] {
+    let end = if c.tx_len - c.tx_off > WRITE_BUDGET then c.tx_off + WRITE_BUDGET else c.tx_len
+    c.tx[c.tx_off..end]
+}
+
+/// Advance the queue by what a write took.
+pub fn wrote(mut c: Conn, n: int) {
+    c.tx_off = c.tx_off + n
+}
+
+/// A WELCOME payload.
+pub fn welcome(id: int, pid: int, session: str, version: str) -> List[byte] {
+    var b = List[byte]()
+    proto.put(mut b, 1, 2)
+    proto.put(mut b, id, 4)
+    proto.put(mut b, pid, 4)
+    proto.put_text(mut b, session)
+    proto.put_text(mut b, version)
+    b
+}
+
+/// A REFUSE or BYE payload (the two share their shape).
+pub fn coded(code: int, text: str) -> List[byte] {
+    var b = List[byte]()
+    proto.put(mut b, code, 2)
+    proto.put_text(mut b, text)
+    b
+}
+
+/// A u32 payload (PONG).
+pub fn number_payload(n: int) -> List[byte] {
+    var b = List[byte]()
+    proto.put(mut b, n, 4)
+    b
+}
+
+/// A TITLE payload from the emulator's title bytes; bytes that are not
+/// UTF-8 make an empty title rather than an invalid message.
+pub fn title_payload(data: List[byte]) -> List[byte] {
+    var b = List[byte]()
+    let text = str_from_utf8(data) else ""
+    proto.put_text(mut b, text)
+    b
+}
+
+/// A CLIPBOARD payload.
+pub fn bytes_payload(data: List[byte]) -> List[byte] {
+    var b = List[byte]()
+    proto.put_bytes(mut b, data)
+    b
+}
+
+/// A REPLY payload.
+pub fn reply_payload(id: int, status: int, out: str, err: str) -> List[byte] {
+    var b = List[byte]()
+    proto.put(mut b, id, 4)
+    proto.put(mut b, status, 1)
+    proto.put_bytes(mut b, out.bytes())
+    proto.put_bytes(mut b, err.bytes())
+    b
+}
+
+/// A HELLO, read after the codec validated it.
+pub struct Hello {
+    role: int,
+    cols: int,
+    rows: int,
+    depth: int,
+    features: int,
+    term: str,
+    target: str,
+    options: int,
+    cwd: str,
+    names: List[str],
+    values: List[str],
+    duplicate: bool,
+}
+
+struct Cursor { bytes: List[byte], at: int }
+
+fn num(mut r: Cursor, width: int) -> int {
+    var n: int = 0
+    var f: int = 1
+    var i = 0
+    while i < width {
+        n = n + (r.bytes[r.at] as int) * f
+        f = f * 256
+        r.at = r.at + 1
+        i += 1
+    }
+    n
+}
+
+fn text_of(mut r: Cursor) -> str {
+    let n = num(mut r, 2)
+    let s = str_from_utf8(r.bytes[r.at..r.at + n]) else ""
+    r.at = r.at + n
+    s
+}
+
+/// Read a validated HELLO payload's fields. Duplicate environment names
+/// are found here (the codec's linear scan does not compare names).
+pub fn read_hello(payload: List[byte]) -> Hello {
+    var r = Cursor { bytes: copy payload, at: 8 }
+    let role = num(mut r, 1)
+    let cols = num(mut r, 2)
+    let rows = num(mut r, 2)
+    let depth = num(mut r, 1)
+    let features = num(mut r, 4)
+    let term_name = text_of(mut r)
+    let target = text_of(mut r)
+    let options = num(mut r, 1)
+    let cwd = text_of(mut r)
+    let count = num(mut r, 2)
+    var names = List[str]()
+    var values = List[str]()
+    var duplicate = false
+    var i = 0
+    while i < count {
+        let name = text_of(mut r)
+        let value = text_of(mut r)
+        for other in names {
+            if other == name { duplicate = true }
+        }
+        (mut names).push(name)
+        (mut values).push(value)
+        i += 1
+    }
+    Hello { role: role, cols: cols, rows: rows, depth: depth, features: features, term: term_name,
+        target: target, options: options, cwd: cwd, names: names, values: values, duplicate: duplicate }
+}
