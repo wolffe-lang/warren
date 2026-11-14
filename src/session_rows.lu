@@ -13,6 +13,7 @@ use std.fs
 use std.net
 use std.net.unix
 use std.process
+use std.signal
 use std.sort
 use std.str
 use std.term
@@ -589,6 +590,165 @@ fn row_rss_flat(mut r: Rig) -> str {
     ""
 }
 
+fn row_last_output(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_line(mut p, "$", 5000) { return "no prompt" }
+    let _i = client.input(p, "printf 'last-%s\\n' words; exit\r")
+    if !client.until_kind(mut p, 135, 5000) || p.end_code != 2 { return "BYE {p.end_code}, expected session-ended" }
+    var seen = false
+    var row = 1
+    while row <= p.image.rows {
+        if proto.row_text(p.image, row) == "last-words" { seen = true }
+        row = row + 1
+    }
+    if !seen { return "the pane's last output was not shown before its end: " + client.screen_text(p) }
+    client.hang_up(mut p)
+    var ch = process.Child { slot: r.server }
+    r.started = false
+    let st = process.wait_status(take ch) else 0 - 1
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_late_child(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_line(mut p, "$", 5000) { return "no prompt" }
+    // The master ends while its program lives on: the pane goes, and the
+    // program is still reaped when it exits.
+    let _i = client.input(p, "exec sh -c 'trap \"\" HUP; echo closing-$((1+1)); exec 0<&- 1>&- 2>&-; sleep 1'\r")
+    if !client.until_kind(mut p, 135, 5000) || p.end_code != 2 { return "BYE {p.end_code}, expected session-ended" }
+    let t0 = now_ms()
+    client.hang_up(mut p)
+    var ch = process.Child { slot: r.server }
+    r.started = false
+    let st = process.wait_status(take ch) else 0 - 1
+    let t = now_ms() - t0
+    if st != 0 { return "server exit {st}" }
+    if t > 4500 { return "the server waited {t} ms: its late child was not reaped when it ended" }
+    if t < 500 { return "the server ended after {t} ms, before its pane's program (which ignores hangup) did" }
+    print("MEASURE late-child server-exit-after-ms={t}")
+    ""
+}
+
+fn row_inherited_ignore(mut r: Rig) -> str {
+    // The server starts with interrupt and quit ignored (as under a parent
+    // that ignored them); its pane's program must still die of Ctrl-C.
+    signal.ignore(signal.interrupt() | signal.quit()) else { return "ignore" }
+    let why = start_server(mut r, "/bin/sh")
+    signal.reset(signal.interrupt() | signal.quit()) else { return "reset" }
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_line(mut p, "$", 5000) { return "no prompt" }
+    let _i = client.input(p, "sleep 30\r")
+    time.sleep(time.millis(300))
+    let _c = client.key(p, 4, 0, 99)
+    let _e = client.input(p, "echo after-$((40+2))\r")
+    if !client.until_text(mut p, "after-42", 5000) { return "Ctrl-C did not end the pane's command under an inherited ignore" }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_pane_proc(mut r: Rig) -> str {
+    let why = start_server(mut r, self_path() + " --print-proc")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut p, 135, 5000) { return "the helper pane did not end" }
+    let screen = client.screen_text(p)
+    client.hang_up(mut p)
+    var ch = process.Child { slot: r.server }
+    r.started = false
+    let _st = process.wait_status(take ch) else 0 - 1
+    if screen.contains("proc=absent") { return "no /proc on this host" }
+    if !screen.contains("SigBlk:0000000000000000") { return "blocked signals inherited: " + screen }
+    if !screen.contains("SigIgn:0000000000000000") { return "ignored signals inherited: " + screen }
+    if !screen.contains("inherited-handles=0") { return "handles inherited: " + screen }
+    ""
+}
+
+fn status_field(pid: int, name: str) -> int {
+    let text = fs.read_text("/proc/{pid}/status") else { return 0 - 1 }
+    for line in text.lines() {
+        if line.starts_with(name) {
+            let parts = line.words()
+            if parts.len >= 2 { return parts[1].to_int() else 0 - 1 }
+        }
+    }
+    0 - 1
+}
+
+fn row_threads(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    let pid = process.pid(process.Child { slot: r.server }) else 0 - 1
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_line(mut p, "$", 5000) { return "no prompt" }
+    let _i = client.input(p, "echo threads\r")
+    let _w = client.until_text(mut p, "threads", 3000)
+    let n = status_field(pid, "Threads:")
+    print("MEASURE server-threads={n} with one session and one client")
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if n < 0 { return "no /proc status for the server" }
+    if n > 3 { return "the server runs {n} threads; the loop starts none of its own" }
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_max_pending(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    // MAX_PENDING (4) connections that send nothing; a fifth with a HELLO
+    // waits in the backlog until one of the four goes.
+    var quiet = List[client.Peer]()
+    var i = 0
+    while i < 4 {
+        let q = client.dial(socket(r)) else |e| { return "dial-{e}" }
+        (mut quiet).push(q)
+        i = i + 1
+    }
+    time.sleep(time.millis(200))
+    var fifth = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    let early = client.next(mut fifth, 700)
+    if early.kind != 0 { return "the fifth connection was served beside four pending ({early.kind})" }
+    client.hang_up(mut quiet[0])
+    if !client.until_kind(mut fifth, 129, 3000) { return "the fifth connection was not served after one pending went" }
+    client.hang_up(mut fifth)
+    i = 1
+    while i < 4 {
+        client.hang_up(mut quiet[i])
+        i = i + 1
+    }
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+fn row_max_sessions(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var n = 0
+    while n < 16 {
+        var p = attach(r, 20, 6, "s{n}", 1) else |e| { return "dial-{e}" }
+        if !client.until_kind(mut p, 129, 3000) { return "session {n}: no WELCOME ({p.end_code})" }
+        let _d = client.send(p, 10, List[byte]())
+        client.hang_up(mut p)
+        n = n + 1
+    }
+    var extra = attach(r, 20, 6, "s16", 1) else |e| { return "dial-{e}" }
+    let code = refusal(mut extra)
+    client.hang_up(mut extra)
+    let st = stop_server(mut r)
+    if code != 7 { return "a 17th session: refusal {code}, expected resource-limit" }
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
 fn run_row(warren: str, name: str) -> str {
     var r = rig(warren, name)
     var why = "no such row"
@@ -608,16 +768,54 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "start-lock" { why = row_start_lock(mut r) }
     else if name == "flood-beside-quiet" { why = row_flood(mut r) }
     else if name == "rss-flat" { why = row_rss_flat(mut r) }
+    else if name == "last-output" { why = row_last_output(mut r) }
+    else if name == "late-child-reaped" { why = row_late_child(mut r) }
+    else if name == "inherited-ignore-reset" { why = row_inherited_ignore(mut r) }
+    else if name == "pane-signals-and-handles" { why = row_pane_proc(mut r) }
+    else if name == "threads" { why = row_threads(mut r) }
+    else if name == "max-pending" { why = row_max_pending(mut r) }
+    else if name == "max-sessions" { why = row_max_sessions(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte session-end command start-lock".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions".split(" ") {
         (mut x).push(n)
     }
     x
+}
+
+
+// The pane-side helper: this process's blocked and ignored signal masks
+// and every descriptor above 2 that names a socket, a pseudo-terminal
+// multiplexer or the server's lock (none may be inherited).
+fn print_proc() -> int {
+    let text = fs.read_text("/proc/self/status") else {
+        print("proc=absent")
+        return 0
+    }
+    for line in text.lines() {
+        if line.starts_with("SigBlk:") || line.starts_with("SigIgn:") {
+            let parts = line.words()
+            if parts.len >= 2 { print("{parts[0]}{parts[1]}") }
+        }
+    }
+    var leaked = 0
+    let names = fs.read_dir("/proc/self/fd") else { return 1 }
+    for n in names {
+        let fd = n.to_int() else 0 - 1
+        if fd > 2 {
+            let target = str_from_utf8(fs.read_link("/proc/self/fd/{n}") else List[byte]()) else ""
+            if target.starts_with("socket:") || target.contains("ptmx") || target.contains("start.lock") {
+                print("leaked {fd} {target}")
+                leaked = leaked + 1
+            }
+        }
+    }
+    print("inherited-handles={leaked}")
+    0
 }
 
 fn self_path() -> str {
@@ -629,6 +827,7 @@ fn self_path() -> str {
 
 fn main() -> int {
     let args = env.args()
+    if args.len == 1 && args[0] == "--print-proc" { return print_proc() }
     if args.len == 1 && args[0] == "--print-size" {
         let size = term.size(fs.stdin()) else |e| {
             print("size-{e}")
