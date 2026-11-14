@@ -15,6 +15,7 @@ use std.net.unix
 use std.process
 use std.sort
 use std.str
+use std.term
 use std.time
 use client
 use proto
@@ -41,9 +42,13 @@ fn socket(r: Rig) -> str {
 /// Start a server for the row, its environment and runtime directory set
 /// before the spawn; wait until its socket answers (bounded).
 fn start_server(mut r: Rig, pane_command: str) -> str {
+    start_bounded(mut r, pane_command, 60000)
+}
+
+fn start_bounded(mut r: Rig, pane_command: str, lifetime_ms: int) -> str {
     fs.remove_dir_all(r.dir) else |_| {}
     env.set("WARREN_RUNTIME_DIR", r.dir) else { return "env" }
-    env.set("WARREN_LIFETIME_MS", "60000") else { return "env" }
+    env.set("WARREN_LIFETIME_MS", "{lifetime_ms}") else { return "env" }
     env.set("WARREN_PANE_COMMAND", pane_command) else { return "env" }
     var c = process.command(r.warren)
     process.push_arg(mut c, "server")
@@ -325,7 +330,9 @@ fn row_two_sizes(mut r: Rig) -> str {
         n = n + 1
     }
     if a.image.cols != 100 || a.image.rows != 30 { return "after leaving {a.image.cols}x{a.image.rows}" }
-    let _i = client.input(a, "stty size\r")
+    // The pane's program reads its size with this program's own helper
+    // mode (a host's stty may not report one).
+    let _i = client.input(a, "{self_path()} --print-size\r")
     if !client.until_text(mut a, "30 100", 5000) { return "the pane did not hear its size: " + client.screen_text(a) }
     client.hang_up(mut a)
     let st = stop_server(mut r)
@@ -392,12 +399,8 @@ fn row_ctrl_c(mut r: Rig) -> str {
     // Ctrl-C is the byte 03 into the pty, never a signal from the server.
     let _c = client.key(p, 4, 0, 99)
     let _e = client.input(p, "echo after-$((40+2))\r")
+    // Typed after the Ctrl-C, it answers long before the sleep's 30 s.
     if !client.until_text(mut p, "after-42", 5000) { return "Ctrl-C did not end the foreground command: " + client.screen_text(p) }
-    var row = 1
-    while row <= p.image.rows {
-        if proto.row_text(p.image, row) == "slept-2" { return "the sleep was not interrupted" }
-        row = row + 1
-    }
     client.hang_up(mut p)
     let st = stop_server(mut r)
     if st != 0 { return "server exit {st}" }
@@ -488,11 +491,22 @@ fn keystrokes(mut q: client.Peer, count: int, gap_ms: int) -> List[int] {
         let t0 = time.monotonic_ns()
         let _k = client.key(q, 0, 0, 97 + n % 26)
         typed = typed + ch
-        if !client.until_line(mut q, "$ " + typed, 10000) { return List[int]() }
+        if !client.until_line(mut q, "$ " + typed, 10000) {
+            eprint("keystroke {n} not shown; frames {q.frames} seq {q.image.seq} ended {q.ended} end {q.end_kind}/{q.end_code}; screen:\n" + client.screen_text(q))
+            var ping = List[byte]()
+            proto.put(mut ping, 5, 4)
+            let _p = client.send(q, 12, ping)
+            let pong = client.until_kind(mut q, 137, 3000)
+            eprint("after: ping answered {pong}, frames {q.frames} seq {q.image.seq}; screen:\n" + client.screen_text(q))
+            return List[int]()
+        }
         (mut times).push((time.monotonic_ns() - t0) / 1000)
         if typed.len == 40 {
             let _u = client.key(q, 4, 0, 117)
-            if !client.until_line(mut q, "$", 10000) { return List[int]() }
+            if !client.until_line(mut q, "$", 10000) {
+                eprint("line not cleared after {n}; screen:\n" + client.screen_text(q))
+                return List[int]()
+            }
             typed = ""
         }
         n = n + 1
@@ -546,14 +560,18 @@ fn rss_kb(pid: int) -> int {
 }
 
 fn row_rss_flat(mut r: Rig) -> str {
-    let why = start_server(mut r, "/bin/sh")
+    let why = start_bounded(mut r, "/bin/sh", 600000)
     if why.len > 0 { return why }
     let pid = process.pid(process.Child { slot: r.server }) else 0 - 1
-    if rss_kb(pid) < 0 { return "no /proc status for the server" }
+    let at_start = rss_kb(pid)
+    if at_start < 0 { return "no /proc status for the server" }
     var q = attach(r, 80, 24, "quiet", 1) else |e| { return "dial-{e}" }
     if !client.until_line(mut q, "$", 5000) { return "no prompt" }
+    let one_session = rss_kb(pid)
     var f = attach(r, 80, 24, "flood", 1) else |e| { return "dial-{e}" }
     if !client.until_line(mut f, "$", 5000) { return "no flood prompt" }
+    let two_sessions = rss_kb(pid)
+    print("MEASURE server-rss start-kb={at_start} one-session-80x24-kb={one_session} two-sessions-kb={two_sessions}")
     let _i = client.input(f, "while :; do echo 0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopq; done\r")
     let _d = client.send(f, 10, List[byte]())
     client.hang_up(mut f)
@@ -602,8 +620,23 @@ fn all_rows() -> List[str] {
     x
 }
 
+fn self_path() -> str {
+    let a0 = env.arg0()
+    if a0.starts_with("/") { return a0 }
+    let here = env.cwd() else "."
+    here + "/" + a0
+}
+
 fn main() -> int {
     let args = env.args()
+    if args.len == 1 && args[0] == "--print-size" {
+        let size = term.size(fs.stdin()) else |e| {
+            print("size-{e}")
+            return 1
+        }
+        print("{size.rows} {size.columns}")
+        return 0
+    }
     if args.len < 1 {
         eprint("usage: session_rows WARREN [ROW...]")
         return 2
