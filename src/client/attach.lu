@@ -3,6 +3,7 @@
 //! there is none and creation is asked for), draw its images, send what is
 //! typed, and give the terminal back on every way out.
 use std.env
+use std.io
 use std.fs
 use std.net
 use std.poll
@@ -359,6 +360,11 @@ pub fn command_sized(argv: List[str], cols: int, rows: int, with_env: bool) -> R
     let long = server.socket_path_problem(server.socket_path(server.runtime_dir()))
     if long.len > 0 { return no_reply(1, "the {long}") }
     var p = dial(server.socket_path(server.runtime_dir())) else |_| { return no_reply(3, "no server is running") }
+    command_on(mut p, argv, cols, rows, with_env)
+}
+
+// One command on a connection already dialed; the connection is hung up.
+fn command_on(mut p: Peer, argv: List[str], cols: int, rows: int, with_env: bool) -> Reply {
     var names = List[str]()
     var values = List[str]()
     if with_env { env_lists(mut names, mut values) }
@@ -389,6 +395,42 @@ pub fn command_sized(argv: List[str], cols: int, rows: int, with_env: bool) -> R
     }
     hang_up(mut p)
     no_reply(1, "the server did not answer the command in 10 s")
+}
+
+/// `warren new [-d] [-s NAME]`: make a session (starting the server when
+/// there is none) at this terminal's size (80x24 without one), in this
+/// directory and environment; print its name, then attach to it unless
+/// `detached`. A name already in use is refused.
+pub fn new_session(name: str, detached: bool) -> int {
+    let long = server.socket_path_problem(server.socket_path(server.runtime_dir()))
+    if long.len > 0 {
+        eprint("warren: the {long}")
+        return 1
+    }
+    let size = term.size(fs.stdin()) else |_| {
+        if !detached {
+            eprint("warren: not a terminal: new needs one on standard input (or -d)")
+            return 1
+        }
+        term.Size { rows: 24, columns: 80 }
+    }
+    var p = dial_or_start(true) else |e| {
+        eprint("warren: cannot reach or start the server: {e}")
+        return 1
+    }
+    var argv = List[str]()
+    (mut argv).push("new-session")
+    if name.len > 0 { (mut argv).push(name) }
+    let r = command_on(mut p, argv, size.columns, size.rows, true)
+    var se = fs.stderr()
+    fs.write_chunk(mut se, r.err) else |_| {}
+    if r.status != 0 { return if r.status == 3 then 1 else r.status }
+    let made = (str_from_utf8(r.out) else "").trim()
+    if detached {
+        io.write_line(made)
+        return 0
+    }
+    attach(made, false)
 }
 
 /// Run one command on the server and return its reply, sending no size.
