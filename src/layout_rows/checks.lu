@@ -1,6 +1,7 @@
 //! member: true
 //! The invariants of docs/LAYOUT.md as checks. Each answers "" when the
 //! invariant holds, or what broke.
+
 use layout
 
 fn hidden(r: layout.Rect) -> bool {
@@ -28,7 +29,9 @@ pub fn tiling(l: layout.Layout, tab: int, cols: int, rows: int) -> str {
         let r = copy rs[i]
         if r.pane != ps[i] { return "rect {i} is pane {r.pane}; tree order has {ps[i]}" }
         if !hidden(r) {
-            if r.cols < 1 || r.rows < 1 { return "pane {r.pane} has a degenerate rect {r.cols}x{r.rows}" }
+            if r.cols < 1 || r.rows < 1 {
+                return "pane {r.pane} has a degenerate rect {r.cols}x{r.rows}"
+            }
             (mut c0).push(r.col)
             (mut r0).push(r.row)
             (mut c1).push(r.col + r.cols)
@@ -69,7 +72,9 @@ pub fn tiling(l: layout.Layout, tab: int, cols: int, rows: int) -> str {
         if !hidden(r) {
             let a = layout.pane_at(l, tab, cols, rows, r.col, r.row)
             let z = layout.pane_at(l, tab, cols, rows, r.col + r.cols - 1, r.row + r.rows - 1)
-            if a != r.pane || z != r.pane { return "pane_at answers {a} and {z} inside pane {r.pane}" }
+            if a != r.pane || z != r.pane {
+                return "pane_at answers {a} and {z} inside pane {r.pane}"
+            }
         }
     }
     for b in bs {
@@ -97,7 +102,9 @@ pub fn structure(l: layout.Layout) -> str {
         if (tab_ids[t.id] else 0) == 1 { return "tab id {t.id} twice" }
         tab_ids[t.id] = 1
         if t.id == l.active { active = true }
-        if t.root < 0 || t.root >= t.nodes.len { return "tab {t.id} root {t.root} outside its arena" }
+        if t.root < 0 || t.root >= t.nodes.len {
+            return "tab {t.id} root {t.root} outside its arena"
+        }
         if t.nodes[t.root].parent != -1 { return "tab {t.id} root has a parent" }
         var stack = List[int]()
         (mut stack).push(t.root)
@@ -114,8 +121,12 @@ pub fn structure(l: layout.Layout) -> str {
                 seen[n.pane] = 1
                 (mut panes).push(n.pane)
             } else if n.kind == layout.SPLIT {
-                if n.axis != layout.COLS && n.axis != layout.ROWS { return "split {i} axis {n.axis}" }
-                if n.share < 1 || n.share > 9999 { return "split {i} share {n.share} outside 1..9999" }
+                if n.axis != layout.COLS && n.axis != layout.ROWS {
+                    return "split {i} axis {n.axis}"
+                }
+                if n.share < 1 || n.share > 9999 {
+                    return "split {i} share {n.share} outside 1..9999"
+                }
                 let why = child(t, i, n.first) + child(t, i, n.second)
                 if why.len > 0 { return why }
                 (mut stack).push(n.first)
@@ -129,8 +140,12 @@ pub fn structure(l: layout.Layout) -> str {
             if n.kind != layout.FREE { live += 1 }
         }
         if live != visited { return "tab {t.id} arena holds {live} nodes, {visited} reachable" }
-        if t.focus_order.len != panes.len { return "tab {t.id} focus order has {t.focus_order.len} of {panes.len} panes" }
-        if t.focus_order[0] != t.focus { return "tab {t.id} focus {t.focus} is not first in its order" }
+        if t.focus_order.len != panes.len {
+            return "tab {t.id} focus order has {t.focus_order.len} of {panes.len} panes"
+        }
+        if t.focus_order[0] != t.focus {
+            return "tab {t.id} focus {t.focus} is not first in its order"
+        }
         var order = Map[int, int]()
         for p in t.focus_order {
             if (order[p] else 0) == 1 { return "tab {t.id} focus order names {p} twice" }
@@ -146,7 +161,12 @@ pub fn structure(l: layout.Layout) -> str {
 
 /// Invariant 3, shares: only resize (one split) and equalize change an
 /// existing split's share.
-pub fn shares_kept(before: layout.Layout, after: layout.Layout, resized: bool, equalized: bool) -> str {
+pub fn shares_kept(
+    before: layout.Layout,
+    after: layout.Layout,
+    resized: bool,
+    equalized: bool,
+) -> str {
     var changed = 0
     for t in after.tabs {
         for b in before.tabs {
@@ -171,7 +191,8 @@ pub fn shares_kept(before: layout.Layout, after: layout.Layout, resized: bool, e
 
 /// Invariant 3, sizes: a pane visible at a size is visible at larger ones.
 pub fn reveals(l: layout.Layout, tab: int, cols: int, rows: int) -> str {
-    let why = revealed(l, tab, cols, rows, cols + 7, rows + 3) + revealed(l, tab, cols, rows, cols * 2, rows * 2)
+    let why = revealed(l, tab, cols, rows, cols + 7, rows + 3) +
+        revealed(l, tab, cols, rows, cols * 2, rows * 2)
     if why.len > 0 || cols > 512 || rows > 512 { return why }
     revealed(l, tab, cols, rows, 512, 512)
 }
@@ -246,7 +267,9 @@ fn there_and_back(l: layout.Layout, tab: int, pane: int, d: int, cols: int, rows
     let ti = index_of(m, tab)
     layout.focus(mut m, tab, d, cols, rows) else |_| { return "" }
     let went = m.tabs[ti].focus
-    layout.focus(mut m, tab, opposite(d), cols, rows) else |e| { return "from {pane} to {went} and no way back: {e}" }
+    layout.focus(mut m, tab, opposite(d), cols, rows) else |e| {
+        return "from {pane} to {went} and no way back: {e}"
+    }
     if m.tabs[ti].focus != pane { return "from {pane} to {went} and back to {m.tabs[ti].focus}" }
     ""
 }
@@ -303,7 +326,8 @@ pub fn same_layout(a: layout.Layout, b: layout.Layout) -> bool {
     if a.tabs.len != b.tabs.len || a.active != b.active || a.next_id != b.next_id { return false }
     var i = 0
     while i < a.tabs.len {
-        let x = a.tabs[i].id == b.tabs[i].id && a.tabs[i].focus == b.tabs[i].focus &&
+        let x = a.tabs[i].id == b.tabs[i].id &&
+            a.tabs[i].focus == b.tabs[i].focus &&
             a.tabs[i].zoomed == b.tabs[i].zoomed
         if !x { return false }
         if !same_ints(a.tabs[i].focus_order, b.tabs[i].focus_order) { return false }

@@ -74,7 +74,11 @@ fn rect(pane: int, b: Box) -> Rect {
 
 fn place(t: Tab, i: int, b: Box, visible: bool, mut out: List[Rect]) {
     if t.nodes[i].kind == LEAF {
-        if visible { (mut out).push(rect(t.nodes[i].pane, b)) } else { (mut out).push(rect(t.nodes[i].pane, nothing())) }
+        if visible {
+            (mut out).push(rect(t.nodes[i].pane, b))
+        } else {
+            (mut out).push(rect(t.nodes[i].pane, nothing()))
+        }
         return
     }
     if !visible {
@@ -97,7 +101,11 @@ fn tab_rects(t: Tab, cols: int, rows: int, zoom: bool) -> List[Rect] {
         var ps = List[int]()
         leaves(t, t.root, mut ps)
         for p in ps {
-            if p == t.focus && visible { (mut out).push(rect(p, whole)) } else { (mut out).push(rect(p, nothing())) }
+            if p == t.focus && visible {
+                (mut out).push(rect(p, whole))
+            } else {
+                (mut out).push(rect(p, nothing()))
+            }
         }
         return out
     }

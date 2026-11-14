@@ -40,8 +40,16 @@ pub fn new(pane: int, name: str) -> Layout ! {bad_id} {
 
 /// Split `pane` of tab `tab` along `axis` at share 5000; the new pane goes
 /// second when `after`, and takes focus.
-pub fn split(mut l: Layout, tab: int, pane: int, axis: int, new_pane: int, after: bool, cols: int,
-    rows: int) -> () ! SplitRefusal {
+pub fn split(
+    mut l: Layout,
+    tab: int,
+    pane: int,
+    axis: int,
+    new_pane: int,
+    after: bool,
+    cols: int,
+    rows: int,
+) -> () ! SplitRefusal {
     assert(axis == COLS || axis == ROWS, "layout-split-axis")
     if new_pane < 1 { return bad_id }
     let ti = tab_index(l, tab)
@@ -55,10 +63,22 @@ pub fn split(mut l: Layout, tab: int, pane: int, axis: int, new_pane: int, after
     l.tabs[ti].zoomed = false
     let parent = l.tabs[ti].nodes[leaf].parent
     let s = alloc(mut l.tabs[ti], take Node {
-        kind: SPLIT, pane: 0, axis: axis, first: -1, second: -1, share: SHARE_HALF, parent: parent,
+        kind: SPLIT,
+        pane: 0,
+        axis: axis,
+        first: -1,
+        second: -1,
+        share: SHARE_HALF,
+        parent: parent,
     })
     let n = alloc(mut l.tabs[ti], take Node {
-        kind: LEAF, pane: new_pane, axis: COLS, first: -1, second: -1, share: 0, parent: s,
+        kind: LEAF,
+        pane: new_pane,
+        axis: COLS,
+        first: -1,
+        second: -1,
+        share: 0,
+        parent: s,
     })
     if after {
         l.tabs[ti].nodes[s].first = leaf
@@ -75,7 +95,11 @@ pub fn split(mut l: Layout, tab: int, pane: int, axis: int, new_pane: int, after
 
 fn remove_tab(mut l: Layout, ti: int) {
     if l.tabs[ti].id == l.active {
-        if ti + 1 < l.tabs.len { l.active = l.tabs[ti + 1].id } else { l.active = l.tabs[ti - 1].id }
+        if ti + 1 < l.tabs.len {
+            l.active = l.tabs[ti + 1].id
+        } else {
+            l.active = l.tabs[ti - 1].id
+        }
     }
     var kept = List[Tab]()
     var i = 0
@@ -99,7 +123,11 @@ pub fn close(mut l: Layout, pane: int) -> () ! CloseRefusal {
         return
     }
     l.tabs[ti].zoomed = false
-    let sibling = if l.tabs[ti].nodes[s].first == w.leaf then l.tabs[ti].nodes[s].second else l.tabs[ti].nodes[s].first
+    let sibling = if l.tabs[ti].nodes[s].first == w.leaf {
+        l.tabs[ti].nodes[s].second
+    } else {
+        l.tabs[ti].nodes[s].first
+    }
     replace_child(mut l.tabs[ti], l.tabs[ti].nodes[s].parent, s, sibling)
     release(mut l.tabs[ti], s)
     release(mut l.tabs[ti], w.leaf)
@@ -195,7 +223,14 @@ pub fn focus_previous(mut l: Layout, tab: int) -> () ! {no_tab} {
 
 /// Move the border on `direction`'s side of a pane by `cells` that way;
 /// answers how many cells the pane grew.
-pub fn resize(mut l: Layout, pane: int, direction: int, cells: int, cols: int, rows: int) -> int ! ResizeRefusal {
+pub fn resize(
+    mut l: Layout,
+    pane: int,
+    direction: int,
+    cells: int,
+    cols: int,
+    rows: int,
+) -> int ! ResizeRefusal {
     assert(direction >= LEFT && direction <= DOWN, "layout-resize-direction")
     let w = locate(l, pane)
     if w.tab < 0 { return no_pane }
@@ -206,7 +241,9 @@ pub fn resize(mut l: Layout, pane: int, direction: int, cells: int, cols: int, r
     var s = l.tabs[ti].nodes[child].parent
     while s >= 0 {
         let n = copy l.tabs[ti].nodes[s]
-        if n.axis == axis && ((near_first && n.first == child) || (!near_first && n.second == child)) { break }
+        if n.axis == axis && (near_first && n.first == child || !near_first && n.second == child) {
+            break
+        }
         child = s
         s = n.parent
     }

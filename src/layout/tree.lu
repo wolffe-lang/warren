@@ -89,7 +89,15 @@ fn alloc(mut t: Tab, take n: Node) -> int {
 }
 
 fn release(mut t: Tab, i: int) {
-    t.nodes[i] = Node { kind: FREE, pane: 0, axis: COLS, first: -1, second: -1, share: 0, parent: -1 }
+    t.nodes[i] = Node {
+        kind: FREE,
+        pane: 0,
+        axis: COLS,
+        first: -1,
+        second: -1,
+        share: 0,
+        parent: -1,
+    }
 }
 
 /// Make `now` stand where `was` stood under `parent` (or at the root).
@@ -112,10 +120,26 @@ fn name_bytes(name: str) -> List[byte] {
 
 fn one_pane_tab(id: int, pane: int, name: str) -> Tab {
     var nodes = List[Node]()
-    (mut nodes).push(Node { kind: LEAF, pane: pane, axis: COLS, first: -1, second: -1, share: 0, parent: -1 })
+    (mut nodes).push(Node {
+        kind: LEAF,
+        pane: pane,
+        axis: COLS,
+        first: -1,
+        second: -1,
+        share: 0,
+        parent: -1,
+    })
     var order = List[int]()
     (mut order).push(pane)
-    Tab { id: id, name: name_bytes(name), nodes: nodes, root: 0, focus: pane, zoomed: false, focus_order: order }
+    Tab {
+        id: id,
+        name: name_bytes(name),
+        nodes: nodes,
+        root: 0,
+        focus: pane,
+        zoomed: false,
+        focus_order: order,
+    }
 }
 
 /// Move `pane` to the front of a focus order, adding it if absent.

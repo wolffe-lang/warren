@@ -5,6 +5,7 @@
 //! FIRST+COUNT-1 at size SIZE (0 for 20x6, then 80x24, 81x25, 320x90 and
 //! 512x512), seeded as the native take's, with the constructed grids when
 //! FIRST is 0. A rig sums the slices; tests/layout/rig/slices.py is one.
+
 use std.env
 use layout_rows
 

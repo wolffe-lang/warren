@@ -13,6 +13,7 @@
 //! A refusal reports `refused: OP: TAG`, a resize `resized: OP: CELLS` and
 //! `at` its pane; the text ends with `dump_at` at the current size, or
 //! `dump` after `plain`.
+
 use layout
 
 /// One golden: a name, the starting size, the script and the whole
@@ -76,7 +77,16 @@ fn name_of(words: List[str], from: int) -> str {
 fn do_split(mut l: layout.Layout, op: str, w: List[str], cols: int, rows: int) -> str {
     if w.len != 6 { return "bad op: {op}" }
     let after = w[5] == "after"
-    layout.split(mut l, number(w[1]), number(w[2]), axis(w[3]), number(w[4]), after, cols, rows) else |e| {
+    layout.split(
+        mut l,
+        number(w[1]),
+        number(w[2]),
+        axis(w[3]),
+        number(w[4]),
+        after,
+        cols,
+        rows,
+    ) else |e| {
         return "refused: {op}: {e}"
     }
     ""
@@ -88,7 +98,9 @@ fn do_close(mut l: layout.Layout, op: str, w: List[str]) -> str {
 }
 
 fn do_focus(mut l: layout.Layout, op: str, w: List[str], cols: int, rows: int) -> str {
-    layout.focus(mut l, number(w[1]), direction(w[2]), cols, rows) else |e| { return "refused: {op}: {e}" }
+    layout.focus(mut l, number(w[1]), direction(w[2]), cols, rows) else |e| {
+        return "refused: {op}: {e}"
+    }
     ""
 }
 
@@ -107,7 +119,14 @@ fn do_next(mut l: layout.Layout, op: str, w: List[str], forward: bool) -> str {
 }
 
 fn do_resize(mut l: layout.Layout, op: str, w: List[str], cols: int, rows: int) -> str {
-    let moved = layout.resize(mut l, number(w[1]), direction(w[2]), number(w[3]), cols, rows) else |e| {
+    let moved = layout.resize(
+        mut l,
+        number(w[1]),
+        direction(w[2]),
+        number(w[3]),
+        cols,
+        rows,
+    ) else |e| {
         return "refused: {op}: {e}"
     }
     "resized: {op}: {moved}"
@@ -124,7 +143,9 @@ fn do_equalize(mut l: layout.Layout, op: str, w: List[str]) -> str {
 }
 
 fn do_tab(mut l: layout.Layout, op: str, w: List[str]) -> str {
-    let id = layout.new_tab(mut l, number(w[1]), name_of(w, 2)) else |e| { return "refused: {op}: {e}" }
+    let id = layout.new_tab(mut l, number(w[1]), name_of(w, 2)) else |e| {
+        return "refused: {op}: {e}"
+    }
     if id < 1 { return "bad tab id {id}: {op}" }
     ""
 }
@@ -159,7 +180,9 @@ pub fn run(c: Case) -> str {
     let head = ops[0].trim()
     let first = head.words()
     if first.len < 2 || first[0] != "new" { return "a script starts with new" }
-    var l = layout.new(number(first[1]), name_of(first, 2)) else |e| { return "refused: {head}: {e}" }
+    var l = layout.new(number(first[1]), name_of(first, 2)) else |e| {
+        return "refused: {head}: {e}"
+    }
     var i = 1
     while i < ops.len {
         let op = ops[i].trim()

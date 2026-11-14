@@ -1,6 +1,7 @@
 //! member: false
 //! The layout module in the ordinary `wolf test` gate: every golden and a
 //! few property sequences per size.
+
 use layout_rows
 
 fn test_layout_goldens() {

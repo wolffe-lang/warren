@@ -37,7 +37,16 @@ fn put_box(mut buf: List[byte], b: Box) {
 
 /// One node and everything under it. `visible` is false under a hidden
 /// split and for every split of a zoomed tab.
-fn describe(t: Tab, i: int, depth: int, b: Box, visible: bool, geometry: bool, whole: Box, mut buf: List[byte]) {
+fn describe(
+    t: Tab,
+    i: int,
+    depth: int,
+    b: Box,
+    visible: bool,
+    geometry: bool,
+    whole: Box,
+    mut buf: List[byte],
+) {
     var k = 0
     while k < depth {
         put(mut buf, "  ")

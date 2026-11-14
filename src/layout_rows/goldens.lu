@@ -10,8 +10,13 @@ fn add(mut cs: List[Case], name: str, cols: int, rows: int, script: str, want: s
 
 // Scripts several cases start from.
 fn s_cols() -> str { "new 1 main; split 1 1 cols 2 after" }
+
 fn s_nest() -> str { "new 1 main; split 1 1 cols 2 after; split 1 2 rows 3 after" }
-fn s_grid() -> str { "new 1 main; split 1 1 cols 2 after; split 1 1 rows 3 after; split 1 2 rows 4 after" }
+
+fn s_grid() -> str {
+    "new 1 main; split 1 1 cols 2 after; split 1 1 rows 3 after; split 1 2 rows 4 after"
+}
+
 fn s_chain() -> str {
     "new 1 main; split 1 1 cols 2 after; split 1 2 cols 3 after; split 1 3 cols 4 after; split 1 4 cols 5 after"
 }
@@ -19,16 +24,16 @@ fn s_chain() -> str {
 // One pane, 80x24.
 fn d_one() -> str {
     "layout tabs=1 active=1 next=2 size=80x24\n" +
-    "tab 1 focus=1 zoomed=0 order=1 name=\"main\"\n" +
-    "  pane 1 at=1,1 size=80x24\n"
+        "tab 1 focus=1 zoomed=0 order=1 name=\"main\"\n" +
+        "  pane 1 at=1,1 size=80x24\n"
 }
 
 // s_cols at 80x24, without its layout line.
 fn t_cols() -> str {
     "tab 1 focus=2 zoomed=0 order=2,1 name=\"main\"\n" +
-    "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
-    "    pane 1 at=1,1 size=39x24\n" +
-    "    pane 2 at=41,1 size=40x24\n"
+        "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
+        "    pane 1 at=1,1 size=39x24\n" +
+        "    pane 2 at=41,1 size=40x24\n"
 }
 
 fn d_cols() -> str { "layout tabs=1 active=1 next=2 size=80x24\n" + t_cols() }
@@ -36,403 +41,39 @@ fn d_cols() -> str { "layout tabs=1 active=1 next=2 size=80x24\n" + t_cols() }
 // s_nest at 80x24.
 fn d_nest() -> str {
     "layout tabs=1 active=1 next=2 size=80x24\n" +
-    "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
-    "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
-    "    pane 1 at=1,1 size=39x24\n" +
-    "    split rows share=5000 at=41,1 size=40x24 border=12\n" +
-    "      pane 2 at=41,1 size=40x11\n" +
-    "      pane 3 at=41,13 size=40x12\n"
+        "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
+        "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
+        "    pane 1 at=1,1 size=39x24\n" +
+        "    split rows share=5000 at=41,1 size=40x24 border=12\n" +
+        "      pane 2 at=41,1 size=40x11\n" +
+        "      pane 3 at=41,13 size=40x12\n"
 }
 
 // s_nest zoomed at 80x24: pane 3 has the area.
 fn d_nest_zoomed() -> str {
     "layout tabs=1 active=1 next=2 size=80x24\n" +
-    "tab 1 focus=3 zoomed=1 order=3,2,1 name=\"main\"\n" +
-    "  split cols share=5000 hidden\n" +
-    "    pane 1 hidden\n" +
-    "    split rows share=5000 hidden\n" +
-    "      pane 2 hidden\n" +
-    "      pane 3 at=1,1 size=80x24\n"
+        "tab 1 focus=3 zoomed=1 order=3,2,1 name=\"main\"\n" +
+        "  split cols share=5000 hidden\n" +
+        "    pane 1 hidden\n" +
+        "    split rows share=5000 hidden\n" +
+        "      pane 2 hidden\n" +
+        "      pane 3 at=1,1 size=80x24\n"
 }
 
 // s_grid at 81x25, below the tab line.
 fn grid_body() -> str {
     "  split cols share=5000 at=1,1 size=81x25 border=41\n" +
-    "    split rows share=5000 at=1,1 size=40x25 border=13\n" +
-    "      pane 1 at=1,1 size=40x12\n" +
-    "      pane 3 at=1,14 size=40x12\n" +
-    "    split rows share=5000 at=42,1 size=40x25 border=13\n" +
-    "      pane 2 at=42,1 size=40x12\n" +
-    "      pane 4 at=42,14 size=40x12\n"
+        "    split rows share=5000 at=1,1 size=40x25 border=13\n" +
+        "      pane 1 at=1,1 size=40x12\n" +
+        "      pane 3 at=1,14 size=40x12\n" +
+        "    split rows share=5000 at=42,1 size=40x25 border=13\n" +
+        "      pane 2 at=42,1 size=40x12\n" +
+        "      pane 4 at=42,14 size=40x12\n"
 }
 
 // s_chain at 20x6, below the tab line: pane 5 hidden.
 fn chain_small_body() -> str {
     "  split cols share=5000 at=1,1 size=20x6 border=10\n" +
-    "    pane 1 at=1,1 size=9x6\n" +
-    "    split cols share=5000 at=11,1 size=10x6 border=15\n" +
-    "      pane 2 at=11,1 size=4x6\n" +
-    "      split cols share=5000 at=16,1 size=5x6 border=18\n" +
-    "        pane 3 at=16,1 size=2x6\n" +
-    "        split cols share=5000 at=19,1 size=2x6 border=none\n" +
-    "          pane 4 at=19,1 size=2x6\n" +
-    "          pane 5 hidden\n"
-}
-
-fn d_chain_small() -> str {
-    "layout tabs=1 active=1 next=2 size=20x6\n" +
-    "tab 1 focus=5 zoomed=0 order=5,4,3,2,1 name=\"main\"\n" +
-    chain_small_body()
-}
-
-// The second tab of s_cols + "tab 3 logs".
-fn t_logs() -> str {
-    "tab 2 focus=3 zoomed=0 order=3 name=\"logs\"\n" +
-    "  pane 3 at=1,1 size=80x24\n"
-}
-
-fn first_cases(mut cs: List[Case]) {
-    add(mut cs, "01-one-pane", 80, 24, "new 1 main", d_one())
-    add(mut cs, "02-split-cols", 80, 24, s_cols(), d_cols())
-    add(mut cs, "03-split-cols-odd", 81, 25, s_cols(),
-        "layout tabs=1 active=1 next=2 size=81x25\n" +
-        "tab 1 focus=2 zoomed=0 order=2,1 name=\"main\"\n" +
-        "  split cols share=5000 at=1,1 size=81x25 border=41\n" +
-        "    pane 1 at=1,1 size=40x25\n" +
-        "    pane 2 at=42,1 size=40x25\n")
-    add(mut cs, "04-split-rows", 80, 24, "new 1 main; split 1 1 rows 2 after",
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=2 zoomed=0 order=2,1 name=\"main\"\n" +
-        "  split rows share=5000 at=1,1 size=80x24 border=12\n" +
-        "    pane 1 at=1,1 size=80x11\n" +
-        "    pane 2 at=1,13 size=80x12\n")
-    add(mut cs, "05-split-before", 80, 24, "new 1 main; split 1 1 cols 2 before",
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=2 zoomed=0 order=2,1 name=\"main\"\n" +
-        "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
-        "    pane 2 at=1,1 size=39x24\n" +
-        "    pane 1 at=41,1 size=40x24\n")
-    add(mut cs, "06-nested", 80, 24, s_nest(), d_nest())
-    add(mut cs, "07-grid", 81, 25, s_grid(),
-        "layout tabs=1 active=1 next=2 size=81x25\n" +
-        "tab 1 focus=4 zoomed=0 order=4,3,2,1 name=\"main\"\n" +
-        grid_body())
-    add(mut cs, "08-grid-focus-walk", 81, 25,
-        s_grid() + "; focus 1 left; focus 1 up; focus 1 right; focus 1 down; focus 1 down",
-        "refused: focus 1 down: no_neighbour\n" +
-        "layout tabs=1 active=1 next=2 size=81x25\n" +
-        "tab 1 focus=4 zoomed=0 order=4,2,1,3 name=\"main\"\n" +
-        grid_body())
-    add(mut cs, "09-tie-most-recent", 80, 25,
-        "new 1 main; split 1 1 cols 2 after; split 1 2 rows 3 after; focus-pane 1; focus 1 right",
-        "layout tabs=1 active=1 next=2 size=80x25\n" +
-        "tab 1 focus=3 zoomed=0 order=3,1,2 name=\"main\"\n" +
-        "  split cols share=5000 at=1,1 size=80x25 border=40\n" +
-        "    pane 1 at=1,1 size=39x25\n" +
-        "    split rows share=5000 at=41,1 size=40x25 border=13\n" +
-        "      pane 2 at=41,1 size=40x12\n" +
-        "      pane 3 at=41,14 size=40x12\n")
-    add(mut cs, "10-tie-most-recent-again", 80, 25,
-        "new 1 main; split 1 1 cols 2 after; split 1 2 rows 3 after; focus-pane 1; focus 1 right; " +
-        "focus 1 left; focus-pane 2; focus-pane 1; focus 1 right",
-        "layout tabs=1 active=1 next=2 size=80x25\n" +
-        "tab 1 focus=2 zoomed=0 order=2,1,3 name=\"main\"\n" +
-        "  split cols share=5000 at=1,1 size=80x25 border=40\n" +
-        "    pane 1 at=1,1 size=39x25\n" +
-        "    split rows share=5000 at=41,1 size=40x25 border=13\n" +
-        "      pane 2 at=41,1 size=40x12\n" +
-        "      pane 3 at=41,14 size=40x12\n")
-    add(mut cs, "11-split-close-back", 80, 24, s_cols() + "; close 2", d_one())
-    add(mut cs, "12-close-unfocused", 80, 24, s_nest() + "; close 2",
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=3 zoomed=0 order=3,1 name=\"main\"\n" +
-        "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
-        "    pane 1 at=1,1 size=39x24\n" +
-        "    pane 3 at=41,1 size=40x24\n")
-    add(mut cs, "13-close-focused", 80, 24, s_nest() + "; focus-pane 1; focus-pane 2; close 2",
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=1 zoomed=0 order=1,3 name=\"main\"\n" +
-        "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
-        "    pane 1 at=1,1 size=39x24\n" +
-        "    pane 3 at=41,1 size=40x24\n")
-    add(mut cs, "14-close-first-child", 80, 24, s_nest() + "; close 1",
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=3 zoomed=0 order=3,2 name=\"main\"\n" +
-        "  split rows share=5000 at=1,1 size=80x24 border=12\n" +
-        "    pane 2 at=1,1 size=80x11\n" +
-        "    pane 3 at=1,13 size=80x12\n")
-    add(mut cs, "15-session-empty", 80, 24, "new 1 main; close 1; close 9",
-        "refused: close 1: session_empty\n" +
-        "refused: close 9: no_pane\n" +
-        d_one())
-    add(mut cs, "16-split-refusals", 80, 24,
-        "new 1 main; split 1 9 cols 2 after; split 1 1 cols 1 after; split 1 1 cols 0 after; split 7 1 cols 2 after",
-        "refused: split 1 9 cols 2 after: no_pane\n" +
-        "refused: split 1 1 cols 1 after: duplicate_id\n" +
-        "refused: split 1 1 cols 0 after: bad_id\n" +
-        "refused: split 7 1 cols 2 after: no_pane\n" +
-        d_one())
-    add(mut cs, "17-too-small-rows", 20, 6,
-        "new 1 main; split 1 1 rows 2 after; split 1 2 rows 3 after; split 1 3 rows 4 after",
-        "refused: split 1 3 rows 4 after: too_small\n" +
-        "layout tabs=1 active=1 next=2 size=20x6\n" +
-        "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
-        "  split rows share=5000 at=1,1 size=20x6 border=3\n" +
-        "    pane 1 at=1,1 size=20x2\n" +
-        "    split rows share=5000 at=1,4 size=20x3 border=5\n" +
-        "      pane 2 at=1,4 size=20x1\n" +
-        "      pane 3 at=1,6 size=20x1\n")
-    add(mut cs, "18-too-small-cols", 20, 6, s_chain(),
-        "refused: split 1 4 cols 5 after: too_small\n" +
-        "layout tabs=1 active=1 next=2 size=20x6\n" +
-        "tab 1 focus=4 zoomed=0 order=4,3,2,1 name=\"main\"\n" +
-        "  split cols share=5000 at=1,1 size=20x6 border=10\n" +
-        "    pane 1 at=1,1 size=9x6\n" +
-        "    split cols share=5000 at=11,1 size=10x6 border=15\n" +
-        "      pane 2 at=11,1 size=4x6\n" +
-        "      split cols share=5000 at=16,1 size=5x6 border=18\n" +
-        "        pane 3 at=16,1 size=2x6\n" +
-        "        pane 4 at=19,1 size=2x6\n")
-    add(mut cs, "19-hidden-when-small", 80, 24, s_chain() + "; size 20x6", d_chain_small())
-    add(mut cs, "20-hidden-comes-back", 80, 24, s_chain() + "; size 20x6; size 80x24",
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=5 zoomed=0 order=5,4,3,2,1 name=\"main\"\n" +
-        "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
-        "    pane 1 at=1,1 size=39x24\n" +
-        "    split cols share=5000 at=41,1 size=40x24 border=60\n" +
-        "      pane 2 at=41,1 size=19x24\n" +
-        "      split cols share=5000 at=61,1 size=20x24 border=70\n" +
-        "        pane 3 at=61,1 size=9x24\n" +
-        "        split cols share=5000 at=71,1 size=10x24 border=75\n" +
-        "          pane 4 at=71,1 size=4x24\n" +
-        "          pane 5 at=76,1 size=5x24\n")
-    add(mut cs, "21-hidden-focus", 80, 24, s_chain() + "; size 20x6; focus 1 left; next 1",
-        "refused: focus 1 left: no_neighbour\n" +
-        "layout tabs=1 active=1 next=2 size=20x6\n" +
-        "tab 1 focus=1 zoomed=0 order=1,5,4,3,2 name=\"main\"\n" +
-        chain_small_body())
-}
-
-fn resize_cases(mut cs: List[Case]) {
-    add(mut cs, "22-resize-grow", 80, 24, s_cols() + "; resize 1 right 5",
-        "resized: resize 1 right 5: 5\n" +
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=2 zoomed=0 order=2,1 name=\"main\"\n" +
-        "  split cols share=5570 at=1,1 size=80x24 border=45\n" +
-        "    pane 1 at=1,1 size=44x24\n" +
-        "    pane 2 at=46,1 size=35x24\n")
-    add(mut cs, "23-resize-back", 80, 24, s_cols() + "; resize 1 right 5; resize 1 right -5",
-        "resized: resize 1 right 5: 5\n" +
-        "resized: resize 1 right -5: -5\n" +
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=2 zoomed=0 order=2,1 name=\"main\"\n" +
-        "  split cols share=4937 at=1,1 size=80x24 border=40\n" +
-        "    pane 1 at=1,1 size=39x24\n" +
-        "    pane 2 at=41,1 size=40x24\n")
-    add(mut cs, "24-resize-left-side", 80, 24, s_cols() + "; resize 2 left 3",
-        "resized: resize 2 left 3: 3\n" +
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=2 zoomed=0 order=2,1 name=\"main\"\n" +
-        "  split cols share=4557 at=1,1 size=80x24 border=37\n" +
-        "    pane 1 at=1,1 size=36x24\n" +
-        "    pane 2 at=38,1 size=43x24\n")
-    add(mut cs, "25-resize-refusals", 80, 24, s_cols() + "; resize 1 left 3; resize 1 up 2; resize 9 left 1",
-        "refused: resize 1 left 3: no_border\n" +
-        "refused: resize 1 up 2: no_border\n" +
-        "refused: resize 9 left 1: no_pane\n" +
-        d_cols())
-    add(mut cs, "26-resize-clamp", 80, 24, s_cols() + "; resize 1 right 100",
-        "resized: resize 1 right 100: 38\n" +
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=2 zoomed=0 order=2,1 name=\"main\"\n" +
-        "  split cols share=9747 at=1,1 size=80x24 border=78\n" +
-        "    pane 1 at=1,1 size=77x24\n" +
-        "    pane 2 at=79,1 size=2x24\n")
-    add(mut cs, "27-resize-subtree-minimum", 80, 24,
-        "new 1 main; split 1 1 cols 2 after; split 1 2 cols 3 after; resize 1 right 100",
-        "resized: resize 1 right 100: 35\n" +
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
-        "  split cols share=9368 at=1,1 size=80x24 border=75\n" +
-        "    pane 1 at=1,1 size=74x24\n" +
-        "    split cols share=5000 at=76,1 size=5x24 border=78\n" +
-        "      pane 2 at=76,1 size=2x24\n" +
-        "      pane 3 at=79,1 size=2x24\n")
-    add(mut cs, "28-resize-nearest-border", 80, 24, s_nest() + "; resize 3 up 2; resize 3 left 4",
-        "resized: resize 3 up 2: 2\n" +
-        "resized: resize 3 left 4: 4\n" +
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
-        "  split cols share=4431 at=1,1 size=80x24 border=36\n" +
-        "    pane 1 at=1,1 size=35x24\n" +
-        "    split rows share=3914 at=37,1 size=44x24 border=10\n" +
-        "      pane 2 at=37,1 size=44x9\n" +
-        "      pane 3 at=37,11 size=44x14\n")
-    add(mut cs, "29-resize-held-by-minimum", 80, 24, s_chain() + "; size 20x6; resize 3 right 1; resize 3 left 1",
-        "resized: resize 3 right 1: 0\n" +
-        "resized: resize 3 left 1: 1\n" +
-        "layout tabs=1 active=1 next=2 size=20x6\n" +
-        "tab 1 focus=5 zoomed=0 order=5,4,3,2,1 name=\"main\"\n" +
-        "  split cols share=5000 at=1,1 size=20x6 border=10\n" +
-        "    pane 1 at=1,1 size=9x6\n" +
-        "    split cols share=3334 at=11,1 size=10x6 border=14\n" +
-        "      pane 2 at=11,1 size=3x6\n" +
-        "      split cols share=5000 at=15,1 size=6x6 border=17\n" +
-        "        pane 3 at=15,1 size=2x6\n" +
-        "        split cols share=5000 at=18,1 size=3x6 border=none\n" +
-        "          pane 4 at=18,1 size=3x6\n" +
-        "          pane 5 hidden\n")
-    add(mut cs, "30-resize-hidden-refused", 80, 24,
-        s_chain() + "; size 20x6; resize 4 right 1; resize 5 left 1; split 1 5 cols 7 after",
-        "refused: resize 4 right 1: no_border\n" +
-        "refused: resize 5 left 1: no_border\n" +
-        "refused: split 1 5 cols 7 after: too_small\n" +
-        d_chain_small())
-}
-
-fn zoom_cases(mut cs: List[Case]) {
-    add(mut cs, "31-zoom", 80, 24, s_nest() + "; zoom 1", d_nest_zoomed())
-    add(mut cs, "32-zoom-follows-focus", 80, 24, s_nest() + "; zoom 1; focus 1 left",
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=1 zoomed=1 order=1,3,2 name=\"main\"\n" +
-        "  split cols share=5000 hidden\n" +
-        "    pane 1 at=1,1 size=80x24\n" +
-        "    split rows share=5000 hidden\n" +
-        "      pane 2 hidden\n" +
-        "      pane 3 hidden\n")
-    add(mut cs, "33-split-unzooms", 80, 24, s_nest() + "; zoom 1; split 1 1 rows 4 after",
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=4 zoomed=0 order=4,3,2,1 name=\"main\"\n" +
-        "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
-        "    split rows share=5000 at=1,1 size=39x24 border=12\n" +
-        "      pane 1 at=1,1 size=39x11\n" +
-        "      pane 4 at=1,13 size=39x12\n" +
-        "    split rows share=5000 at=41,1 size=40x24 border=12\n" +
-        "      pane 2 at=41,1 size=40x11\n" +
-        "      pane 3 at=41,13 size=40x12\n")
-    add(mut cs, "34-zoom-toggles", 80, 24, s_nest() + "; zoom 1; zoom 1; zoom 5",
-        "refused: zoom 5: no_tab\n" + d_nest())
-    add(mut cs, "35-resize-unzooms", 80, 24, s_nest() + "; zoom 1; resize 3 up 1",
-        "resized: resize 3 up 1: 1\n" +
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
-        "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
-        "    pane 1 at=1,1 size=39x24\n" +
-        "    split rows share=4348 at=41,1 size=40x24 border=11\n" +
-        "      pane 2 at=41,1 size=40x10\n" +
-        "      pane 3 at=41,12 size=40x13\n")
-    add(mut cs, "36-close-unzooms", 80, 24, s_nest() + "; zoom 1; close 1",
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=3 zoomed=0 order=3,2 name=\"main\"\n" +
-        "  split rows share=5000 at=1,1 size=80x24 border=12\n" +
-        "    pane 2 at=1,1 size=80x11\n" +
-        "    pane 3 at=1,13 size=80x12\n")
-    add(mut cs, "37-equalize", 80, 24, s_nest() + "; resize 3 up 2; resize 3 left 4; equalize 1; equalize 4",
-        "resized: resize 3 up 2: 2\n" +
-        "resized: resize 3 left 4: 4\n" +
-        "refused: equalize 4: no_tab\n" +
-        d_nest())
-}
-
-fn tab_cases(mut cs: List[Case]) {
-    add(mut cs, "38-new-tab", 80, 24, s_cols() + "; tab 3 logs",
-        "layout tabs=2 active=2 next=3 size=80x24\n" + t_cols() + t_logs())
-    add(mut cs, "39-tab-select", 80, 24,
-        s_cols() + "; tab 3 logs; tab 4 build; select 1; next-tab; next-tab; prev-tab; select 4; select-id 9",
-        "refused: select 4: no_tab\n" +
-        "refused: select-id 9: no_tab\n" +
-        "layout tabs=3 active=2 next=4 size=80x24\n" +
-        t_cols() + t_logs() +
-        "tab 3 focus=4 zoomed=0 order=4 name=\"build\"\n" +
-        "  pane 4 at=1,1 size=80x24\n")
-    add(mut cs, "40-tab-wrap", 80, 24, s_cols() + "; tab 3 logs; next-tab; prev-tab; prev-tab; select-id 2; select-id 1",
-        "layout tabs=2 active=1 next=3 size=80x24\n" + t_cols() + t_logs())
-    add(mut cs, "41-last-pane-closes-tab", 80, 24, s_cols() + "; tab 3 logs; close 3",
-        "layout tabs=1 active=1 next=3 size=80x24\n" + t_cols())
-    add(mut cs, "42-close-tab", 80, 24,
-        s_cols() + "; tab 3 logs; tab 4 build; select 2; close-tab 2; close-tab 1; close-tab 3; close-tab 8",
-        "refused: close-tab 3: last_tab\n" +
-        "refused: close-tab 8: no_tab\n" +
-        "layout tabs=1 active=3 next=4 size=80x24\n" +
-        "tab 3 focus=4 zoomed=0 order=4 name=\"build\"\n" +
-        "  pane 4 at=1,1 size=80x24\n")
-    add(mut cs, "43-rename-escapes", 80, 24, "new 1 main; rename 1 a%22b%5cc%09d%c3%a9; rename 4 x",
-        "refused: rename 4 x: no_tab\n" +
-        "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=1 zoomed=0 order=1 name=\"a\\\"b\\\\c\\x09dé\"\n" +
-        "  pane 1 at=1,1 size=80x24\n")
-    add(mut cs, "44-names", 80, 24, "new 1 main; tab 2; rename 1 two words",
-        "layout tabs=2 active=2 next=3 size=80x24\n" +
-        "tab 1 focus=1 zoomed=0 order=1 name=\"two words\"\n" +
-        "  pane 1 at=1,1 size=80x24\n" +
-        "tab 2 focus=2 zoomed=0 order=2 name=\"\"\n" +
-        "  pane 2 at=1,1 size=80x24\n")
-    add(mut cs, "45-new-tab-refusals", 80, 24, "new 1 main; tab 1 dup; tab 0 bad; tab -3 bad",
-        "refused: tab 1 dup: duplicate_id\n" +
-        "refused: tab 0 bad: bad_id\n" +
-        "refused: tab -3 bad: bad_id\n" +
-        d_one())
-    add(mut cs, "46-split-other-tab", 80, 24, s_cols() + "; tab 3 logs; split 1 1 rows 4 after",
-        "layout tabs=2 active=2 next=3 size=80x24\n" +
-        "tab 1 focus=4 zoomed=0 order=4,2,1 name=\"main\"\n" +
-        "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
-        "    split rows share=5000 at=1,1 size=39x24 border=12\n" +
-        "      pane 1 at=1,1 size=39x11\n" +
-        "      pane 4 at=1,13 size=39x12\n" +
-        "    pane 2 at=41,1 size=40x24\n" +
-        t_logs())
-    add(mut cs, "47-focus-pane-activates", 80, 24, s_cols() + "; tab 3 logs; focus-pane 1; focus-pane 9",
-        "refused: focus-pane 9: no_pane\n" +
-        "layout tabs=2 active=1 next=3 size=80x24\n" +
-        "tab 1 focus=1 zoomed=0 order=1,2 name=\"main\"\n" +
-        "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
-        "    pane 1 at=1,1 size=39x24\n" +
-        "    pane 2 at=41,1 size=40x24\n" +
-        t_logs())
-}
-
-fn other_cases(mut cs: List[Case]) {
-    add(mut cs, "48-tree-order", 81, 25, s_grid() + "; next 1; next 1; prev 1; prev 1; prev 1; next 5",
-        "refused: next 5: no_tab\n" +
-        "layout tabs=1 active=1 next=2 size=81x25\n" +
-        "tab 1 focus=2 zoomed=0 order=2,4,1,3 name=\"main\"\n" +
-        grid_body())
-    add(mut cs, "49-pane-at", 80, 24,
-        s_nest() + "; at 1 1; at 39 24; at 40 5; at 41 12; at 41 13; at 80 24; at 81 1; at 0 1; at 41 1",
-        "at 1 1: 1\n" +
-        "at 39 24: 1\n" +
-        "at 40 5: -1\n" +
-        "at 41 12: -1\n" +
-        "at 41 13: 3\n" +
-        "at 80 24: 3\n" +
-        "at 81 1: -1\n" +
-        "at 0 1: -1\n" +
-        "at 41 1: 2\n" +
-        d_nest())
-    add(mut cs, "50-pane-at-zoomed", 80, 24, s_nest() + "; zoom 1; at 1 1; at 40 5",
-        "at 1 1: 3\n" +
-        "at 40 5: 3\n" +
-        d_nest_zoomed())
-    add(mut cs, "51-pane-at-hidden", 80, 24, s_chain() + "; size 20x6; at 19 1; at 20 6; at 18 3",
-        "at 19 1: 4\n" +
-        "at 20 6: 4\n" +
-        "at 18 3: -1\n" +
-        d_chain_small())
-    add(mut cs, "52-rows-hidden", 80, 24,
-        "new 1 main; split 1 1 rows 2 after; split 1 2 rows 3 after; split 1 3 rows 4 after; size 20x6",
-        "layout tabs=1 active=1 next=2 size=20x6\n" +
-        "tab 1 focus=4 zoomed=0 order=4,3,2,1 name=\"main\"\n" +
-        "  split rows share=5000 at=1,1 size=20x6 border=3\n" +
-        "    pane 1 at=1,1 size=20x2\n" +
-        "    split rows share=5000 at=1,4 size=20x3 border=5\n" +
-        "      pane 2 at=1,4 size=20x1\n" +
-        "      split rows share=5000 at=1,6 size=20x1 border=none\n" +
-        "        pane 3 at=1,6 size=20x1\n" +
-        "        pane 4 hidden\n")
-    add(mut cs, "53-hidden-subtree", 80, 24, s_chain() + "; split 1 5 rows 6 after; size 20x6",
-        "layout tabs=1 active=1 next=2 size=20x6\n" +
-        "tab 1 focus=6 zoomed=0 order=6,5,4,3,2,1 name=\"main\"\n" +
-        "  split cols share=5000 at=1,1 size=20x6 border=10\n" +
         "    pane 1 at=1,1 size=9x6\n" +
         "    split cols share=5000 at=11,1 size=10x6 border=15\n" +
         "      pane 2 at=11,1 size=4x6\n" +
@@ -440,64 +81,727 @@ fn other_cases(mut cs: List[Case]) {
         "        pane 3 at=16,1 size=2x6\n" +
         "        split cols share=5000 at=19,1 size=2x6 border=none\n" +
         "          pane 4 at=19,1 size=2x6\n" +
-        "          split rows share=5000 hidden\n" +
-        "            pane 5 hidden\n" +
-        "            pane 6 hidden\n")
-    add(mut cs, "54-large", 320, 90, "new 1 main; split 1 1 rows 2 after; split 1 1 cols 3 after; resize 3 left 50",
+        "          pane 5 hidden\n"
+}
+
+fn d_chain_small() -> str {
+    "layout tabs=1 active=1 next=2 size=20x6\n" +
+        "tab 1 focus=5 zoomed=0 order=5,4,3,2,1 name=\"main\"\n" +
+        chain_small_body()
+}
+
+// The second tab of s_cols + "tab 3 logs".
+fn t_logs() -> str {
+    "tab 2 focus=3 zoomed=0 order=3 name=\"logs\"\n" + "  pane 3 at=1,1 size=80x24\n"
+}
+
+fn first_cases(mut cs: List[Case]) {
+    add(mut cs, "01-one-pane", 80, 24, "new 1 main", d_one())
+    add(mut cs, "02-split-cols", 80, 24, s_cols(), d_cols())
+    add(
+        mut cs,
+        "03-split-cols-odd",
+        81,
+        25,
+        s_cols(),
+        "layout tabs=1 active=1 next=2 size=81x25\n" +
+            "tab 1 focus=2 zoomed=0 order=2,1 name=\"main\"\n" +
+            "  split cols share=5000 at=1,1 size=81x25 border=41\n" +
+            "    pane 1 at=1,1 size=40x25\n" +
+            "    pane 2 at=42,1 size=40x25\n",
+    )
+    add(
+        mut cs,
+        "04-split-rows",
+        80,
+        24,
+        "new 1 main; split 1 1 rows 2 after",
+        "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=2 zoomed=0 order=2,1 name=\"main\"\n" +
+            "  split rows share=5000 at=1,1 size=80x24 border=12\n" +
+            "    pane 1 at=1,1 size=80x11\n" +
+            "    pane 2 at=1,13 size=80x12\n",
+    )
+    add(
+        mut cs,
+        "05-split-before",
+        80,
+        24,
+        "new 1 main; split 1 1 cols 2 before",
+        "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=2 zoomed=0 order=2,1 name=\"main\"\n" +
+            "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
+            "    pane 2 at=1,1 size=39x24\n" +
+            "    pane 1 at=41,1 size=40x24\n",
+    )
+    add(mut cs, "06-nested", 80, 24, s_nest(), d_nest())
+    add(
+        mut cs,
+        "07-grid",
+        81,
+        25,
+        s_grid(),
+        "layout tabs=1 active=1 next=2 size=81x25\n" +
+            "tab 1 focus=4 zoomed=0 order=4,3,2,1 name=\"main\"\n" +
+            grid_body(),
+    )
+    add(
+        mut cs,
+        "08-grid-focus-walk",
+        81,
+        25,
+        s_grid() + "; focus 1 left; focus 1 up; focus 1 right; focus 1 down; focus 1 down",
+        "refused: focus 1 down: no_neighbour\n" +
+            "layout tabs=1 active=1 next=2 size=81x25\n" +
+            "tab 1 focus=4 zoomed=0 order=4,2,1,3 name=\"main\"\n" +
+            grid_body(),
+    )
+    add(
+        mut cs,
+        "09-tie-most-recent",
+        80,
+        25,
+        "new 1 main; split 1 1 cols 2 after; split 1 2 rows 3 after; focus-pane 1; focus 1 right",
+        "layout tabs=1 active=1 next=2 size=80x25\n" +
+            "tab 1 focus=3 zoomed=0 order=3,1,2 name=\"main\"\n" +
+            "  split cols share=5000 at=1,1 size=80x25 border=40\n" +
+            "    pane 1 at=1,1 size=39x25\n" +
+            "    split rows share=5000 at=41,1 size=40x25 border=13\n" +
+            "      pane 2 at=41,1 size=40x12\n" +
+            "      pane 3 at=41,14 size=40x12\n",
+    )
+    add(
+        mut cs,
+        "10-tie-most-recent-again",
+        80,
+        25,
+        "new 1 main; split 1 1 cols 2 after; split 1 2 rows 3 after; focus-pane 1; focus 1 right; " +
+            "focus 1 left; focus-pane 2; focus-pane 1; focus 1 right",
+        "layout tabs=1 active=1 next=2 size=80x25\n" +
+            "tab 1 focus=2 zoomed=0 order=2,1,3 name=\"main\"\n" +
+            "  split cols share=5000 at=1,1 size=80x25 border=40\n" +
+            "    pane 1 at=1,1 size=39x25\n" +
+            "    split rows share=5000 at=41,1 size=40x25 border=13\n" +
+            "      pane 2 at=41,1 size=40x12\n" +
+            "      pane 3 at=41,14 size=40x12\n",
+    )
+    add(mut cs, "11-split-close-back", 80, 24, s_cols() + "; close 2", d_one())
+    add(
+        mut cs,
+        "12-close-unfocused",
+        80,
+        24,
+        s_nest() + "; close 2",
+        "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=3 zoomed=0 order=3,1 name=\"main\"\n" +
+            "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
+            "    pane 1 at=1,1 size=39x24\n" +
+            "    pane 3 at=41,1 size=40x24\n",
+    )
+    add(
+        mut cs,
+        "13-close-focused",
+        80,
+        24,
+        s_nest() + "; focus-pane 1; focus-pane 2; close 2",
+        "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=1 zoomed=0 order=1,3 name=\"main\"\n" +
+            "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
+            "    pane 1 at=1,1 size=39x24\n" +
+            "    pane 3 at=41,1 size=40x24\n",
+    )
+    add(
+        mut cs,
+        "14-close-first-child",
+        80,
+        24,
+        s_nest() + "; close 1",
+        "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=3 zoomed=0 order=3,2 name=\"main\"\n" +
+            "  split rows share=5000 at=1,1 size=80x24 border=12\n" +
+            "    pane 2 at=1,1 size=80x11\n" +
+            "    pane 3 at=1,13 size=80x12\n",
+    )
+    add(
+        mut cs,
+        "15-session-empty",
+        80,
+        24,
+        "new 1 main; close 1; close 9",
+        "refused: close 1: session_empty\n" + "refused: close 9: no_pane\n" + d_one(),
+    )
+    add(
+        mut cs,
+        "16-split-refusals",
+        80,
+        24,
+        "new 1 main; split 1 9 cols 2 after; split 1 1 cols 1 after; split 1 1 cols 0 after; split 7 1 cols 2 after",
+        "refused: split 1 9 cols 2 after: no_pane\n" +
+            "refused: split 1 1 cols 1 after: duplicate_id\n" +
+            "refused: split 1 1 cols 0 after: bad_id\n" +
+            "refused: split 7 1 cols 2 after: no_pane\n" +
+            d_one(),
+    )
+    add(
+        mut cs,
+        "17-too-small-rows",
+        20,
+        6,
+        "new 1 main; split 1 1 rows 2 after; split 1 2 rows 3 after; split 1 3 rows 4 after",
+        "refused: split 1 3 rows 4 after: too_small\n" +
+            "layout tabs=1 active=1 next=2 size=20x6\n" +
+            "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
+            "  split rows share=5000 at=1,1 size=20x6 border=3\n" +
+            "    pane 1 at=1,1 size=20x2\n" +
+            "    split rows share=5000 at=1,4 size=20x3 border=5\n" +
+            "      pane 2 at=1,4 size=20x1\n" +
+            "      pane 3 at=1,6 size=20x1\n",
+    )
+    add(
+        mut cs,
+        "18-too-small-cols",
+        20,
+        6,
+        s_chain(),
+        "refused: split 1 4 cols 5 after: too_small\n" +
+            "layout tabs=1 active=1 next=2 size=20x6\n" +
+            "tab 1 focus=4 zoomed=0 order=4,3,2,1 name=\"main\"\n" +
+            "  split cols share=5000 at=1,1 size=20x6 border=10\n" +
+            "    pane 1 at=1,1 size=9x6\n" +
+            "    split cols share=5000 at=11,1 size=10x6 border=15\n" +
+            "      pane 2 at=11,1 size=4x6\n" +
+            "      split cols share=5000 at=16,1 size=5x6 border=18\n" +
+            "        pane 3 at=16,1 size=2x6\n" +
+            "        pane 4 at=19,1 size=2x6\n",
+    )
+    add(mut cs, "19-hidden-when-small", 80, 24, s_chain() + "; size 20x6", d_chain_small())
+    add(
+        mut cs,
+        "20-hidden-comes-back",
+        80,
+        24,
+        s_chain() + "; size 20x6; size 80x24",
+        "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=5 zoomed=0 order=5,4,3,2,1 name=\"main\"\n" +
+            "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
+            "    pane 1 at=1,1 size=39x24\n" +
+            "    split cols share=5000 at=41,1 size=40x24 border=60\n" +
+            "      pane 2 at=41,1 size=19x24\n" +
+            "      split cols share=5000 at=61,1 size=20x24 border=70\n" +
+            "        pane 3 at=61,1 size=9x24\n" +
+            "        split cols share=5000 at=71,1 size=10x24 border=75\n" +
+            "          pane 4 at=71,1 size=4x24\n" +
+            "          pane 5 at=76,1 size=5x24\n",
+    )
+    add(
+        mut cs,
+        "21-hidden-focus",
+        80,
+        24,
+        s_chain() + "; size 20x6; focus 1 left; next 1",
+        "refused: focus 1 left: no_neighbour\n" +
+            "layout tabs=1 active=1 next=2 size=20x6\n" +
+            "tab 1 focus=1 zoomed=0 order=1,5,4,3,2 name=\"main\"\n" +
+            chain_small_body(),
+    )
+}
+
+fn resize_cases(mut cs: List[Case]) {
+    add(
+        mut cs,
+        "22-resize-grow",
+        80,
+        24,
+        s_cols() + "; resize 1 right 5",
+        "resized: resize 1 right 5: 5\n" +
+            "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=2 zoomed=0 order=2,1 name=\"main\"\n" +
+            "  split cols share=5570 at=1,1 size=80x24 border=45\n" +
+            "    pane 1 at=1,1 size=44x24\n" +
+            "    pane 2 at=46,1 size=35x24\n",
+    )
+    add(
+        mut cs,
+        "23-resize-back",
+        80,
+        24,
+        s_cols() + "; resize 1 right 5; resize 1 right -5",
+        "resized: resize 1 right 5: 5\n" +
+            "resized: resize 1 right -5: -5\n" +
+            "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=2 zoomed=0 order=2,1 name=\"main\"\n" +
+            "  split cols share=4937 at=1,1 size=80x24 border=40\n" +
+            "    pane 1 at=1,1 size=39x24\n" +
+            "    pane 2 at=41,1 size=40x24\n",
+    )
+    add(
+        mut cs,
+        "24-resize-left-side",
+        80,
+        24,
+        s_cols() + "; resize 2 left 3",
+        "resized: resize 2 left 3: 3\n" +
+            "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=2 zoomed=0 order=2,1 name=\"main\"\n" +
+            "  split cols share=4557 at=1,1 size=80x24 border=37\n" +
+            "    pane 1 at=1,1 size=36x24\n" +
+            "    pane 2 at=38,1 size=43x24\n",
+    )
+    add(
+        mut cs,
+        "25-resize-refusals",
+        80,
+        24,
+        s_cols() + "; resize 1 left 3; resize 1 up 2; resize 9 left 1",
+        "refused: resize 1 left 3: no_border\n" +
+            "refused: resize 1 up 2: no_border\n" +
+            "refused: resize 9 left 1: no_pane\n" +
+            d_cols(),
+    )
+    add(
+        mut cs,
+        "26-resize-clamp",
+        80,
+        24,
+        s_cols() + "; resize 1 right 100",
+        "resized: resize 1 right 100: 38\n" +
+            "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=2 zoomed=0 order=2,1 name=\"main\"\n" +
+            "  split cols share=9747 at=1,1 size=80x24 border=78\n" +
+            "    pane 1 at=1,1 size=77x24\n" +
+            "    pane 2 at=79,1 size=2x24\n",
+    )
+    add(
+        mut cs,
+        "27-resize-subtree-minimum",
+        80,
+        24,
+        "new 1 main; split 1 1 cols 2 after; split 1 2 cols 3 after; resize 1 right 100",
+        "resized: resize 1 right 100: 35\n" +
+            "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
+            "  split cols share=9368 at=1,1 size=80x24 border=75\n" +
+            "    pane 1 at=1,1 size=74x24\n" +
+            "    split cols share=5000 at=76,1 size=5x24 border=78\n" +
+            "      pane 2 at=76,1 size=2x24\n" +
+            "      pane 3 at=79,1 size=2x24\n",
+    )
+    add(
+        mut cs,
+        "28-resize-nearest-border",
+        80,
+        24,
+        s_nest() + "; resize 3 up 2; resize 3 left 4",
+        "resized: resize 3 up 2: 2\n" +
+            "resized: resize 3 left 4: 4\n" +
+            "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
+            "  split cols share=4431 at=1,1 size=80x24 border=36\n" +
+            "    pane 1 at=1,1 size=35x24\n" +
+            "    split rows share=3914 at=37,1 size=44x24 border=10\n" +
+            "      pane 2 at=37,1 size=44x9\n" +
+            "      pane 3 at=37,11 size=44x14\n",
+    )
+    add(
+        mut cs,
+        "29-resize-held-by-minimum",
+        80,
+        24,
+        s_chain() + "; size 20x6; resize 3 right 1; resize 3 left 1",
+        "resized: resize 3 right 1: 0\n" +
+            "resized: resize 3 left 1: 1\n" +
+            "layout tabs=1 active=1 next=2 size=20x6\n" +
+            "tab 1 focus=5 zoomed=0 order=5,4,3,2,1 name=\"main\"\n" +
+            "  split cols share=5000 at=1,1 size=20x6 border=10\n" +
+            "    pane 1 at=1,1 size=9x6\n" +
+            "    split cols share=3334 at=11,1 size=10x6 border=14\n" +
+            "      pane 2 at=11,1 size=3x6\n" +
+            "      split cols share=5000 at=15,1 size=6x6 border=17\n" +
+            "        pane 3 at=15,1 size=2x6\n" +
+            "        split cols share=5000 at=18,1 size=3x6 border=none\n" +
+            "          pane 4 at=18,1 size=3x6\n" +
+            "          pane 5 hidden\n",
+    )
+    add(
+        mut cs,
+        "30-resize-hidden-refused",
+        80,
+        24,
+        s_chain() + "; size 20x6; resize 4 right 1; resize 5 left 1; split 1 5 cols 7 after",
+        "refused: resize 4 right 1: no_border\n" +
+            "refused: resize 5 left 1: no_border\n" +
+            "refused: split 1 5 cols 7 after: too_small\n" +
+            d_chain_small(),
+    )
+}
+
+fn zoom_cases(mut cs: List[Case]) {
+    add(mut cs, "31-zoom", 80, 24, s_nest() + "; zoom 1", d_nest_zoomed())
+    add(
+        mut cs,
+        "32-zoom-follows-focus",
+        80,
+        24,
+        s_nest() + "; zoom 1; focus 1 left",
+        "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=1 zoomed=1 order=1,3,2 name=\"main\"\n" +
+            "  split cols share=5000 hidden\n" +
+            "    pane 1 at=1,1 size=80x24\n" +
+            "    split rows share=5000 hidden\n" +
+            "      pane 2 hidden\n" +
+            "      pane 3 hidden\n",
+    )
+    add(
+        mut cs,
+        "33-split-unzooms",
+        80,
+        24,
+        s_nest() + "; zoom 1; split 1 1 rows 4 after",
+        "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=4 zoomed=0 order=4,3,2,1 name=\"main\"\n" +
+            "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
+            "    split rows share=5000 at=1,1 size=39x24 border=12\n" +
+            "      pane 1 at=1,1 size=39x11\n" +
+            "      pane 4 at=1,13 size=39x12\n" +
+            "    split rows share=5000 at=41,1 size=40x24 border=12\n" +
+            "      pane 2 at=41,1 size=40x11\n" +
+            "      pane 3 at=41,13 size=40x12\n",
+    )
+    add(
+        mut cs,
+        "34-zoom-toggles",
+        80,
+        24,
+        s_nest() + "; zoom 1; zoom 1; zoom 5",
+        "refused: zoom 5: no_tab\n" + d_nest(),
+    )
+    add(
+        mut cs,
+        "35-resize-unzooms",
+        80,
+        24,
+        s_nest() + "; zoom 1; resize 3 up 1",
+        "resized: resize 3 up 1: 1\n" +
+            "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
+            "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
+            "    pane 1 at=1,1 size=39x24\n" +
+            "    split rows share=4348 at=41,1 size=40x24 border=11\n" +
+            "      pane 2 at=41,1 size=40x10\n" +
+            "      pane 3 at=41,12 size=40x13\n",
+    )
+    add(
+        mut cs,
+        "36-close-unzooms",
+        80,
+        24,
+        s_nest() + "; zoom 1; close 1",
+        "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=3 zoomed=0 order=3,2 name=\"main\"\n" +
+            "  split rows share=5000 at=1,1 size=80x24 border=12\n" +
+            "    pane 2 at=1,1 size=80x11\n" +
+            "    pane 3 at=1,13 size=80x12\n",
+    )
+    add(
+        mut cs,
+        "37-equalize",
+        80,
+        24,
+        s_nest() + "; resize 3 up 2; resize 3 left 4; equalize 1; equalize 4",
+        "resized: resize 3 up 2: 2\n" +
+            "resized: resize 3 left 4: 4\n" +
+            "refused: equalize 4: no_tab\n" +
+            d_nest(),
+    )
+}
+
+fn tab_cases(mut cs: List[Case]) {
+    add(
+        mut cs,
+        "38-new-tab",
+        80,
+        24,
+        s_cols() + "; tab 3 logs",
+        "layout tabs=2 active=2 next=3 size=80x24\n" + t_cols() + t_logs(),
+    )
+    add(
+        mut cs,
+        "39-tab-select",
+        80,
+        24,
+        s_cols() +
+            "; tab 3 logs; tab 4 build; select 1; next-tab; next-tab; prev-tab; select 4; select-id 9",
+        "refused: select 4: no_tab\n" +
+            "refused: select-id 9: no_tab\n" +
+            "layout tabs=3 active=2 next=4 size=80x24\n" +
+            t_cols() +
+            t_logs() +
+            "tab 3 focus=4 zoomed=0 order=4 name=\"build\"\n" +
+            "  pane 4 at=1,1 size=80x24\n",
+    )
+    add(
+        mut cs,
+        "40-tab-wrap",
+        80,
+        24,
+        s_cols() + "; tab 3 logs; next-tab; prev-tab; prev-tab; select-id 2; select-id 1",
+        "layout tabs=2 active=1 next=3 size=80x24\n" + t_cols() + t_logs(),
+    )
+    add(
+        mut cs,
+        "41-last-pane-closes-tab",
+        80,
+        24,
+        s_cols() + "; tab 3 logs; close 3",
+        "layout tabs=1 active=1 next=3 size=80x24\n" + t_cols(),
+    )
+    add(
+        mut cs,
+        "42-close-tab",
+        80,
+        24,
+        s_cols() +
+            "; tab 3 logs; tab 4 build; select 2; close-tab 2; close-tab 1; close-tab 3; close-tab 8",
+        "refused: close-tab 3: last_tab\n" +
+            "refused: close-tab 8: no_tab\n" +
+            "layout tabs=1 active=3 next=4 size=80x24\n" +
+            "tab 3 focus=4 zoomed=0 order=4 name=\"build\"\n" +
+            "  pane 4 at=1,1 size=80x24\n",
+    )
+    add(
+        mut cs,
+        "43-rename-escapes",
+        80,
+        24,
+        "new 1 main; rename 1 a%22b%5cc%09d%c3%a9; rename 4 x",
+        "refused: rename 4 x: no_tab\n" +
+            "layout tabs=1 active=1 next=2 size=80x24\n" +
+            "tab 1 focus=1 zoomed=0 order=1 name=\"a\\\"b\\\\c\\x09dé\"\n" +
+            "  pane 1 at=1,1 size=80x24\n",
+    )
+    add(
+        mut cs,
+        "44-names",
+        80,
+        24,
+        "new 1 main; tab 2; rename 1 two words",
+        "layout tabs=2 active=2 next=3 size=80x24\n" +
+            "tab 1 focus=1 zoomed=0 order=1 name=\"two words\"\n" +
+            "  pane 1 at=1,1 size=80x24\n" +
+            "tab 2 focus=2 zoomed=0 order=2 name=\"\"\n" +
+            "  pane 2 at=1,1 size=80x24\n",
+    )
+    add(
+        mut cs,
+        "45-new-tab-refusals",
+        80,
+        24,
+        "new 1 main; tab 1 dup; tab 0 bad; tab -3 bad",
+        "refused: tab 1 dup: duplicate_id\n" +
+            "refused: tab 0 bad: bad_id\n" +
+            "refused: tab -3 bad: bad_id\n" +
+            d_one(),
+    )
+    add(
+        mut cs,
+        "46-split-other-tab",
+        80,
+        24,
+        s_cols() + "; tab 3 logs; split 1 1 rows 4 after",
+        "layout tabs=2 active=2 next=3 size=80x24\n" +
+            "tab 1 focus=4 zoomed=0 order=4,2,1 name=\"main\"\n" +
+            "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
+            "    split rows share=5000 at=1,1 size=39x24 border=12\n" +
+            "      pane 1 at=1,1 size=39x11\n" +
+            "      pane 4 at=1,13 size=39x12\n" +
+            "    pane 2 at=41,1 size=40x24\n" +
+            t_logs(),
+    )
+    add(
+        mut cs,
+        "47-focus-pane-activates",
+        80,
+        24,
+        s_cols() + "; tab 3 logs; focus-pane 1; focus-pane 9",
+        "refused: focus-pane 9: no_pane\n" +
+            "layout tabs=2 active=1 next=3 size=80x24\n" +
+            "tab 1 focus=1 zoomed=0 order=1,2 name=\"main\"\n" +
+            "  split cols share=5000 at=1,1 size=80x24 border=40\n" +
+            "    pane 1 at=1,1 size=39x24\n" +
+            "    pane 2 at=41,1 size=40x24\n" +
+            t_logs(),
+    )
+}
+
+fn other_cases(mut cs: List[Case]) {
+    add(
+        mut cs,
+        "48-tree-order",
+        81,
+        25,
+        s_grid() + "; next 1; next 1; prev 1; prev 1; prev 1; next 5",
+        "refused: next 5: no_tab\n" +
+            "layout tabs=1 active=1 next=2 size=81x25\n" +
+            "tab 1 focus=2 zoomed=0 order=2,4,1,3 name=\"main\"\n" +
+            grid_body(),
+    )
+    add(
+        mut cs,
+        "49-pane-at",
+        80,
+        24,
+        s_nest() +
+            "; at 1 1; at 39 24; at 40 5; at 41 12; at 41 13; at 80 24; at 81 1; at 0 1; at 41 1",
+        "at 1 1: 1\n" +
+            "at 39 24: 1\n" +
+            "at 40 5: -1\n" +
+            "at 41 12: -1\n" +
+            "at 41 13: 3\n" +
+            "at 80 24: 3\n" +
+            "at 81 1: -1\n" +
+            "at 0 1: -1\n" +
+            "at 41 1: 2\n" +
+            d_nest(),
+    )
+    add(
+        mut cs,
+        "50-pane-at-zoomed",
+        80,
+        24,
+        s_nest() + "; zoom 1; at 1 1; at 40 5",
+        "at 1 1: 3\n" + "at 40 5: 3\n" + d_nest_zoomed(),
+    )
+    add(
+        mut cs,
+        "51-pane-at-hidden",
+        80,
+        24,
+        s_chain() + "; size 20x6; at 19 1; at 20 6; at 18 3",
+        "at 19 1: 4\n" + "at 20 6: 4\n" + "at 18 3: -1\n" + d_chain_small(),
+    )
+    add(
+        mut cs,
+        "52-rows-hidden",
+        80,
+        24,
+        "new 1 main; split 1 1 rows 2 after; split 1 2 rows 3 after; split 1 3 rows 4 after; size 20x6",
+        "layout tabs=1 active=1 next=2 size=20x6\n" +
+            "tab 1 focus=4 zoomed=0 order=4,3,2,1 name=\"main\"\n" +
+            "  split rows share=5000 at=1,1 size=20x6 border=3\n" +
+            "    pane 1 at=1,1 size=20x2\n" +
+            "    split rows share=5000 at=1,4 size=20x3 border=5\n" +
+            "      pane 2 at=1,4 size=20x1\n" +
+            "      split rows share=5000 at=1,6 size=20x1 border=none\n" +
+            "        pane 3 at=1,6 size=20x1\n" +
+            "        pane 4 hidden\n",
+    )
+    add(
+        mut cs,
+        "53-hidden-subtree",
+        80,
+        24,
+        s_chain() + "; split 1 5 rows 6 after; size 20x6",
+        "layout tabs=1 active=1 next=2 size=20x6\n" +
+            "tab 1 focus=6 zoomed=0 order=6,5,4,3,2,1 name=\"main\"\n" +
+            "  split cols share=5000 at=1,1 size=20x6 border=10\n" +
+            "    pane 1 at=1,1 size=9x6\n" +
+            "    split cols share=5000 at=11,1 size=10x6 border=15\n" +
+            "      pane 2 at=11,1 size=4x6\n" +
+            "      split cols share=5000 at=16,1 size=5x6 border=18\n" +
+            "        pane 3 at=16,1 size=2x6\n" +
+            "        split cols share=5000 at=19,1 size=2x6 border=none\n" +
+            "          pane 4 at=19,1 size=2x6\n" +
+            "          split rows share=5000 hidden\n" +
+            "            pane 5 hidden\n" +
+            "            pane 6 hidden\n",
+    )
+    add(
+        mut cs,
+        "54-large",
+        320,
+        90,
+        "new 1 main; split 1 1 rows 2 after; split 1 1 cols 3 after; resize 3 left 50",
         "resized: resize 3 left 50: 50\n" +
-        "layout tabs=1 active=1 next=2 size=320x90\n" +
-        "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
-        "  split rows share=5000 at=1,1 size=320x90 border=45\n" +
-        "    split cols share=3417 at=1,1 size=320x44 border=110\n" +
-        "      pane 1 at=1,1 size=109x44\n" +
-        "      pane 3 at=111,1 size=210x44\n" +
-        "    pane 2 at=1,46 size=320x45\n")
-    add(mut cs, "55-largest", 320, 90,
+            "layout tabs=1 active=1 next=2 size=320x90\n" +
+            "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
+            "  split rows share=5000 at=1,1 size=320x90 border=45\n" +
+            "    split cols share=3417 at=1,1 size=320x44 border=110\n" +
+            "      pane 1 at=1,1 size=109x44\n" +
+            "      pane 3 at=111,1 size=210x44\n" +
+            "    pane 2 at=1,46 size=320x45\n",
+    )
+    add(
+        mut cs,
+        "55-largest",
+        320,
+        90,
         "new 1 main; split 1 1 rows 2 after; split 1 1 cols 3 after; resize 3 left 50; size 512x512",
         "resized: resize 3 left 50: 50\n" +
-        "layout tabs=1 active=1 next=2 size=512x512\n" +
-        "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
-        "  split rows share=5000 at=1,1 size=512x512 border=256\n" +
-        "    split cols share=3417 at=1,1 size=512x255 border=175\n" +
-        "      pane 1 at=1,1 size=174x255\n" +
-        "      pane 3 at=176,1 size=337x255\n" +
-        "    pane 2 at=1,257 size=512x256\n")
-    add(mut cs, "56-plain-dump", 80, 24, s_nest() + "; plain",
+            "layout tabs=1 active=1 next=2 size=512x512\n" +
+            "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
+            "  split rows share=5000 at=1,1 size=512x512 border=256\n" +
+            "    split cols share=3417 at=1,1 size=512x255 border=175\n" +
+            "      pane 1 at=1,1 size=174x255\n" +
+            "      pane 3 at=176,1 size=337x255\n" +
+            "    pane 2 at=1,257 size=512x256\n",
+    )
+    add(
+        mut cs,
+        "56-plain-dump",
+        80,
+        24,
+        s_nest() + "; plain",
         "layout tabs=1 active=1 next=2\n" +
-        "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
-        "  split cols share=5000\n" +
-        "    pane 1\n" +
-        "    split rows share=5000\n" +
-        "      pane 2\n" +
-        "      pane 3\n")
-    add(mut cs, "57-focus-across-axes", 80, 24,
+            "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
+            "  split cols share=5000\n" +
+            "    pane 1\n" +
+            "    split rows share=5000\n" +
+            "      pane 2\n" +
+            "      pane 3\n",
+    )
+    add(
+        mut cs,
+        "57-focus-across-axes",
+        80,
+        24,
         "new 1 main; split 1 1 rows 2 after; split 1 1 cols 3 after; focus 1 down; focus 1 up",
         "layout tabs=1 active=1 next=2 size=80x24\n" +
-        "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
-        "  split rows share=5000 at=1,1 size=80x24 border=12\n" +
-        "    split cols share=5000 at=1,1 size=80x11 border=40\n" +
-        "      pane 1 at=1,1 size=39x11\n" +
-        "      pane 3 at=41,1 size=40x11\n" +
-        "    pane 2 at=1,13 size=80x12\n")
-    add(mut cs, "58-tie-up", 81, 25,
+            "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
+            "  split rows share=5000 at=1,1 size=80x24 border=12\n" +
+            "    split cols share=5000 at=1,1 size=80x11 border=40\n" +
+            "      pane 1 at=1,1 size=39x11\n" +
+            "      pane 3 at=41,1 size=40x11\n" +
+            "    pane 2 at=1,13 size=80x12\n",
+    )
+    add(
+        mut cs,
+        "58-tie-up",
+        81,
+        25,
         "new 1 main; split 1 1 rows 2 after; split 1 1 cols 3 after; focus-pane 2; focus 1 up",
         "layout tabs=1 active=1 next=2 size=81x25\n" +
-        "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
-        "  split rows share=5000 at=1,1 size=81x25 border=13\n" +
-        "    split cols share=5000 at=1,1 size=81x12 border=41\n" +
-        "      pane 1 at=1,1 size=40x12\n" +
-        "      pane 3 at=42,1 size=40x12\n" +
-        "    pane 2 at=1,14 size=81x12\n")
-    add(mut cs, "59-tie-up-again", 81, 25,
+            "tab 1 focus=3 zoomed=0 order=3,2,1 name=\"main\"\n" +
+            "  split rows share=5000 at=1,1 size=81x25 border=13\n" +
+            "    split cols share=5000 at=1,1 size=81x12 border=41\n" +
+            "      pane 1 at=1,1 size=40x12\n" +
+            "      pane 3 at=42,1 size=40x12\n" +
+            "    pane 2 at=1,14 size=81x12\n",
+    )
+    add(
+        mut cs,
+        "59-tie-up-again",
+        81,
+        25,
         "new 1 main; split 1 1 rows 2 after; split 1 1 cols 3 after; focus-pane 2; focus 1 up; " +
-        "focus-pane 1; focus-pane 2; focus 1 up",
+            "focus-pane 1; focus-pane 2; focus 1 up",
         "layout tabs=1 active=1 next=2 size=81x25\n" +
-        "tab 1 focus=1 zoomed=0 order=1,2,3 name=\"main\"\n" +
-        "  split rows share=5000 at=1,1 size=81x25 border=13\n" +
-        "    split cols share=5000 at=1,1 size=81x12 border=41\n" +
-        "      pane 1 at=1,1 size=40x12\n" +
-        "      pane 3 at=42,1 size=40x12\n" +
-        "    pane 2 at=1,14 size=81x12\n")
+            "tab 1 focus=1 zoomed=0 order=1,2,3 name=\"main\"\n" +
+            "  split rows share=5000 at=1,1 size=81x25 border=13\n" +
+            "    split cols share=5000 at=1,1 size=81x12 border=41\n" +
+            "      pane 1 at=1,1 size=40x12\n" +
+            "      pane 3 at=42,1 size=40x12\n" +
+            "    pane 2 at=1,14 size=81x12\n",
+    )
 }
 
 /// Every golden, in order.
