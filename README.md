@@ -135,8 +135,8 @@ and source-triggered report limits have complete-frame fixtures; repaired D9/D13
 reference inputs and D10's failed raw reports never become candidate-derived
 goldens. The Linux drive records 200 requested-4KiB streams with bytewise/random
 P2 and primary content/rendition/resize-path checks; the nightly profile uses
-5000 seeds, with a step limit and a drive deadline sized from the measured pace
-(`ci/tiers.py`). Each rule records its source triggers, permitted field deltas and
+5000 seeds. Both profiles' step limits and drive deadlines are sized from the
+measured pace (`ci/tiers.py`). Each rule records its source triggers, permitted field deltas and
 case counts; an unexplained difference remains red. The assigned-scalar width
 sweep permits zero non-control differences.
 The finite hostile row uses capped
