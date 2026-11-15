@@ -11,7 +11,10 @@
 //! made by `new` (detached, a duplicate refused, attached), a second
 //! client at a smaller size, the server outliving the client that started
 //! it, and a verb the server does not know. End to end: the prefix and a
-//! split through the real client, its screen read back cell for cell.
+//! split through the real client, its screen read back cell for cell. The
+//! window: a terminal reporting 0x0 attaches at the documented 80x24, or at
+//! COLUMNS x LINES when both are set; a window larger than the protocol
+//! carries is refused by name before anything starts.
 //!
 //! After every row nothing it started may still run (Linux reads /proc; a
 //! process whose environment names the row's runtime directory is red).

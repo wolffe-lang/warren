@@ -6,6 +6,9 @@
 //!
 //!   session_rows WARREN [ROW...]
 //!
+//! `close-causes` reads the server's trace (WARREN_TRACE, its standard
+//! error kept in a file): every close names its cause.
+//!
 //! Prints `PASS <row>` or `FAIL <row> <why>` per row, then
 //! `SESSION-ROWS rows=N failed=M`; exits 1 when any row is red.
 use std.env
