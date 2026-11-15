@@ -146,6 +146,22 @@ class Tiers(unittest.TestCase):
         deadline = fresh_fuzz.profile_deadline('pull-request') if hasattr(fresh_fuzz, 'profile_deadline') else 3600
         self.assertGreaterEqual(deadline, 2 * seeds * tiers.FRESH_SECONDS_PER_SEED)
 
+    def test_pull_request_fits_its_limit(self):
+        # The pull-request profile's Linux gate at the slowest measured pace: the
+        # rest of the gate and its 200 seeds. Its step limit holds twice that, the
+        # rule LIMITS follows, as the nightly's does.
+        tiers = tiers_module()
+        sys.path.insert(0, str(ROOT / 'tests/vt'))
+        try:
+            import fresh_fuzz
+        finally:
+            sys.path.pop(0)
+        seeds, _ = fresh_fuzz.profile_settings('pull-request')
+        expected = tiers.GATE_SECONDS_BESIDE_FRESH + seeds * tiers.FRESH_SECONDS_PER_SEED
+        limit = tiers.LIMITS['linux'] * 60
+        self.assertGreaterEqual(limit, 2 * expected, 'pull-request limit %d s, expected %d s' % (limit, expected))
+        self.assertLessEqual(tiers.GATE_SECONDS_BESIDE_FRESH + fresh_fuzz.profile_deadline('pull-request'), limit)
+
     def test_workflow_carries_the_limits(self):
         import re
         tiers = tiers_module()
