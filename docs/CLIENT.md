@@ -12,7 +12,8 @@ role. Later verbs (`detach`, `split`, `tab`, ...) fail by name.
 
 `warren new` makes a session at this terminal's size, in this directory and
 with this environment, prints its name and attaches to it. With `-d` it makes
-the session and returns (at 80x24 when there is no terminal). Without `-s` the
+the session and returns (at 80x24 when there is no terminal, or at `COLUMNS` by
+`LINES` when both are set: see "The window's size" below). Without `-s` the
 server names it with the lowest positive number not in use. A name in use is
 refused, and so are an empty name and one holding `/` or a control byte; names
 are compared as bytes.
@@ -33,6 +34,25 @@ not promised here.
 
 A command the server does not know is refused with the usage status and its
 name, so a newer client facing an older server fails cleanly.
+
+## The window's size
+
+The client makes and attaches a session at the window its terminal reports
+(`TIOCGWINSZ`). A terminal that reports a dimension as 0 has not been told its
+size: a serial line, or a console that draws a grid it does not report (PAX's
+console under QEMU reports 0x0 while it draws 160x50). For such a dimension the
+client takes `COLUMNS` (or `LINES`) from its environment when it is a positive
+number no larger than 65,535, and otherwise 80 columns (or 24 rows); a
+dimension the terminal reports is kept, whatever the environment says. So
+`warren` at a 0x0 window attaches at 80x24, and `COLUMNS=160 LINES=50 warren`
+at 160x50. When the window later changes, a dimension it reports as 0 keeps its
+last size.
+
+A window the protocol cannot carry (more than 65,535 in a dimension, or more
+than 262,144 cells) is refused by name before the client starts a server or
+takes the terminal: `warren: the terminal's window 600x500 is larger than
+warren takes (262144 cells)`. A smaller window than 20x6 is the server's to
+refuse (too small, below).
 
 ## The terminal, taken and given back
 
@@ -55,10 +75,12 @@ rows hold this for each way out:
 | too small (a resize below 20x6) | 1 | `warren: the terminal is too small (...)` |
 | refused (no such session, limits) | 1 | `warren: refused: ...` |
 | the server closed without a BYE | 1 | `warren: the server closed the connection` |
+| a HELLO the client's codec refuses (a bug) | 1 | `warren: the hello could not be sent: ...` |
 | an image that does not apply | 1 | `warren: the server sent an image that does not apply` |
 | terminate, hangup, quit or interrupt signals | 1 | `warren: ended by a signal` |
 | the terminal closed or cannot be written | 1 | `warren: the terminal closed` / `cannot be written` |
 | standard input is not a terminal | 1 | `warren: not a terminal: ...` (nothing was changed) |
+| a window larger than warren takes | 1 | `warren: the terminal's window CxR is larger than ...` (nothing was changed) |
 
 A suspend (`SIGTSTP` sent to the client) gives the terminal back first, then
 stops; on continue the client takes it again and asks for a full repaint.
