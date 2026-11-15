@@ -10,7 +10,8 @@
 //! runs nothing and is reported, not promised). Lifecycle rows: a session
 //! made by `new` (detached, a duplicate refused, attached), a second
 //! client at a smaller size, the server outliving the client that started
-//! it, and a verb the server does not know.
+//! it, and a verb the server does not know. End to end: the prefix and a
+//! split through the real client, its screen read back cell for cell.
 //!
 //! After every row nothing it started may still run (Linux reads /proc; a
 //! process whose environment names the row's runtime directory is red).
@@ -858,6 +859,105 @@ fn row_unknown_verb(warren: str) -> str {
     ""
 }
 
+// The cells of one row of the client's screen (1-based), columns col ..
+// col+n-1, untrimmed.
+fn cells_at(v: vt.Vt, row: int, col: int, n: int) -> str {
+    let cells = if v.active_alternate then v.alternate.cells else v.primary.cells
+    var t = List[byte]()
+    var c = col
+    while c < col + n && c <= v.cols {
+        let cell = copy cells[(row - 1) * v.cols + c - 1]
+        if cell.width != 0 { client.utf8(mut t, if cell.base == 0 then 32 else cell.base) }
+        c += 1
+    }
+    str_from_utf8(t) else ""
+}
+
+// How many of rows 1..rows of a column hold a border glyph.
+fn border_down(v: vt.Vt, col: int, rows: int) -> int {
+    let cells = if v.active_alternate then v.alternate.cells else v.primary.cells
+    var n = 0
+    var r = 1
+    while r <= rows {
+        let b = cells[(r - 1) * v.cols + col - 1].base
+        if b >= 9472 && b <= 9599 { n += 1 }
+        r += 1
+    }
+    n
+}
+
+fn until_border(mut r: Run, col: int, rows: int, want: int, ms: int) -> bool {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        if border_down(r.screen, col, rows) == want { return true }
+        pump(mut r, 50)
+    }
+    border_down(r.screen, col, rows) == want
+}
+
+fn region_has(v: vt.Vt, text: str, col: int, row: int, cols: int, rows: int) -> bool {
+    var y = row
+    while y < row + rows {
+        if cells_at(v, y, col, cols).contains(text) { return true }
+        y += 1
+    }
+    false
+}
+
+fn clock_shape(text: str) -> bool {
+    let b = text.bytes()
+    if b.len != 7 { return false }
+    for i in [1, 2, 4, 5] {
+        if b[i] < 48 as byte || b[i] > 57 as byte { return false }
+    }
+    b[0] == 32 as byte && b[3] == 58 as byte && b[6] == 32 as byte
+}
+
+// The real client in this program's pty, end to end: the prefix (the
+// terminal sends Ctrl-Space as NUL) and `|` split the session; the
+// client's screen, read through warren's emulator, shows the border down
+// column 40, line one (the session, the mode field, the clock) and the
+// hint line; a command lands in the new right pane; the prefix, `x` and `y`
+// close it.
+fn row_split_e2e(warren: str) -> str {
+    var r = launch(warren, "e2e", List[str](), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut r, "$", 10000) {
+        close_run(r)
+        return "no prompt: " + screen_text(r.screen)
+    }
+    type_text(mut r, "\u{0}|")
+    if !until_border(mut r, 40, 22, 22, 5000) {
+        close_run(r)
+        return "no border down column 40:\n" + screen_text(r.screen)
+    }
+    let one = cells_at(r.screen, 23, 1, 80)
+    if !one.starts_with(" ") || cells_at(r.screen, 23, 66, 6) != "NORMAL" || !clock_shape(cells_at(r.screen, 23, 74, 7)) {
+        close_run(r)
+        return "line one: '{one}'"
+    }
+    let two = cells_at(r.screen, 24, 1, 80)
+    if !two.starts_with(" C-Space prefix  ? keys") {
+        close_run(r)
+        return "the hint line: '{two}'"
+    }
+    type_text(mut r, "echo E-$((2+2))\r")
+    let until = now_ms() + 5000
+    while !region_has(r.screen, "E-4", 41, 1, 40, 22) && now_ms() < until { pump(mut r, 50) }
+    if !region_has(r.screen, "E-4", 41, 1, 40, 22) || region_has(r.screen, "E-4", 1, 1, 39, 22) {
+        close_run(r)
+        return "the command did not land in the right pane alone:\n" + screen_text(r.screen)
+    }
+    type_text(mut r, "\u{0}xy")
+    if !until_border(mut r, 40, 22, 0, 5000) {
+        close_run(r)
+        return "the close did not close:\n" + screen_text(r.screen)
+    }
+    type_text(mut r, "\u{0}d")
+    let why = ends_with(mut r, 0, "[detached")
+    close_run(r)
+    why
+}
+
 fn run_row(warren: str, name: str) -> str {
     if name == "detach-reattach" { return row_detach_reattach(warren) }
     if name == "server-stopping" { return row_server_stopping(warren) }
@@ -875,6 +975,7 @@ fn run_row(warren: str, name: str) -> str {
     if name == "server-outlives-client" { return row_server_outlives_client(warren) }
     if name == "unknown-verb" { return row_unknown_verb(warren) }
     if name == "session-names" { return row_session_names(warren) }
+    if name == "split-e2e" { return row_split_e2e(warren) }
     "no such row"
 }
 
@@ -900,7 +1001,7 @@ fn main() -> int {
         i += 1
     }
     if rows.len == 0 {
-        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names")
+        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names split-e2e")
     }
     if !fs.exists("/proc") { print("NOTE leftovers unchecked here: no /proc to read") }
     // Every row's socket lives in a short directory under this one; a
