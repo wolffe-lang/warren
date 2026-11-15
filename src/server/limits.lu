@@ -93,5 +93,13 @@ pub const PROMPT_BYTES: int = 256
 /// The bar's mode field: a fixed width, so a mode change never moves
 /// anything beside it.
 pub const MODE_FIELD: int = 9
+/// The bar's clock, ` HH:MM `, at the right end of line one...
+pub const CLOCK_FIELD: int = 7
+/// ...from this many columns; narrower, the mode field takes the end.
+pub const CLOCK_MIN_COLS: int = 40
+/// A tab's mark: a pane of it wrote while it was not shown.
+pub const MARK_ACTIVITY: int = 1
+/// A tab's mark: a pane of it rang the bell while it was not shown.
+pub const MARK_BELL: int = 2
 /// A connection's sequence numbers reconnect before this.
 pub const SEQ_MAX: int = 4294967295
