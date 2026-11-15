@@ -55,14 +55,14 @@ jobs:
     # nightly fuzz profile (sized there from measured runs); the job's is ten
     # minutes more, for checkout and upload. The image's packages come from a
     # snapshot archive that can be slow.
-    timeout-minutes: ${{ (github.event_name == 'schedule' || inputs.profile == 'nightly') && 355 || 90 }}
+    timeout-minutes: ${{ (github.event_name == 'schedule' || inputs.profile == 'nightly') && 355 || 115 }}
     outputs:
       limit: ${{ steps.limit.outputs.limit }}
       minutes: ${{ steps.limit.outputs.minutes }}
     steps:
       - uses: actions/checkout@v4
       - id: gate
-        timeout-minutes: ${{ (github.event_name == 'schedule' || inputs.profile == 'nightly') && 345 || 80 }}
+        timeout-minutes: ${{ (github.event_name == 'schedule' || inputs.profile == 'nightly') && 345 || 105 }}
         run: |
           date +%s > "$RUNNER_TEMP/gate-start"
           bash tools/in-container
