@@ -118,8 +118,10 @@ fn sync_interest(mut s: Server, index: int) {
 }
 
 /// Close a connection: membership leaves exactly once, the readiness
-/// entry goes before the socket, the slot is kept for reuse.
-fn close_conn(mut s: Server, index: int) {
+/// entry goes before the socket, the slot is kept for reuse. `why` is the
+/// cause the trace names, for every close (a close that sends the peer
+/// nothing included).
+fn close_conn(mut s: Server, index: int, why: str) {
     if !s.conns[index].live { return }
     leave(mut s, index)
     let key = s.conns[index].key
@@ -131,7 +133,24 @@ fn close_conn(mut s: Server, index: int) {
     s.conns[index].key = 0 - 1
     s.conns[index].fd = 0 - 1
     s.conns[index].pending = 0
-    trace(s, "conn {index} closed")
+    trace(s, "conn {index} closed: {why}")
+}
+
+// A phase's name in the trace.
+fn phase_name(phase: int) -> str {
+    if phase == ACCEPTED { return "waiting for its HELLO" }
+    if phase == ATTACHED { return "attached" }
+    if phase == COMMANDING { return "waiting for its COMMAND" }
+    if phase == DRAINING { return "draining" }
+    "closed"
+}
+
+// A terminal message's name in the trace: REFUSE, BYE or REPLY and its code.
+fn sent_name(kind: int, code: int) -> str {
+    if kind == 130 { return "REFUSE {code}" }
+    if kind == 135 { return "BYE {code}" }
+    if kind == 136 { return "REPLY" }
+    "message {kind}"
 }
 
 fn leave(mut s: Server, index: int) {
@@ -151,9 +170,11 @@ fn terminal(mut s: Server, index: int, kind: int, code: int, text: str) {
     s.conns[index].pending = 0
     let ok = send(mut s.conns[index], kind, coded(code, text))
     if !ok {
-        close_conn(mut s, index)
+        close_conn(mut s, index, "{sent_name(kind, code)} ({text}) could not be queued")
         return
     }
+    s.conns[index].sent_kind = kind
+    s.conns[index].sent_code = code
     s.conns[index].phase = DRAINING
     s.conns[index].deadline = now_ns() + DRAIN_MS * 1000000
     flush(mut s, index)
@@ -162,7 +183,7 @@ fn terminal(mut s: Server, index: int, kind: int, code: int, text: str) {
 fn protocol_error(mut s: Server, index: int, why: str) {
     trace(s, "conn {index} protocol error: {why}")
     if s.conns[index].phase == ACCEPTED {
-        close_conn(mut s, index)
+        close_conn(mut s, index, "a protocol error before its HELLO ({why})")
         return
     }
     terminal(mut s, index, 135, 6, why)
@@ -177,13 +198,13 @@ fn flush(mut s: Server, index: int) {
     }
     var sock = socket_of(s.conns[index])
     let chunk = next_write(s.conns[index])
-    var gone = false
+    var gone = ""
     let n = net.write_some(mut sock, chunk) else |e| {
-        if "{e}" != "busy" { gone = true }
+        if "{e}" != "busy" { gone = "{e}" }
         0
     }
-    if gone {
-        close_conn(mut s, index)
+    if gone.len > 0 {
+        close_conn(mut s, index, "write failed: {gone}")
         return
     }
     wrote(mut s.conns[index], n)
@@ -197,7 +218,7 @@ fn after_write(mut s: Server, index: int) {
         s.conns[index].image_end = 0 - 1
     }
     if s.conns[index].phase == DRAINING && queued(s.conns[index]) == 0 {
-        close_conn(mut s, index)
+        close_conn(mut s, index, "{sent_name(s.conns[index].sent_kind, s.conns[index].sent_code)} sent")
         return
     }
     sync_interest(mut s, index)
@@ -1470,9 +1491,11 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
         }
     }
     let ok = send(mut s.conns[index], 136, reply_payload(id, status, out, err))
+    s.conns[index].sent_kind = 136
+    s.conns[index].sent_code = status
     s.conns[index].phase = DRAINING
     s.conns[index].deadline = now_ns() + DRAIN_MS * 1000000
-    if !ok { close_conn(mut s, index) }
+    if !ok { close_conn(mut s, index, "the REPLY to {verb} could not be queued") }
     if s.conns[index].stop_after || (!ok && verb == "kill-server") { begin_stop(mut s, "kill-server") }
 }
 
@@ -1482,20 +1505,21 @@ fn message(mut s: Server, index: int, kind: int, body: List[byte]) {
     if phase == DRAINING { return }
     if phase == ACCEPTED {
         if kind != 1 {
-            close_conn(mut s, index)
+            close_conn(mut s, index, "its first message was not a HELLO (type {kind})")
             return
         }
         let v = proto.hello_version(body)
         if v.code != 0 {
-            close_conn(mut s, index)
+            close_conn(mut s, index, "a HELLO whose magic or versions cannot be read (code {v.code})")
             return
         }
         if v.minimum > 1 || v.maximum < 1 {
             terminal(mut s, index, 130, 1, "no common protocol version")
             return
         }
-        if proto.validate(1, body) != 0 {
-            close_conn(mut s, index)
+        let invalid = proto.validate(1, body)
+        if invalid != 0 {
+            close_conn(mut s, index, "a malformed HELLO (code {invalid})")
             return
         }
         var j = 0
@@ -1585,14 +1609,13 @@ fn next_complete(c: Conn) -> bool {
 
 fn read_conn(mut s: Server, index: int) {
     var sock = socket_of(s.conns[index])
-    var end = false
+    var end = ""
     let got = net.read_bytes(mut sock, READ_BUDGET) else |e| {
-        if "{e}" != "timeout" { end = true }
+        if "{e}" != "timeout" { end = "{e}" }
         List[byte]()
     }
-    if end {
-        trace(s, "conn {index} end of input")
-        close_conn(mut s, index)
+    if end.len > 0 {
+        close_conn(mut s, index, "end of input ({end})")
         return
     }
     if s.conns[index].phase == DRAINING { return }
@@ -1689,7 +1712,7 @@ fn make_session(mut s: Server, name: str, cols: int, rows: int, cwd: str, names:
 fn hello(mut s: Server, index: int) {
     let h = read_hello(s.conns[index].hello[0..s.conns[index].hello_len])
     if h.duplicate {
-        close_conn(mut s, index)
+        close_conn(mut s, index, "a HELLO naming one environment variable twice")
         return
     }
     // Defence in depth beside the 0700 directory: a peer of another user
@@ -1698,15 +1721,14 @@ fn hello(mut s: Server, index: int) {
         unix.Credentials { pid: 0 - 1, uid: s.uid, gid: 0 - 1 }
     }
     if peer.uid != s.uid {
-        trace(s, "conn {index} from uid {peer.uid}: closed")
-        close_conn(mut s, index)
+        close_conn(mut s, index, "a peer of uid {peer.uid}, not {s.uid}")
         return
     }
     if h.role == 2 {
         s.conns[index].hello_ready = false
         s.conns[index].read_on = true
         if !welcome_conn(mut s, index, "") {
-            close_conn(mut s, index)
+            close_conn(mut s, index, "the WELCOME could not be queued")
             return
         }
         s.conns[index].phase = COMMANDING
@@ -1723,7 +1745,7 @@ fn hello(mut s: Server, index: int) {
     if h.cols < MIN_COLS || h.rows < MIN_ROWS {
         s.conns[index].hello_ready = false
         if !welcome_conn(mut s, index, name) {
-            close_conn(mut s, index)
+            close_conn(mut s, index, "the WELCOME could not be queued")
             return
         }
         terminal(mut s, index, 135, 7, "too small")
@@ -1755,7 +1777,7 @@ fn hello(mut s: Server, index: int) {
     s.conns[index].hello_ready = false
     s.conns[index].read_on = true
     if !welcome_conn(mut s, index, name) {
-        close_conn(mut s, index)
+        close_conn(mut s, index, "the WELCOME could not be queued")
         return
     }
     s.conns[index].phase = ATTACHED
@@ -2164,13 +2186,13 @@ fn timers(mut s: Server, now: int) {
     var i = 0
     while i < s.conns.len {
         if s.conns[i].live && s.conns[i].deadline > 0 && now >= s.conns[i].deadline {
-            trace(s, "conn {i} deadline in phase {s.conns[i].phase}")
             if s.conns[i].ending {
+                trace(s, "conn {i} deadline for its last image")
                 s.conns[i].ending = false
                 s.conns[i].deadline = 0
                 terminal(mut s, i, 135, 2, "session ended")
             } else {
-                close_conn(mut s, i)
+                close_conn(mut s, i, "its deadline passed while {phase_name(s.conns[i].phase)}")
             }
         }
         // A message's time is up: its client's bar is drawn again.
@@ -2419,7 +2441,7 @@ pub fn serve() -> int {
     trace(s, "stopped after {s.turns} turns")
     var k = 0
     while k < s.conns.len {
-        close_conn(mut s, k)
+        close_conn(mut s, k, "the server stopped")
         k += 1
     }
     poll.close(take s.w) else |_| {}
