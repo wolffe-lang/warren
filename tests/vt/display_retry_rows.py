@@ -188,11 +188,11 @@ def main():
             and 'exit -13' in str(error) and not str(error).startswith('reference-terminal-killed'),
             'launches=%d error=%s' % (fake.launches(), error))
 
-        fake, shown = Fake(base, ['display', 'ok', 'display', 'ok', 'display', 'ok']), display()
-        for _ in range(3):
+        fake, shown = Fake(base, ['display', 'ok'] * 4), display()
+        for _ in range(4):
             attempt(fake, shown)
         problem = shown.rate_problem() if hasattr(shown, 'rate_problem') else None
-        row('rate-bound-over', problem == 'reference-retry-rate retries=3 launches=6 bound=2',
+        row('rate-bound-over', problem == 'reference-retry-rate retries=4 launches=8 bound=3',
             'launches=%d retries=%d problem=%r' % (fake.launches(), len(retries(shown)), problem))
 
         fake, shown = Fake(base, ['display', 'ok', 'sigpipe', 'ok', 'ok']), display()
@@ -202,18 +202,33 @@ def main():
         row('rate-bound-under', problem == '' and getattr(shown, 'launches', None) == 5 and len(retries(shown)) == 2,
             'launches=%r retries=%d problem=%r' % (getattr(shown, 'launches', None), len(retries(shown)), problem))
 
-        fake = Fake(base, ['display'] * 6)
+        fake = Fake(base, ['display'] * 8)
         streams = fake.dir / 'streams'
         streams.mkdir()
-        for n in range(3):
+        for n in range(4):
             (streams / ('s%d.in' % n)).write_bytes(b'abc')
         env = dict(os.environ, PATH=str(fake.bin) + os.pathsep + os.environ['PATH'], WARREN_ORACLE_DISPLAY=':fake')
         done = subprocess.run([sys.executable, '-I', str(ROOT / 'tools/oracle/run.py'), 'cases', str(streams),
                                '--out', str(fake.dir / 'cases-out')], env=env, capture_output=True, text=True, timeout=120)
         lines = done.stdout.splitlines()
-        row('rate-bound-in-cases-command', done.returncode == 1 and fake.launches() == 6
-            and 'FAIL reference-retry-rate retries=3 launches=6 bound=2' in lines,
+        row('rate-bound-in-cases-command', done.returncode == 1 and fake.launches() == 8
+            and 'FAIL reference-retry-rate retries=4 launches=8 bound=3' in lines,
             'exit=%d launches=%d stdout=%r' % (done.returncode, fake.launches(), done.stdout[-300:]))
+
+        # The bound against counts taken from hosted runs (the trunk push at a19da16's census: 9 retries in 613
+        # launches; the busiest green run's fresh drive: 28 in 1,570) and #15's failing runner (83 in 1,625).
+        def counted(retries, launches):
+            shown = display()
+            shown.retries = [{'name': 'reference-display-unavailable', 'pass': 'S', 'work': 'w'}] * retries
+            shown.launches = launches
+            return shown.rate_problem() if hasattr(shown, 'rate_problem') else None
+        row('rate-bound-ordinary-runner', counted(9, 613) == '' and counted(28, 1570) == '',
+            'census 9/613: %r; fresh 28/1570: %r' % (counted(9, 613), counted(28, 1570)))
+        row('rate-bound-failing-runner', counted(83, 1625) == 'reference-retry-rate retries=83 launches=1625 bound=66',
+            'fresh 83/1625: %r' % counted(83, 1625))
+        bound = getattr(oracle, 'retry_bound', None)
+        values = [bound(n) for n in (6, 613, 1542, 1625)] if bound else None
+        row('rate-bound-values', values == [3, 32, 63, 66], 'retry_bound at 6, 613, 1542, 1625: %r' % values)
 
         reports = runpy.run_path(str(ROOT / 'tests/vt/probes/fresh_reports.py'))
         fake, shown = Fake(base, ['display', 'ok']), display()
@@ -251,14 +266,14 @@ def main():
 
         verdict = fresh.get('rate_verdict')
         shown = display()
-        shown.retries = [{'name': 'reference-terminal-killed', 'pass': 'S', 'work': 'w'}] * 3
-        shown.launches = 6
+        shown.retries = [{'name': 'reference-terminal-killed', 'pass': 'S', 'work': 'w'}] * 4
+        shown.launches = 8
         manifest = {'failed': 0}
         printed = io.StringIO()
         with contextlib.redirect_stdout(printed):
             said = verdict(manifest, shown) if verdict else None
-        row('fresh-rate-verdict', said == 'reference-retry-rate retries=3 launches=6 bound=2' and manifest['failed'] == 1
-            and printed.getvalue() == 'FAIL reference-retry-rate retries=3 launches=6 bound=2\n',
+        row('fresh-rate-verdict', said == 'reference-retry-rate retries=4 launches=8 bound=3' and manifest['failed'] == 1
+            and printed.getvalue() == 'FAIL reference-retry-rate retries=4 launches=8 bound=3\n',
             'rate_verdict=%r said=%r failed=%r printed=%r' % (verdict, said, manifest['failed'], printed.getvalue()))
     finally:
         shutil.rmtree(base)
