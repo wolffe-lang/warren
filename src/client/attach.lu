@@ -179,13 +179,51 @@ fn bye_end(code: int, text: str, session: str) -> End {
 
 const LISTENED: int = 2 + 1 + 4 + 16 + 16384 + 32 + 8192
 
+/// The columns a 0x0 window is given when COLUMNS does not say.
+pub const DEFAULT_COLS: int = 80
+/// The rows a 0x0 window is given when LINES does not say.
+pub const DEFAULT_ROWS: int = 24
+
+// A positive number from the environment, or `fallback`.
+fn env_size(name: str, fallback: int) -> int {
+    let text = env.get(name) else ""
+    let n = text.trim().to_int() else 0
+    if n > 0 && n <= 65535 { return n }
+    fallback
+}
+
+/// The window a session is made and attached at. A dimension the terminal
+/// reports as 0 (a serial line, or a console never told its size) is taken
+/// from COLUMNS or LINES when that is a positive number, else 80 columns
+/// and 24 rows; a dimension it reports is kept.
+pub fn window_size(read: term.Size) -> term.Size {
+    let cols = if read.columns > 0 then read.columns else env_size("COLUMNS", DEFAULT_COLS)
+    let rows = if read.rows > 0 then read.rows else env_size("LINES", DEFAULT_ROWS)
+    term.Size { rows: rows, columns: cols }
+}
+
+/// Why a window cannot be carried by the protocol (more than 65,535 in a
+/// dimension, or more than GRID_MAX cells), or "".
+pub fn window_problem(s: term.Size) -> str {
+    if s.columns > 65535 || s.rows > 65535 || s.columns * s.rows > proto.GRID_MAX {
+        return "the terminal's window {s.columns}x{s.rows} is larger than warren takes ({proto.GRID_MAX} cells)"
+    }
+    ""
+}
+
 /// Attach this terminal to `target` (empty: the default session),
 /// creating it (and the server) when `create`. Returns the exit code.
 pub fn attach(target: str, create: bool) -> int {
     var out = fs.stdout()
     let file = fs.stdin()
-    let size = term.size(file) else |_| {
+    let read = term.size(file) else |_| {
         eprint("warren: not a terminal: attach needs one on standard input")
+        return 1
+    }
+    let size = window_size(read)
+    let large = window_problem(size)
+    if large.len > 0 {
+        eprint("warren: {large}")
         return 1
     }
     let console = (env.get("WARREN_RENDER") else "") == "console"
@@ -299,8 +337,12 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
             let _r = send(p, 9, List[byte]())
         }
         if m & signal.resize() != 0 {
-            let s = term.size(t.file) else |_| term.Size { rows: last_rows, columns: last_cols }
-            if s.columns != last_cols || s.rows != last_rows {
+            // A dimension the window now reports as 0 keeps its last size; a
+            // window the protocol cannot carry is not sent.
+            let now = term.size(t.file) else |_| term.Size { rows: last_rows, columns: last_cols }
+            let s = term.Size { rows: if now.rows > 0 then now.rows else last_rows,
+                columns: if now.columns > 0 then now.columns else last_cols }
+            if window_problem(s).len == 0 && (s.columns != last_cols || s.rows != last_rows) {
                 last_cols = s.columns
                 last_rows = s.rows
                 var b = number(s.columns, 2)
@@ -410,7 +452,8 @@ fn command_on(mut p: Peer, argv: List[str], cols: int, rows: int, with_env: bool
 }
 
 /// `warren new [-d] [-s NAME]`: make a session (starting the server when
-/// there is none) at this terminal's size (80x24 without one), in this
+/// there is none) at this terminal's size (`window_size`: COLUMNS and LINES,
+/// else 80x24, for a 0x0 window or none), in this
 /// directory and environment; print its name, then attach to it unless
 /// `detached`. A name already in use is refused.
 pub fn new_session(name: str, detached: bool) -> int {
@@ -419,12 +462,19 @@ pub fn new_session(name: str, detached: bool) -> int {
         eprint("warren: the {long}")
         return 1
     }
-    let size = term.size(fs.stdin()) else |_| {
+    let read = term.size(fs.stdin()) else |_| {
         if !detached {
             eprint("warren: not a terminal: new needs one on standard input (or -d)")
             return 1
         }
-        term.Size { rows: 24, columns: 80 }
+        term.Size { rows: 0, columns: 0 }
+    }
+    // The session is made at the window the attach will send.
+    let size = window_size(read)
+    let large = window_problem(size)
+    if large.len > 0 {
+        eprint("warren: {large}")
+        return 1
     }
     var p = dial_or_start(true) else |e| {
         eprint("warren: cannot reach or start the server: {e}")
