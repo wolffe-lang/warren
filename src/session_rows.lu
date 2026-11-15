@@ -48,13 +48,30 @@ fn start_server(mut r: Rig, pane_command: str) -> str {
 }
 
 fn start_bounded(mut r: Rig, pane_command: str, lifetime_ms: int) -> str {
+    start_traced(mut r, pane_command, lifetime_ms, "")
+}
+
+/// As start_bounded; with a `trace` path, the server runs with WARREN_TRACE
+/// and its standard error goes to that file.
+fn start_traced(mut r: Rig, pane_command: str, lifetime_ms: int, trace: str) -> str {
     fs.remove_dir_all(r.dir) else |_| {}
     env.set("WARREN_RUNTIME_DIR", r.dir) else { return "env" }
     env.set("WARREN_LIFETIME_MS", "{lifetime_ms}") else { return "env" }
     env.set("WARREN_PANE_COMMAND", pane_command) else { return "env" }
     var c = process.command(r.warren)
     process.push_arg(mut c, "server")
-    let ch = process.start(c) else |e| { return "server-start-{e}" }
+    if trace.len > 0 {
+        env.set("WARREN_TRACE", "1") else { return "env" }
+        let f = fs.create(trace) else |e| { return "trace-file-{e}" }
+        process.set_stderr(mut c, f)
+    }
+    var failed = ""
+    let ch = process.start(c) else |e| {
+        failed = "server-start-{e}"
+        process.Child { slot: 0 - 1 }
+    }
+    if trace.len > 0 { env.unset("WARREN_TRACE") else |_| {} }
+    if failed.len > 0 { return failed }
     r.server = ch.slot
     r.started = true
     let until = now_ms() + 5000
@@ -459,6 +476,61 @@ fn row_command(mut r: Rig) -> str {
     if !client.until_kind(mut a, 135, 3000) || a.end_code != 3 { return "attached: BYE {a.end_code}" }
     client.hang_up(mut a)
     if st != 0 { return "server exit {st}" }
+    ""
+}
+
+// Every close names its cause in the server's trace, the ordinary ones
+// too: a command's REPLY sent, a first message that is not a HELLO, a
+// client gone before its WELCOME was written, a client's end of input, a
+// detach's BYE sent, and the connection the stop closes.
+fn row_close_causes(mut r: Rig) -> str {
+    let path = (env.cwd() else ".") + "/" + r.dir + "-trace"
+    fs.remove(path) else |_| {}
+    let why = start_traced(mut r, "/bin/sh", 60000, path)
+    if why.len > 0 { return why }
+    var verb = List[str]()
+    (mut verb).push("list-sessions")
+    let listed = client.command_reply(verb)
+    if listed.status != 0 { return "list-sessions status {listed.status}" }
+    var k = List[byte]()
+    proto.put(mut k, 0, 1)
+    proto.put(mut k, 0, 1)
+    proto.put(mut k, 97, 4)
+    var a = client.dial(socket(r)) else |e| { return "dial-{e}" }
+    let _k = client.send(a, 2, k)
+    let silent = closed_silently(mut a)
+    if silent.len > 0 { return "non-HELLO first: " + silent }
+    client.hang_up(mut a)
+    // A HELLO, then gone before anything is read back.
+    var g = attach(r, 80, 24, "gone", 1) else |e| { return "dial-{e}" }
+    client.hang_up(mut g)
+    var ended = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut ended, "$", 5000) { return "no prompt" }
+    client.hang_up(mut ended)
+    var d = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut d, "$", 5000) { return "no prompt (second attach)" }
+    let _d = client.send(d, 10, List[byte]())
+    if !client.until_kind(mut d, 135, 3000) || d.end_code != 1 { return "detach: BYE {d.end_code}" }
+    client.hang_up(mut d)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    let text = fs.read_text(path) else |e| { return "the trace: {e}" }
+    var closes = 0
+    for line in text.lines() {
+        let at = line.find(" closed") else 0 - 1
+        if !line.starts_with("warren-server: conn ") || at < 0 { continue }
+        closes += 1
+        let rest = line[at + 7..line.len]
+        if !rest.starts_with(": ") || rest.trim().len < 3 { return "a close without its cause: '{line}'" }
+    }
+    for cause in "REPLY sent|not a HELLO|end of input|BYE 1 sent".split("|") {
+        if !text.contains(cause) { return "no close names '{cause}' ({closes} closes)" }
+    }
+    for line in text.lines() {
+        if line.contains("conn ") && line.contains("closed: ") && (line.contains("write failed") || line.contains("WELCOME")) {
+            print("MEASURE close-causes gone-before-welcome {line}")
+        }
+    }
     ""
 }
 
@@ -969,13 +1041,14 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "memory-budget" { why = row_memory_budget(mut r) }
     else if name == "resize-crossing-image" { why = row_resize_crossing(mut r) }
     else if name == "too-slow" { why = row_too_slow(mut r) }
+    else if name == "close-causes" { why = row_close_causes(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes".split(" ") {
         (mut x).push(n)
     }
     x
