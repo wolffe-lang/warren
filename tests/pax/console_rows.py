@@ -278,12 +278,12 @@ try:
     typed(b'warren attach -t con\r')
     again = until_screen(r'C3-\d+-[RL]', 15)
     lines = screen()
-    drawn = again is not None and border_on(lines)
+    redrawn = again is not None and border_on(lines)
     prefix_then('d')
     det2 = until_stream(r'\[detached from con\]', 20, s7)
     if 'C5' in ROWS:
-        row('C5', drawn and det2 is not None, f'warren attach -t con: the border and the earlier output drawn again: '
-            f'{drawn}; detached again: {det2 is not None}')
+        row('C5', redrawn and det2 is not None, f'warren attach -t con: the border and the earlier output drawn again: '
+            f'{redrawn}; detached again: {det2 is not None}')
     until_stream(r'[$#] $', 10, s7)
     s8 = len(buf)
     typed(b'COLUMNS=160 LINES=50 warren new -s big\r')
