@@ -104,7 +104,10 @@ class Tiers(unittest.TestCase):
             '--outcome', outcome, '--since-file', str(start), '--now', str(1000 + ran),
             '--github-output', str(out)], capture_output=True, text=True)
         self.assertEqual(p.returncode, 0, p.stderr)
-        return p.stdout.strip(), out.read_text()
+        # The output's first line is the verdict; the second names the minutes it held.
+        lines = out.read_text().splitlines(True)
+        self.assertEqual(lines[1:], ['minutes=%d\n' % tiers_module().LIMITS[job]])
+        return p.stdout.strip(), lines[0]
 
     def test_limit_step(self):
         import tempfile
