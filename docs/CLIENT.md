@@ -126,7 +126,11 @@ console transcript, with the client in a pseudo-terminal of the rows' own.
 They hold every way out above and the sessions-and-clients rules: `new`
 detached, numbered, refused and attached; a second client at a smaller size
 beside the first, then gone; the server outliving the client that started it;
-a verb the server does not know; and the names a session may hold. On Linux,
+a verb the server does not know; the names a session may hold; and a
+terminal whose window is 0x0 (attached at 80x24, or at `COLUMNS` by `LINES`) or
+larger than warren takes (refused before anything starts). At PAX's own
+console under QEMU, `tests/pax/console_rows.py` holds the same session as root
+on the console's terminal, with keys from the emulated keyboard (MAP). On Linux,
 the first prompt after starting the server is drawn about 0.1 s after the
 client starts, and `new -d` against a running server takes about 40 ms from
 its start to its exit.
