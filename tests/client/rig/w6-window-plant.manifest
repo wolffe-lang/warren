@@ -1,0 +1,6 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# passes a 0x0 window through to the HELLO instead of the documented default.
+floor 15
+rig w6-window-plant-step.sh sha256=20efb88b63154672139dec3f476f3b5f731597b0d025a713acfd6806707988fb
+step w6-window-plant-build tools=python3,cc script=w6-window-plant-step.sh -- build
+step zero-window needs=w6-window-plant-build tools=python3 script=w6-window-plant-step.sh -- rows
