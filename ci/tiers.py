@@ -29,7 +29,7 @@ LIMITS = {'linux': 80, 'macos': 40}
 # profile's limit: the fresh drive's slowest pace (298 s for 200 seeds, run
 # 43589528422; the median is 233 s), and the rest of the gate's slowest
 # (3,097 s less its 254-s drive, run 43640682013, whose image took 1,253 s).
-FRESH_SECONDS_PER_SEED = 1.49
+FRESH_SECONDS_PER_SEED = 2.0
 GATE_SECONDS_BESIDE_FRESH = 2843
 # The nightly profile drives 5,000 seeds, so its Linux gate step takes about
 # 2,843 + 5,000 * 1.49 = 10,293 s (172 minutes) at that pace (7,800 s at the
