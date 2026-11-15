@@ -19,7 +19,8 @@ def main():
         (CLIENT_RIG, 'w2-client-plant.manifest', ['w2-client-plant-build', 'console-policy']),
         (CLIENT_RIG, 'w2-lifecycle-plant.manifest', ['w2-lifecycle-plant-build', 'second-client']),
         (PANE_RIG, 'w3-plant.manifest', ['w3-plant-build', 'keys-reach-focused']),
-        (PANE_RIG, 'w3-modes-plant.manifest', ['w3-modes-plant-build', 'hint-line'])):
+        (PANE_RIG, 'w3-modes-plant.manifest', ['w3-modes-plant-build', 'hint-line']),
+        (PANE_RIG, 'w3-bar-plant.manifest', ['w3-bar-plant-build', 'activity-marks'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
@@ -41,6 +42,8 @@ def main():
     assert 'pane-rows" "$root/target/native/warren" keys-reach-focused split-sizes' in pane_plant
     modes_plant = (PANE_RIG / 'w3-modes-plant-step.sh').read_text()
     assert 'pane-rows" "$root/target/native/warren" hint-line confirm-close' in modes_plant
+    bar_plant = (PANE_RIG / 'w3-bar-plant-step.sh').read_text()
+    assert 'pane-rows" "$root/target/native/warren" activity-marks zoom-mark' in bar_plant
     linux = (RIG / 'w1-step.sh').read_text()
     assert 'tools/gate linux' in linux and 'vt_resource_bench.lu' in linux
     assert 'width_sweep.py' in linux and '--suite recordings' in linux
