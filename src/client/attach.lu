@@ -232,7 +232,19 @@ pub fn attach(target: str, create: bool) -> int {
 
 fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Policy, features: int,
     hello: List[byte]) -> End {
-    if !send(p, 1, hello) { return End { code: 1, line: "warren: the server closed the connection", gone: false } }
+    // A HELLO the codec refuses is the client's own refusal, never the
+    // server's close: it is named, with the window it carried.
+    let first = proto.encode(1, 0, hello)
+    if first.code != 0 {
+        ctrace("hello not sent: the codec refused it (code {first.code}) at {cols}x{rows}")
+        return End { code: 1, line: "warren: the hello could not be sent: the codec refused a {cols}x{rows} window (code {first.code})",
+            gone: false }
+    }
+    if !send_raw(p, first.bytes) {
+        ctrace("hello not sent: the write failed")
+        return End { code: 1, line: "warren: the server closed the connection before the hello", gone: false }
+    }
+    ctrace("hello sent at {cols}x{rows}")
     // A suspend is the client's to handle (it gives the terminal back
     // first): an inherited ignore of it would hide it from the wait.
     signal.reset(signal.suspend() | signal.reload()) else |_| {}
