@@ -60,6 +60,9 @@ pub struct Server {
     inherited: List[int],
     keys: config.Keys,
     help: List[str],
+    clock_hour: int,
+    clock_minute: int,
+    clock_next: int,
 }
 
 fn now_ns() -> int {
@@ -490,6 +493,8 @@ fn close_pane(mut s: Server, si: int, k: int) {
 /// its rect's size, the frame's owner map to rebuild, every member to
 /// rescan its frame.
 fn layout_changed(mut s: Server, si: int) {
+    let shown = s.sessions[si].layout.active
+    clear_marks(mut s, si, shown)
     sync_sizes(mut s, si)
     s.sessions[si].layout_gen = s.sessions[si].layout_gen + 1
     session_changed(mut s, si, now_ns())
@@ -605,11 +610,94 @@ fn ensure_chrome(mut s: Server, si: int) {
     }
 }
 
-/// A tab's label on the bar: ` N ` or ` N:NAME `.
-fn tab_label(t: layout.Tab, n: int) -> str {
+// ---- line one: marks and the clock ----
+
+fn tab_exists(s: Server, si: int, tab: int) -> bool {
+    for t in s.sessions[si].layout.tabs {
+        if t.id == tab { return true }
+    }
+    false
+}
+
+/// Mark a tab (MARK_ACTIVITY, MARK_BELL); its members draw line one again
+/// when the marks change. Entries are reused once clear or their tab gone.
+fn mark_tab(mut s: Server, si: int, tab: int, bits: int) {
+    var free = 0 - 1
+    var i = 0
+    while i < s.sessions[si].mark_tab.len {
+        if s.sessions[si].mark_tab[i] == tab {
+            let was = s.sessions[si].mark_bits[i]
+            if was | bits == was { return }
+            s.sessions[si].mark_bits[i] = was | bits
+            s.sessions[si].bar_gen = s.sessions[si].bar_gen + 1
+            session_changed(mut s, si, now_ns())
+            return
+        }
+        if free < 0 && (s.sessions[si].mark_bits[i] == 0 || !tab_exists(s, si, s.sessions[si].mark_tab[i])) { free = i }
+        i += 1
+    }
+    if free >= 0 {
+        s.sessions[si].mark_tab[free] = tab
+        s.sessions[si].mark_bits[free] = bits
+    } else {
+        (mut s.sessions[si].mark_tab).push(tab)
+        (mut s.sessions[si].mark_bits).push(bits)
+    }
+    s.sessions[si].bar_gen = s.sessions[si].bar_gen + 1
+    session_changed(mut s, si, now_ns())
+}
+
+/// A tab is shown: its marks clear.
+fn clear_marks(mut s: Server, si: int, tab: int) {
+    var i = 0
+    while i < s.sessions[si].mark_tab.len {
+        if s.sessions[si].mark_tab[i] == tab && s.sessions[si].mark_bits[i] != 0 {
+            s.sessions[si].mark_bits[i] = 0
+            s.sessions[si].bar_gen = s.sessions[si].bar_gen + 1
+        }
+        i += 1
+    }
+}
+
+fn marks_of(s: Server, si: int, tab: int) -> int {
+    var i = 0
+    while i < s.sessions[si].mark_tab.len {
+        if s.sessions[si].mark_tab[i] == tab { return s.sessions[si].mark_bits[i] }
+        i += 1
+    }
+    0
+}
+
+/// The local time's hour and minute (TZ or /etc/localtime; UTC where the
+/// zone cannot be read), and the next minute's boundary to read it again.
+fn read_clock(mut s: Server) {
+    let ms = time.unix_ms()
+    let sec = ms / 1000
+    s.clock_next = (ms / 60000 + 1) * 60000
+    let l = time.local(sec) else |_| {
+        s.clock_hour = sec % 86400 / 3600
+        s.clock_minute = sec % 3600 / 60
+        return
+    }
+    s.clock_hour = l.hour
+    s.clock_minute = l.minute
+}
+
+fn two_digits(n: int) -> str {
+    if n < 10 { return "0{n}" }
+    "{n}"
+}
+
+/// A tab's label on the bar: ` N `, ` N:NAME `, with its marks after the
+/// name: `Z` zoomed, `+` output and `!` a bell while it was not shown.
+fn tab_label(t: layout.Tab, n: int, marks: int) -> str {
     let name = str_from_utf8(t.name[0..t.name.len]) else ""
-    if name.len == 0 { return " {n} " }
-    " {n}:{name} "
+    var tail = ""
+    if t.zoomed { tail = tail + "Z" }
+    if marks & MARK_ACTIVITY != 0 { tail = tail + "+" }
+    if marks & MARK_BELL != 0 { tail = tail + "!" }
+    if name.len == 0 { return " {n}{tail} " }
+    " {n}:{name}{tail} "
 }
 
 fn blank_line(cols: int) -> List[vt.Cell] {
@@ -688,14 +776,18 @@ fn bar_cells(s: Server, si: int, index: int, now: int) -> List[vt.Cell] {
         }
     }
     var line = blank_line(cols)
-    // The tabs end one column before the mode field.
-    let tab_end = cols - MODE_FIELD - 1
+    // The mode field, left of the clock from CLOCK_MIN_COLS; the tabs end
+    // one column before it.
+    let clock = cols >= CLOCK_MIN_COLS
+    let field = if clock then cols - MODE_FIELD - CLOCK_FIELD + 1 else cols - MODE_FIELD + 1
+    let tab_end = field - 2
     var col = put_text(mut line, 1, tab_end, " " + name_of(s.sessions[si]) + " ", INVERSE)
     var labels = List[str]()
     var active = 0
     var t = 0
     while t < s.sessions[si].layout.tabs.len {
-        (mut labels).push(tab_label(s.sessions[si].layout.tabs[t], t + 1))
+        let id = s.sessions[si].layout.tabs[t].id
+        (mut labels).push(tab_label(s.sessions[si].layout.tabs[t], t + 1, marks_of(s, si, id)))
         if s.sessions[si].layout.tabs[t].id == s.sessions[si].layout.active { active = t }
         t += 1
     }
@@ -722,13 +814,16 @@ fn bar_cells(s: Server, si: int, index: int, now: int) -> List[vt.Cell] {
         }
         if to + 1 < labels.len { col = put_text(mut line, col, tab_end, ">", 0) }
     }
-    if cols >= MODE_FIELD {
-        var c = cols - MODE_FIELD
-        while c < cols {
+    if field >= 1 {
+        var c = field - 1
+        while c < field - 1 + MODE_FIELD {
             line[c] = chrome_cell(32, INVERSE | BOLD, 0 - 1)
             c += 1
         }
-        let _f = put_text(mut line, cols - MODE_FIELD + 2, cols, config.mode_name(mode), INVERSE | BOLD)
+        let _f = put_text(mut line, field + 1, field + MODE_FIELD - 1, config.mode_name(mode), INVERSE | BOLD)
+    }
+    if clock {
+        let _k = put_text(mut line, cols - CLOCK_FIELD + 2, cols, two_digits(s.clock_hour) + ":" + two_digits(s.clock_minute), 0)
     }
     for cell in line { (mut bar).push(cell) }
     var two = blank_line(cols)
@@ -908,6 +1003,7 @@ fn close_tab(mut s: Server, si: int) {
     let from = focused_slot(s, si)
     var last = false
     layout.close_tab(mut s.sessions[si].layout, tab) else |e| { last = "{e}" == "last_tab" }
+    clear_marks(mut s, si, tab)
     if last {
         end_session(mut s, si)
         return
@@ -1569,6 +1665,8 @@ fn make_session(mut s: Server, name: str, cols: int, rows: int, cwd: str, names:
     for b in cwd.bytes() { (mut s.sessions[slot].cwd).push(b) }
     (mut s.sessions[slot].env_names).reset()
     (mut s.sessions[slot].env_values).reset()
+    (mut s.sessions[slot].mark_tab).reset()
+    (mut s.sessions[slot].mark_bits).reset()
     i = 0
     while i < names.len {
         (mut s.sessions[slot].env_names).push(copy names[i])
@@ -1755,6 +1853,15 @@ fn read_master(mut s: Server, k: int, now: int) {
             }
             i += 1
         }
+    }
+    // Output (and a bell) in a tab that is not shown marks the tab.
+    if !active && si >= 0 && s.sessions[si].live && s.sessions[si].generation == s.panes[k].session_gen {
+        var bits = MARK_ACTIVITY
+        for ev in events {
+            if ev.kind == 2 { bits = bits | MARK_BELL }
+        }
+        let tab = layout.tab_of(s.sessions[si].layout, s.panes[k].id)
+        if tab >= 0 { mark_tab(mut s, si, tab, bits) }
     }
     if s.panes[k].screen.mode_values[15] == 1 {
         if s.panes[k].sync_since == 0 { s.panes[k].sync_since = now }
@@ -2073,6 +2180,18 @@ fn timers(mut s: Server, now: int) {
         }
         i += 1
     }
+    // The minute moved: every session's line one is drawn again.
+    if s.clock_next > 0 && time.unix_ms() >= s.clock_next {
+        read_clock(mut s)
+        var si = 0
+        while si < s.sessions.len {
+            if s.sessions[si].live {
+                s.sessions[si].bar_gen = s.sessions[si].bar_gen + 1
+                session_changed(mut s, si, now)
+            }
+            si += 1
+        }
+    }
     if s.lifetime > 0 && now - s.started >= s.lifetime { begin_stop(mut s, "lifetime bound") }
     if !s.stopping && live_sessions(s) == 0 && live_conns(s) == 0 && now - s.idle_since >= IDLE_MS * 1000000 {
         begin_stop(mut s, "no sessions and no clients")
@@ -2096,6 +2215,12 @@ fn next_deadline_ms(s: Server, now: int) -> int {
         i += 1
     }
     if s.stopping && (at < 0 || s.stop_deadline < at) { at = s.stop_deadline }
+    // The clock's next minute, while a session is live.
+    if s.clock_next > 0 && live_sessions(s) > 0 {
+        let left = s.clock_next - time.unix_ms()
+        let tick = now + (if left > 0 then left else 0) * 1000000
+        if at < 0 || tick < at { at = tick }
+    }
     if s.lifetime > 0 {
         let end = s.started + s.lifetime
         if at < 0 || end < at { at = end }
@@ -2269,7 +2394,9 @@ pub fn serve() -> int {
         version: vt.package_version(), again: false, need_slot: false, need_pane: false, want_cols: 0,
         want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, master_read: master_read,
         budget: budget, uid: env.euid() else 0 - 1, inherited: inherited, keys: keys, help: help,
+        clock_hour: 0, clock_minute: 0, clock_next: 0,
     }
+    read_clock(mut s)
     net.set_listener_deadline(mut s.place.listener, 1) else |_| {}
     listener_interest(mut s)
     trace(s, "listening at {s.place.socket}")
