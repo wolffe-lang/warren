@@ -1045,10 +1045,14 @@ fn row_window_too_large(warren: str) -> str {
         why = "no line naming 600x500: " + warren_line(t)
     } else if t.contains("\u{1b}[?1049h") || after != r.before {
         why = "the client took the terminal"
-    } else if fs.exists(r.dir + "/default") {
-        why = "a server was started"
     }
-    close_run(r)
+    // No server may have been started: stop one only if it was.
+    if fs.exists(r.dir + "/default") {
+        if why.len == 0 { why = "a server was started" }
+        close_run(r)
+    } else {
+        close_quiet(r)
+    }
     why
 }
 
