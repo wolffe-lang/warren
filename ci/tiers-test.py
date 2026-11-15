@@ -119,6 +119,30 @@ class Tiers(unittest.TestCase):
             self.assertEqual(self.limit(tmp, 'failure', linux, 'linux')[1], 'limit=hit\n')
             self.assertEqual(self.limit(tmp, 'failure', linux - 60, 'linux')[1], 'limit=held\n')
 
+    def test_nightly_fits_its_limit(self):
+        # The nightly's Linux gate at the slowest measured pace: the rest of the
+        # gate and every seed of its fresh drive. Its step limit holds twice that
+        # (the rule LIMITS follows), and the drive's own deadline, which names a
+        # stopped drive, ends it before the step limit would.
+        tiers = tiers_module()
+        sys.path.insert(0, str(ROOT / 'tests/vt'))
+        try:
+            import fresh_fuzz
+        finally:
+            sys.path.pop(0)
+        seeds, _ = fresh_fuzz.profile_settings('nightly')
+        drive = seeds * tiers.FRESH_SECONDS_PER_SEED
+        expected = tiers.GATE_SECONDS_BESIDE_FRESH + drive
+        limit = getattr(tiers, 'NIGHTLY_LIMITS', tiers.LIMITS)['linux'] * 60
+        deadline = fresh_fuzz.profile_deadline('nightly') if hasattr(fresh_fuzz, 'profile_deadline') else 3600
+        self.assertGreaterEqual(limit, 2 * expected, 'nightly limit %d s, expected %d s' % (limit, expected))
+        self.assertGreaterEqual(deadline, 2 * drive, 'nightly drive deadline %d s, drive %d s' % (deadline, drive))
+        self.assertLessEqual(tiers.GATE_SECONDS_BESIDE_FRESH + deadline, limit,
+                             'the drive deadline %d s beside the rest of the gate passes the limit %d s' % (deadline, limit))
+        seeds, _ = fresh_fuzz.profile_settings('pull-request')
+        deadline = fresh_fuzz.profile_deadline('pull-request') if hasattr(fresh_fuzz, 'profile_deadline') else 3600
+        self.assertGreaterEqual(deadline, 2 * seeds * tiers.FRESH_SECONDS_PER_SEED)
+
     def test_workflow_carries_the_limits(self):
         import re
         tiers = tiers_module()
