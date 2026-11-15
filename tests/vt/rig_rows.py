@@ -23,7 +23,8 @@ def main():
         (PANE_RIG, 'w3-bar-plant.manifest', ['w3-bar-plant-build', 'activity-marks']),
         (CLIENT_RIG, 'w6-window-plant.manifest', ['w6-window-plant-build', 'zero-window']),
         (RIG, 'oracle-harness.manifest', ['oracle-harness-unit', 'oracle-harness-reference']),
-        (RIG, 'oracle-retry-plant.manifest', ['signal-retry'])):
+        (RIG, 'oracle-retry-plant.manifest', ['signal-retry']),
+        (RIG, 'oracle-bound-plant.manifest', ['retry-bound'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
@@ -51,6 +52,7 @@ def main():
     assert 'client-rows" "$root/target/native/warren" zero-window window-too-large' in window_plant
     harness = (RIG / 'oracle-harness-step.sh').read_text()
     assert "printf 'FAIL signal-retry " in harness and 'display_retry_rows.py' in harness
+    assert "printf 'FAIL retry-bound " in harness and 'rate-bound-ordinary-runner' in harness
     assert 'tests/vt/fresh_fuzz.py --profile pull-request' in harness and 'exec bash tools/gate unit' in harness
     linux = (RIG / 'w1-step.sh').read_text()
     assert 'tools/gate linux' in linux and 'vt_resource_bench.lu' in linux
