@@ -432,9 +432,10 @@ active tab reaches the clients; titles come from the focused pane only.
 
 **The frame** is the session's size: the tab area, then line one of the bar
 (the session's name and the tabs, the active one inverse; tabs that do not fit
-leave out the far side of the active one, marked `<` or `>`; at the right end
-the client's mode in a fixed field of nine columns, inverse and bold), then the
-hint line: the mode's rows of the key table, `keys label` with the keys
+leave out the far side of the active one, marked `<` or `>`; the client's mode
+in a fixed field of nine columns, inverse and bold; at the right end the local
+time, ` HH:MM `, from 40 columns, where narrower the mode field takes the end),
+then the hint line: the mode's rows of the key table, `keys label` with the keys
 inverse, two spaces apart, those that do not fit counted as `+N` (normal and
 prefix mode share one line, so the prefix repaints only the mode field); a
 prompt with its cursor; the confirm question; or a message while one lasts.
@@ -446,6 +447,14 @@ focused pane's rect are drawn in colour 2; when exactly two panes show they
 share one border along its length, so the half beside the focused pane is
 marked instead (tmux 3.4 draws both rules the same way, measured by its
 `tmux-focus-ring` rows). A zoomed tab draws no border.
+
+**Marks and the clock.** A tab's label carries `Z` while the tab is zoomed,
+`+` once a pane of it wrote while the tab was not shown, and `!` once one rang
+the bell then (the bell itself reaches clients only from the shown tab);
+showing the tab clears `+` and `!`. The clock is the local time (`TZ` or
+`/etc/localtime`; UTC where no zone can be read), read when the server starts
+and again at each minute's boundary, which is the clock's only wake; every
+session's line one is then drawn again.
 
 **Damage.** A client's image is a delta against what it holds, over what may
 have changed: the rects of the shown panes whose grids changed since its last
@@ -473,7 +482,10 @@ bytes, the hint lines, the prefix sent twice and locked mode reaching the pane
 (`--read-bytes`), the four sticky modes, a close that asks, the rename and
 command prompts, modes held per client, INPUT and PASTE dropped outside normal
 and locked mode, and the key list drawn for one client and closed back to the
-exact frame. The key table itself is held by `src/keys_test.lu` (every binding's
+exact frame; line one at 20, 80 and 200 columns and with nine tabs at 40, the
+zoom mark, the activity and bell marks, the clock and its minute, and (with
+/proc) the threads and resident size a pane. The client rows drive the same
+split end to end through the real client. The key table itself is held by `src/keys_test.lu` (every binding's
 step, the hint lines at 80 and 40 columns, the key list, the command line),
 natively, on the checked machine and under lupin. Differences from tmux, by ruling:
 warren's split gives the first pane the smaller half (39 and 40 columns at 80,
