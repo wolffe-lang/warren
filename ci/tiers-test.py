@@ -147,12 +147,40 @@ class Tiers(unittest.TestCase):
         import re
         tiers = tiers_module()
         text = (ROOT / '.github/workflows/ci.yml').read_text()
+        night = "(github.event_name == 'schedule' || inputs.profile == 'nightly')"
         for job, minutes in tiers.LIMITS.items():
             block = re.search(r'^  %s:\n(.*?)(?=^  [a-z-]+:\n|\Z)' % re.escape(job), text, re.M | re.S).group(1)
-            self.assertIn('    timeout-minutes: %d\n' % (minutes + 10), block, job)
-            self.assertIn('      - id: gate\n        timeout-minutes: %d\n' % minutes, block, job)
-            self.assertIn('ci/tiers.py limit --job %s ' % job, block, job)
+            if job in tiers.NIGHTLY_LIMITS:
+                nightly = tiers.NIGHTLY_LIMITS[job]
+                self.assertIn('    timeout-minutes: ${{ %s && %d || %d }}\n' % (night, nightly + 10, minutes + 10), block, job)
+                self.assertIn('      - id: gate\n        timeout-minutes: ${{ %s && %d || %d }}\n' % (night, nightly, minutes), block, job)
+                self.assertIn("WARREN_FUZZ_PROFILE: ${{ %s && 'nightly' || 'pull-request' }}" % night, block, job)
+                self.assertIn('ci/tiers.py limit --job %s --profile "${{ %s && \'nightly\' || \'pull-request\' }}" ' % (job, night), block, job)
+                # A hosted job may run at most six hours.
+                self.assertLessEqual(nightly + 10, 360, job)
+            else:
+                self.assertIn('    timeout-minutes: %d\n' % (minutes + 10), block, job)
+                self.assertIn('      - id: gate\n        timeout-minutes: %d\n' % minutes, block, job)
+                self.assertIn('ci/tiers.py limit --job %s ' % job, block, job)
             self.assertIn('limit: ${{ steps.limit.outputs.limit }}', block, job)
+        self.assertIn("      profile:\n", text)
+        self.assertIn("        options: [pull-request, nightly]\n", text)
+
+    def test_limit_step_for_the_nightly(self):
+        import tempfile
+        nightly = tiers_module().NIGHTLY_LIMITS['linux'] * 60
+        with tempfile.TemporaryDirectory() as tmp:
+            start = Path(tmp) / 'gate-start'
+            start.write_text('1000\n')
+            for profile, ran, verdict in (('nightly', nightly, 'hit'), ('nightly', 80 * 60, 'held'),
+                                          ('pull-request', 80 * 60, 'hit')):
+                out = Path(tmp) / 'output'
+                out.write_text('')
+                p = subprocess.run([sys.executable, '-I', str(ROOT / 'ci/tiers.py'), 'limit', '--job', 'linux',
+                    '--profile', profile, '--outcome', 'cancelled', '--since-file', str(start),
+                    '--now', str(1000 + ran), '--github-output', str(out)], capture_output=True, text=True)
+                self.assertEqual(p.returncode, 0, p.stderr)
+                self.assertIn('limit=%s\n' % verdict, out.read_text(), (profile, ran))
 
 
 if __name__ == '__main__': unittest.main()
