@@ -4,8 +4,8 @@
 # harness: `unit` is the unit gate (the harness's own rows, the display retry
 # rows among them); `oracle` builds warren and the corpus properties and runs
 # every gate step that launches the pinned reference terminal, through the
-# harness's launch and retry; `plant` runs the display retry rows on a plant
-# and names the row it must turn red.
+# harness's launch and retry; `plant` and `bound-plant` run the display retry
+# rows on a plant and name the row it must turn red.
 set -euo pipefail
 root=$PWD
 export HOME="$root/target/home" TMPDIR="$root/target/tmp" SHELL=/bin/sh
@@ -48,6 +48,15 @@ case "${1:-}" in
   sed 's/^/  /' target/gate/plant-retry-rows.out
   if grep -q '^FAIL display-retry signal-once-then-answers' target/gate/plant-retry-rows.out; then
     printf 'FAIL signal-retry a reference terminal that died on a signal before answering was not retried\n'
+  fi
+  exit "$rc"
+  ;;
+ bound-plant)
+  rc=0
+  python3 -I tests/vt/display_retry_rows.py > target/gate/plant-bound-rows.out 2>&1 || rc=$?
+  sed 's/^/  /' target/gate/plant-bound-rows.out
+  if grep -q '^FAIL display-retry rate-bound-ordinary-runner' target/gate/plant-bound-rows.out; then
+    printf 'FAIL retry-bound an ordinary hosted runner (9 retries in 613 launches) was held past the retry bound\n'
   fi
   exit "$rc"
   ;;

@@ -1,0 +1,5 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# puts back the flat 1% retry bound in place of the binomial one.
+floor 15
+rig oracle-harness-step.sh sha256=1bb82f111e6167531d3f11cd57d5f22e50f44ad4f5001a2535ea6da530e2507f
+step retry-bound tools=python3 script=oracle-harness-step.sh -- bound-plant
