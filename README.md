@@ -136,7 +136,11 @@ reference inputs and D10's failed raw reports never become candidate-derived
 goldens. The Linux drive records 200 requested-4KiB streams with bytewise/random
 P2 and primary content/rendition/resize-path checks; the nightly profile uses
 5000 seeds. Both profiles' step limits and drive deadlines are sized from the
-measured pace (`ci/tiers.py`). Each rule records its source triggers, permitted field deltas and
+measured pace (`ci/tiers.py`). A seed whose failure is a known defect is listed
+in `tests/vt/fresh-known.json` with the issue that tracks it and the failures it
+shows: it prints `KNOWN` and does not fail the drive while it fails exactly so,
+and it fails the drive as `FIXED` once it passes, until its fix removes it from
+the list. Each rule records its source triggers, permitted field deltas and
 case counts; an unexplained difference remains red. The assigned-scalar width
 sweep permits zero non-control differences.
 The finite hostile row uses capped
