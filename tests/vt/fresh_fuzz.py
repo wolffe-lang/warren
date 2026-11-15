@@ -34,7 +34,8 @@ def profile_settings(name):
 
 
 def failure_name(error):
-    """A reference terminal that never opened its display is not a bound violation."""
+    """A reference terminal that never opened its display, or died on a signal before
+    answering, is not a bound violation: each has its own name."""
     return getattr(error, 'failure_name', 'reference-observation-or-bound')
 
 
@@ -43,6 +44,16 @@ def note_display_retries(manifest, entry, name, retries):
     entry['display_retries'] = [dict(retry) for retry in retries]
     manifest['display_retries'].extend({'case': name, **retry} for retry in retries)
     return len(retries)
+
+
+def rate_verdict(manifest, display):
+    """The display's retries against its bound: past it, the named FAIL line, counted as a failure."""
+    problem = display.rate_problem()
+    if problem:
+        print('FAIL ' + problem, flush=True)
+        manifest['failed'] += 1
+        manifest['retry_rate'] = problem
+    return problem
 
 
 def select_cases(cases, names):
@@ -227,9 +238,10 @@ def main():
                     (work / 'properties.stderr').write_bytes(result.stderr)
             retried = note_display_retries(manifest, entry, name, display.retries[retries_before:])
             if retried:
-                print('RETRIED fresh-fuzz %s reference-display-unavailable launches=%d %s' % (
-                    name, retried, ' '.join('%s/%s' % (Path(retry['work']).name, retry['pass'])
-                                            for retry in entry['display_retries'])), flush=True)
+                print('RETRIED fresh-fuzz %s %s launches=%d %s' % (
+                    name, ','.join(sorted({retry['name'] for retry in entry['display_retries']})), retried,
+                    ' '.join('%s/%s' % (Path(retry['work']).name, retry['pass'])
+                             for retry in entry['display_retries'])), flush=True)
             failed = bool(entry['failures'])
             manifest['failed'] += failed
             manifest['cases'][name] = entry
@@ -238,11 +250,13 @@ def main():
             print('%s fresh-fuzz %s bytes=%d failures=%s reference-excluded=%s' %
                   ('FAIL' if failed else 'PASS', name, len(data), ','.join(row['name'] for row in entry['failures']) or '-', bool(entry['reference_exclusion'])), flush=True)
             (args.out / 'progress.json').write_text(json.dumps({'completed': len(manifest['cases']), 'failed': manifest['failed']}) + '\n')
+    manifest['launches'] = display.launches
+    rate_verdict(manifest, display)
     (args.out / 'result.json').write_text(json.dumps(manifest, indent=2) + '\n')
     print('FRESH-RULE-COUNTS ' + json.dumps(manifest['rule_counts'], sort_keys=True), flush=True)
-    print('FRESH-FUZZ completed=%d requested=%d failed=%d reference-excluded=%d display-retries=%d' %
+    print('FRESH-FUZZ completed=%d requested=%d failed=%d reference-excluded=%d display-retries=%d launches=%d retry-bound=%d' %
           (len(manifest['cases']), len(selected), manifest['failed'], len(excluded),
-           len(manifest['display_retries'])), flush=True)
+           len(manifest['display_retries']), display.launches, oracle.retry_bound(display.launches)), flush=True)
     return bool(manifest['failed'])
 
 
