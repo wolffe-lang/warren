@@ -1,0 +1,6 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# stops output in a tab that is not shown from marking it.
+floor 15
+rig w3-bar-plant-step.sh sha256=c82e4d9f33386561226e7c941a655c3fa2f4c7e4cc2984cd979060229c62f2a8
+step w3-bar-plant-build tools=python3,cc script=w3-bar-plant-step.sh -- build
+step activity-marks needs=w3-bar-plant-build tools=python3 script=w3-bar-plant-step.sh -- rows
