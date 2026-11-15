@@ -322,12 +322,26 @@ ignored or blocked and no inherited descriptor, the server's thread count, the
 pre-HELLO, connection, session and memory limits (the memory row lowers the
 budget through `WARREN_MEMORY_BUDGET`, which the server takes only below its
 own), a resize while an image is outstanding, a client too slow for its events
-beside one that keeps up, a keystroke's delay beside a flooding pane, and a
-flat resident size over 10,000 keystrokes. `src/compose_rows.lu` holds every
+beside one that keeps up, a keystroke's delay beside a flooding pane, a
+flat resident size over 10,000 keystrokes, and the trace's closes (below).
+`src/compose_rows.lu` holds every
 composed image, applied by the client's applier, to the emulator's stored
 cells, and holds the event queue's cap to the bytes a client has yet to take
 (a small socket under a steady pane never empties the queue, and must not
 count what it sent).
+
+With `WARREN_TRACE` set, the server writes a trace to its standard error, and
+every close of a connection names its cause there, including the closes that
+send the peer nothing: `conn N closed: CAUSE`, where the cause is the message
+it drained to (`REPLY sent`, `BYE 1 sent`, `REFUSE 2 sent`), the peer's end
+(`end of input (closed)`), a failed write (`write failed: closed`), a first
+message that is not a HELLO, a HELLO that cannot be read or is malformed, a
+peer of another user, a deadline that passed (naming the phase), a message
+that could not be queued, or the server stopping. A `new` at a terminal is two
+connections: the command that makes the session (`REPLY sent`), then the
+attach. The `close-causes` session row drives the ordinary closes, a first
+message that is not a HELLO, and a client gone before its WELCOME is written,
+and fails on any close in the trace that names no cause.
 
 On PAX a pane ends when its program ends, not when the program closes its
 terminal: the late-child row measures the session's end about a second after
