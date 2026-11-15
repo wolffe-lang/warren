@@ -14,6 +14,7 @@ its pty (tools/oracle/feeder.py) and its print-screen file.
 """
 import argparse
 import json
+import math
 import os
 from pathlib import Path
 import subprocess
@@ -62,18 +63,38 @@ class ReferenceKilled(OracleError):
 # signal is retried, and only once.
 DISPLAY_FAILURE = b"Can't open display"
 RETRY_PAUSE_SECONDS = 1.0
-# The retries one display may need before its runner is the red: at most this
-# share of its launches, and never fewer than RETRY_FLOOR. A single retry turns
-# a stream red only when two launches in a row fail, about N * p * p times in N
-# launches; at p = 1% and the fresh drive's ~1,540 launches that is 0.15 a run,
-# and it grows with the square of the rate past it.
-RETRY_RATE = 0.01
+# The retries one display may need before its runner is the red. A launch
+# fails its display (or dies before answering) with some small probability p
+# that belongs to the runner, so a display's retries are close to binomial in
+# its launches. The bound is the least b with P(Binomial(launches, RETRY_P) > b)
+# at most RETRY_TAIL, and never under RETRY_FLOOR.
+#
+# RETRY_P is set from hosted Linux jobs' counts (23 jobs, 2026-11-12 to 11-15):
+# the highest per-run rate on a command with over 100 launches is 2.29% (the
+# fuzz digests, 3 of 131, beside 28 of 1,570 in the fresh drive on the same
+# runner), rounded up to 2.5%. One runner, the one warren#15 named as failing
+# throughout, ran at 4.2% (83 of 1,625 in the fresh drive) and is not counted:
+# it is what the bound is for. A job makes six checks (cases, mutations, the
+# census, fuzz and recording digests, the fresh drive), so at p = 2.5% a run is
+# falsely red at most 6 in 10,000 times; most runners retry nothing at all.
+RETRY_P = 0.025
+RETRY_TAIL = 1e-4
 RETRY_FLOOR = 2
 
 
-def retry_bound(launches):
-    """The most retries a display of `launches` launches may need."""
-    return max(RETRY_FLOOR, int(launches * RETRY_RATE))
+def retry_bound(launches, p=None, tail=None):
+    """The most retries a display of `launches` launches may need (see RETRY_P)."""
+    p = RETRY_P if p is None else p
+    tail = RETRY_TAIL if tail is None else tail
+    below = 0.0
+    b = 0
+    while b <= launches:
+        below += math.exp(math.lgamma(launches + 1) - math.lgamma(b + 1) - math.lgamma(launches - b + 1)
+                          + b * math.log(p) + (launches - b) * math.log1p(-p))
+        if 1.0 - below <= tail:
+            break
+        b += 1
+    return max(RETRY_FLOOR, b)
 
 
 def clipped(data, keep=300):
