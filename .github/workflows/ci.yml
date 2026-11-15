@@ -12,6 +12,11 @@ on:
         description: 'Optional job IDs, space-separated; empty runs every job'
         type: string
         default: ''
+      profile:
+        description: 'The fresh fuzz profile the Linux gate drives (the nightly runs nightly)'
+        type: choice
+        options: [pull-request, nightly]
+        default: pull-request
 permissions:
   contents: read
 concurrency:
@@ -46,26 +51,28 @@ jobs:
     needs: plan
     if: ${{ contains(fromJSON(needs.plan.outputs.jobs), 'linux') }}
     runs-on: ubuntu-24.04
-    # The gate step's limit is ci/tiers.py's LIMITS (sized there from measured
-    # runs); the job's is ten minutes more, for checkout and upload. The
-    # image's packages come from a snapshot archive that can be slow.
-    timeout-minutes: 90
+    # The gate step's limit is ci/tiers.py's LIMITS, or NIGHTLY_LIMITS for the
+    # nightly fuzz profile (sized there from measured runs); the job's is ten
+    # minutes more, for checkout and upload. The image's packages come from a
+    # snapshot archive that can be slow.
+    timeout-minutes: ${{ (github.event_name == 'schedule' || inputs.profile == 'nightly') && 355 || 90 }}
     outputs:
       limit: ${{ steps.limit.outputs.limit }}
+      minutes: ${{ steps.limit.outputs.minutes }}
     steps:
       - uses: actions/checkout@v4
       - id: gate
-        timeout-minutes: 80
+        timeout-minutes: ${{ (github.event_name == 'schedule' || inputs.profile == 'nightly') && 345 || 80 }}
         run: |
           date +%s > "$RUNNER_TEMP/gate-start"
           bash tools/in-container
         env:
           WARREN_ENGINE: docker
           WARREN_CPUS: '0'
-          WARREN_FUZZ_PROFILE: ${{ github.event_name == 'schedule' && 'nightly' || 'pull-request' }}
+          WARREN_FUZZ_PROFILE: ${{ (github.event_name == 'schedule' || inputs.profile == 'nightly') && 'nightly' || 'pull-request' }}
       - id: limit
         if: ${{ always() }}
-        run: python3 -I ci/tiers.py limit --job linux --outcome "${{ steps.gate.outcome }}" --since-file "$RUNNER_TEMP/gate-start" --github-output "$GITHUB_OUTPUT"
+        run: python3 -I ci/tiers.py limit --job linux --profile "${{ (github.event_name == 'schedule' || inputs.profile == 'nightly') && 'nightly' || 'pull-request' }}" --outcome "${{ steps.gate.outcome }}" --since-file "$RUNNER_TEMP/gate-start" --github-output "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
