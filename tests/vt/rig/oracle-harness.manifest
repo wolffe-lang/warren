@@ -2,6 +2,6 @@
 # image, from a clean committed checkout. The unit gate, then every step that
 # launches the pinned reference terminal.
 floor 35
-rig oracle-harness-step.sh sha256=fa884cdb124594a074a931c558190e23dd2a7b540fd05a1bde12e9412f47cef7
+rig oracle-harness-step.sh sha256=00102e9e2389d574e4af4b3304278ae9f74bba8d53950e0dc50f56acc524d81e
 step oracle-harness-unit tools=python3 script=oracle-harness-step.sh -- unit
 step oracle-harness-reference tools=python3,cc script=oracle-harness-step.sh -- oracle

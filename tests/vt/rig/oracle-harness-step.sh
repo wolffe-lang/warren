@@ -5,8 +5,8 @@
 # rows among them); `oracle` builds warren and the corpus properties and runs
 # every gate step that launches the pinned reference terminal, through the
 # harness's launch and retry; `plant` and `bound-plant` run the display retry
-# rows, and `nightly-plant` the tier tests, on a plant and name the row it must
-# turn red.
+# rows, `nightly-plant` the tier tests and `known-plant` the fresh drive's
+# known-failure rows, on a plant and name the row it must turn red.
 set -euo pipefail
 root=$PWD
 export HOME="$root/target/home" TMPDIR="$root/target/tmp" SHELL=/bin/sh
@@ -67,6 +67,15 @@ case "${1:-}" in
   sed 's/^/  /' target/gate/plant-tiers.out
   if grep -q '^FAIL: test_nightly_fits_its_limit' target/gate/plant-tiers.out; then
     printf 'FAIL nightly-limit the nightly profile no longer fits twice within its step limit\n'
+  fi
+  exit "$rc"
+  ;;
+ known-plant)
+  rc=0
+  python3 -I tests/vt/fresh_known_rows.py > target/gate/plant-known-rows.out 2>&1 || rc=$?
+  sed 's/^/  /' target/gate/plant-known-rows.out
+  if grep -q '^FAIL fresh-known known-passes' target/gate/plant-known-rows.out; then
+    printf 'FAIL known-fixed a known seed that passes was not held red until it leaves the list\n'
   fi
   exit "$rc"
   ;;
