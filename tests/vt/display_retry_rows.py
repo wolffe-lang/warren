@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
-"""A reference terminal that cannot open its display is retried once, by name.
+"""A reference terminal that cannot open its display, or that ends on a signal
+before it answers, is retried once, by name; the retries are held to a rate.
 
 The fake terminal below stands in for the pinned emulator on PATH. It never
 opens a display; each launch follows the next action in its plan. Only a
-launch that produced no answers and reports the display failure is retried,
-once; a terminal that ran and disagreed is never retried, and stderr keeps
-both its head and its tail.
+launch that produced no answers and either reports the display failure or
+died on a signal (a real SIGPIPE: a write to a pipe with no reader) is
+retried, once in all; a terminal that ran and disagreed, or answered and then
+died, is never retried, and stderr keeps both its head and its tail. More
+retries than the display's bound is its own named red, in the oracle's
+commands and in the fresh drive.
 """
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
 import runpy
 import shutil
+import subprocess
 import sys
 import tempfile
 
@@ -21,7 +28,7 @@ import run as oracle  # noqa: E402
 
 DISPLAY_LINE = "xterm: Xt error: Can't open display: %s\n"
 FAKE = r'''
-import json, sys
+import json, os, signal, sys
 from pathlib import Path
 here = Path(__file__).resolve().parent
 argv = sys.argv[1:]
@@ -32,6 +39,17 @@ count = int((here / 'launches').read_text()) + 1 if (here / 'launches').exists()
 plan = json.loads((here / 'plan.json').read_text())
 action = plan[count - 1] if count <= len(plan) else 'unplanned'
 head = 'HEAD-MARKER ' + 'h' * 700 + '\n'
+def sigpipe():
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    r, w = os.pipe()
+    os.close(r)
+    os.write(w, b'x')
+    sys.exit(97)
+if action == 'sigpipe':
+    sigpipe()
+if action == 'answered-sigpipe':
+    answers.write_text(json.dumps({'fake': 'answered', 'launch': count}))
+    sigpipe()
 if action == 'display':
     sys.stderr.write(head + "xterm: Xt error: Can't open display: %s\n")
     sys.exit(1)
@@ -141,6 +159,62 @@ def main():
         row('answered-launch-never-retried', result is None and fake.launches() == 1 and not retries(shown),
             'launches=%d error=%s' % (fake.launches(), error))
 
+        killed = getattr(oracle, 'ReferenceKilled', ())
+        fake, shown = Fake(base, ['sigpipe', 'ok']), display()
+        result, error = attempt(fake, shown, 'S')
+        found = retries(shown)
+        row('signal-once-then-answers', error is None and result and result.get('launch') == 2 and fake.launches() == 2
+            and len(found) == 1 and found[0].get('name') == 'reference-terminal-killed' and found[0].get('pass') == 'S',
+            'launches=%d retries=%r error=%s' % (fake.launches(), found, error))
+
+        fake, shown = Fake(base, ['sigpipe', 'sigpipe', 'ok']), display()
+        result, error = attempt(fake, shown, 'S')
+        text = str(error)
+        row('signal-twice-stays-red', result is None and fake.launches() == 2 and len(retries(shown)) == 1
+            and isinstance(error, killed) and text.startswith('reference-terminal-killed') and 'exit -13' in text,
+            'launches=%d retries=%d error=%s' % (fake.launches(), len(retries(shown)), text[:160]))
+
+        fake, shown = Fake(base, ['display', 'sigpipe', 'ok']), display()
+        result, error = attempt(fake, shown, 'S')
+        found = retries(shown)
+        row('one-retry-across-causes', result is None and fake.launches() == 2 and len(found) == 1
+            and found[0].get('name') == 'reference-display-unavailable' and isinstance(error, killed)
+            and str(error).startswith('reference-terminal-killed'),
+            'launches=%d retries=%r error=%s' % (fake.launches(), found, str(error)[:160]))
+
+        fake, shown = Fake(base, ['answered-sigpipe', 'ok']), display()
+        result, error = attempt(fake, shown, 'S')
+        row('signal-after-answers-never-retried', result is None and fake.launches() == 1 and not retries(shown)
+            and 'exit -13' in str(error) and not str(error).startswith('reference-terminal-killed'),
+            'launches=%d error=%s' % (fake.launches(), error))
+
+        fake, shown = Fake(base, ['display', 'ok', 'display', 'ok', 'display', 'ok']), display()
+        for _ in range(3):
+            attempt(fake, shown)
+        problem = shown.rate_problem() if hasattr(shown, 'rate_problem') else None
+        row('rate-bound-over', problem == 'reference-retry-rate retries=3 launches=6 bound=2',
+            'launches=%d retries=%d problem=%r' % (fake.launches(), len(retries(shown)), problem))
+
+        fake, shown = Fake(base, ['display', 'ok', 'sigpipe', 'ok', 'ok']), display()
+        for _ in range(3):
+            attempt(fake, shown)
+        problem = shown.rate_problem() if hasattr(shown, 'rate_problem') else None
+        row('rate-bound-under', problem == '' and getattr(shown, 'launches', None) == 5 and len(retries(shown)) == 2,
+            'launches=%r retries=%d problem=%r' % (getattr(shown, 'launches', None), len(retries(shown)), problem))
+
+        fake = Fake(base, ['display'] * 6)
+        streams = fake.dir / 'streams'
+        streams.mkdir()
+        for n in range(3):
+            (streams / ('s%d.in' % n)).write_bytes(b'abc')
+        env = dict(os.environ, PATH=str(fake.bin) + os.pathsep + os.environ['PATH'], WARREN_ORACLE_DISPLAY=':fake')
+        done = subprocess.run([sys.executable, '-I', str(ROOT / 'tools/oracle/run.py'), 'cases', str(streams),
+                               '--out', str(fake.dir / 'cases-out')], env=env, capture_output=True, text=True, timeout=120)
+        lines = done.stdout.splitlines()
+        row('rate-bound-in-cases-command', done.returncode == 1 and fake.launches() == 6
+            and 'FAIL reference-retry-rate retries=3 launches=6 bound=2' in lines,
+            'exit=%d launches=%d stdout=%r' % (done.returncode, fake.launches(), done.stdout[-300:]))
+
         reports = runpy.run_path(str(ROOT / 'tests/vt/probes/fresh_reports.py'))
         fake, shown = Fake(base, ['display', 'ok']), display()
         saved = os.environ['PATH']
@@ -164,7 +238,8 @@ def main():
         row('fresh-failure-names', name_of is not None and unavailable is not None
             and name_of(unavailable('reference-display-unavailable: pass S')) == 'reference-display-unavailable'
             and name_of(oracle.OracleError('pass S: row 1 differs')) == 'reference-observation-or-bound'
-            and name_of(AssertionError('bound')) == 'reference-observation-or-bound',
+            and name_of(AssertionError('bound')) == 'reference-observation-or-bound'
+            and killed != () and name_of(killed('reference-terminal-killed: pass S')) == 'reference-terminal-killed',
             'failure_name=%r DisplayUnavailable=%r' % (name_of, unavailable))
 
         note = fresh.get('note_display_retries')
@@ -173,12 +248,24 @@ def main():
         row('fresh-manifest-counts-by-name', counted == 1 and entry.get('display_retries') == [{'name': 'reference-display-unavailable', 'pass': 'S', 'work': 'w'}]
             and manifest['display_retries'] == [{'case': 'fresh-0123', 'name': 'reference-display-unavailable', 'pass': 'S', 'work': 'w'}],
             'note_display_retries=%r counted=%r manifest=%r' % (note, counted, manifest))
+
+        verdict = fresh.get('rate_verdict')
+        shown = display()
+        shown.retries = [{'name': 'reference-terminal-killed', 'pass': 'S', 'work': 'w'}] * 3
+        shown.launches = 6
+        manifest = {'failed': 0}
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            said = verdict(manifest, shown) if verdict else None
+        row('fresh-rate-verdict', said == 'reference-retry-rate retries=3 launches=6 bound=2' and manifest['failed'] == 1
+            and printed.getvalue() == 'FAIL reference-retry-rate retries=3 launches=6 bound=2\n',
+            'rate_verdict=%r said=%r failed=%r printed=%r' % (verdict, said, manifest['failed'], printed.getvalue()))
     finally:
         shutil.rmtree(base)
     if failed:
         print('FAIL display-retry rows: %s' % ' '.join(failed))
         return 1
-    print('PASS display-retry once-only named counted head-and-tail never-on-disagreement')
+    print('PASS display-retry once-only named counted head-and-tail never-on-disagreement signal-retried rate-bounded')
     return 0
 
 
