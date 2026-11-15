@@ -1,0 +1,5 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# stops the harness retrying a reference terminal that died on a signal.
+floor 15
+rig oracle-harness-step.sh sha256=1411b05f9e52335a50df58b82fb31c7d5ba4c73c05a6d7bff6fa9161d1a05a31
+step signal-retry tools=python3 script=oracle-harness-step.sh -- plant
