@@ -43,6 +43,60 @@ def profile_deadline(name):
     return profiles[name]['deadline']
 
 
+KNOWN_LIST = ROOT / 'tests/vt/fresh-known.json'
+# The failures a known seed may list: every name the drive gives a case except a
+# reference terminal that never opened its display or died on a signal, which
+# are retried and rate-bounded, never a seed's own defect.
+KNOWN_FAILURE_NAMES = ('reference-observation-or-bound', 'unclassified-complete-frame',
+                       'P2-bytewise', 'P2-random', 'R1-R3-R8', 'native-exit')
+
+
+def known_failures(path=KNOWN_LIST):
+    """Seeds whose failure is a known defect, each with the issue that tracks it and
+    the failures it shows: {name: {'issue': N, 'failures': [...]}}."""
+    listed = json.loads(Path(path).read_text())
+    if not isinstance(listed, dict):
+        raise ValueError('the known list is an object of seeds')
+    for name, entry in listed.items():
+        match = re.fullmatch(r'fresh-(\d{4})', name)
+        if not match or not 1 <= int(match.group(1)) <= 5000:
+            raise ValueError('known seed %r is not fresh-0001..fresh-5000' % name)
+        if not isinstance(entry, dict) or set(entry) != {'issue', 'failures'}:
+            raise ValueError('known seed %s needs exactly an issue and its failures' % name)
+        if type(entry['issue']) is not int or entry['issue'] < 1:
+            raise ValueError('known seed %s names no issue' % name)
+        failures = entry['failures']
+        if (not isinstance(failures, list) or not failures or len(set(failures)) != len(failures)
+                or any(failure not in KNOWN_FAILURE_NAMES for failure in failures)):
+            raise ValueError('known seed %s lists no failures, a repeated one or an unknown one' % name)
+    return listed
+
+
+def case_outcome(manifest, name, entry, size, known):
+    """One case's line and count. A known seed failing exactly as listed is KNOWN and
+    does not count; a known seed that passes is FIXED and counts until it leaves the
+    list; any other failure counts, as before."""
+    failures = [row['name'] for row in entry['failures']]
+    listed = known.get(name)
+    if listed and failures and sorted(failures) == sorted(listed['failures']):
+        entry['known_issue'] = listed['issue']
+        manifest['known'][name] = listed['issue']
+        print('KNOWN %s warren#%d failures=%s' % (name, listed['issue'], ','.join(failures)), flush=True)
+        return
+    if listed and not failures:
+        manifest['fixed'][name] = listed['issue']
+        manifest['failed'] += 1
+        print('FIXED %s warren#%d passes: remove it from the list in %s' % (
+            name, listed['issue'], KNOWN_LIST.relative_to(ROOT)), flush=True)
+        return
+    manifest['failed'] += bool(failures)
+    line = '%s fresh-fuzz %s bytes=%d failures=%s reference-excluded=%s' % (
+        'FAIL' if failures else 'PASS', name, size, ','.join(failures) or '-', bool(entry['reference_exclusion']))
+    if listed:
+        line += ' known=warren#%d:%s' % (listed['issue'], ','.join(listed['failures']))
+    print(line, flush=True)
+
+
 def failure_name(error):
     """A reference terminal that never opened its display, or died on a signal before
     answering, is not a bound violation: each has its own name."""
@@ -93,6 +147,7 @@ def main():
     args.seeds = seeds if args.seeds is None else args.seeds
     args.bytes = size if args.bytes is None else args.bytes
     selected = select_cases(generated(args.seeds, args.bytes), args.case)
+    known = known_failures()
     for part in ('tools/oracle', 'tests/vt', 'tools/vt', 'tests/vt/probes'):
         sys.path.insert(0, str(ROOT / part))
     import run as oracle
@@ -115,10 +170,10 @@ def main():
         'fixture_sha256': {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in
             ('tests/vt/fresh_expectations.py', 'tests/vt/report_expectations.py',
              'tools/vt/repair_background_fixture.py', 'tools/vt/legacy_black_fixture.py',
-             'tools/vt/report_fixture.py', 'tools/vt/erase_extent_fixture.py')},
+             'tools/vt/report_fixture.py', 'tools/vt/erase_extent_fixture.py', 'tests/vt/fresh-known.json')},
         'rule_counts': {rule: {'source_cases': 0, 'cases_with_permitted_delta': 0,
                                'fully_resolved_at_stage': 0} for rule in rules},
-        'cases': {}, 'failed': 0, 'display_retries': []}
+        'cases': {}, 'failed': 0, 'known': {}, 'fixed': {}, 'display_retries': []}
     started = time.monotonic()
     source_models = {name: trace(data) for name, data in selected.items()}
     excluded = {name: model['reference_exclusions'] for name, model in source_models.items()
@@ -254,20 +309,17 @@ def main():
                     name, ','.join(sorted({retry['name'] for retry in entry['display_retries']})), retried,
                     ' '.join('%s/%s' % (Path(retry['work']).name, retry['pass'])
                              for retry in entry['display_retries'])), flush=True)
-            failed = bool(entry['failures'])
-            manifest['failed'] += failed
+            case_outcome(manifest, name, entry, len(data), known)
             manifest['cases'][name] = entry
             journal.write(json.dumps({'name': name, **entry}) + '\n')
             journal.flush()
-            print('%s fresh-fuzz %s bytes=%d failures=%s reference-excluded=%s' %
-                  ('FAIL' if failed else 'PASS', name, len(data), ','.join(row['name'] for row in entry['failures']) or '-', bool(entry['reference_exclusion'])), flush=True)
             (args.out / 'progress.json').write_text(json.dumps({'completed': len(manifest['cases']), 'failed': manifest['failed']}) + '\n')
     manifest['launches'] = display.launches
     rate_verdict(manifest, display)
     (args.out / 'result.json').write_text(json.dumps(manifest, indent=2) + '\n')
     print('FRESH-RULE-COUNTS ' + json.dumps(manifest['rule_counts'], sort_keys=True), flush=True)
-    print('FRESH-FUZZ completed=%d requested=%d failed=%d reference-excluded=%d display-retries=%d launches=%d retry-bound=%d' %
-          (len(manifest['cases']), len(selected), manifest['failed'], len(excluded),
+    print('FRESH-FUZZ completed=%d requested=%d failed=%d known=%d fixed=%d reference-excluded=%d display-retries=%d launches=%d retry-bound=%d' %
+          (len(manifest['cases']), len(selected), manifest['failed'], len(manifest['known']), len(manifest['fixed']), len(excluded),
            len(manifest['display_retries']), display.launches, oracle.retry_bound(display.launches)), flush=True)
     return bool(manifest['failed'])
 
