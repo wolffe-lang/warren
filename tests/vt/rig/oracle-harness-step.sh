@@ -5,7 +5,8 @@
 # rows among them); `oracle` builds warren and the corpus properties and runs
 # every gate step that launches the pinned reference terminal, through the
 # harness's launch and retry; `plant` and `bound-plant` run the display retry
-# rows on a plant and name the row it must turn red.
+# rows, and `nightly-plant` the tier tests, on a plant and name the row it must
+# turn red.
 set -euo pipefail
 root=$PWD
 export HOME="$root/target/home" TMPDIR="$root/target/tmp" SHELL=/bin/sh
@@ -57,6 +58,15 @@ case "${1:-}" in
   sed 's/^/  /' target/gate/plant-bound-rows.out
   if grep -q '^FAIL display-retry rate-bound-ordinary-runner' target/gate/plant-bound-rows.out; then
     printf 'FAIL retry-bound an ordinary hosted runner (9 retries in 613 launches) was held past the retry bound\n'
+  fi
+  exit "$rc"
+  ;;
+ nightly-plant)
+  rc=0
+  python3 -I ci/tiers-test.py > target/gate/plant-tiers.out 2>&1 || rc=$?
+  sed 's/^/  /' target/gate/plant-tiers.out
+  if grep -q '^FAIL: test_nightly_fits_its_limit' target/gate/plant-tiers.out; then
+    printf 'FAIL nightly-limit the nightly profile no longer fits twice within its step limit\n'
   fi
   exit "$rc"
   ;;
