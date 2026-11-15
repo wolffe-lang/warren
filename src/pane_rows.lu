@@ -712,7 +712,7 @@ fn golden_three(img: proto.Image, focus: int, name: str) -> str {
         row += 1
     }
     // Line one: " NAME " and " 1 ", both inverse (the one tab is active),
-    // blanks, and the mode field " NORMAL  " at columns 72-80.
+    // blanks, the mode field " NORMAL  " at columns 65-73, the clock.
     let bar = " {name}  1 "
     var k = 0
     for b in bar.bytes() {
@@ -721,17 +721,19 @@ fn golden_three(img: proto.Image, focus: int, name: str) -> str {
         k += 1
     }
     c = k + 1
-    while c <= 71 {
+    while c <= 64 {
         let w = cell_is(img, c, 23, 32, 0, 0)
         if w.len > 0 { return "bar " + w }
         c += 1
     }
-    k = 72
+    k = 65
     for b in " NORMAL  ".bytes() {
         let w = cell_is(img, k, 23, b as int, FIELD, 0)
         if w.len > 0 { return "mode field " + w }
         k += 1
     }
+    let cw = clock_cells_are(img)
+    if cw.len > 0 { return "clock " + cw }
     let hw = hint_cells_are(img, 24, NORMAL_HINTS, [2, 8, 18, 18, 26, 27, 36, 39, 48, 48, 57, 57, 68, 69])
     if hw.len > 0 { return "hint line " + hw }
     let at_col = if focus == 1 then 1 else 41
@@ -1057,10 +1059,17 @@ fn type_keys(p: client.Peer, text: str) -> bool {
     true
 }
 
+/// The first column of the bar's mode field: left of the clock from 40
+/// columns, at the right end below.
+fn field_at(cols: int) -> int {
+    if cols >= 40 { return cols - 15 }
+    cols - 8
+}
+
 /// The bar's mode field, trimmed.
 fn mode_of(img: proto.Image) -> str {
     if !img.valid || img.cols < 9 { return "" }
-    cells(img, img.rows - 1, img.cols - 7, 8)
+    cells(img, img.rows - 1, field_at(img.cols) + 1, 8)
 }
 
 fn until_mode(mut p: client.Peer, name: str, ms: int) -> bool {
@@ -1104,7 +1113,7 @@ fn active_label(img: proto.Image, name: str) -> str {
     let row = img.rows - 1
     var out = List[byte]()
     var c = name.len + 3
-    while c <= img.cols - 9 {
+    while c < field_at(img.cols) - 1 {
         let i = (row - 1) * img.cols + c - 1
         if img.flags[i] == INVERSE { push_utf8(mut out, img.base[i]) }
         c += 1
@@ -1138,7 +1147,7 @@ fn row_mode_field(mut r: Rig) -> str {
     if why.len > 0 { return why }
     var p = attach(r, 80, 24, "f", 1) else |e| { return "dial-{e}" }
     if !until_mode(mut p, "NORMAL", 5000) { return "no NORMAL field: '" + cells(p.image, 23, 1, 80) + "'" }
-    var k = 72
+    var k = 65
     for b in " NORMAL  ".bytes() {
         let w = cell_is(p.image, k, 23, b as int, FIELD, 0)
         if w.len > 0 { return "the field: " + w }
@@ -1169,7 +1178,7 @@ fn row_mode_field(mut r: Rig) -> str {
         else if key == "C-g" { let _g = client.key(p, 4, 0, 103) }
         else { let _t = type_keys(p, key) }
         if !until_mode(mut p, steps[i + 1], 3000) { return "after {key}: '" + mode_of(p.image) + "', expected " + steps[i + 1] }
-        if cells(p.image, 23, 72, 1) != "" || p.image.flags[22 * 80 + 71] != FIELD { return "the field moved after {key}" }
+        if cells(p.image, 23, 65, 1) != "" || p.image.flags[22 * 80 + 64] != FIELD { return "the field moved after {key}" }
         i += 2
     }
     finish(mut r, mut p)
@@ -1522,6 +1531,276 @@ fn row_help_overlay(mut r: Rig) -> str {
     finish(mut r, mut a)
 }
 
+// ---------------- line one: marks, the clock ----------------
+
+fn digit_at(img: proto.Image, col: int, row: int) -> bool {
+    let i = (row - 1) * img.cols + col - 1
+    img.base[i] >= 48 && img.base[i] <= 57 && img.flags[i] == 0
+}
+
+/// "" when line one's last seven cells are ` HH:MM ` in the default
+/// rendition (at 40 columns and wider).
+fn clock_cells_are(img: proto.Image) -> str {
+    let row = img.rows - 1
+    let c = img.cols - 6
+    let i = (row - 1) * img.cols
+    if img.base[i + c - 1] != 32 || img.base[i + img.cols - 1] != 32 || img.base[i + c + 2] != 58 ||
+        !digit_at(img, c + 1, row) || !digit_at(img, c + 2, row) || !digit_at(img, c + 4, row) ||
+        !digit_at(img, c + 5, row) || img.flags[i + c - 1] != 0 || img.flags[i + c + 2] != 0 {
+        return "not ' HH:MM ' at {c}-{img.cols}: '" + cells(img, row, c, 7) + "'"
+    }
+    ""
+}
+
+/// The clock's HH:MM.
+fn clock_of(img: proto.Image) -> str {
+    cells(img, img.rows - 1, img.cols - 5, 5)
+}
+
+fn two(n: int) -> str {
+    if n < 10 { return "0{n}" }
+    "{n}"
+}
+
+/// The host's local HH:MM at a UNIX second, as the rows read it (TZ or
+/// /etc/localtime; UTC where there is no zone).
+fn local_hhmm(unix_s: int) -> str {
+    let l = time.local(unix_s) else {
+        let d = unix_s % 86400
+        return two(d / 3600) + ":" + two(d / 60 % 60)
+    }
+    two(l.hour) + ":" + two(l.minute)
+}
+
+/// "" when line one reads `text` from column 1 up to the mode field, the
+/// columns of each (first, last) pair in `inverse` inverse and the rest
+/// plain, blanks up to the field.
+fn line_one_is(img: proto.Image, text: str, inverse: List[int]) -> str {
+    let row = img.rows - 1
+    let end = field_at(img.cols) - 1
+    var col = 1
+    var cps = List[int]()
+    for cp in text.code_points() { (mut cps).push(cp) }
+    while col <= end {
+        let base = if col <= cps.len then cps[col - 1] else 32
+        var flags = 0
+        var q = 0
+        while q + 1 < inverse.len {
+            if col >= inverse[q] && col <= inverse[q + 1] { flags = INVERSE }
+            q += 2
+        }
+        let w = cell_is(img, col, row, base, flags, 0)
+        if w.len > 0 { return w + " in '" + cells(img, row, 1, end) + "'" }
+        col += 1
+    }
+    let f = field_at(img.cols)
+    var k = f
+    for b in " NORMAL  ".bytes() {
+        let w = cell_is(img, k, row, b as int, FIELD, 0)
+        if w.len > 0 { return "mode field " + w }
+        k += 1
+    }
+    if img.cols >= 40 { return clock_cells_are(img) }
+    ""
+}
+
+fn until_line_one(mut p: client.Peer, text: str, inverse: List[int], ms: int) -> str {
+    let until = now_ms() + ms
+    var w = line_one_is(p.image, text, inverse)
+    while w.len > 0 && now_ms() < until {
+        let k = client.step(mut p, 100)
+        if k < 0 { return "connection ended: " + w }
+        w = line_one_is(p.image, text, inverse)
+    }
+    w
+}
+
+// Line one at 80, 20 and 200 columns, and at 40 with nine tabs: the
+// session's name, the tabs (the active one inverse, a name after its
+// number), the mode field, the clock from 40 columns; tabs that do not
+// fit leave the far side of the active one.
+fn row_bar_line_one(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/cat")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "b", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut p, 131, 5000) { return "no image" }
+    let _c = prefix(p, 99)
+    let _d = prefix(p, 99)
+    let _two = prefix(p, 50)
+    let _n = prefix(p, 44)
+    let _t = type_keys(p, "logs")
+    let _e = enter(p)
+    let _one = prefix(p, 49)
+    var w = until_line_one(mut p, " b  1  2:logs  3 ", [1, 3, 4, 6], 3000)
+    if w.len > 0 { return "80 columns: " + w }
+    let _s = client.resize(p, 20, 6)
+    w = until_line_one(mut p, " b  1 >", [1, 3, 4, 6], 3000)
+    if w.len > 0 { return "20 columns: " + w }
+    let _b = client.resize(p, 200, 24)
+    w = until_line_one(mut p, " b  1  2:logs  3 ", [1, 3, 4, 6], 3000)
+    if w.len > 0 { return "200 columns: " + w }
+    var n = 3
+    while n < 9 {
+        let _x = prefix(p, 99)
+        n += 1
+    }
+    let _r = client.resize(p, 40, 24)
+    w = until_line_one(mut p, " b < 4  5  6  7  8  9 ", [1, 3, 20, 22], 3000)
+    if w.len > 0 { return "40 columns, nine tabs: " + w }
+    finish(mut r, mut p)
+}
+
+// A zoomed tab's label carries Z.
+fn row_zoom_mark(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/cat")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "z", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut p, 131, 5000) { return "no image" }
+    let _s = prefix(p, 124)
+    if !until_borders(mut p, AREA, 3000) { return "no split" }
+    let _z = prefix(p, 122)
+    if !until_active(mut p, "z", "1Z", 3000) { return "zoomed: '" + cells(p.image, 23, 1, 80) + "'" }
+    let _u = prefix(p, 122)
+    if !until_active(mut p, "z", "1", 3000) { return "unzoomed: '" + cells(p.image, 23, 1, 80) + "'" }
+    finish(mut r, mut p)
+}
+
+/// The text of a tab's label on line one (its number first), trimmed.
+fn label_of(img: proto.Image, n: int) -> str {
+    let line = cells(img, img.rows - 1, 1, field_at(img.cols) - 1)
+    for part in line.split(" ") {
+        if part.starts_with("{n}") { return part }
+    }
+    ""
+}
+
+fn until_label(mut p: client.Peer, n: int, label: str, ms: int) -> bool {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        if label_of(p.image, n) == label { return true }
+        let k = client.step(mut p, 100)
+        if k < 0 { return false }
+    }
+    label_of(p.image, n) == label
+}
+
+// Output in a tab that is not shown marks it `+`, a bell `!`; showing the
+// tab clears both; the shown tab is never marked.
+fn row_activity_marks(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "a") else |e| { return "dial-{e}" }
+    let _c = prefix(p, 99)
+    if !until_active(mut p, "a", "2", 5000) { return "no second tab" }
+    if !until_rect_line(mut p, "$", 1, 1, 80, 1, 5000) { return "no prompt in tab 2" }
+    let _x = client.input(p, "sleep 1; echo OUT-$((1+1))\r")
+    let _p = prefix(p, 112)
+    if !until_active(mut p, "a", "1", 3000) { return "tab 1 not shown" }
+    if label_of(p.image, 2) != "2" { return "tab 2 marked before its output: '" + label_of(p.image, 2) + "'" }
+    let t0 = now_ms()
+    if !until_label(mut p, 2, "2+", 5000) { return "no + on tab 2: '" + cells(p.image, 23, 1, 80) + "'" }
+    print("MEASURE activity-mark-ms={now_ms() - t0} (from a second before the output)")
+    let _y = client.input(p, "echo SHOWN-$((2+2))\r")
+    if !until_text(mut p, "SHOWN-4", 5000) { return "no output in tab 1" }
+    if label_of(p.image, 1) != "1" { return "the shown tab was marked: '" + label_of(p.image, 1) + "'" }
+    let _two = prefix(p, 50)
+    if !until_active(mut p, "a", "2", 3000) { return "showing tab 2 did not clear +: '" + cells(p.image, 23, 1, 80) + "'" }
+    let _b = client.input(p, "sleep 1; printf '\\007'\r")
+    let _q = prefix(p, 49)
+    if !until_label(mut p, 2, "2+!", 5000) { return "no ! on tab 2 after its bell: '" + cells(p.image, 23, 1, 80) + "'" }
+    let _back = prefix(p, 50)
+    if !until_active(mut p, "a", "2", 3000) { return "showing tab 2 did not clear its marks" }
+    let _one = prefix(p, 49)
+    if !until_label(mut p, 2, "2", 3000) { return "tab 2's marks came back: '" + label_of(p.image, 2) + "'" }
+    finish(mut r, mut p)
+}
+
+// The clock is the host's local HH:MM.
+fn row_clock(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/cat")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut p, 131, 5000) { return "no image" }
+    drain(mut p, 200)
+    let s = time.unix_ms() / 1000
+    let shown = clock_of(p.image)
+    if shown != local_hhmm(s) && shown != local_hhmm(s - 60) {
+        return "the clock reads '{shown}', the host " + local_hhmm(s) + " (line one '" + cells(p.image, 23, 1, 80) + "')"
+    }
+    finish(mut r, mut p)
+}
+
+// At the next minute boundary the clock moves, within a second.
+fn row_clock_tick(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/cat")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut p, 131, 5000) { return "no image" }
+    drain(mut p, 200)
+    var ms = time.unix_ms()
+    // Not within a second of a boundary already.
+    if ms % 60000 > 58500 {
+        time.sleep(time.millis(2000))
+        drain(mut p, 100)
+        ms = time.unix_ms()
+    }
+    let boundary = (ms / 60000 + 1) * 60000
+    let want = local_hhmm(boundary / 1000)
+    while time.unix_ms() < boundary + 1000 && clock_of(p.image) != want {
+        let _k = client.step(mut p, 100)
+    }
+    let late = time.unix_ms() - boundary
+    if clock_of(p.image) != want { return "the clock reads '" + clock_of(p.image) + "' a second after {want}" }
+    print("MEASURE clock-tick-ms={late} (the minute's boundary to the image holding it)")
+    finish(mut r, mut p)
+}
+
+fn status_field(pid: int, field: str) -> int {
+    let t = fs.read_text("/proc/{pid}/status") else { return 0 - 1 }
+    for line in t.lines() {
+        if line.starts_with(field + ":") {
+            for w in line.split("\t") {
+                let v = w.trim().split(" ")
+                if v.len >= 1 {
+                    let n = v[0].to_int() else 0 - 1
+                    if n >= 0 { return n }
+                }
+            }
+        }
+    }
+    0 - 1
+}
+
+// Threads and resident size a pane, from one pane to four (hosts with
+// /proc): the server is one loop, so no thread a pane.
+fn row_pane_cost(mut r: Rig) -> str {
+    if !has_proc() { return "no /proc here" }
+    let why = start_server(mut r, "/bin/cat")
+    if why.len > 0 { return why }
+    let pid = server_pid(r)
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut p, 131, 5000) { return "no image" }
+    drain(mut p, 300)
+    let t1 = status_field(pid, "Threads")
+    let r1 = status_field(pid, "VmRSS")
+    let _a = prefix(p, 124)
+    if !until_borders(mut p, AREA, 3000) { return "no second pane" }
+    let _b = prefix(p, 45)
+    let _c = prefix(p, 104)
+    let _d = prefix(p, 45)
+    if !until_borders(mut p, AREA + 40 + 39, 3000) { return "not four panes: {border_cells(p.image)} border cells" }
+    drain(mut p, 300)
+    let t4 = status_field(pid, "Threads")
+    let r4 = status_field(pid, "VmRSS")
+    if t1 < 1 || r1 < 1 || t4 < 1 || r4 < 1 { return "no Threads or VmRSS for the server ({t1} {r1} {t4} {r4})" }
+    let per = (r4 - r1) / 3
+    print("MEASURE threads-per-pane={(t4 - t1) / 3} server-threads={t1}->{t4} server-rss-per-pane-kb={per} server-rss-kb={r1}->{r4} (1 -> 4 panes at 80x22)")
+    finish(mut r, mut p)
+    if t4 != t1 { return "the server's threads went {t1} -> {t4} for three panes (predicted none)" }
+    if per > 13 * 1024 { return "{per} kB a pane (predicted at most 13 MB)" }
+    ""
+}
+
 fn run_row(warren: str, name: str) -> str {
     var r = rig(warren, name)
     var why = "no such row"
@@ -1556,13 +1835,19 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "modes-per-client" { why = row_modes_per_client(mut r) }
     else if name == "input-in-modes" { why = row_input_in_modes(mut r) }
     else if name == "help-overlay" { why = row_help_overlay(mut r) }
+    else if name == "bar-line-one" { why = row_bar_line_one(mut r) }
+    else if name == "zoom-mark" { why = row_zoom_mark(mut r) }
+    else if name == "activity-marks" { why = row_activity_marks(mut r) }
+    else if name == "clock" { why = row_clock(mut r) }
+    else if name == "clock-tick" { why = row_clock_tick(mut r) }
+    else if name == "pane-cost" { why = row_pane_cost(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay".split(" ") {
+    for n in "split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
         (mut x).push(n)
     }
     x
