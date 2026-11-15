@@ -51,7 +51,9 @@ pub struct Pane {
 /// last such size when nobody is attached), its members and its layout,
 /// with the working directory and environment its panes start with. The
 /// compositor's owner map and border cells (the tab area's) are kept here
-/// for the layout generation they were built for.
+/// for the layout generation they were built for. `mark_tab` and
+/// `mark_bits` hold the tabs' marks by tab id (MARK_ACTIVITY, MARK_BELL),
+/// in place: an entry whose bits are clear is free.
 pub struct Session {
     live: bool,
     name: List[byte],
@@ -71,6 +73,8 @@ pub struct Session {
     owner: List[int],
     border: List[vt.Cell],
     last_output: int,
+    mark_tab: List[int],
+    mark_bits: List[int],
 }
 
 /// What a spawn needs: the pane's size, the session's working directory
@@ -131,7 +135,8 @@ pub fn idle_session() -> Session {
     Session { live: false, name: List[byte](), name_len: 0, cols: 0, rows: 0, members: 0, changed: false,
         generation: 0, layout: layout.Layout { tabs: List[layout.Tab](), active: 0, next_id: 1 },
         cwd: List[byte](), env_names: List[str](), env_values: List[str](), layout_gen: 0, bar_gen: 0,
-        chrome_gen: 0 - 1, owner: List[int](), border: List[vt.Cell](), last_output: 0 }
+        chrome_gen: 0 - 1, owner: List[int](), border: List[vt.Cell](), last_output: 0, mark_tab: List[int](),
+        mark_bits: List[int]() }
 }
 
 /// The session's working directory as text.
