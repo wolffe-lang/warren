@@ -1693,13 +1693,17 @@ fn row_activity_marks(mut r: Rig) -> str {
     let _c = prefix(p, 99)
     if !until_active(mut p, "a", "2", 5000) { return "no second tab" }
     if !until_rect_line(mut p, "$", 1, 1, 80, 1, 5000) { return "no prompt in tab 2" }
-    let _x = client.input(p, "sleep 1; echo OUT-$((1+1))\r")
+    // The typed line's echo is the tab's own output: wait for it before
+    // the tab is hidden, so that only the command's output can mark it.
+    let _x = client.input(p, "sleep 2; echo OUT-$((1+1))\r")
+    if !until_text(mut p, "OUT-$((1+1))", 5000) { return "the typed line was not echoed in tab 2" }
+    drain(mut p, 200)
     let _p = prefix(p, 112)
     if !until_active(mut p, "a", "1", 3000) { return "tab 1 not shown" }
     if label_of(p.image, 2) != "2" { return "tab 2 marked before its output: '" + label_of(p.image, 2) + "'" }
     let t0 = now_ms()
     if !until_label(mut p, 2, "2+", 5000) { return "no + on tab 2: '" + cells(p.image, 23, 1, 80) + "'" }
-    print("MEASURE activity-mark-ms={now_ms() - t0} (from a second before the output)")
+    print("MEASURE activity-mark-ms={now_ms() - t0} (from the switch; the output follows the line by 2 s)")
     let _y = client.input(p, "echo SHOWN-$((2+2))\r")
     if !until_text(mut p, "SHOWN-4", 5000) { return "no output in tab 1" }
     if label_of(p.image, 1) != "1" { return "the shown tab was marked: '" + label_of(p.image, 1) + "'" }
