@@ -1,1 +1,9 @@
-{}
+{
+  "fresh-0695": {"issue": 26, "failures": ["reference-observation-or-bound"]},
+  "fresh-1609": {"issue": 26, "failures": ["reference-observation-or-bound"]},
+  "fresh-1616": {"issue": 26, "failures": ["reference-observation-or-bound"]},
+  "fresh-1857": {"issue": 26, "failures": ["reference-observation-or-bound"]},
+  "fresh-1976": {"issue": 26, "failures": ["reference-observation-or-bound"]},
+  "fresh-4576": {"issue": 26, "failures": ["reference-observation-or-bound"]},
+  "fresh-4595": {"issue": 26, "failures": ["reference-observation-or-bound"]}
+}
