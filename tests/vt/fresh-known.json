@@ -41,6 +41,7 @@
   "fresh-2645": {"issue": 31, "failures": ["R1-R3-R8"]},
   "fresh-2668": {"issue": 28, "failures": ["unclassified-complete-frame"]},
   "fresh-2773": {"issue": 28, "failures": ["unclassified-complete-frame"]},
+  "fresh-2851": {"issue": 33, "failures": ["unclassified-complete-frame"]},
   "fresh-2933": {"issue": 32, "failures": ["unclassified-complete-frame"]},
   "fresh-3107": {"issue": 29, "failures": ["unclassified-complete-frame"]},
   "fresh-3276": {"issue": 28, "failures": ["unclassified-complete-frame"]},
@@ -60,5 +61,6 @@
   "fresh-4754": {"issue": 32, "failures": ["unclassified-complete-frame"]},
   "fresh-4767": {"issue": 28, "failures": ["unclassified-complete-frame"]},
   "fresh-4908": {"issue": 31, "failures": ["R1-R3-R8"]},
+  "fresh-4971": {"issue": 33, "failures": ["unclassified-complete-frame"]},
   "fresh-4986": {"issue": 28, "failures": ["unclassified-complete-frame"]}
 }
