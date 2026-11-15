@@ -11,7 +11,9 @@ console reads beside the keyboard; every key under test (the prefix, Ctrl-Space,
 and the keys after it) is the monitor's `sendkey` on the keyboard. The panes run /bin/sh with a scratch HOME.
 
 The console mirrors what it draws to COM1. The screen is read by replaying those bytes through warren's own
-emulator (HOST_WARREN vt-dump at the console's grid, 160x50), so a row reads cells, not a byte stream.
+emulator (HOST_WARREN vt-dump at the console's grid, 160x50), so a row reads cells, not a byte stream. COM1 also
+carries the kernel's own lines (`user: ...`, between a program's writes), which an image booted `quiet` keeps off
+the screen: they are taken out before the replay.
 
   C0 the console as warren finds it: root, its terminal, TERM, COLUMNS, LINES and the window it reports (printed)
   C1 `warren new -s con`: the session holds at the console's window, or at the documented 80x24 for a 0x0 one:
@@ -60,10 +62,18 @@ def row(name, ok, what):
         bad.append(name)
 
 
+KERNEL_LINE = re.compile(rb'user: [^\r\n]*\r?\n')
+
+
+def drawn(since=0):
+    """COM1's bytes from `since` without the kernel's own lines: what the console drew."""
+    return KERNEL_LINE.sub(b'', bytes(buf[since:]))
+
+
 def screen():
     """The console's screen now: COM1's bytes so far replayed through warren's emulator, as lines of text."""
     path = WORK / 'replay.bin'
-    path.write_bytes(bytes(buf))
+    path.write_bytes(drawn())
     out = subprocess.run([str(args.warren), 'vt-dump', '--cols', str(COLS), '--rows', str(LINES), str(path)],
                          capture_output=True, timeout=60).stdout.decode('utf-8', 'replace')
     lines = [[' '] * COLS for _ in range(LINES)]
@@ -113,7 +123,7 @@ def pump(t):
 
 
 def stream_text(since=0):
-    plain = re.sub(rb'\x1b\[[0-9;?<>= ]*[A-Za-z]|\x1b[()][A-Za-z0-9]|\x1b[=>78]|\x1b\][^\x07]*\x07', b'', bytes(buf[since:]))
+    plain = re.sub(rb'\x1b\[[0-9;?<>= ]*[A-Za-z]|\x1b[()][A-Za-z0-9]|\x1b[=>78]|\x1b\][^\x07]*\x07', b'', drawn(since))
     return plain.replace(b'\r', b'').decode('utf-8', 'replace')
 
 
