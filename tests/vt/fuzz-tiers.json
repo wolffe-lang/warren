@@ -1,4 +1,4 @@
 {
-  "pull-request": {"seeds": 200, "bytes": 4096},
-  "nightly": {"seeds": 5000, "bytes": 4096}
+  "pull-request": {"seeds": 200, "bytes": 4096, "deadline": 3600},
+  "nightly": {"seeds": 5000, "bytes": 4096, "deadline": 15000}
 }

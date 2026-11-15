@@ -33,6 +33,16 @@ def profile_settings(name):
     return profiles[name]['seeds'], profiles[name]['bytes']
 
 
+def profile_deadline(name):
+    """The profile's own bound on a drive, in seconds: twice its seeds at the
+    slowest pace measured on hosted runs (ci/tiers.py), so a drive that ends on
+    it ran at half that pace and says so by name."""
+    profiles = json.loads((ROOT / 'tests/vt/fuzz-tiers.json').read_text())
+    if name not in profiles:
+        raise ValueError('unknown fresh fuzz profile')
+    return profiles[name]['deadline']
+
+
 def failure_name(error):
     """A reference terminal that never opened its display, or died on a signal before
     answering, is not a bound violation: each has its own name."""
@@ -71,12 +81,14 @@ def main():
     parser.add_argument('--bytes', type=int)
     parser.add_argument('--case', action='append', help='explicit finite diagnostic only; default still runs the full profile')
     parser.add_argument('--out', type=Path, required=True)
-    parser.add_argument('--deadline', type=float, default=3600)
+    parser.add_argument('--deadline', type=float, help="seconds; default the profile's own")
     parser.add_argument('warren')
     parser.add_argument('properties')
     args = parser.parse_args()
-    if not 0 < args.deadline <= 7200:
-        parser.error('deadline must be positive and at most7200 seconds')
+    if args.deadline is None:
+        args.deadline = profile_deadline(args.profile)
+    if not 0 < args.deadline <= 21600:
+        parser.error('deadline must be positive and at most 21600 seconds')
     seeds, size = profile_settings(args.profile)
     args.seeds = seeds if args.seeds is None else args.seeds
     args.bytes = size if args.bytes is None else args.bytes
