@@ -19,11 +19,12 @@ JOBS = ['plan-test', 'linux', 'macos']
 #          reached the old 20-minute limit with every finished step green.
 #          The server's steps took 29 s of a 685 s gate on a second
 #          Apple-silicon machine, so about 960 s: 40 minutes is 2.5 times it.
-#   linux: green jobs took 1,686 s, 1,879 s and 2,106 s (runs 43575973926,
-#          43563124431 and 43231544049). The server's steps took 229 s in the
-#          pinned image on two CPUs (compose rows 80 s, session rows 141 s),
-#          so about 2,340 s: 80 minutes is twice it.
-LIMITS = {'linux': 80, 'macos': 40}
+#   linux: sized from the measured pace below: the rest of the gate's
+#          slowest 2,843 s and the pull-request drive's 200 seeds at 1.49 s,
+#          3,141 s in all; 105 minutes is twice it (6,300 s against 6,282).
+#          It was 80 minutes, from 2,340 s measured before the panes and the
+#          oracle steps grew; the slowest complete gate since took 3,097 s.
+LIMITS = {'linux': 105, 'macos': 40}
 # What the Linux gate takes, measured on hosted runs (19 green Linux jobs and
 # #15's red one, which ran every step, 2026-11-14 and 11-15), for sizing a
 # profile's limit: the fresh drive's slowest pace (298 s for 200 seeds, run
