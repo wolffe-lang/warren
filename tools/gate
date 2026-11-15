@@ -175,8 +175,9 @@ pane_rows() (
   rows=(split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs
     resize-all-tabs zoom too-small pane-memory pane-limit frame-golden damage-in-rect focus-bytes
     keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode
-    session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay)
-  if [ "$mode" = linux ]; then rows+=(split-close-cycles); fi
+    session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay
+    bar-line-one zoom-mark activity-marks clock clock-tick)
+  if [ "$mode" = linux ]; then rows+=(split-close-cycles pane-cost); fi
   rm -rf target/prows && mkdir -p target/prows && cd target/prows
   "$root/target/native/pane-rows" "$root/target/native/warren" "${rows[@]}"
 )
