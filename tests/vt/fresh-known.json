@@ -27,6 +27,7 @@
   "fresh-2080": {"issue": 28, "failures": ["unclassified-complete-frame"]},
   "fresh-2112": {"issue": 29, "failures": ["unclassified-complete-frame"]},
   "fresh-2196": {"issue": 28, "failures": ["unclassified-complete-frame"]},
+  "fresh-2265": {"issue": 30, "failures": ["unclassified-complete-frame"]},
   "fresh-2267": {"issue": 27, "failures": ["reference-observation-or-bound"]},
   "fresh-2303": {"issue": 28, "failures": ["unclassified-complete-frame"]},
   "fresh-2407": {"issue": 27, "failures": ["reference-observation-or-bound"]},
