@@ -71,7 +71,15 @@ width/resource/platform evidence remain separate pending measurements.
 - **Session rows:** a scripted client on a pseudo-terminal of the suite's own,
   compared with tmux as a black box where the behaviour is comparable, and
   with a written expectation where warren differs on purpose. *Planned.*
-- **PAX rows:** under QEMU, at the console and over an ssh session. *Planned.*
+- **PAX rows:** under QEMU. At the console: `tests/pax/console_rows.py` boots an
+  image whose console runs root's shell, types command lines through COM1 and
+  presses every key under test on the emulated keyboard (the prefix Ctrl-Space,
+  which the console types as NUL), on BIOS and UEFI with a USB and a PS/2
+  keyboard; it reads the console's screen by replaying COM1's bytes through
+  warren's own emulator. It holds `new`, a split, focus, detach, attach and
+  `kill-server` at the console's 0x0 window (the documented 80x24) and at
+  `COLUMNS` by `LINES`. Over an ssh session: the image's own checks. The image
+  recipe is not in this repository.
 
 A row that tests an interrupt writes the byte 0x03 into the pseudo-terminal.
 No row sends a signal from a script.
