@@ -24,6 +24,13 @@ JOBS = ['plan-test', 'linux', 'macos']
 #          pinned image on two CPUs (compose rows 80 s, session rows 141 s),
 #          so about 2,340 s: 80 minutes is twice it.
 LIMITS = {'linux': 80, 'macos': 40}
+# What the Linux gate takes, measured on hosted runs (19 green Linux jobs and
+# #15's red one, which ran every step, 2026-11-14 and 11-15), for sizing a
+# profile's limit: the fresh drive's slowest pace (298 s for 200 seeds, run
+# 43589528422; the median is 233 s), and the rest of the gate's slowest
+# (3,097 s less its 254-s drive, run 43640682013, whose image took 1,253 s).
+FRESH_SECONDS_PER_SEED = 1.49
+GATE_SECONDS_BESIDE_FRESH = 2843
 # A gate step that ended this close to its limit, red or cancelled, ran
 # into it.
 LIMIT_SLACK_SECONDS = 30
