@@ -5,7 +5,7 @@
 | W0 | pins, tiered CI, the oracle, the survey, the prediction | the repository half is here; the PAX readiness half is measured in PAX |
 | W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | pure core, CLI/replay and frozen complete-frame comparisons; final measurements pending |
 | W2 | server, client, protocol v1; one pane; detach and attach | codec, server, terminal client, lifecycle (new, attach, detach, second client, the server outliving its client); session and client rows; PAX console logout waits on PAX |
-| W3 | split tree, tabs, modes, the hint bar, configuration v1 | pure layout module (tabs, split tree, geometry, operations) with golden and property rows; panes and tabs in the server, the compositor's borders and focus mark, the bar's two lines (session, tabs and mode; hints, prompts and messages), modes per client from the key table (`keys_test`, `pane_rows`, SERVER.md §8); configuration planned |
+| W3 | split tree, tabs, modes, the hint bar, configuration v1 | pure layout module (tabs, split tree, geometry, operations) with golden and property rows; panes and tabs in the server, the compositor's borders and focus mark, the bar's two lines (session, tabs with their marks, mode and clock; hints, prompts and messages), modes per client from the key table, the split end to end through the real client (`keys_test`, `pane_rows`, `client_rows`, SERVER.md §8); configuration planned |
 | W4 | mouse, scrollback, copy mode, search, OSC 52 | planned |
 | W5 | command socket, CLI verbs, layout files, save and restore | planned |
 | W6 | static on the PAX image; rows in PAX's own suites | planned |
