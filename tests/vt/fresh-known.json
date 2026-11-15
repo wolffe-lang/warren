@@ -1,9 +1,14 @@
 {
   "fresh-0695": {"issue": 26, "failures": ["reference-observation-or-bound"]},
+  "fresh-1000": {"issue": 27, "failures": ["reference-observation-or-bound"]},
   "fresh-1609": {"issue": 26, "failures": ["reference-observation-or-bound"]},
   "fresh-1616": {"issue": 26, "failures": ["reference-observation-or-bound"]},
   "fresh-1857": {"issue": 26, "failures": ["reference-observation-or-bound"]},
   "fresh-1976": {"issue": 26, "failures": ["reference-observation-or-bound"]},
+  "fresh-2267": {"issue": 27, "failures": ["reference-observation-or-bound"]},
+  "fresh-2407": {"issue": 27, "failures": ["reference-observation-or-bound"]},
+  "fresh-2596": {"issue": 27, "failures": ["reference-observation-or-bound"]},
+  "fresh-3640": {"issue": 27, "failures": ["reference-observation-or-bound"]},
   "fresh-4576": {"issue": 26, "failures": ["reference-observation-or-bound"]},
   "fresh-4595": {"issue": 26, "failures": ["reference-observation-or-bound"]}
 }
