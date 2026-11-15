@@ -11,7 +11,9 @@ use proto
 /// waiting for a pane slot made between turns (its input waits behind it);
 /// `message` shows on the client's hint line until `message_until`;
 /// `seen_*` say what its last image already holds (the layout and bar
-/// generations, and each pane slot's damage count). Keys are the client's
+/// generations, and each pane slot's damage count); `sent_kind` and
+/// `sent_code` are the last message it is draining to (REFUSE, BYE or
+/// REPLY), which its close names in the trace. Keys are the client's
 /// own: its `mode` (config's MODE_*), the sticky mode or normal that confirm,
 /// help and the prompts go `back` to, the `prompt` being typed, the action a
 /// `confirm` waits on, and the key list's first line `help_top`.
@@ -70,6 +72,8 @@ pub struct Conn {
     pending_arg: int,
     message: List[byte],
     message_until: int,
+    sent_kind: int,
+    sent_code: int,
     seen_layout: int,
     seen_bar: int,
     seen_damage: List[int],
@@ -98,7 +102,7 @@ pub fn new_conn() -> Conn {
         mode: 0, back: 0, prompt: List[byte](), confirm: 0, help_top: 0, hello: List[byte](), hello_len: 0, hello_ready: false,
         resize_ready: false, resize_cols: 0, resize_rows: 0, command_ready: false, command: List[byte](),
         command_len: 0, stop_after: false, pending: 0, pending_arg: 0, message: List[byte](), message_until: 0,
-        seen_layout: 0 - 1, seen_bar: 0 - 1, seen_damage: List[int](),
+        sent_kind: 0, sent_code: 0, seen_layout: 0 - 1, seen_bar: 0 - 1, seen_damage: List[int](),
     }
 }
 
@@ -151,6 +155,8 @@ pub fn reset_conn(mut c: Conn, fd: int, id: int, now: int) {
     c.pending_arg = 0
     (mut c.message).reset()
     c.message_until = 0
+    c.sent_kind = 0
+    c.sent_code = 0
     c.seen_layout = 0 - 1
     c.seen_bar = 0 - 1
 }
