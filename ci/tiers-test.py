@@ -188,11 +188,12 @@ class Tiers(unittest.TestCase):
     def test_limit_step_for_the_nightly(self):
         import tempfile
         nightly = tiers_module().NIGHTLY_LIMITS['linux'] * 60
+        pull = tiers_module().LIMITS['linux'] * 60
         with tempfile.TemporaryDirectory() as tmp:
             start = Path(tmp) / 'gate-start'
             start.write_text('1000\n')
-            for profile, ran, verdict in (('nightly', nightly, 'hit'), ('nightly', 80 * 60, 'held'),
-                                          ('pull-request', 80 * 60, 'hit')):
+            for profile, ran, verdict in (('nightly', nightly, 'hit'), ('nightly', pull, 'held'),
+                                          ('pull-request', pull, 'hit')):
                 out = Path(tmp) / 'output'
                 out.write_text('')
                 p = subprocess.run([sys.executable, '-I', str(ROOT / 'ci/tiers.py'), 'limit', '--job', 'linux',
