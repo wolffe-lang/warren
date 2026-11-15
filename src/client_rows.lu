@@ -64,6 +64,15 @@ fn launch(warren: str, name: str, args: List[str], cols: int, rows: int) -> Run 
 // As launch, for one of several clients of the same server at once: `tag`
 // keeps each client's pid, status and trace files apart.
 fn launch_as(warren: str, name: str, tag: str, args: List[str], cols: int, rows: int) -> Run ! {io, invalid} {
+    launch_window(warren, name, tag, args, cols, rows, cols, rows, List[str]())
+}
+
+// As launch_as, with the window the pty reports (`cols` x `rows`, either
+// may be 0) apart from the screen the row reads the client's output into,
+// and `extra` NAME=VALUE pairs in the client's environment. COLUMNS and
+// LINES are never inherited: a row that wants them names them here.
+fn launch_window(warren: str, name: str, tag: str, args: List[str], cols: int, rows: int, screen_cols: int,
+    screen_rows: int, extra: List[str]) -> Run ! {io, invalid} {
     let dir = row_dir(name)
     let files = if tag.len > 0 then dir + "-" + tag else dir
     if server.socket_path_problem(server.socket_path(dir)).len > 0 { return invalid }
@@ -86,6 +95,12 @@ fn launch_as(warren: str, name: str, tag: str, args: List[str], cols: int, rows:
     fs.remove(files + "-trace") else |_| {}
     env.set("TERM", "xterm-256color") else { return io }
     env.set("COLORTERM", "truecolor") else { return io }
+    env.unset("COLUMNS") else { return io }
+    env.unset("LINES") else { return io }
+    for kv in extra {
+        let at = kv.find("=") else 0 - 1
+        if at > 0 { env.set(kv[0..at], kv[at + 1..kv.len]) else { return io } }
+    }
     let pid_file = files + "-pid"
     let status_file = files + "-status"
     let done_file = files + "-done"
@@ -157,6 +172,11 @@ fn launch_as(warren: str, name: str, tag: str, args: List[str], cols: int, rows:
         }
         process.exit(code)
     }
+    // The extra environment was the client's alone.
+    for kv in extra {
+        let at = kv.find("=") else 0 - 1
+        if at > 0 { env.unset(kv[0..at]) else |_| {} }
+    }
     var pid = 0
     let t0 = now_ms()
     while pid == 0 && now_ms() - t0 < 3000 {
@@ -165,7 +185,7 @@ fn launch_as(warren: str, name: str, tag: str, args: List[str], cols: int, rows:
         if pid == 0 { time.sleep(time.millis(10)) }
     }
     Run { warren: warren, dir: dir, files: files, master: pty.master, slave: pty.slave, pid: pid, slot: a.child.slot,
-        out: List[byte](), screen: vt.new(cols, rows, 0), before: before, status: 0, ended: false }
+        out: List[byte](), screen: vt.new(screen_cols, screen_rows, 0), before: before, status: 0, ended: false }
 }
 
 // Read what the client wrote, for up to ms; reap it if it ended.
@@ -958,6 +978,80 @@ fn row_split_e2e(warren: str) -> str {
     why
 }
 
+// The last line the client printed that starts `warren: `, for a row's
+// reason.
+fn warren_line(t: str) -> str {
+    let at = t.rfind("warren: ") else 0 - 1
+    if at < 0 { return "(no warren line)" }
+    let rest = t[at..t.len]
+    let end = rest.find("\r") else rest.len
+    rest[0..end]
+}
+
+// A session at a 0x0 window holds at `size`: a prompt, a command run in
+// its pane, the size the server lists, and a detach that gives the
+// terminal back.
+fn zero_attached(mut r: Run, size: str) -> str {
+    let until = now_ms() + 10000
+    while !r.ended && now_ms() < until && !screen_text(r.screen).contains("$") { pump(mut r, 50) }
+    if r.ended { return "the client ended {r.status} at a 0x0 window: " + warren_line(output_text(r)) }
+    if !screen_text(r.screen).contains("$") { return "no prompt: " + screen_text(r.screen) }
+    type_text(mut r, "echo zero-$((6*7))\r")
+    if !until_screen(mut r, "zero-42", 5000) { return "the pane's echo was not drawn" }
+    let listed = client.command_reply(words("list-sessions"))
+    let out = (str_from_utf8(listed.out) else "").trim()
+    if !out.contains("zero: {size} (1 attached)") { return "list-sessions said '{out}', not zero at {size}" }
+    type_text(mut r, "\u{0}d")
+    ends_with(mut r, 0, "[detached")
+}
+
+// A terminal that reports a 0x0 window (a serial line, or a console never
+// told its size): `new` makes the session at the documented default, 80x24,
+// and the client attaches to it; never a session made and then dropped.
+fn row_zero_window(warren: str) -> str {
+    var r = launch_window(warren, "zero", "", words("new -s zero"), 0, 0, 80, 24, List[str]()) else |e| { return "launch: {e}" }
+    let why = zero_attached(mut r, "80x24")
+    close_run(r)
+    why
+}
+
+// The same window with COLUMNS and LINES in the environment: the session
+// takes their size.
+fn row_zero_window_env(warren: str) -> str {
+    var extra = List[str]()
+    (mut extra).push("COLUMNS=100")
+    (mut extra).push("LINES=30")
+    var r = launch_window(warren, "zeroenv", "", words("new -s zero"), 0, 0, 100, 30, extra) else |e| { return "launch: {e}" }
+    let why = zero_attached(mut r, "100x30")
+    close_run(r)
+    why
+}
+
+// A window larger than the protocol carries (262,144 cells) is refused by
+// name before the client starts a server or takes the terminal.
+fn row_window_too_large(warren: str) -> str {
+    var r = launch_window(warren, "large", "", List[str](), 600, 500, 80, 24, List[str]()) else |e| { return "launch: {e}" }
+    if !until_end(mut r, 10000) {
+        close_run(r)
+        return "the client did not end"
+    }
+    pump(mut r, 100)
+    let t = output_text(r)
+    let after = term.pack(term.mode(r.slave) else { return "the mode cannot be read" })
+    var why = ""
+    if r.status != 1 {
+        why = "the client ended {r.status}, not 1: " + warren_line(t)
+    } else if !t.contains("600x500") {
+        why = "no line naming 600x500: " + warren_line(t)
+    } else if t.contains("\u{1b}[?1049h") || after != r.before {
+        why = "the client took the terminal"
+    } else if fs.exists(r.dir + "/default") {
+        why = "a server was started"
+    }
+    close_run(r)
+    why
+}
+
 fn run_row(warren: str, name: str) -> str {
     if name == "detach-reattach" { return row_detach_reattach(warren) }
     if name == "server-stopping" { return row_server_stopping(warren) }
@@ -976,6 +1070,9 @@ fn run_row(warren: str, name: str) -> str {
     if name == "unknown-verb" { return row_unknown_verb(warren) }
     if name == "session-names" { return row_session_names(warren) }
     if name == "split-e2e" { return row_split_e2e(warren) }
+    if name == "zero-window" { return row_zero_window(warren) }
+    if name == "zero-window-env" { return row_zero_window_env(warren) }
+    if name == "window-too-large" { return row_window_too_large(warren) }
     "no such row"
 }
 
@@ -1001,7 +1098,7 @@ fn main() -> int {
         i += 1
     }
     if rows.len == 0 {
-        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names split-e2e")
+        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names split-e2e zero-window zero-window-env window-too-large")
     }
     if !fs.exists("/proc") { print("NOTE leftovers unchecked here: no /proc to read") }
     // Every row's socket lives in a short directory under this one; a
