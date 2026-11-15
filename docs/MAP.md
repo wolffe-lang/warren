@@ -95,6 +95,7 @@ No row sends a signal from a script.
 | the fuzz generator is stable, and its streams dump to the recorded digests | `fuzz-generator`, `oracle-fuzz` |
 | the recordings are the committed bytes and dump to the recorded digests | `corpus-digests`, `oracle-corpus` |
 | tmux agrees with the reference on text and cursor for six cases; its split sizes, zoom, focus ring and closed pane's program, beside warren's | `tmux-rows` |
+| a reference terminal that cannot open its display, or ends on a signal before it answers, is retried once, by its cause's name; a second failure is red by that name; more retries than 1% of a display's launches (at least 2) are their own red, `reference-retry-rate` | `display-retry-rows`, and each oracle step's last lines |
 
 ## Evidence boundaries
 
