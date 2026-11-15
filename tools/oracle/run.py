@@ -53,9 +53,27 @@ class DisplayUnavailable(OracleError):
     failure_name = 'reference-display-unavailable'
 
 
-# Only this message, from a launch that wrote no answers, is retried, and only once.
+class ReferenceKilled(OracleError):
+    """The reference terminal ended on a signal before it wrote any answers."""
+    failure_name = 'reference-terminal-killed'
+
+
+# A launch that wrote no answers and either printed this message or ended on a
+# signal is retried, and only once.
 DISPLAY_FAILURE = b"Can't open display"
 RETRY_PAUSE_SECONDS = 1.0
+# The retries one display may need before its runner is the red: at most this
+# share of its launches, and never fewer than RETRY_FLOOR. A single retry turns
+# a stream red only when two launches in a row fail, about N * p * p times in N
+# launches; at p = 1% and the fresh drive's ~1,540 launches that is 0.15 a run,
+# and it grows with the square of the rate past it.
+RETRY_RATE = 0.01
+RETRY_FLOOR = 2
+
+
+def retry_bound(launches):
+    """The most retries a display of `launches` launches may need."""
+    return max(RETRY_FLOOR, int(launches * RETRY_RATE))
 
 
 def clipped(data, keep=300):
@@ -70,6 +88,15 @@ class Display:
     def __init__(self):
         # Every retried launch, by name; printed when the display closes, never silent.
         self.retries = []
+        # Every reference terminal launched on this display, retries included.
+        self.launches = 0
+
+    def rate_problem(self):
+        """'' while the retries are within retry_bound, else the named red's text."""
+        bound = retry_bound(self.launches)
+        if len(self.retries) <= bound:
+            return ''
+        return 'reference-retry-rate retries=%d launches=%d bound=%d' % (len(self.retries), self.launches, bound)
 
     def __enter__(self):
         if os.environ.get('WARREN_ORACLE_DISPLAY'):
@@ -100,23 +127,31 @@ class Display:
 def launch(display, which, command, env, outputs, timeout):
     """Run one reference terminal. outputs[0] is its answers file; every output is cleared first.
 
-    A launch that wrote no answers and reports that it could not open its display
-    is retried once and recorded on the display by name. A second such launch is
-    DisplayUnavailable. Any other result, including a terminal that ran and
-    disagreed, is returned for the caller to judge and is never retried.
+    A launch that wrote no answers and either reports that it could not open its
+    display or ended on a signal is retried once and recorded on the display by
+    its cause's name. A second such launch raises its own cause:
+    DisplayUnavailable or ReferenceKilled. Any other result, including a
+    terminal that ran and disagreed or answered and then died, is returned for
+    the caller to judge and is never retried.
     """
     for attempt in (1, 2):
         for path in outputs:
             if path.exists():
                 path.unlink()
+        display.launches = getattr(display, 'launches', 0) + 1
         done = subprocess.run(command, env=env, capture_output=True, timeout=timeout)
-        if outputs[0].exists() or DISPLAY_FAILURE not in done.stderr:
+        cause = None
+        if not outputs[0].exists():
+            if DISPLAY_FAILURE in done.stderr:
+                cause = DisplayUnavailable
+            elif done.returncode < 0:
+                cause = ReferenceKilled
+        if cause is None:
             return done
         if attempt == 2:
-            raise DisplayUnavailable('%s: pass %s: emulator exit %d on both launches: %s' % (
-                DisplayUnavailable.failure_name, which, done.returncode, clipped(done.stderr)))
-        display.retries.append({'name': DisplayUnavailable.failure_name, 'pass': which,
-                                'work': str(outputs[0].parent)})
+            raise cause('%s: pass %s: emulator exit %d on its retry, after %s: %s' % (
+                cause.failure_name, which, done.returncode, display.retries[-1]['name'], clipped(done.stderr)))
+        display.retries.append({'name': cause.failure_name, 'pass': which, 'work': str(outputs[0].parent)})
         time.sleep(RETRY_PAUSE_SECONDS)
 
 
@@ -458,6 +493,7 @@ def cmd_cases(args):
             if not fails:
                 print('PASS oracle-case %s (two takes identical)' % name)
     print('oracle-cases: %d cases, %d failed, %d display retries' % (len(cases), failed, len(display.retries)))
+    failed += rate_verdict(display)
     return 1 if failed else 0
 
 
@@ -507,7 +543,16 @@ def cmd_digests(args):
     failed += len(missing)
     print('oracle-digests: %d streams, two takes each, %d failed, %d display retries' % (
         len(streams), failed, len(display.retries)))
+    failed += rate_verdict(display)
     return 1 if failed else 0
+
+
+def rate_verdict(display):
+    """1, with its named FAIL line, when the display needed more retries than its bound; else 0."""
+    problem = display.rate_problem()
+    if problem:
+        print('FAIL ' + problem, flush=True)
+    return int(bool(problem))
 
 
 def selftest(screens):
@@ -580,7 +625,7 @@ def main():
                 cols, rows = case_size(path)
                 screens.append((path.stem, S.dumps(
                     dump(display, path, cols, rows, Path(args.out) / path.stem / 'mutations'))))
-        return selftest(screens)
+        return selftest(screens) | rate_verdict(display)
     with Display() as display:
         work = Path(args.work) if args.work else Path(tempfile.mkdtemp(prefix='oracle-'))
         text = S.dumps(dump(display, Path(args.input).resolve(), args.cols, args.rows, work))
