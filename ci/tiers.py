@@ -31,6 +31,14 @@ LIMITS = {'linux': 80, 'macos': 40}
 # (3,097 s less its 254-s drive, run 43640682013, whose image took 1,253 s).
 FRESH_SECONDS_PER_SEED = 1.49
 GATE_SECONDS_BESIDE_FRESH = 2843
+# The nightly profile drives 5,000 seeds, so its Linux gate step takes about
+# 2,843 + 5,000 * 1.49 = 10,293 s (172 minutes) at that pace (7,800 s at the
+# median). Its limit is twice that, 345 minutes, and the job's 355 stays under
+# a hosted job's 360. The drive's own deadline (15,000 s, twice 7,450) ends a
+# slow drive by name before the step limit would: 2,843 + 15,000 = 17,843 s
+# against 20,700. A workflow dispatch may ask for the nightly profile.
+NIGHTLY_LIMITS = {'linux': 345}
+PROFILES = ('pull-request', 'nightly')
 # A gate step that ended this close to its limit, red or cancelled, ran
 # into it.
 LIMIT_SLACK_SECONDS = 30
@@ -49,6 +57,7 @@ def main():
     sub.add_parser('verdict')
     limit = sub.add_parser('limit')
     limit.add_argument('--job', required=True, choices=sorted(LIMITS))
+    limit.add_argument('--profile', choices=PROFILES, default='pull-request')
     limit.add_argument('--outcome', required=True)
     limit.add_argument('--since-file')
     limit.add_argument('--now', type=int)
@@ -67,8 +76,10 @@ def main():
             result = needs.get(job, {}).get('result')
             if result == 'success':
                 continue
-            if (needs.get(job, {}).get('outputs') or {}).get('limit') == 'hit':
-                raise ValueError('selected job hit its time limit: %s (gate step %d minutes)' % (job, LIMITS[job]))
+            outputs = needs.get(job, {}).get('outputs') or {}
+            if outputs.get('limit') == 'hit':
+                raise ValueError('selected job hit its time limit: %s (gate step %s minutes)' % (
+                    job, outputs.get('minutes') or LIMITS[job]))
             if result == 'cancelled':
                 raise ValueError('selected job was cancelled: %s (a cancel, or its job limit)' % job)
             raise ValueError('selected job did not succeed: ' + job)
@@ -106,6 +117,13 @@ def main():
     return 0
 
 
+def limit_minutes(job, profile):
+    """A gate step's limit for a fuzz profile: the nightly's own where it has one."""
+    if profile == 'nightly' and job in NIGHTLY_LIMITS:
+        return NIGHTLY_LIMITS[job]
+    return LIMITS[job]
+
+
 def limit_step(args):
     """After a gate step, whatever its outcome: did it run into its limit?
     Prints one line and writes `limit=hit|held|unknown`; never fails."""
@@ -116,7 +134,7 @@ def limit_step(args):
         except (OSError, ValueError):
             since = None
     now = args.now if args.now is not None else int(time.time())
-    minutes = LIMITS[args.job]
+    minutes = limit_minutes(args.job, args.profile)
     if since is None:
         verdict = 'unknown'
         print('limit %s: the gate step never started (outcome %s)' % (args.job, args.outcome))
@@ -133,6 +151,7 @@ def limit_step(args):
     if args.github_output:
         with Path(args.github_output).open('a') as f:
             f.write('limit=' + verdict + '\n')
+            f.write('minutes=%d\n' % minutes)
     return 0
 
 
