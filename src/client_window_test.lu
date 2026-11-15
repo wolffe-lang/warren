@@ -1,0 +1,63 @@
+//! member: false
+//! The window a client attaches at: a dimension the terminal reports as 0
+//! (a serial line, a console never told its size) takes COLUMNS or LINES
+//! when that is a positive number, else 80 columns and 24 rows; a reported
+//! dimension is kept; a window the protocol cannot carry is named.
+use std.env
+use std.term
+use client
+use proto
+
+fn sized(cols: int, rows: int) -> term.Size {
+    term.Size { rows: rows, columns: cols }
+}
+
+fn shown(s: term.Size) -> str {
+    "{s.columns}x{s.rows}"
+}
+
+fn clear() {
+    env.unset("COLUMNS") else |_| {}
+    env.unset("LINES") else |_| {}
+}
+
+fn test_zero_window_takes_the_default() {
+    clear()
+    assert(shown(client.window_size(sized(0, 0))) == "80x24", "window-zero-default")
+    assert(shown(client.window_size(sized(97, 33))) == "97x33", "window-reported-kept")
+    assert(shown(client.window_size(sized(0, 33))) == "80x33", "window-zero-columns-only")
+    assert(shown(client.window_size(sized(97, 0))) == "97x24", "window-zero-rows-only")
+}
+
+fn test_zero_window_takes_columns_and_lines() {
+    clear()
+    env.set("COLUMNS", "160") else |_| {}
+    env.set("LINES", "50") else |_| {}
+    assert(shown(client.window_size(sized(0, 0))) == "160x50", "window-zero-env")
+    // A window the terminal reports wins over the environment.
+    assert(shown(client.window_size(sized(97, 33))) == "97x33", "window-reported-over-env")
+    clear()
+}
+
+fn test_unusable_environment_is_ignored() {
+    clear()
+    env.set("COLUMNS", "0") else |_| {}
+    env.set("LINES", "lots") else |_| {}
+    assert(shown(client.window_size(sized(0, 0))) == "80x24", "window-env-zero-and-text")
+    env.set("COLUMNS", "-5") else |_| {}
+    env.set("LINES", "70000") else |_| {}
+    assert(shown(client.window_size(sized(0, 0))) == "80x24", "window-env-negative-and-too-wide")
+    env.set("COLUMNS", " 120 ") else |_| {}
+    env.set("LINES", "40") else |_| {}
+    assert(shown(client.window_size(sized(0, 0))) == "120x40", "window-env-trimmed")
+    clear()
+}
+
+fn test_window_too_large_is_named() {
+    assert(client.window_problem(sized(80, 24)).len == 0, "window-ordinary-carried")
+    assert(client.window_problem(sized(512, 512)).len == 0, "window-at-the-cap-carried")
+    assert(512 * 512 == proto.GRID_MAX, "window-cap-is-grid-max")
+    let why = client.window_problem(sized(600, 500))
+    assert(why.contains("600x500") && why.contains("262144"), "window-too-large-named")
+    assert(client.window_problem(sized(70000, 1)).contains("70000x1"), "window-too-wide-named")
+}
