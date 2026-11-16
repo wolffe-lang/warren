@@ -953,6 +953,49 @@ fn clock_shape(text: str) -> bool {
 // column 40, line one (the session, the mode field, the clock) and the
 // hint line; a command lands in the new right pane; the prefix, `x` and `y`
 // close it.
+fn terminal_mouse(mut r: Run, legacy: bool, col: int, row: int) {
+    for release in [false, true] {
+        var data = List[byte]()
+        if legacy {
+            data = "\u{1b}[M".bytes()
+            for n in [if release then 35 else 32, col + 32, row + 32] { (mut data).push(n as byte) }
+        } else {
+            let end = if release then "m" else "M"
+            data = "\u{1b}[<0;{col};{row}{end}".bytes()
+        }
+        fs.write_chunk(mut r.master, data) else |_| {}
+    }
+}
+
+fn row_mouse_e2e(warren: str, legacy: bool) -> str {
+    let name = if legacy then "mouse-legacy" else "mouse-sgr"
+    var r = launch(warren, name, words("new -s m"), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut r, "$", 10000) { close_run(r); return "no prompt" }
+    type_text(mut r, "\u{0}|")
+    if !until_border(mut r, 40, 22, 22, 5000) { close_run(r); return "no split" }
+    terminal_mouse(mut r, legacy, 5, 3)
+    type_text(mut r, "echo M-$((2+2))\r")
+    let end = now_ms() + 5000
+    while !region_has(r.screen, "M-4", 1, 1, 39, 22) && now_ms() < end { pump(mut r, 50) }
+    if !region_has(r.screen, "M-4", 1, 1, 39, 22) || region_has(r.screen, "M-4", 41, 1, 40, 22) {
+        close_run(r)
+        return "click did not direct typing to the left pane:\n" + screen_text(r.screen)
+    }
+    type_text(mut r, "\u{0}c")
+    if !until_border(mut r, 40, 22, 0, 5000) { close_run(r); return "new tab did not hide the split" }
+    terminal_mouse(mut r, legacy, 5, 23)
+    if !until_border(mut r, 40, 22, 22, 5000) { close_run(r); return "tab click did not restore the split" }
+    terminal_mouse(mut r, legacy, 40, 3)
+    type_text(mut r, "echo B-$((3+3))\r")
+    let end2 = now_ms() + 5000
+    while !region_has(r.screen, "B-6", 1, 1, 39, 22) && now_ms() < end2 { pump(mut r, 50) }
+    if !region_has(r.screen, "B-6", 1, 1, 39, 22) { close_run(r); return "border click changed focus" }
+    type_text(mut r, "\u{0}d")
+    let why = ends_with(mut r, 0, "[detached")
+    close_run(r)
+    why
+}
+
 fn row_split_e2e(warren: str) -> str {
     var r = launch(warren, "e2e", List[str](), 80, 24) else |e| { return "launch: {e}" }
     if !until_screen(mut r, "$", 10000) {
@@ -1315,6 +1358,8 @@ fn run_row(warren: str, name: str) -> str {
     if name == "unknown-verb" { return row_unknown_verb(warren) }
     if name == "session-names" { return row_session_names(warren) }
     if name == "split-e2e" { return row_split_e2e(warren) }
+    if name == "mouse-sgr" { return row_mouse_e2e(warren, false) }
+    if name == "mouse-legacy" { return row_mouse_e2e(warren, true) }
     if name == "zero-window" { return row_zero_window(warren) }
     if name == "zero-window-env" { return row_zero_window_env(warren) }
     if name == "quick-legacy" { return row_quick_e2e(warren, 0) }
@@ -1353,7 +1398,7 @@ fn main() -> int {
     }
     let quick_defaults = rows.len == 0
     if rows.len == 0 {
-        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names split-e2e zero-window zero-window-env window-too-large")
+        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names split-e2e mouse-sgr mouse-legacy zero-window zero-window-env window-too-large")
     }
     if !fs.exists("/proc") { print("NOTE leftovers unchecked here: no /proc to read") }
     // Every row's socket lives in a short directory under this one; a
