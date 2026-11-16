@@ -7,6 +7,10 @@ requires zero non-control differences. Non-annotation jamo/format exceptions
 of width zero attach under section2.3 and D10; regional indicators are width one,
 so a pair advances two.
 
+Current erase-extent policy: D14 is withdrawn. The reference runs with jump
+scroll off, and its extents after a partial erase are warren's contract
+(section 3.1).
+
 The reference contract for `src/vt`. It is exact where exactness
 decides whether two implementations agree: the parser's states, the grid's
 invariants, resize, and what scrollback costs. "Measured" means a census
@@ -317,7 +321,7 @@ The list, with the document's section for each, is in the prediction
 | D11 | withdrawn; scalar widths now agree outside control characters | Unicode 15.1.0 plus the explicit exception classes in `tests/vt/width-exceptions.json` | the exhaustive sweep accepts zero non-control differences |
 | D12 | origin-mode CPR wraps a negative relative row after restoring an absolute cursor above the current region; a one-above-top row reports zero | keep the measured absolute placement but report relative CPR row 1 above the region | exact-trigger reference-report inconsistency; DECCIR remains the absolute witness |
 | D13 | legacy SGR30 with bold promotes the stored black foreground to index8 | store index0 plus bold, exactly as indexed38;5;0 | painter brightening does not change stored colour; 31–37, indexed0 and explicit90 remain strict controls |
-| D14 | on a scroll-made row, a same-fill-background ECH/EL can erase without extending the reported extent, even after printing in the span | a partial erase marks its requested cells written, independent of row history | source-only exact row/extent/value bounds; any changed cell, rendition or cursor remains red |
+| D14 | withdrawn; with jump scroll off the reference counts a partial erase's cells as written, as warren does | a partial erase marks its requested cells written, independent of row history | the measured exception was the reference's jump scroll: with it on, the same bytes gave different extents from run to run (warren#25) |
 
 Rows for the live divergences D1 to D14 compare with written expectations, never with the
 reference, and a corpus stream that exercises one is compared under that
@@ -334,18 +338,16 @@ repair of separate reference input, never a candidate-output golden: exact
 background cell sets and values bound original-versus-repaired observations,
 and every other field must match.
 
-D14's measured scroll-made rows come from LF, NEL, SU and RI at a margin;
-fresh rows, ESC D, DL and IL controls do not show the same extent behavior.
-The erase pen equals the row's fill background, and no target cell has had a
-background change since that fill. Printing in the erased span does not remove
-the effect; a different background inside its first or last cell, or a changed
-erase pen, restores ordinary behavior. Glyphs outside the span still count:
-controls retain extent4 before it or10 after it. The bounded source tracer
-computes the surviving reference and contract extents without candidate data.
-`tests/vt/reference/erase-extents` retains32 complete boundary frames. Only the
-exact predicted extent fields change in non-resized expectations; the three
-resized frames use independent full R1/R5 contracts under D6, not an expanded
-extent-only allowance.
+D14 is withdrawn. Its measured scroll-made rows were the reference's jump
+scroll: with it on, the reference batched buffered line feeds into one scroll,
+and whether a later erase counted its cells as written depended on whether
+that row's scroll was still waiting, which depended on how the reference's
+reads split the input. Twenty dumps of the same bytes gave different extents
+(warren#25); with jump scroll off every input gives one answer every time, and
+it is warren's contract. The oracle runs the reference with jump scroll off,
+and nothing corrects its extents. `tests/vt/reference/erase-extents` keeps 32
+complete boundary frames, captured that way and uncorrected; the three resized
+frames use independent full R1/R5 contracts under D6.
 
 ### 3.2 SGR details (measured)
 
