@@ -36,7 +36,7 @@ row 3 extent=0
 1-6 1 U+0020 -
 row 4 extent=0
 1-6 1 U+0020 -
-row 5 extent=4
+row 5 extent=6
 1 1 U+0061 bg=idx:5
 2 1 U+0062 bg=idx:5
 3 1 U+0063 bg=idx:5

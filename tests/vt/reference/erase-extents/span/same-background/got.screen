@@ -34,5 +34,5 @@ row 2 extent=0
 1-12 1 U+0020 -
 row 3 extent=0
 1-12 1 U+0020 -
-row 4 extent=0
+row 4 extent=9
 1-12 1 U+0020 bg=idx:5

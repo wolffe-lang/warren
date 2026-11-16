@@ -28,7 +28,7 @@ mode origin 0
 mode reverse-wrap 0
 mode send-receive 1
 mode synchronized-output ?
-row 1 extent=0
+row 1 extent=9
 1-12 1 U+0020 -
 row 2 extent=0
 1-12 1 U+0020 -
