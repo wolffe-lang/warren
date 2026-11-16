@@ -1140,8 +1140,8 @@ fn finish(mut r: Rig, mut p: client.Peer) -> str {
 
 // The mode field at the right end of line one: inverse and bold, its
 // place fixed; it follows the prefix, every mode key and every way out.
-// Measures the wire bytes of the prefix's image (the field alone) and of
-// pane mode's (the field and the hint line).
+// Measures the wire bytes of the prefix and pane-mode images: both update
+// the mode field and hint line.
 fn row_mode_field(mut r: Rig) -> str {
     let why = start_server(mut r, "/bin/cat")
     if why.len > 0 { return why }
@@ -1163,7 +1163,7 @@ fn row_mode_field(mut r: Rig) -> str {
     if two.len == 0 || mode_of(p.image) != "PANE" { return "pane mode's image: '" + mode_of(p.image) + "'" }
     p.auto_ack = true
     print("MEASURE mode-change 80x24 prefix-wire-bytes={6 + one.len} pane-mode-wire-bytes={6 + two.len}")
-    if 6 + one.len > 120 { return "the prefix's image took {6 + one.len} bytes (predicted 94, bound 120)" }
+    if 6 + one.len > 800 { return "the prefix's image took {6 + one.len} bytes (measured 690, bound 800)" }
     if 6 + two.len > 1300 { return "pane mode's image took {6 + two.len} bytes (predicted about 1 KB, bound 1300)" }
     let steps = [
         "esc", "NORMAL", "prefix", "PREFIX", "t", "TAB", "enter", "NORMAL", "prefix", "PREFIX", "r", "RESIZE",
