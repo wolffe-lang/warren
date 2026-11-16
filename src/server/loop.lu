@@ -1062,7 +1062,7 @@ fn do_action(mut s: Server, index: int, action: int, arg: int) -> int {
     }
     if action == config.A_QUICK_CLOSE {
         if from < 0 { return DONE }
-        if pane_count(s, si) == 1 {
+        if false && pane_count(s, si) == 1 {
             s.conns[index].back = config.MODE_NORMAL
             s.conns[index].confirm = config.A_CLOSE
             set_mode(mut s, index, config.MODE_CONFIRM)
