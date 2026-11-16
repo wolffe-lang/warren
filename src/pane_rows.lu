@@ -1830,6 +1830,14 @@ fn outer_mouse(p: client.Peer, legacy: bool, kind: int, col: int, row: int) -> b
     client.send(p, 3, body)
 }
 
+fn wire_mouse_button(p: client.Peer, kind: int, button: int, col: int, row: int) -> bool {
+    var body = List[byte]()
+    for n in [kind, button, 0] { proto.put(mut body, n, 1) }
+    proto.put(mut body, col, 2)
+    proto.put(mut body, row, 2)
+    client.send(p, 3, body)
+}
+
 fn mouse_click(p: client.Peer, legacy: bool, col: int, row: int) -> bool {
     outer_mouse(p, legacy, 0, col, row) && outer_mouse(p, legacy, 1, col, row)
 }
@@ -1914,6 +1922,16 @@ fn row_mouse_focus(mut r: Rig, legacy: bool, encoding: int) -> str {
     drain(mut a, 100)
     if mouse_probe_text(left) != expected + expected { return "an inert border/bar gesture reached the program" }
     if !until_mouse_focus(mut a, true) { return "an inert gesture changed focus" }
+    for button in [2, 3] {
+        let _down_right = wire_mouse_button(a, 0, button, 45, 3)
+        let _up_right = wire_mouse_button(a, 1, button, 45, 3)
+        if !until_mouse_focus(mut a, false) { return "middle/right click did not focus right" }
+        let _down_left = wire_mouse_button(a, 0, button, 5, 3)
+        let _up_left = wire_mouse_button(a, 1, button, 5, 3)
+        if !until_mouse_focus(mut a, true) { return "middle/right click did not focus left" }
+    }
+    drain(mut a, 100)
+    if mouse_probe_text(left) != expected + expected || mouse_probe_text(right) != expected { return "middle/right focus gestures leaked" }
     client.hang_up(mut b)
     finish(mut r, mut a)
 }
