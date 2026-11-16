@@ -207,6 +207,7 @@ mkdir -p "$work/fuzz"
 step oracle-identity oracle_identity
 step case-streams python3 -I tests/vt/cases.py "$work/cases"
 step oracle-cases python3 -I tools/oracle/run.py cases "$work/cases" --expected tests/vt/expected --out "$work/cases-out"
+step jump-scroll-rows python3 -I tests/vt/jump_scroll_rows.py
 step oracle-mutations python3 -I tools/oracle/run.py mutations "$work/cases" --out "$work/cases-out"
 step census-streams python3 -I tests/vt/census.py "$work/census"
 step oracle-census python3 -I tools/oracle/run.py digests "$work/census" --out "$work/census-out" --manifest tests/vt/census.sha256
