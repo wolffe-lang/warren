@@ -61,7 +61,7 @@ step combining-reference python3 -I tools/vt/check_combining.py
 step combine-anchor-reference python3 -I tools/vt/check_combine_anchor.py
 step zero-width-reference python3 -I tools/vt/check_zero_width.py
 step annotation-reference python3 -I tools/vt/check_annotations.py
-step erase-extent-reference python3 -I tools/vt/check_erase_extents.py
+step erase-extent-captures python3 -I tools/vt/erase_extent_captures.py
 step d9-background-fixture python3 -I tests/vt/background_fixture_rows.py
 step d9-bounds python3 -I tests/vt/d9_bound_rows.py
 step origin-fixture-rows python3 -I tests/vt/origin_fixture_rows.py
@@ -76,7 +76,6 @@ step width-exception-rows python3 -I tests/vt/width_exception_rows.py
 step current-width-measurements python3 -I tools/vt/check_width_columns.py
 step report-fixture-rows python3 -I tests/vt/report_fixture_rows.py
 step report-bound-rows python3 -I tests/vt/report_bound_rows.py
-step erase-extent-source-rows python3 -I tests/vt/erase_extent_rows.py
 step RI-mark-exclusion-rows python3 -I tests/vt/ri_mark_exclusion_rows.py
 step corpus-chunking-rows python3 -I tests/vt/chunking_rows.py
 step checked-verdict-rows python3 -I tests/vt/checked_verdict_rows.py
