@@ -161,9 +161,9 @@ def main():
     from report_expectations import recompose_no_bold
     from fresh_expectations import background_pair, legacy_pair, measured_tabs
     from fresh_reports import status_pass
-    from erase_extent_fixture import trace, apply as extent_frame
+    from erase_extent_fixture import trace
     args.out.mkdir(parents=True, exist_ok=False)
-    rules = ('D7', 'D9', 'D12', 'D13', 'RPT-BRIGHT-BOLD-COLOUR', 'RPT-TABS-COLUMN-ONE', 'D14')
+    rules = ('D7', 'D9', 'D12', 'D13', 'RPT-BRIGHT-BOLD-COLOUR', 'RPT-TABS-COLUMN-ONE')
     manifest = {'schema': 2, 'seeds': args.seeds, 'requested_bytes': args.bytes,
         'selected_case_count': len(selected), 'diagnostic_selection': args.case,
         'pins_sha256': hashlib.sha256((ROOT / 'warren-oracle.toml').read_bytes()).hexdigest(),
@@ -260,9 +260,12 @@ def main():
                         record = status_pass(display, source, work / 'tab-status.json')
                         current, detail = measured_tabs(data, current, record)
                         stage('RPT-TABS-COLUMN-ONE', current, detail, True, detail['tab_one'])
-                    current, detail = extent_frame(data, current)
-                    assert detail['cursor'] == [current['cursor']['row'], current['cursor']['col']], 'source cursor differs from reference DECCIR'
-                    stage('D14', current, detail, bool(detail['events']), bool(detail['rows']))
+                    # The source trace's cursor must be the reference's: a check
+                    # on the reference, never a correction of it. (D14's extent
+                    # corrections are withdrawn: with jump scroll off the
+                    # reference's extents are warren's contract, warren#25.)
+                    traced = source_models[name]['cursor']
+                    assert traced == [current['cursor']['row'], current['cursor']['col']], 'source cursor differs from reference DECCIR'
                     written = d7(current, data)
                     (work / 'expected.screen').write_text(screen.dumps(written))
             except (AssertionError, oracle.OracleError, ValueError, OSError, subprocess.TimeoutExpired) as error:
