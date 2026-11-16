@@ -49,7 +49,7 @@ const INVERSE: int = 64
 const FIELD: int = 65
 /// Idle hints, and the prefix table revealed after Ctrl-Space.
 const NORMAL_HINTS: str = " C-Space prefix"
-const PREFIX_HINTS: str = " C-Space prefix  ? keys  |- split  hjkl focus  x close  c new tab  np tabs  +13"
+const PREFIX_HINTS: str = " C-Space prefix  M-\\ M-| |- split  M-t c new tab  M-w x close  ? keys  +15"
 const PANE_HINTS: str = " |- split  hjkl focus  x close  z zoom  o next pane  = equalize  Esc back"
 
 fn now_ms() -> int {
@@ -1196,7 +1196,7 @@ fn row_hint_line(mut r: Rig) -> str {
     let _a = ctrl_space(p)
     if !until_mode(mut p, "PREFIX", 3000) { return "no prefix mode" }
     if !until_hint(mut p, PREFIX_HINTS, 3000) { return "prefix: '" + hint_of(p.image) + "'" }
-    let pw = hint_cells_are(p.image, 24, PREFIX_HINTS, [2, 8, 18, 18, 26, 27, 36, 39, 48, 48, 57, 57, 68, 69])
+    let pw = hint_cells_are(p.image, 24, PREFIX_HINTS, [2, 8, 18, 27, 36, 40, 51, 55, 64, 64])
     if pw.len > 0 { return "prefix cells: " + pw }
     let _w = client.key(p, 0, 0, 119)
     if !until_hint(mut p, PANE_HINTS, 3000) { return "pane: '" + hint_of(p.image) + "'" }
@@ -1217,7 +1217,7 @@ fn row_hint_line(mut r: Rig) -> str {
     let _z = client.resize(p, 40, 24)
     if !until_hint(mut p, NORMAL_HINTS, 3000) { return "idle at 40 columns: '" + hint_of(p.image) + "'" }
     let _narrow = ctrl_space(p)
-    if !until_hint(mut p, " C-Space prefix  ? keys  |- split  +17", 3000) { return "prefix at 40 columns: '" + hint_of(p.image) + "'" }
+    if !until_hint(mut p, " C-Space prefix  M-\\ M-| |- split  +18", 3000) { return "prefix at 40 columns: '" + hint_of(p.image) + "'" }
     finish(mut r, mut p)
 }
 
@@ -1562,7 +1562,7 @@ fn row_help_overlay(mut r: Rig) -> str {
     drain(mut b, 300)
     if rect_has(b.image, "C-Space", 1, 1, 80, AREA) { return "the key list reached the other client" }
     let _j = client.key(a, 0, 0, 106)
-    if !until_rect_line(mut a, "  PREFIX   ?          the key list", 1, 1, 80, 1, 3000) { return "j: '" + cells(a.image, 1, 1, 80) + "'" }
+    if !until_rect_line(mut a, "  NORMAL   M-\\        split-right", 1, 1, 80, 1, 3000) { return "j: '" + cells(a.image, 1, 1, 80) + "'" }
     let _k = client.key(a, 0, 0, 107)
     if !until_rect_line(mut a, first, 1, 1, 80, 1, 3000) { return "k: '" + cells(a.image, 1, 1, 80) + "'" }
     let _e = esc(a)

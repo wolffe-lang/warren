@@ -32,6 +32,34 @@ fn test_the_prefix_enters_and_sends_itself() {
     assert(key_is(named(k, config.MODE_NORMAL, 14), config.A_PASS, 0, config.MODE_NORMAL), "Esc in normal")
 }
 
+fn test_prefix_free_quick_keys() {
+    let k = config.defaults()
+    let n = config.MODE_NORMAL
+    for mode in [n, config.MODE_PREFIX] {
+        assert(key_is(config.step(k, mode, 2, 0, 92), config.A_SPLIT, 0, n), "Alt-backslash columns")
+        assert(key_is(config.step(k, mode, 2, 0, 124), config.A_SPLIT, 1, n), "Alt-pipe rows")
+        for code in [116, 84] { assert(key_is(config.step(k, mode, 2, 0, code), config.A_NEW_TAB, 0, n), "Alt-t/T new tab") }
+        let close = config.step(k, mode, 2, 0, 119)
+        assert(close.action != config.A_PASS && close.action != config.A_NONE && close.mode == n, "Alt-w closes")
+        assert(config.step(k, mode, 2, 0, 87).action == close.action, "Alt-W closes too")
+    }
+    for code in [116, 119] {
+        assert(key_is(config.step(k, n, 4, 0, code), config.A_PASS, 0, n), "Ctrl-t/w remain program keys")
+        assert(key_is(config.step(k, n, 6, 0, code), config.A_PASS, 0, n), "Ctrl-Alt-t/w remain program keys")
+    }
+    for code in [92, 124, 116, 84, 119, 87] {
+        assert(key_is(config.step(k, config.MODE_LOCKED, 2, 0, code), config.A_PASS, 0, config.MODE_LOCKED), "locked Alt passes")
+    }
+    var shown = 0
+    for line in config.help_lines(k) {
+        if line.contains("NORMAL") && line.contains("M-\\") && line.contains("split-right") { shown += 1 }
+        if line.contains("NORMAL") && line.contains("M-|") && line.contains("split-down") { shown += 1 }
+        if line.contains("NORMAL") && line.contains("M-t") && line.contains("new-tab") { shown += 1 }
+        if line.contains("NORMAL") && line.contains("M-w") && line.contains("close-pane") { shown += 1 }
+    }
+    assert(shown == 4, "all four quick keys are in the shared key list")
+}
+
 fn test_the_prefix_table() {
     let k = config.defaults()
     let p = config.MODE_PREFIX
@@ -196,11 +224,11 @@ fn test_the_prompts() {
 
 fn test_the_hint_lines() {
     let k = config.defaults()
-    let prefix = " C-Space prefix  ? keys  |- split  hjkl focus  x close  c new tab  np tabs  +13"
+    let prefix = " C-Space prefix  M-\\ M-| |- split  M-t c new tab  M-w x close  ? keys  +15"
     assert(config.hint_text(k, config.MODE_NORMAL, 80) == " C-Space prefix", "idle has only the prefix at 80")
     assert(config.hint_text(k, config.MODE_PREFIX, 80) == prefix, "prefix at 80")
     assert(config.hint_text(k, config.MODE_NORMAL, 40) == " C-Space prefix", "idle has only the prefix at 40")
-    assert(config.hint_text(k, config.MODE_PREFIX, 40) == " C-Space prefix  ? keys  |- split  +17", "prefix at 40")
+    assert(config.hint_text(k, config.MODE_PREFIX, 40) == " C-Space prefix  M-\\ M-| |- split  +18", "prefix at 40")
     assert(config.hint_text(k, config.MODE_PANE, 80) == " |- split  hjkl focus  x close  z zoom  o next pane  = equalize  Esc back", "pane")
     assert(config.hint_text(k, config.MODE_TAB, 80) == " hl prev/next  c new  x close  r rename  1-9 go to  Esc back", "tab")
     assert(config.hint_text(k, config.MODE_RESIZE, 80) == " hjkl resize  = equalize  Esc back", "resize")
@@ -280,6 +308,7 @@ fn test_the_command_line() {
 
 fn main() -> int {
     test_the_prefix_enters_and_sends_itself()
+    test_prefix_free_quick_keys()
     test_the_prefix_table()
     test_the_sticky_modes()
     test_resize_repeats_and_each_exit_key()

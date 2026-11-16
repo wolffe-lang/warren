@@ -1,0 +1,80 @@
+//! member: false
+//! Bounded legacy/CSI-u input and quick-key routing, native/checked/lupin.
+use client
+use config
+
+fn keyboard_events(text: str, split: bool) -> List[client.Event] {
+    var p = client.parser()
+    var out = List[client.Event]()
+    if split {
+        for b in text.bytes() {
+            var one = List[byte]()
+            (mut one).push(b)
+            for e in client.feed(mut p, one, 0) { (mut out).push(e) }
+        }
+    } else {
+        for e in client.feed(mut p, text.bytes(), 0) { (mut out).push(e) }
+    }
+    for e in client.expire(mut p, 1000) { (mut out).push(e) }
+    out
+}
+
+fn keyboard_show(events: List[client.Event]) -> str {
+    var text = ""
+    for e in events {
+        if text.len > 0 { text = text + " " }
+        text = text + (if e.kind == 2 then "K{e.mods}:{e.key}:{e.code}" else "I")
+    }
+    text
+}
+
+fn keyboard_check(text: str, want: str) {
+    assert(keyboard_show(keyboard_events(text, false)) == want, "keyboard whole report")
+    assert(keyboard_show(keyboard_events(text, true)) == want, "keyboard bytewise report")
+}
+
+fn test_quick_keyboard_encodings() {
+    keyboard_check("\u{1b}\\\u{1b}|\u{1b}t\u{1b}T\u{1b}w\u{1b}W", "K2:0:92 K2:0:124 K2:0:116 K2:0:84 K2:0:119 K2:0:87")
+    keyboard_check("\u{1b}[92;3u", "K2:0:92")
+    keyboard_check("\u{1b}[92;3:1u\u{1b}[92;3:2u\u{1b}[92;3:3u", "K2:0:92 K2:0:92")
+    keyboard_check("\u{1b}[92:124;4:1u", "K3:0:124")
+    keyboard_check("\u{1b}[92;4u", "K3:0:124")
+    keyboard_check("\u{1b}[92;4;124u", "K3:0:124")
+    keyboard_check("\u{1b}[116:84;4u\u{1b}[119:87;4u", "K3:0:84 K3:0:87")
+    keyboard_check("\u{1b}[116;3u\u{1b}[119;3:3u", "K2:0:116")
+    keyboard_check("\u{1b}[116;195u", "K2:0:84")
+    keyboard_check("\u{1b}[116;5u\u{1b}[119;5u", "K4:0:116 K4:0:119")
+    keyboard_check("\u{1b}[32;5:1u\u{1b}[32;5:3u", "K4:0:32")
+    keyboard_check("\u{1b}[27;1:1u\u{1b}[27;1:3u", "K0:1:14")
+    keyboard_check("\u{1b}[0;;97:769u", "K0:0:97 K0:0:769")
+    keyboard_check("\u{1b}[57443;3:1u\u{1b}[57443;1:3u", "")
+    for bad in ["\u{1b}[55296;3u", "\u{1b}[119;11u", "\u{1b}[119;3:4u", "\u{1b}[119;3;23u", "\u{1b}[119;3;119;1u", "\u{1b}[0u"] {
+        keyboard_check(bad, "I")
+    }
+}
+
+fn test_each_real_repeat_acts_once() {
+    let k = config.defaults()
+    let events = keyboard_events("\u{1b}[92;3:1u\u{1b}[92;3:2u\u{1b}[92;3:3u", true)
+    var splits = 0
+    for e in events {
+        if e.kind == 2 && config.step(k, config.MODE_NORMAL, e.mods, e.key, e.code).action == config.A_SPLIT { splits += 1 }
+    }
+    assert(splits == 2, "one split per press or intentional repeat, no release action")
+}
+
+fn test_bare_escape_keeps_its_deadline() {
+    var p = client.parser()
+    assert(client.feed(mut p, "\u{1b}".bytes(), 100).len == 0, "bare Escape waits")
+    assert(client.expire(mut p, 100 + client.ESC_MS - 1).len == 0, "no early Escape")
+    assert(keyboard_show(client.expire(mut p, 100 + client.ESC_MS)) == "K0:1:14", "bare Escape expires normally")
+    assert(keyboard_show(client.feed(mut p, "w".bytes(), 100 + client.ESC_MS + 1)) == "K0:0:119", "late w is not Alt-w")
+}
+
+fn main() -> int {
+    test_quick_keyboard_encodings()
+    test_each_real_repeat_acts_once()
+    test_bare_escape_keeps_its_deadline()
+    print("PASS keyboard-quick-input")
+    0
+}
