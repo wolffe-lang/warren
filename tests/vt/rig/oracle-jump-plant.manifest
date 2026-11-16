@@ -1,0 +1,5 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# runs the reference with jump scroll on again.
+floor 15
+rig oracle-harness-step.sh sha256=a6f471d987ab040b6d2d5eb511c8c99557ada179dd2e55cf207aae45d4f8c0dd
+step jump-scroll-off tools=python3 script=oracle-harness-step.sh -- jump-plant

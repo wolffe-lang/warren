@@ -5,8 +5,9 @@
 # rows among them); `oracle` builds warren and the corpus properties and runs
 # every gate step that launches the pinned reference terminal, through the
 # harness's launch and retry; `plant` and `bound-plant` run the display retry
-# rows, `nightly-plant` the tier tests and `known-plant` the fresh drive's
-# known-failure rows, on a plant and name the row it must turn red.
+# rows, `nightly-plant` the tier tests, `known-plant` the fresh drive's
+# known-failure rows and `jump-plant` the jump-scroll rows (which launch the
+# pinned reference terminal), on a plant and name the row it must turn red.
 set -euo pipefail
 root=$PWD
 export HOME="$root/target/home" TMPDIR="$root/target/tmp" SHELL=/bin/sh
@@ -34,6 +35,7 @@ case "${1:-}" in
   }
   run case-streams python3 -I tests/vt/cases.py "$work/cases"
   run oracle-cases python3 -I tools/oracle/run.py cases "$work/cases" --expected tests/vt/expected --out "$work/cases-out"
+  run jump-scroll-rows python3 -I tests/vt/jump_scroll_rows.py
   run oracle-mutations python3 -I tools/oracle/run.py mutations "$work/cases" --out "$work/cases-out"
   run census-streams python3 -I tests/vt/census.py "$work/census"
   run oracle-census python3 -I tools/oracle/run.py digests "$work/census" --out "$work/census-out" --manifest tests/vt/census.sha256
@@ -76,6 +78,16 @@ case "${1:-}" in
   sed 's/^/  /' target/gate/plant-known-rows.out
   if grep -q '^FAIL fresh-known known-passes' target/gate/plant-known-rows.out; then
     printf 'FAIL known-fixed a known seed that passes was not held red until it leaves the list\n'
+  fi
+  exit "$rc"
+  ;;
+ jump-plant)
+  rc=0
+  export LC_ALL=C.UTF-8
+  python3 -I tests/vt/jump_scroll_rows.py > target/gate/plant-jump-rows.out 2>&1 || rc=$?
+  sed 's/^/  /' target/gate/plant-jump-rows.out
+  if grep -q '^FAIL jump-scroll erase-on-a-scroll-made-row-counts-written' target/gate/plant-jump-rows.out; then
+    printf 'FAIL jump-scroll-off an erase on a scroll-made row did not count its cells as written\n'
   fi
   exit "$rc"
   ;;
