@@ -18,7 +18,10 @@ def resized(name, reference=False):
         if painted:
             for col in range(6):
                 result['rows'][row][col][2] = 'bg=idx:5'
-        result['extents'][row] = 4 if scrolling else 6
+        # The resized row is cut at six columns. With jump scroll on, the
+        # reference left the scrolled row's erase uncounted (extent 4); with
+        # jump scroll off, as it now runs, it counts it like any row (warren#25).
+        result['extents'][row] = 6
         return result
     for offset in range(12 if scrolling and painted else 9):
         r, c = divmod(offset, 6)
