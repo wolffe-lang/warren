@@ -42,6 +42,10 @@ RESOURCES = {
     'cursorBlink': 'false',
     'bellIsUrgent': 'false',
     'visualBell': 'false',
+    # Jump scroll batches buffered line feeds into one scroll, so an erase on a
+    # row made by a scroll counted as written or not by read timing: the same
+    # bytes gave different extents (warren#25). Off, one answer every time.
+    'jumpScroll': 'false',
 }
 
 
