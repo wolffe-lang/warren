@@ -60,7 +60,10 @@ growth buffers rather than assuming that replaced arena storage was freed.
 
 It is run under a virtual X server and spoken to only through its own pty and
 its print-screen file (`tools/oracle/`). Two passes replay the same bytes into
-two fresh emulators.
+two fresh emulators. Jump scroll is off: with it on, the reference batched
+buffered line feeds into one scroll, and an erase on a row made by a scroll
+counted its cells as written or not depending on how its reads split the
+input, so the same bytes gave different extents.
 
 **Pass A** asks: the cursor (CPR and DECCIR, which must agree), the pending
 wrap (DECCIR), tab stops (DECTABSR), the cursor shape and scroll region
