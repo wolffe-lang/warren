@@ -208,6 +208,11 @@ fn test_legacy_mouse() {
     let cut = legacy_mouse(0, 10, 5)
     let short = cut[0..5]
     assert(parse(short) == "I5:27:91:77:32:42", "truncated legacy report stays whole")
+    assert(parse(legacy_mouse(0, 0, 1)) == "I6:27:91:77:32:32:33", "zero coordinate is not a mouse event")
+    assert(parse(legacy_mouse(128, 1, 1)) == "I6:27:91:77:160:33:33", "unsupported legacy button stays whole")
+    var followed = legacy_mouse(0, 10, 5)
+    (mut followed).push(97 as byte)
+    assert(parse(followed) == "M0:0:1:10:5 K0:0:97", "one legacy report does not swallow the next key")
 }
 
 fn main() -> int {
