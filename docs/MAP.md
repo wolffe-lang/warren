@@ -81,6 +81,13 @@ width/resource/platform evidence remain separate pending measurements.
   `COLUMNS` by `LINES`. Over an ssh session: the image's own checks. The image
   recipe is not in this repository.
 
+The `quick-*` terminal-client rows hold the Alt split axes, new tabs and
+pane/tab close behavior in legacy and CSI-u encodings, including intentional
+repeats, ignored releases, final-session confirmation at 80 and 20 columns,
+Ctrl+t/Ctrl+w passthrough and the bare-Escape deadline. The bounded
+`client_keyboard_test` entry runs the input/routing table on native, the
+explicit checked machine and lupin.
+
 A row that tests an interrupt writes the byte 0x03 into the pseudo-terminal.
 No row sends a signal from a script.
 

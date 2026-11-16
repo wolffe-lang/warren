@@ -392,9 +392,22 @@ A zoomed pane takes the whole area. A split's new pane starts at its rect, in
 the session's working directory, with the session's environment.
 
 **Keys and modes.** Every KEY goes through the key table (`src/config/keys.lu`)
-in the client's own mode; modes are per client, focus is per session. One key
-is taken from programs in normal mode, the prefix (Ctrl-Space). After it, one
-key of the prefix table:
+in the client's own mode; modes are per client, focus is per session. Normal
+mode takes the prefix (Ctrl-Space) and four Alt quick keys:
+
+| key | operation |
+|---|---|
+| Alt+\ | split side by side, with a vertical divider |
+| Alt+\| (Alt+Shift+\) | stack panes, with a horizontal divider |
+| Alt+t or Alt+T | new tab |
+| Alt+w or Alt+W | close the focused pane, closing its tab when empty; ask before the session's final pane closes |
+
+Ctrl+t and Ctrl+w belong to the programs inside. The prefix hints reveal the
+quick keys as `M-` chords alongside the prefix table; those quick keys also
+work after the prefix. Idle still shows only `C-Space prefix`. Locked mode
+passes the Alt keys through, as it does every key except its unlock key.
+Other sticky modes retain their own bindings. After the prefix, one key of
+its table:
 
 | key | operation |
 |---|---|
@@ -438,7 +451,10 @@ client's hint line for 2 s; a focus move with no neighbour does nothing.
 
 **Closing.** A pane closes on `x` and `y` or when its program's terminal
 ends; a tab closes with all its panes on `x` and `y` in tab mode; the last pane
-of the last tab ends the session (as one pane did before). Keys, pastes, INPUT,
+of the last tab ends the session (as one pane did before). Alt+w closes other
+panes immediately but asks before this final close: Escape or any non-yes key
+keeps the session, and `y` confirms. The warning explicitly names the session,
+even at 20 columns. Keys, pastes, INPUT,
 focus reports and mouse events go to the focused pane of the active tab; a mouse event outside it is dropped, one inside is made relative to
 its rect. When focus moves, a pane that asked for focus reports hears it lose
 or take focus, and the clients take the new pane's title. A bell from the
@@ -483,7 +499,7 @@ bytes; a keystroke's image holds only the focused pane's cells; a split's new
 prompt is drawn 18 ms after the key; a keystroke in a split is drawn in 2.4 ms
 (p50) and 13.6 ms beside a flooding neighbour in the same tab. A client's mode
 change repaints only its own bar: revealing the prefix table (the mode field
-and hint line) is 690 bytes at 80x24, and entering pane mode 864 bytes. Resize
+and hint line) is 626 bytes at 80x24, and entering pane mode 854 bytes. Resize
 mode has no idle timeout; its arrows and letter keys keep resizing until
 Escape, Enter or the prefix leaves it.
 

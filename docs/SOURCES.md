@@ -5,6 +5,17 @@ consulted, with a digest where the document is a file, and what it was used
 for. The lists of what may and may not be read are in the README. The
 reference programs were run as binaries and never opened as implementations.
 
+## Consulted for CSI-u input (2026-11-16 UTC)
+
+The published **kitty keyboard protocol** documentation at
+https://sw.kovidgoyal.net/kitty/keyboard-protocol/, downloaded HTML SHA-256
+`77d9835c78efc51b6d1234f584f2a9128d790f130b84a1ca3d3a9c289f67665e`
+(checked twice): the central CSI-u form, Unicode/shifted/base-layout fields,
+modifier bits and defaults, press/repeat/release event types, and associated
+text rules. Only documentation was consulted, not terminal implementation
+source. The parser accepts the scalar reports needed by the quick bindings;
+it does not negotiate keyboard modes or promise every functional-key report.
+
 ## Consulted for grammar and character editing (2026-11-13 UTC)
 
 **ECMA-48, fifth edition, June 1991**, fetched from

@@ -100,6 +100,17 @@ every named key and modifier parses back to the same event (a row). What a key
 does (the prefix, the modes, the prompts) is the server's key table, per client
 (SERVER.md §8); the client sends every key as it is.
 
+The Alt quick keys arrive as an ESC prefix in legacy input. The parser also
+accepts CSI-u scalar key reports: press and repeat act once, releases do not
+act, and a supplied shifted alternative or associated text is retained.
+ASCII letters and the Shift+backslash quick key have a fallback when no
+shifted value is supplied. Caps/Num Lock do not create extra shortcut
+modifiers. Super/Hyper/Meta chords, unsupported functional keys and malformed
+reports remain raw input rather than being mistaken for an Alt shortcut.
+Modifier-only reports for representable modifiers are consumed. This does
+not enable or negotiate a new terminal keyboard mode, and is not a claim of
+complete kitty functional-key support. A bare ESC still waits the same 30 ms.
+
 ## Rendering
 
 The client keeps what the terminal shows and sends only the cells that change,
