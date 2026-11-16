@@ -36,6 +36,8 @@ fn keyboard_check(text: str, want: str) {
 fn test_quick_keyboard_encodings() {
     keyboard_check("\u{1b}\\\u{1b}|\u{1b}t\u{1b}T\u{1b}w\u{1b}W", "K2:0:92 K2:0:124 K2:0:116 K2:0:84 K2:0:119 K2:0:87")
     keyboard_check("\u{1b}[92;3u", "K2:0:92")
+    keyboard_check("\u{1b}[92;3;u", "K2:0:92")
+    keyboard_check("\u{1b}[119::116;3u", "K2:0:119")
     keyboard_check("\u{1b}[92;3:1u\u{1b}[92;3:2u\u{1b}[92;3:3u", "K2:0:92 K2:0:92")
     keyboard_check("\u{1b}[92:124;4:1u", "K3:0:124")
     keyboard_check("\u{1b}[92;4u", "K3:0:124")
@@ -48,7 +50,7 @@ fn test_quick_keyboard_encodings() {
     keyboard_check("\u{1b}[27;1:1u\u{1b}[27;1:3u", "K0:1:14")
     keyboard_check("\u{1b}[0;;97:769u", "K0:0:97 K0:0:769")
     keyboard_check("\u{1b}[57443;3:1u\u{1b}[57443;1:3u", "")
-    for bad in ["\u{1b}[55296;3u", "\u{1b}[119;11u", "\u{1b}[119;3:4u", "\u{1b}[119;3;23u", "\u{1b}[119;3;119;1u", "\u{1b}[0u"] {
+    for bad in ["\u{1b}[119:87;3u", "\u{1b}[55296;3u", "\u{1b}[119;11u", "\u{1b}[119;3:4u", "\u{1b}[119;3;23u", "\u{1b}[119;3;119;1u", "\u{1b}[0u"] {
         keyboard_check(bad, "I")
     }
 }
