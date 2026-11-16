@@ -444,11 +444,15 @@ fn keyboard_csi(p: Parser, mut out: List[Event], n: int) -> bool {
     // The wire cannot represent Super/Hyper/Meta. Never mask one away and
     // accidentally turn that chord into a destructive Alt shortcut.
     if flags & 56 != 0 || event_type < 1 || event_type > 3 { return false }
+    if shifted >= 0 && flags & 1 == 0 { return false }
     var text = List[int]()
     if fields.len == 3 {
-        for cp in fields[2] {
-            if !keyboard_scalar(cp) || cp < 32 || (cp >= 127 && cp < 160) { return false }
-            (mut text).push(cp)
+        let associated = fields[2]
+        if !(associated.len == 1 && associated[0] < 0) {
+            for cp in associated {
+                if !keyboard_scalar(cp) || cp < 32 || (cp >= 127 && cp < 160) { return false }
+                (mut text).push(cp)
+            }
         }
     }
     if code == 0 && text.len == 0 { return false }
