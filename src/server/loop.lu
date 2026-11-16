@@ -1376,7 +1376,7 @@ fn mouse_event(mut s: Server, index: int, body: List[byte]) {
     let col = u(body, 3, 2)
     let row = u(body, 5, 2)
     let bit = if button == 1 then 1 else if button == 2 then 2 else 4
-    if kind == 1 && s.conns[index].mouse_consumed & bit != 0 {
+    if false && kind == 1 && s.conns[index].mouse_consumed & bit != 0 {
         s.conns[index].mouse_consumed = s.conns[index].mouse_consumed & (7 - bit)
         return
     }
