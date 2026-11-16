@@ -1960,7 +1960,7 @@ fn row_mouse_tabs(mut r: Rig, legacy: bool) -> str {
 fn mouse_probe_helper(path: str, encoding: int) -> int {
     let was = term.mode(fs.stdin()) else { return 1 }
     term.set_mode(fs.stdin(), term.raw_bytes(was)) else { return 1 }
-    if encoding != 0 { print("\u{1b}[?1000h") }
+    if encoding != 0 { print("\u{1b}[?1003h") }
     if encoding == 1 { print("\u{1b}[?1006h") }
     fs.write_text(path, "ready\n") else { return 1 }
     var tty = fs.stdin()
