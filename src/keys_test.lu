@@ -171,10 +171,11 @@ fn test_the_prompts() {
 
 fn test_the_hint_lines() {
     let k = config.defaults()
-    let normal = " C-Space prefix  ? keys  |- split  hjkl focus  x close  c new tab  np tabs  +13"
-    assert(config.hint_text(k, config.MODE_NORMAL, 80) == normal, "normal at 80")
-    assert(config.hint_text(k, config.MODE_PREFIX, 80) == normal, "prefix at 80, the same line")
-    assert(config.hint_text(k, config.MODE_NORMAL, 40) == " C-Space prefix  ? keys  |- split  +17", "normal at 40")
+    let prefix = " C-Space prefix  ? keys  |- split  hjkl focus  x close  c new tab  np tabs  +13"
+    assert(config.hint_text(k, config.MODE_NORMAL, 80) == " C-Space prefix", "idle has only the prefix at 80")
+    assert(config.hint_text(k, config.MODE_PREFIX, 80) == prefix, "prefix at 80")
+    assert(config.hint_text(k, config.MODE_NORMAL, 40) == " C-Space prefix", "idle has only the prefix at 40")
+    assert(config.hint_text(k, config.MODE_PREFIX, 40) == " C-Space prefix  ? keys  |- split  +17", "prefix at 40")
     assert(config.hint_text(k, config.MODE_PANE, 80) == " |- split  hjkl focus  x close  z zoom  o next pane  = equalize  Esc back", "pane")
     assert(config.hint_text(k, config.MODE_TAB, 80) == " hl prev/next  c new  x close  r rename  1-9 go to  Esc back", "tab")
     assert(config.hint_text(k, config.MODE_RESIZE, 80) == " hjkl resize  = equalize  Esc back", "resize")

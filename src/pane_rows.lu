@@ -47,9 +47,9 @@ const GREEN: int = 16777218
 const INVERSE: int = 64
 /// The bar's mode field: inverse and bold, nine columns at the right end.
 const FIELD: int = 65
-/// The normal (and prefix) mode's hint line at 80 columns, and its keys'
-/// columns (first, last), drawn inverse.
-const NORMAL_HINTS: str = " C-Space prefix  ? keys  |- split  hjkl focus  x close  c new tab  np tabs  +13"
+/// Idle hints, and the prefix table revealed after Ctrl-Space.
+const NORMAL_HINTS: str = " C-Space prefix"
+const PREFIX_HINTS: str = " C-Space prefix  ? keys  |- split  hjkl focus  x close  c new tab  np tabs  +13"
 const PANE_HINTS: str = " |- split  hjkl focus  x close  z zoom  o next pane  = equalize  Esc back"
 
 fn now_ms() -> int {
@@ -734,7 +734,7 @@ fn golden_three(img: proto.Image, focus: int, name: str) -> str {
     }
     let cw = clock_cells_are(img)
     if cw.len > 0 { return "clock " + cw }
-    let hw = hint_cells_are(img, 24, NORMAL_HINTS, [2, 8, 18, 18, 26, 27, 36, 39, 48, 48, 57, 57, 68, 69])
+    let hw = hint_cells_are(img, 24, NORMAL_HINTS, [2, 8])
     if hw.len > 0 { return "hint line " + hw }
     let at_col = if focus == 1 then 1 else 41
     let at_row = if focus == 1 then 1 else 12
@@ -1184,29 +1184,40 @@ fn row_mode_field(mut r: Rig) -> str {
     finish(mut r, mut p)
 }
 
-// The hint line is the mode's rows of the key table: the same line for
-// normal and prefix mode, pane mode's own, locked mode's one key, and the
-// line at 40 columns with the rest counted.
+// Idle shows only the prefix, which reveals the action table; every way
+// back hides it. Narrow prefix tables still count the hints that do not fit.
 fn row_hint_line(mut r: Rig) -> str {
     let why = start_server(mut r, "/bin/cat")
     if why.len > 0 { return why }
     var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
     if !until_hint(mut p, NORMAL_HINTS, 5000) { return "normal: '" + hint_of(p.image) + "'" }
-    let w = hint_cells_are(p.image, 24, NORMAL_HINTS, [2, 8, 18, 18, 26, 27, 36, 39, 48, 48, 57, 57, 68, 69])
+    let w = hint_cells_are(p.image, 24, NORMAL_HINTS, [2, 8])
     if w.len > 0 { return "normal's cells: " + w }
     let _a = ctrl_space(p)
     if !until_mode(mut p, "PREFIX", 3000) { return "no prefix mode" }
-    if hint_of(p.image) != NORMAL_HINTS { return "prefix: '" + hint_of(p.image) + "'" }
+    if !until_hint(mut p, PREFIX_HINTS, 3000) { return "prefix: '" + hint_of(p.image) + "'" }
+    let pw = hint_cells_are(p.image, 24, PREFIX_HINTS, [2, 8, 18, 18, 26, 27, 36, 39, 48, 48, 57, 57, 68, 69])
+    if pw.len > 0 { return "prefix cells: " + pw }
     let _w = client.key(p, 0, 0, 119)
     if !until_hint(mut p, PANE_HINTS, 3000) { return "pane: '" + hint_of(p.image) + "'" }
     let _e = esc(p)
     if !until_hint(mut p, NORMAL_HINTS, 3000) { return "back to normal: '" + hint_of(p.image) + "'" }
+    let _again = ctrl_space(p)
+    if !until_hint(mut p, PREFIX_HINTS, 3000) { return "prefix again" }
+    let _cancel = esc(p)
+    if !until_hint(mut p, NORMAL_HINTS, 3000) { return "Escape from prefix did not hide actions" }
+    let _pane = prefix(p, 119)
+    if !until_hint(mut p, PANE_HINTS, 3000) { return "pane again" }
+    let _enter = enter(p)
+    if !until_hint(mut p, NORMAL_HINTS, 3000) { return "Enter from pane did not hide actions" }
     let _g = prefix(p, 103)
     if !until_hint(mut p, " C-g unlock", 3000) { return "locked: '" + hint_of(p.image) + "'" }
     let _u = client.key(p, 4, 0, 103)
     if !until_hint(mut p, NORMAL_HINTS, 3000) { return "unlocked: '" + hint_of(p.image) + "'" }
     let _z = client.resize(p, 40, 24)
-    if !until_hint(mut p, " C-Space prefix  ? keys  |- split  +17", 3000) { return "at 40 columns: '" + hint_of(p.image) + "'" }
+    if !until_hint(mut p, NORMAL_HINTS, 3000) { return "idle at 40 columns: '" + hint_of(p.image) + "'" }
+    let _narrow = ctrl_space(p)
+    if !until_hint(mut p, " C-Space prefix  ? keys  |- split  +17", 3000) { return "prefix at 40 columns: '" + hint_of(p.image) + "'" }
     finish(mut r, mut p)
 }
 
@@ -1467,6 +1478,13 @@ fn row_modes_per_client(mut r: Rig) -> str {
     if !until_mode(mut a, "PANE", 3000) { return "no pane mode" }
     drain(mut b, 300)
     if mode_of(b.image) != "NORMAL" { return "the other client's mode: " + mode_of(b.image) }
+    if hint_of(a.image) != PANE_HINTS || hint_of(b.image) != NORMAL_HINTS { return "hints leaked between clients" }
+    let _bp = ctrl_space(b)
+    if !until_hint(mut b, PREFIX_HINTS, 3000) { return "the second client did not reveal its prefix table" }
+    drain(mut a, 100)
+    if mode_of(a.image) != "PANE" || hint_of(a.image) != PANE_HINTS { return "the second prefix changed the first client" }
+    let _be = esc(b)
+    if !until_hint(mut b, NORMAL_HINTS, 3000) { return "the second Escape did not hide its table" }
     let _t = client.input(b, "echo B-$((1+1))\r")
     if !until_text(mut b, "B-2", 5000) { return "the other client's keys did not reach the pane" }
     let _s = client.key(a, 0, 0, 124)
