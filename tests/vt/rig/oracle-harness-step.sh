@@ -43,6 +43,7 @@ case "${1:-}" in
   run oracle-fuzz python3 -I tools/oracle/run.py digests "$work/fuzz" --out "$work/fuzz-out" --manifest tests/corpus/fuzz-screens.sha256
   run oracle-corpus python3 -I tools/oracle/run.py digests tests/corpus --out "$work/corpus-out" --manifest tests/corpus/recording-screens.sha256
   run fresh-fuzz-native python3 -I tests/vt/fresh_fuzz.py --profile pull-request --out "$work/fresh-fuzz" "$root/target/native/warren" "$root/target/native/corpus-properties"
+  run fresh-fuzz-wide-break python3 -I tests/vt/fresh_fuzz.py --profile nightly --case fresh-0901 --case fresh-2265 --case fresh-2536 --out "$work/fresh-wide-break" "$root/target/native/warren" "$root/target/native/corpus-properties"
   exit "$rc"
   ;;
  plant)
