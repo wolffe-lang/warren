@@ -273,7 +273,7 @@ def parse_print(data, rows):
     result = []
     for raw in lines:
         line = decode(raw)
-        clusters, state, at, stated = [], {}, 0, False
+        clusters, state, at, stated = [], {}, 0, 0
         while at < len(line):
             cp = line[at]
             if cp == 0x1b and at + 1 < len(line) and line[at + 1] == 0x23:
@@ -282,14 +282,15 @@ def parse_print(data, rows):
                 end = line.index(0x6d, at)
                 sgr_to_attrs(''.join(chr(c) for c in line[at + 2:end]), state)
                 at = end + 1
-                stated = True
+                stated += 1
             elif clusters and is_combining(cp):
                 clusters[-1][0].append(cp)
                 at += 1
             else:
-                # The third field: a rendition was written just before this cell.
+                # The third field: how many renditions were written since the
+                # last character. lay_out decides which of them is this cell's.
                 clusters.append([[cp], attrs_text(state), stated])
-                stated = False
+                stated = 0
                 at += 1
         result.append(clusters)
     return result
@@ -345,7 +346,18 @@ def lay_out(clusters, sums, limit):
         raise OracleError('print and checksums %s: %s against %s' % (
             'disagree' if not found else 'have two readings',
             ' '.join(code_points(c[0]) for c in clusters[:12]), ' '.join(sums[:12])))
-    return found[0]
+    # Print screen writes the second half of a wide character with a rendition
+    # as a cell of its own: an SGR with no character after it. That first SGR
+    # is the second half's, so the next cell stated its own only if another
+    # followed (warren#27).
+    cells = found[0]
+    owed = 0
+    for cell in cells:
+        if cell[0] == 0:
+            continue
+        cell[3] = cell[3] > owed
+        owed = 1 if cell[0] == 2 and cell[2] != '-' else 0
+    return cells
 
 
 def reply_field(text, head, tail):
