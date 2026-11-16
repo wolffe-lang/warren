@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Bound D14 from owned input bytes; never inspect candidate output.
+"""A source trace of owned input bytes; never inspect candidate output.
 
 This is a finite specification trace of cursor, backgrounds and written bits,
 not a renderer or a replacement reference oracle. Only the owned well-formed
-fixture/fuzz subset is accepted. The actual reference must independently agree
-with every declared reference extent before any field correction is allowed.
+fixture/fuzz subset is accepted. The fresh drive uses its cursor, which the
+reference's must equal, and its reference exclusions. Its scroll-made row model
+belonged to D14, now withdrawn: with the reference's jump scroll off, the
+reference's extents are warren's contract (warren#25), and nothing corrects them.
 """
 from bisect import bisect_right
-import copy
 from dataclasses import dataclass
 import json
 from pathlib import Path
@@ -393,15 +394,3 @@ def trace(data, cols=80, rows=24):
     return {'schema': 1, 'events': state.events, 'rows': changed,
             'reference_exclusions': state.reference_exclusions,
             'cursor': [state.row, state.col], 'active_alternate': bool(state.alternate)}
-
-
-def apply(data, reference):
-    """Permit only the source-declared extent deltas on an independent frame."""
-    model = trace(data, *reference['size'])
-    result = copy.deepcopy(reference)
-    for row in model['rows']:
-        index = row['row'] - 1
-        if reference['extents'][index] != row['reference_extent']:
-            raise ValueError('D14 source/reference extent disagreement')
-        result['extents'][index] = row['contract_extent']
-    return result, model
