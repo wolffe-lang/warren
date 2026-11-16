@@ -1360,9 +1360,23 @@ fn row_resize_mode(mut r: Rig) -> str {
     let _b = client.key(p, 0, 0, 104)
     (mut want).push("w winch 22 43")
     if !until_in_order(f, want, 5000) { return "after h: " + (fs.read_text(f) else "") }
-    if mode_of(p.image) != "RESIZE" { return "resize mode was left: " + mode_of(p.image) }
+    // A pause longer than a short repeat timeout must not end the mode.
+    time.sleep(time.millis(700))
+    let _arrow = client.key(p, 0, 1, 3)
+    (mut want).push("w winch 22 45")
+    if !until_in_order(f, want, 5000) { return "the fifth resize (Right after a pause): " + (fs.read_text(f) else "") }
+    if !until_mode(mut p, "RESIZE", 3000) { return "resize mode was left: " + mode_of(p.image) }
+    if hint_of(p.image) != " hjkl resize  = equalize  Esc back" { return "resize hints vanished" }
     let _e = esc(p)
-    if !until_mode(mut p, "NORMAL", 3000) { return "Esc did not leave" }
+    if !until_mode(mut p, "NORMAL", 3000) || hint_of(p.image) != NORMAL_HINTS { return "Esc did not leave to idle hints" }
+    let _again = prefix(p, 114)
+    if !until_mode(mut p, "RESIZE", 3000) { return "resize before Enter" }
+    let _enter = enter(p)
+    if !until_mode(mut p, "NORMAL", 3000) || hint_of(p.image) != NORMAL_HINTS { return "Enter did not leave to idle hints" }
+    let _last = prefix(p, 114)
+    if !until_mode(mut p, "RESIZE", 3000) { return "resize before prefix" }
+    let _prefix = ctrl_space(p)
+    if !until_mode(mut p, "PREFIX", 3000) || hint_of(p.image) != PREFIX_HINTS { return "the prefix did not leave resize" }
     finish(mut r, mut p)
 }
 
@@ -1490,6 +1504,17 @@ fn row_modes_per_client(mut r: Rig) -> str {
     let _s = client.key(a, 0, 0, 124)
     if !until_borders(mut b, AREA, 5000) { return "the split did not reach the other client" }
     if mode_of(a.image) != "PANE" { return "the split left pane mode" }
+    let _end = esc(a)
+    if !until_hint(mut a, NORMAL_HINTS, 3000) { return "the first client did not return to idle hints" }
+    let _resize = prefix(a, 114)
+    if !until_mode(mut a, "RESIZE", 3000) { return "the first client did not enter resize" }
+    let _left = client.key(a, 0, 1, 4)
+    if !until_rect(mut b, "│", 38, 1, 1, AREA, 3000) { return "the resize did not reach the second client" }
+    drain(mut a, 100)
+    if mode_of(a.image) != "RESIZE" || hint_of(a.image) != " hjkl resize  = equalize  Esc back" { return "resize did not stay on the first client" }
+    if mode_of(b.image) != "NORMAL" || hint_of(b.image) != NORMAL_HINTS { return "resize changed the second client's mode or hints" }
+    let _leave = enter(a)
+    if !until_hint(mut a, NORMAL_HINTS, 3000) { return "the first client's Enter did not hide resize hints" }
     client.hang_up(mut b)
     finish(mut r, mut a)
 }

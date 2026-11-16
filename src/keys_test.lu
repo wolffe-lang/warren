@@ -120,6 +120,31 @@ fn test_the_sticky_modes() {
     assert(key_is(scalar(k, s, 113), config.A_NONE, 0, s), "session q unbound")
 }
 
+// Protective coverage for resize mode, whose reported exit is not reproduced.
+fn test_resize_repeats_and_each_exit_key() {
+    let k = config.defaults()
+    let r = config.MODE_RESIZE
+    for code in [1, 2, 3, 4] {
+        let st = named(k, r, code)
+        assert(st.action == config.A_RESIZE && st.mode == r, "every resize arrow stays")
+    }
+    var mode = r
+    let kinds = [0, 1, 0, 1, 0]
+    let codes = [108, 3, 104, 4, 108]
+    let directions = [1, 1, 0, 0, 1]
+    var i = 0
+    while i < 5 {
+        let st = config.step(k, mode, 0, kinds[i], codes[i])
+        assert(key_is(st, config.A_RESIZE, directions[i], r), "five resizes in one mode")
+        mode = st.mode
+        assert(config.hint_text(k, mode, 80) == " hjkl resize  = equalize  Esc back", "resize hints stay")
+        i += 1
+    }
+    assert(key_is(named(k, r, 14), config.A_NONE, 0, config.MODE_NORMAL), "resize Escape exits")
+    assert(key_is(named(k, r, 13), config.A_NONE, 0, config.MODE_NORMAL), "resize Enter exits")
+    assert(key_is(ctrl(k, r, 32), config.A_NONE, 0, config.MODE_PREFIX), "resize prefix exits")
+}
+
 fn test_locked_passes_everything_but_its_one_key() {
     let k = config.defaults()
     let g = config.MODE_LOCKED
@@ -257,6 +282,7 @@ fn main() -> int {
     test_the_prefix_enters_and_sends_itself()
     test_the_prefix_table()
     test_the_sticky_modes()
+    test_resize_repeats_and_each_exit_key()
     test_locked_passes_everything_but_its_one_key()
     test_confirm_and_help()
     test_the_prompts()
