@@ -94,7 +94,7 @@ accepts CSI-u scalar key reports: press and repeat act once, releases do not
 act, and a supplied shifted alternative or associated text is retained.
 ASCII letters and the Shift+backslash quick key have a fallback when no
 shifted value is supplied. Caps/Num Lock do not create extra shortcut
-modifiers. Super/Hyper/Meta chords, unsupported functional keys and malformed
+modifiers. Super/Hyper/Meta chords, unsupported functional key presses and malformed
 reports remain raw input rather than being mistaken for an Alt shortcut.
 Modifier-only reports for representable modifiers are consumed. This does
 not enable or negotiate a new terminal keyboard mode, and is not a claim of
