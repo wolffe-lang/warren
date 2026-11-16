@@ -397,10 +397,10 @@ mode takes the prefix (Ctrl-Space) and four Alt quick keys:
 
 | key | operation |
 |---|---|
-| Alt+\ | split side by side, with a vertical divider |
-| Alt+\| (Alt+Shift+\) | stack panes, with a horizontal divider |
-| Alt+t or Alt+T | new tab |
-| Alt+w or Alt+W | close the focused pane, closing its tab when empty; ask before the session's final pane closes |
+| `Alt+\` | split side by side, with a vertical divider |
+| `Alt+\|` (`Alt+Shift+\`) | stack panes, with a horizontal divider |
+| `Alt+t` or `Alt+T` | new tab |
+| `Alt+w` or `Alt+W` | close the focused pane, closing its tab when empty; ask before the session's final pane closes |
 
 Ctrl+t and Ctrl+w belong to the programs inside. The prefix hints reveal the
 quick keys as `M-` chords alongside the prefix table; those quick keys also
