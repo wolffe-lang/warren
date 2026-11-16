@@ -41,8 +41,10 @@ starting the server and the session when there are none; `warren new [-d]
 [-s NAME]`, `warren attach -t NAME`, `kill-server` and `list-sessions` work,
 several clients may share a session, and the server outlives the client that
 started it. Behind the prefix (Ctrl-Space) a session splits into panes and
-holds tabs, drawn with their borders and a bar (SERVER.md §8); `vt-dump` is a
-diagnostic command.
+holds tabs, drawn with their borders and a bar (SERVER.md §8). While idle,
+the hint line shows only Ctrl-Space; pressing it reveals its actions, and
+leaving the prefix or a mode hides them again. `vt-dump` is a diagnostic
+command.
 [MAP](docs/MAP.md) separates what is planned from what is measured.
 
 ## What is planned
