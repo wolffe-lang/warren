@@ -450,8 +450,10 @@ leave out the far side of the active one, marked `<` or `>`; the client's mode
 in a fixed field of nine columns, inverse and bold; at the right end the local
 time, ` HH:MM `, from 40 columns, where narrower the mode field takes the end),
 then the hint line: the mode's rows of the key table, `keys label` with the keys
-inverse, two spaces apart, those that do not fit counted as `+N` (normal and
-prefix mode share one line, so the prefix repaints only the mode field); a
+inverse, two spaces apart, those that do not fit counted as `+N`. While idle
+only `C-Space prefix` is shown; pressing the prefix reveals its action table,
+and leaving the prefix or a mode restores the idle hint. A sticky mode keeps
+its own hints until it ends. The line can instead show a
 prompt with its cursor; the confirm question; or a message while one lasts.
 The key list (`?`) is drawn over the tab area for that client only, one line a
 binding, and scrolls with `j` and `k`. Each
@@ -480,8 +482,10 @@ panes side by side at 80x24 is a 600-byte image and among three panes 314
 bytes; a keystroke's image holds only the focused pane's cells; a split's new
 prompt is drawn 18 ms after the key; a keystroke in a split is drawn in 2.4 ms
 (p50) and 13.6 ms beside a flooding neighbour in the same tab. A client's mode
-change repaints only its own bar: the prefix's image (the mode field) is 94
-bytes, and entering pane mode (the field and the hint line) 864 bytes.
+change repaints only its own bar: revealing the prefix table (the mode field
+and hint line) is 690 bytes at 80x24, and entering pane mode 864 bytes. Resize
+mode has no idle timeout; its arrows and letter keys keep resizing until
+Escape, Enter or the prefix leaves it.
 
 **Rows.** `src/pane_rows.lu` drives a real server through key events: split
 sizes, keys reaching the focused pane, the window change a pane's program hears

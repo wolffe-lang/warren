@@ -958,7 +958,8 @@ fn row_split_e2e(warren: str) -> str {
         return "the prefix did not reveal its hints"
     }
     type_text(mut r, "\u{1b}")
-    pump(mut r, 100)
+    let hint_deadline = now_ms() + 3000
+    while cells_at(r.screen, 24, 1, 80).trim() != "C-Space prefix" && now_ms() < hint_deadline { pump(mut r, 50) }
     if cells_at(r.screen, 24, 1, 80).trim() != "C-Space prefix" {
         close_run(r)
         return "Escape did not hide the prefix hints"
