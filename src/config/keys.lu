@@ -92,6 +92,8 @@ pub const A_ERASE: int = 24
 pub const A_CLEAR: int = 25
 /// Run the prompt's line.
 pub const A_RUN: int = 26
+/// Close immediately except that the final pane of the session asks first.
+pub const A_QUICK_CLOSE: int = 27
 
 const SHIFT: int = 1
 const ALT: int = 2
@@ -208,6 +210,13 @@ pub fn defaults() -> Keys {
     let n = MODE_NORMAL
     let p = MODE_PREFIX
     bind(mut l, n, CTRL, SCALAR, 32, A_NONE, 0, p, "C-Space", "prefix")
+    bind(mut l, n, ALT, SCALAR, 92, A_SPLIT, 0, n, "M-\\ ", "split")
+    bind(mut l, n, ALT, SCALAR, 124, A_SPLIT, 1, n, "M-| ", "split")
+    bind(mut l, n, ALT, SCALAR, 116, A_NEW_TAB, 0, n, "M-t ", "new tab")
+    hidden(mut l, n, ALT, SCALAR, 84, A_NEW_TAB, 0, n)
+    bind(mut l, n, ALT, SCALAR, 119, A_QUICK_CLOSE, 0, n, "M-w ", "close")
+    hidden(mut l, n, ALT, SCALAR, 87, A_QUICK_CLOSE, 0, n)
+
 
     letter(mut l, p, "?", A_HELP, 0, MODE_HELP, "keys")
     letter(mut l, p, "|", A_SPLIT, 0, n, "split")
@@ -317,7 +326,16 @@ pub fn step(k: Keys, mode: int, mods: int, kind: int, code: int) -> Step {
         }
     }
     if mode == MODE_NORMAL || mode == MODE_LOCKED { return found(A_PASS, 0, mode) }
-    if mode == MODE_PREFIX { return found(A_NONE, 0, MODE_NORMAL) }
+    // Prefix hints include root quick actions; those advertised keys act
+    // here too, after the exact prefix-table bindings have had first choice.
+    if mode == MODE_PREFIX {
+        for b in k.bindings {
+            if b.mode == MODE_NORMAL && b.action != A_NONE && b.mods == m && b.kind == kind && b.code == code {
+                return found(b.action, b.arg, b.next)
+            }
+        }
+        return found(A_NONE, 0, MODE_NORMAL)
+    }
     if mode == MODE_CONFIRM { return found(A_NONE, 0, MODE_BACK) }
     if mode == MODE_COMMAND || mode == MODE_RENAME {
         if kind == SCALAR && m == 0 && code >= 32 && code != 127 && !(code >= 128 && code < 160) {
@@ -400,6 +418,7 @@ pub fn hint_line(k: Keys, mode: int, cols: int) -> HintLine {
     var shows = List[str]()
     for b in k.bindings {
         if b.hint == "" || !in_line(b.mode, mode) { continue }
+        if mode == MODE_NORMAL && !(b.action == A_NONE && b.next == MODE_PREFIX) { continue }
         var at = -1
         var i = 0
         while i < labels.len {
@@ -465,6 +484,7 @@ fn verb(action: int, arg: int) -> str {
     if action == A_ZOOM { return "zoom" }
     if action == A_EQUALIZE { return "equalize" }
     if action == A_CLOSE { return "close-pane" }
+    if action == A_QUICK_CLOSE { return "close-pane (asks on last pane)" }
     if action == A_NEW_TAB { return "new-tab" }
     if action == A_NEXT_TAB { return "next-tab" }
     if action == A_PREVIOUS_TAB { return "previous-tab" }

@@ -852,7 +852,7 @@ fn bar_cells(s: Server, si: int, index: int, now: int) -> List[vt.Cell] {
     if prompt.len > 0 {
         let _p = put_text(mut two, 1, cols, prompt, 0)
     } else if mode == config.MODE_CONFIRM {
-        let question = if s.conns[index].confirm == config.A_CLOSE_TAB then " close this tab and its panes?" else " close this pane?"
+        let question = if s.conns[index].confirm == config.A_CLOSE_TAB then " close this tab and its panes?" else if pane_count(s, si) == 1 then " close last pane and end session?" else " close this pane?"
         let q = put_text(mut two, 1, cols, question, 0)
         put_hints(mut two, q, cols, config.hint_line(s.keys, mode, cols - q + 1))
     } else if s.conns[index].message_until > now && s.conns[index].message.len > 0 {
@@ -1058,6 +1058,15 @@ fn do_action(mut s: Server, index: int, action: int, arg: int) -> int {
     }
     if action == config.A_CLOSE {
         if from >= 0 { close_pane(mut s, si, from) }
+        return DONE
+    }
+    if action == config.A_QUICK_CLOSE {
+        if from < 0 { return DONE }
+        if pane_count(s, si) == 1 {
+            s.conns[index].back = config.MODE_NORMAL
+            s.conns[index].confirm = config.A_CLOSE
+            set_mode(mut s, index, config.MODE_CONFIRM)
+        } else { close_pane(mut s, si, from) }
         return DONE
     }
     if action == config.A_CLOSE_TAB {

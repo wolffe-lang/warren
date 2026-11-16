@@ -384,9 +384,99 @@ fn tilde_code(n: int) -> int {
     }
 }
 
+// A CSI-u report is bounded by SEQUENCE_MAX, with at most three fields.
+// Empty subfields stay -1 so shifted/base alternatives cannot slide left.
+fn keyboard_fields(p: Parser, n: int) -> List[List[int]] {
+    var fields = List[List[int]]()
+    var values = List[int]()
+    var v = 0 - 1
+    var i = 2
+    while i < n - 1 {
+        let x = at(p, i)
+        if x >= 48 && x <= 57 {
+            if v < 0 { v = 0 }
+            v = v * 10 + x - 48
+            if v > 1114111 { return List[List[int]]() }
+        } else if x == 58 || x == 59 {
+            (mut values).push(v)
+            v = 0 - 1
+            if x == 59 {
+                (mut fields).push(copy values)
+                values = List[int]()
+                if fields.len >= 3 { return List[List[int]]() }
+            }
+        } else { return List[List[int]]() }
+        i += 1
+    }
+    (mut values).push(v)
+    (mut fields).push(values)
+    fields
+}
+
+fn keyboard_scalar(cp: int) -> bool {
+    cp >= 0 && cp <= 1114111 && !(cp >= 55296 && cp <= 57343)
+}
+
+// CSI-u scalars and the legacy-compatible Escape/Enter/Tab/Backspace codes.
+// No terminal keyboard mode is negotiated; unsupported reports stay INPUT.
+fn keyboard_csi(p: Parser, mut out: List[Event], n: int) -> bool {
+    let fields = keyboard_fields(p, n)
+    if fields.len == 0 || fields.len > 3 { return false }
+    let keys = fields[0]
+    if keys.len < 1 || keys.len > 3 || !keyboard_scalar(keys[0]) { return false }
+    var code = keys[0]
+    var shifted = 0 - 1
+    if keys.len > 1 && keys[1] >= 0 {
+        if !keyboard_scalar(keys[1]) { return false }
+        shifted = keys[1]
+    }
+    if keys.len > 2 && keys[2] >= 0 && !keyboard_scalar(keys[2]) { return false }
+    var flags = 0
+    var event_type = 1
+    if fields.len > 1 {
+        let m = fields[1]
+        if m.len < 1 || m.len > 2 { return false }
+        let value = if m[0] < 0 then 1 else m[0]
+        if value < 1 || value > 256 { return false }
+        flags = value - 1
+        if m.len > 1 && m[1] >= 0 { event_type = m[1] }
+    }
+    // The wire cannot represent Super/Hyper/Meta. Never mask one away and
+    // accidentally turn that chord into a destructive Alt shortcut.
+    if flags & 56 != 0 || event_type < 1 || event_type > 3 { return false }
+    var text = List[int]()
+    if fields.len == 3 {
+        for cp in fields[2] {
+            if !keyboard_scalar(cp) || cp < 32 || (cp >= 127 && cp < 160) { return false }
+            (mut text).push(cp)
+        }
+    }
+    if code == 0 && text.len == 0 { return false }
+    if event_type == 3 { return true }
+    // Modifier-only key events have no v1 KEY representation or action.
+    if code >= 57441 && code <= 57454 { return text.len == 0 }
+    let mods = flags & 7
+    if text.len > 0 && mods & 6 == 0 {
+        for cp in text { (mut out).push(key_of(cp, mods)) }
+        return true
+    }
+    if code == 0 { return false }
+    if code >= 57344 && code <= 63743 { return false }
+    if flags & 1 != 0 {
+        if shifted >= 0 { code = shifted }
+        else if text.len == 1 { code = text[0] }
+        else if code == 92 { code = 124 }
+    }
+    if shifted < 0 && code >= 97 && code <= 122 && ((flags & 1 != 0) != (flags & 64 != 0)) { code -= 32 }
+    if code == 27 { (mut out).push(event(2, mods, 1, 14)) }
+    else { (mut out).push(key_of(code, mods)) }
+    true
+}
+
 // Decode a complete CSI of length n; false when it means nothing here.
 fn csi(mut p: Parser, mut out: List[Event], n: int) -> bool {
     let f = at(p, n - 1)
+    if f == 117 { return keyboard_csi(p, mut out, n) }
     let r = params(p, n)
     if !r.ok { return false }
     if r.private == 60 && (f == 77 || f == 109) {
