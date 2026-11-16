@@ -936,12 +936,6 @@ fn clock_shape(text: str) -> bool {
     b[0] == 32 as byte && b[3] == 58 as byte && b[6] == 32 as byte
 }
 
-// The real client in this program's pty, end to end: the prefix (the
-// terminal sends Ctrl-Space as NUL) and `|` split the session; the
-// client's screen, read through warren's emulator, shows the border down
-// column 40, line one (the session, the mode field, the clock) and the
-// hint line; a command lands in the new right pane; the prefix, `x` and `y`
-// close it.
 fn terminal_mouse(mut r: Run, legacy: bool, col: int, row: int) {
     for release in [false, true] {
         var data = List[byte]()
@@ -985,6 +979,12 @@ fn row_mouse_e2e(warren: str, legacy: bool) -> str {
     why
 }
 
+// The real client in this program's pty, end to end: the prefix (the
+// terminal sends Ctrl-Space as NUL) and `|` split the session; the
+// client's screen, read through warren's emulator, shows the border down
+// column 40, line one (the session, the mode field, the clock) and the
+// hint line; a command lands in the new right pane; the prefix, `x` and `y`
+// close it.
 fn row_split_e2e(warren: str) -> str {
     var r = launch(warren, "e2e", List[str](), 80, 24) else |e| { return "launch: {e}" }
     if !until_screen(mut r, "$", 10000) {

@@ -19,6 +19,8 @@
 //!                       terminal hangs up, and exits
 //!   --read-bytes FILE N appends `ready`, reads N bytes from its terminal in
 //!                       raw mode, appends `bytes HEX...`, and exits
+//!   --mouse-probe FILE ENCODING  logs raw input bytes until its terminal
+//!                       hangs up; ENCODING is 0 off, 1 SGR, 2 legacy
 //! No row sends a signal: a helper reports what reached it.
 use std.env
 use std.fs
