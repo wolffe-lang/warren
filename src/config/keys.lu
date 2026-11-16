@@ -207,7 +207,7 @@ pub fn defaults() -> Keys {
     var l = List[Binding]()
     let n = MODE_NORMAL
     let p = MODE_PREFIX
-    bind(mut l, n, CTRL, SCALAR, 32, A_NONE, 0, p, "C-Space", "prefix")
+    bind(mut l, n, CTRL, SCALAR, 32, A_NONE, 0, p, "C-Space", "")
 
     letter(mut l, p, "?", A_HELP, 0, MODE_HELP, "keys")
     letter(mut l, p, "|", A_SPLIT, 0, n, "split")
