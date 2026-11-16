@@ -387,14 +387,14 @@ pub fn text_width(text: str) -> int {
 }
 
 fn in_line(mode: int, line: int) -> bool {
-    if line == MODE_NORMAL || line == MODE_PREFIX { return mode == MODE_NORMAL || mode == MODE_PREFIX }
+    if line == MODE_PREFIX { return mode == MODE_NORMAL || mode == MODE_PREFIX }
     mode == line
 }
 
 /// The hint line of a mode at a width: the mode's bindings grouped by label
-/// in table order, each `keys label`, two spaces apart; normal and prefix
-/// mode share one line (the prefix, then the prefix table). Groups that do not
-/// fit are counted at the end as `+N`.
+/// in table order, each `keys label`, two spaces apart. Idle shows only its
+/// prefix binding; prefix mode adds the prefix table. Groups that do not fit
+/// are counted at the end as `+N`.
 pub fn hint_line(k: Keys, mode: int, cols: int) -> HintLine {
     var labels = List[str]()
     var shows = List[str]()
