@@ -1258,12 +1258,9 @@ fn main() -> int {
         (mut rows).push(args[i])
         i += 1
     }
+    let quick_defaults = rows.len == 0
     if rows.len == 0 {
         rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names split-e2e zero-window zero-window-env window-too-large")
-        (mut rows).push("quick-legacy")
-        (mut rows).push("quick-events")
-        (mut rows).push("quick-csi-u")
-        (mut rows).push("quick-small")
     }
     if !fs.exists("/proc") { print("NOTE leftovers unchecked here: no /proc to read") }
     // Every row's socket lives in a short directory under this one; a
@@ -1274,6 +1271,12 @@ fn main() -> int {
         print("FAIL client-rows the working directory is too deep: the {long}")
         print("CLIENT-ROWS rows={rows.len} failed={rows.len}")
         return 1
+    }
+    if quick_defaults {
+        (mut rows).push("quick-legacy")
+        (mut rows).push("quick-events")
+        (mut rows).push("quick-csi-u")
+        (mut rows).push("quick-small")
     }
     var failed = 0
     for name in rows {

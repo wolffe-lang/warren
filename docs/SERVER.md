@@ -449,12 +449,13 @@ A refused split or new tab (too small, the pane limit, the memory budget, a
 program that did not start) leaves everything as it was and is named on that
 client's hint line for 2 s; a focus move with no neighbour does nothing.
 
+Alt+w closes other panes immediately but asks before the final close:
+Escape or any non-yes key keeps the session, and `y` confirms. The warning
+explicitly names the session, even at 20 columns.
+
 **Closing.** A pane closes on `x` and `y` or when its program's terminal
 ends; a tab closes with all its panes on `x` and `y` in tab mode; the last pane
-of the last tab ends the session (as one pane did before). Alt+w closes other
-panes immediately but asks before this final close: Escape or any non-yes key
-keeps the session, and `y` confirms. The warning explicitly names the session,
-even at 20 columns. Keys, pastes, INPUT,
+of the last tab ends the session (as one pane did before). Keys, pastes, INPUT,
 focus reports and mouse events go to the focused pane of the active tab; a mouse event outside it is dropped, one inside is made relative to
 its rect. When focus moves, a pane that asked for focus reports hears it lose
 or take focus, and the clients take the new pane's title. A bell from the
