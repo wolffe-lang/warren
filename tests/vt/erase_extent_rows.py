@@ -27,6 +27,13 @@ def main():
             row = result['rows'][0]
             assert row['reference_extent'] == expected and row['contract_extent'] == 9, (name, result)
     assert trace(b'abcd' + C + b'5G' + C + b'5X', 12, 4)['events'] == []
+    # An erase in display over a scroll-made row ends D14 for that row: the
+    # reference extends a later erase there as on any row (warren#26). A line
+    # clear (EL 2, above) does not.
+    for label, clear in (('ED2', C + b'2J'), ('ED0-whole-row', C + b'4;1H' + C + b'0J'),
+                         ('ED1-to-the-cursor', C + b'4;7H' + C + b'1J')):
+        result = trace(C + b'4;1H\n' + clear + C + b'4;5H' + C + b'5X', 12, 4)
+        assert result['rows'] == [], ('ED-ends-scroll-made', label, result)
     span = runpy.run_path(str(ROOT / 'tests/vt/probes/erase_span_bounds.py'))['cases']()
     for name, (data, replay) in span.items():
         if replay:
@@ -60,7 +67,7 @@ def main():
             pass
         else:
             raise AssertionError(('unowned input accepted', data[:20]))
-    print('PASS D14 source-only scroll16 span10 no-trigger-row strict-unsupported-input-refusal')
+    print('PASS D14 source-only scroll16 span10 no-trigger-row ED-ends-scroll-made strict-unsupported-input-refusal')
 
 
 if __name__ == '__main__':
