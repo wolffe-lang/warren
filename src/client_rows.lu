@@ -250,6 +250,16 @@ fn until_screen(mut r: Run, text: str, ms: int) -> bool {
     screen_text(r.screen).contains(text)
 }
 
+// A terminal repaint can span reads; wait for the complete hint row.
+fn until_terminal_hint(mut r: Run, text: str, ms: int) -> bool {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        if cells_at(r.screen, r.screen.rows, 1, r.screen.cols).trim() == text { return true }
+        pump(mut r, 50)
+    }
+    cells_at(r.screen, r.screen.rows, 1, r.screen.cols).trim() == text
+}
+
 fn until_end(mut r: Run, ms: int) -> bool {
     let until = now_ms() + ms
     while !r.ended && now_ms() < until { pump(mut r, 50) }
@@ -948,7 +958,7 @@ fn row_split_e2e(warren: str) -> str {
         close_run(r)
         return "no prompt: " + screen_text(r.screen)
     }
-    if cells_at(r.screen, 24, 1, 80).trim() != "C-Space prefix" {
+    if !until_terminal_hint(mut r, "C-Space prefix", 3000) {
         close_run(r)
         return "idle hints: '" + cells_at(r.screen, 24, 1, 80) + "'"
     }
@@ -958,9 +968,7 @@ fn row_split_e2e(warren: str) -> str {
         return "the prefix did not reveal its hints"
     }
     type_text(mut r, "\u{1b}")
-    let hint_deadline = now_ms() + 3000
-    while cells_at(r.screen, 24, 1, 80).trim() != "C-Space prefix" && now_ms() < hint_deadline { pump(mut r, 50) }
-    if cells_at(r.screen, 24, 1, 80).trim() != "C-Space prefix" {
+    if !until_terminal_hint(mut r, "C-Space prefix", 3000) {
         close_run(r)
         return "Escape did not hide the prefix hints"
     }
@@ -974,8 +982,8 @@ fn row_split_e2e(warren: str) -> str {
         close_run(r)
         return "line one: '{one}'"
     }
-    let two = cells_at(r.screen, 24, 1, 80)
-    if two.trim() != "C-Space prefix" {
+    if !until_terminal_hint(mut r, "C-Space prefix", 3000) {
+        let two = cells_at(r.screen, 24, 1, 80)
         close_run(r)
         return "the hint line: '{two}'"
     }
