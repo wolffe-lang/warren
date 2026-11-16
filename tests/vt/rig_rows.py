@@ -59,6 +59,7 @@ def main():
     assert "printf 'FAIL nightly-limit " in harness and 'test_nightly_fits_its_limit' in harness
     assert "printf 'FAIL known-fixed " in harness and 'fresh-known known-passes' in harness
     assert "printf 'FAIL jump-scroll-off " in harness and 'jump_scroll_rows.py' in harness
+    assert '--case fresh-0901 --case fresh-2265 --case fresh-2536' in harness
     assert 'tests/vt/fresh_fuzz.py --profile pull-request' in harness and 'exec bash tools/gate unit' in harness
     linux = (RIG / 'w1-step.sh').read_text()
     assert 'tools/gate linux' in linux and 'vt_resource_bench.lu' in linux
