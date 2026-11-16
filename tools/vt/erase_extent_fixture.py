@@ -293,6 +293,10 @@ class Trace:
                         first = self.col if mode == 0 and row == self.row else 1
                         last = self.col if mode == 1 and row == self.row else self.cols
                         self.erase(row, first, last, final, offset)
+                        # An erase in display ends a row's scroll-made state:
+                        # the reference extends the extent of a later erase on
+                        # it as on any row (warren#26).
+                        self.screen[row - 1].fill = None
         elif final in ('@', 'P'):
             self.clear_mark_uncertainty()
             self.pending = False
