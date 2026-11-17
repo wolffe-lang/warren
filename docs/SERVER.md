@@ -545,7 +545,28 @@ window is filled again at the new size on the same content. A window's two
 buffers belong to its client and grow only between turns, outside the turn's
 region: to its session's tab area once the client is attached, and to any
 larger size a step asks for, which then waits for the next turn. Fills and
-lookups allocate nothing.
+lookups allocate nothing. A line that goes on from history into the live rows
+is one soft-wrapped line in the window.
+
+**Search.** In scroll mode `?` opens a prompt toward older rows and `/` toward
+newer rows, typed on the hint line after the `?` or `/` (Backspace and `C-u`
+as in the other prompts); the mode field reads SEARCH. Enter searches and
+returns to scroll mode, Esc returns without searching, and an empty line keeps
+the last search. The text is literal and case-sensitive, 1 to 62 scalars, and
+matches within one logical line: across soft wraps, never across a line break.
+A combining mark is a scalar of its own. The search reads the pane's retained
+history, oldest first, then its live rows; the alternate screen is not
+searched. A new search starts at the window's edge, `?` at its bottom row and
+`/` at its top row, whose own matches count; `n` searches again the same way
+from the last match and `N` the other way. Neither end wraps: the hint line
+says `no older match: TEXT` or `no newer match: TEXT` and the window stays. A
+match the window shows leaves it in place; otherwise the window moves to put
+the match's first row in its middle, clamped at the live rows and the oldest
+row. The match is drawn inverse for that client wherever the window shows it,
+until a selection starts or the mode ends; a match on the live rows is shown
+on a snapshot of them. A search keeps a window the wheel opened. Positions are
+logical (a line and a cell), so `n` after more output goes on from the same
+text. A search allocates nothing and runs within the turn.
 
 **Selection and the register.** A left press in the focused pane in normal
 mode, when its program asked for no mouse reports (with Shift, even when it
