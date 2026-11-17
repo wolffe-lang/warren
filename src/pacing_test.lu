@@ -1,0 +1,66 @@
+//! member: false
+//! Frame pacing (src/server/pacing.lu), held by hand-written expectations:
+//! a drained master's damage is due at once, a streaming pane keeps the
+//! quiet and age rules, frames keep their spacing, synchronized output
+//! holds a frame, and which reads count as a full buffer.
+use server
+
+const MS: int = 1000000
+
+fn test_a_drained_master_is_due_at_once() {
+    // Output read at 500 ms, the last frame long before: due at 500 ms.
+    assert(server.frame_at(100 * MS, 500 * MS, 500 * MS, 0, false, false) == 500 * MS, "drained: due when stale")
+    // Damage older than the output that drained (a bar change at 490 ms).
+    assert(server.frame_at(100 * MS, 490 * MS, 500 * MS, 0, false, false) == 490 * MS, "drained: due since stale")
+}
+
+fn test_a_streaming_pane_waits_for_quiet_or_age() {
+    let quiet = server.FRAME_QUIET_MS * MS
+    let age = server.FRAME_AGE_MS * MS
+    assert(server.frame_at(100 * MS, 500 * MS, 500 * MS, 0, true, false) == 500 * MS + quiet, "streaming: quiet first")
+    // Output kept coming until 507 ms: the age bound wins.
+    assert(server.frame_at(100 * MS, 500 * MS, 507 * MS, 0, true, false) == 500 * MS + age, "streaming: age bound")
+    assert(server.frame_at(100 * MS, 500 * MS, 505 * MS, 0, true, false) == 505 * MS + quiet, "streaming: quiet after the last read")
+}
+
+fn test_frames_keep_their_spacing() {
+    let age = server.FRAME_AGE_MS * MS
+    // The last frame went 2 ms before the output: one frame per 8 ms.
+    assert(server.frame_at(498 * MS, 500 * MS, 500 * MS, 0, false, false) == 498 * MS + age, "drained: spacing")
+    assert(server.frame_at(498 * MS, 500 * MS, 500 * MS, 0, true, false) == 498 * MS + age, "streaming: spacing")
+}
+
+fn test_synchronized_output_holds_a_frame() {
+    let sync = server.SYNC_MS * MS
+    assert(server.frame_at(100 * MS, 500 * MS, 500 * MS, 499 * MS, false, false) == 499 * MS + sync, "drained inside sync: held")
+    assert(server.frame_at(100 * MS, 500 * MS, 500 * MS, 499 * MS, true, false) == 499 * MS + sync, "streaming inside sync: held")
+}
+
+fn test_a_full_image_waits_only_for_spacing() {
+    let age = server.FRAME_AGE_MS * MS
+    assert(server.frame_at(498 * MS, 500 * MS, 500 * MS, 499 * MS, true, true) == 498 * MS + age, "full: spacing only")
+    assert(server.frame_at(100 * MS, 0, 0, 0, false, true) == 100 * MS + age, "full: from the last frame")
+}
+
+fn test_which_reads_leave_the_pane_streaming() {
+    let asked = 65536
+    assert(!server.read_streams(1, asked, 0), "an echo drains, even as the first read")
+    assert(!server.read_streams(1023, asked, 0), "under STREAM_MIN drains, even as the largest read")
+    assert(server.read_streams(1024, asked, 0), "STREAM_MIN reached, the largest read yet: a full buffer")
+    assert(server.read_streams(4096, asked, 4096), "a read as large as the buffer: streaming")
+    assert(!server.read_streams(2929, asked, 4096), "the rest after a full buffer drains")
+    assert(server.read_streams(asked, asked, 0), "a read that filled what it asked for")
+    assert(server.read_streams(512, 512, 4096), "a short budget filled: streaming")
+    assert(!server.read_streams(0, asked, 4096), "nothing read")
+}
+
+fn main() -> int {
+    test_a_drained_master_is_due_at_once()
+    test_a_streaming_pane_waits_for_quiet_or_age()
+    test_frames_keep_their_spacing()
+    test_synchronized_output_holds_a_frame()
+    test_a_full_image_waits_only_for_spacing()
+    test_which_reads_leave_the_pane_streaming()
+    print("PASS frame-pacing")
+    0
+}
