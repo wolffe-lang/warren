@@ -82,6 +82,7 @@ fn test_soft_wrap_relaid_at_the_current_width() {
     assert(vt.fill_view(mut view, pane, 2) == 2 && lines(view) == "abcd|efgh", "wrapped history rows: " + lines(view))
     assert(view.screen.wrapped[0], "a soft wrap is marked")
     assert(vt.fill_view(mut view, pane, 1) == 1 && lines(view) == "efgh|ij", "history then live: " + lines(view))
+    assert(view.screen.wrapped[0] && !view.screen.wrapped[1], "the line wraps from history into the live rows")
     vt.feed(mut pane, "\r\ny\r\nz".bytes())
     assert(vt.resize(mut pane, 3, 2) == "")
     let total = vt.fill_view(mut view, pane, 99)
