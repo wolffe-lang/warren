@@ -951,7 +951,7 @@ fn bytes_until_golden_three(mut p: client.Peer, focus: int, name: str, ms: int, 
 }
 
 // The bytes of the images a focus change makes, two and three panes.
-fn row_focus_bytes(mut r: Rig) -> str {
+fn row_focus_bytes(mut r: Rig, separate: bool) -> str {
     let why = start_server(mut r, "/bin/cat")
     if why.len > 0 { return why }
     var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
@@ -962,7 +962,6 @@ fn row_focus_bytes(mut r: Rig) -> str {
     drain(mut p, 300)
     p.auto_ack = false
     var captured = List[str]()
-    let separate = (env.get("WARREN_FOCUS_SPLIT") else "") == "1"
     var two_prefix = 0
     if separate {
         let _p = ctrl_space(p)
@@ -1947,7 +1946,8 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "pane-limit" { why = row_pane_limit(mut r) }
     else if name == "frame-golden" { why = row_frame_golden(mut r) }
     else if name == "damage-in-rect" { why = row_damage_in_rect(mut r) }
-    else if name == "focus-bytes" { why = row_focus_bytes(mut r) }
+    else if name == "focus-bytes" { why = row_focus_bytes(mut r, false) }
+    else if name == "focus-prefix-bytes" { why = row_focus_bytes(mut r, true) }
     else if name == "keys-in-split" { why = row_keys_in_split(mut r) }
     else if name == "split-latency" { why = row_split_latency(mut r) }
     else if name == "split-close-cycles" { why = row_split_close_cycles(mut r) }
@@ -1977,7 +1977,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
+    for n in "split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
         (mut x).push(n)
     }
     x

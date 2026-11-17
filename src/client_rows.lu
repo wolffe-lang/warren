@@ -30,6 +30,7 @@ use std.signal
 use std.term
 use std.time
 use client
+use row_support
 use proto
 use server
 use vt
@@ -1042,6 +1043,89 @@ fn until_quick_file(mut r: Run, path: str, text: str) -> bool {
     false
 }
 
+// Ordered after every key in the preceding terminal input. HELP changes
+// no panes/tabs; returning to idle makes the final bar safe to count.
+fn quick_ui_barrier(mut r: Run) -> bool {
+    type_text(mut r, "\u{0}?")
+    let end = now_ms() + 3000
+    while cells_at(r.screen, 23, 66, 6).trim() != "HELP" && now_ms() < end { pump(mut r, 50) }
+    if cells_at(r.screen, 23, 66, 6).trim() != "HELP" { return false }
+    type_text(mut r, "\u{1b}")
+    until_terminal_hint(mut r, "C-Space prefix", 3000)
+}
+
+fn quick_tab_count(r: Run) -> int {
+    row_support.default_tab_count(cells_at(r.screen, 23, 1, 64), "q")
+}
+
+fn until_quick_tabs(mut r: Run, count: int) -> bool {
+    let end = now_ms() + 5000
+    while now_ms() < end {
+        if row_support.default_tabs_are(cells_at(r.screen, 23, 1, 64), "q", count) { return true }
+        pump(mut r, 50)
+    }
+    row_support.default_tabs_are(cells_at(r.screen, 23, 1, 64), "q", count)
+}
+
+fn until_quick_region(mut r: Run, col: int, row: int, cols: int, rows: int) -> bool {
+    let end = now_ms() + 5000
+    while !region_has(r.screen, "$", col, row, cols, rows) && now_ms() < end { pump(mut r, 50) }
+    region_has(r.screen, "$", col, row, cols, rows)
+}
+
+// Exactly two Alt-t actions, then output deliberately released from tab two
+// after tab three exists. The original unmarked oracle must reject this.
+fn row_quick_late_output(warren: str, encoding: int) -> str {
+    let name = "late-{encoding}"
+    let gate = row_dir(name) + "-gate"
+    fs.remove(gate) else |_| {}
+    var extra = List[str]()
+    (mut extra).push("WARREN_PANE_COMMAND={self_path()} --quick-late-output {gate}")
+    var r = launch_window(warren, name, "", words("new -s q"), 80, 24, 80, 24, extra) else |e| { return "launch: {e}" }
+    if !until_screen(mut r, "$", 10000) { close_run(r); return "no prompt" }
+    quick_press(mut r, 92, encoding)
+    if !until_border(mut r, 40, 22, 22, 5000) || !until_quick_region(mut r, 41, 1, 40, 22) { close_run(r); return "first split not ready" }
+    quick_press(mut r, 124, encoding)
+    if !until_horizontal(mut r, true) || !until_quick_region(mut r, 41, 12, 40, 11) { close_run(r); return "second split not ready" }
+    type_text(mut r, quick_bytes(116, encoding, 1) + quick_bytes(116, encoding, 2) + quick_bytes(116, encoding, 3))
+    if !quick_ui_barrier(mut r) { close_run(r); return "repeat/release barrier" }
+    // Let both fresh helper prompts finish, then clear startup activity once.
+    for tab in [2, 3, 1, 2, 3] {
+        type_text(mut r, "\u{0}{tab}")
+        if !quick_ui_barrier(mut r) || !until_screen(mut r, "$", 3000) { close_run(r); return "startup prompt barrier" }
+    }
+    if quick_tab_count(r) > 3 { close_run(r); return "release created a fourth tab" }
+    if !until_quick_tabs(mut r, 3) { close_run(r); return "not exactly three tabs before controlled output" }
+    fs.write_text(gate, "go\n") else { close_run(r); return "cannot release controlled output" }
+    let end = now_ms() + 5000
+    while !cells_at(r.screen, 23, 1, 64).contains(" 2+ ") && now_ms() < end { pump(mut r, 50) }
+    if !cells_at(r.screen, 23, 1, 64).contains(" 2+ ") { close_run(r); return "tab two did not emit after tab three existed" }
+    if !until_quick_tabs(mut r, 3) {
+        let bar = cells_at(r.screen, 23, 1, 64)
+        close_run(r)
+        return "marked bar rejected exactly three tabs: '" + bar + "'"
+    }
+    if quick_tab_count(r) > 3 { close_run(r); return "release created a fourth tab after late output" }
+    type_text(mut r, "\u{0}d")
+    let why = ends_with(mut r, 0, "[detached")
+    close_run(r)
+    why
+}
+
+// This pane fixture prints once at startup and, only for the first new tab
+// (pane four after the two splits), once after its explicit file gate opens.
+fn quick_late_output_helper(gate: str) -> int {
+    print("$ ")
+    let pane = (env.get("WARREN_PANE") else "0").to_int() else 0
+    var emitted = false
+    let end = now_ms() + 30000
+    while now_ms() < end {
+        if pane == 4 && !emitted && fs.exists(gate) { print("controlled late output"); emitted = true }
+        time.sleep(time.millis(10))
+    }
+    0
+}
+
 // Real terminal input in each encoding: split axes, repeated new tabs,
 // pane then tab close, a warned final close, Ctrl keys, and a bare Escape.
 fn row_quick_e2e(warren: str, encoding: int) -> str {
@@ -1235,6 +1319,9 @@ fn run_row(warren: str, name: str) -> str {
     if name == "quick-legacy" { return row_quick_e2e(warren, 0) }
     if name == "quick-events" { return row_quick_e2e(warren, 1) }
     if name == "quick-csi-u" { return row_quick_e2e(warren, 2) }
+    if name == "late-legacy" { return row_quick_late_output(warren, 0) }
+    if name == "late-events" { return row_quick_late_output(warren, 1) }
+    if name == "late-csi-u" { return row_quick_late_output(warren, 2) }
     if name == "quick-small" { return row_quick_small(warren) }
     if name == "window-too-large" { return row_window_too_large(warren) }
     "no such row"
@@ -1242,6 +1329,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn main() -> int {
     let args = env.args()
+    if args.len == 2 && args[0] == "--quick-late-output" { return quick_late_output_helper(args[1]) }
     if args.len == 3 && args[0] == "--quick-probe" { return quick_probe(args[1], args[2].to_int() else 2) }
     // The pane-side helper: the size of the terminal it runs in, tagged.
     if args.len == 2 && args[0] == "--print-size" {
@@ -1281,6 +1369,9 @@ fn main() -> int {
         (mut rows).push("quick-events")
         (mut rows).push("quick-csi-u")
         (mut rows).push("quick-small")
+        (mut rows).push("late-legacy")
+        (mut rows).push("late-events")
+        (mut rows).push("late-csi-u")
     }
     var failed = 0
     for name in rows {

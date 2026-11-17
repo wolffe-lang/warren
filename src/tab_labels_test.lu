@@ -1,0 +1,30 @@
+//! member: false
+//! Default tab counts remain exact when documented status suffixes arrive.
+use row_support
+
+fn test_marked_tab_labels_still_count_exactly() {
+    for suffix in ["", "Z", "+", "!", "Z+", "Z!", "+!", "Z+!"] {
+        assert(row_support.default_tabs_are(" q  1  2{suffix}  3 ", "q", 3), "documented suffix preserves exactly three")
+    }
+    assert(row_support.default_tabs_are(" q  1+  2+!  3Z ", "q", 3), "independent marks")
+    assert(!row_support.default_tabs_are(" q  1  2+ ", "q", 3), "not enough tabs")
+    assert(!row_support.default_tabs_are(" q  1  2+  3  4 ", "q", 3), "four tabs is not three")
+    assert(row_support.default_tab_count(" q  1  2+  3  4! ", "q") == 4, "negative fourth-tab check sees marks")
+}
+
+fn test_only_documented_suffixes_and_ordered_labels() {
+    for suffix in ["++", "ZZ", "!!", "!+", "+Z", "?", "a", ":name", "Z+!!"] {
+        assert(row_support.default_tab_count(" q  1  2{suffix}  3 ", "q") == 0 - 1, "malformed suffix is not normalized away")
+    }
+    for line in ["", "q", " other  1  2  3 ", " q  1  3  2 ", " q  1  2  2 ", " q  0  1  2 ", " q  1  02  3 ", " q < 1  2  3 ", " q  1  2  3 >"] {
+        assert(!row_support.default_tabs_are(line, "q", 3), "malformed or clipped bar is not exact three")
+    }
+    assert(!row_support.default_tabs_are("q", "q", 0), "empty does not count as exact zero")
+}
+
+fn main() -> int {
+    test_marked_tab_labels_still_count_exactly()
+    test_only_documented_suffixes_and_ordered_labels()
+    print("PASS default-tab-cardinality")
+    0
+}
