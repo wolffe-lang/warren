@@ -1456,6 +1456,11 @@ fn view_to(mut s: Server, index: int, back: int) {
     s.conns[index].view_back = shown
     s.conns[index].view_id = s.conns[index].view.screen.line_ids[0]
     s.conns[index].view_offset = s.conns[index].view.screen.line_offsets[0]
+    // A drag whose window was filled a turn late is marked again on it.
+    if s.conns[index].sel_state == 2 {
+        vt.mark_view(mut s.conns[index].view, s.conns[index].sel_row, s.conns[index].sel_col,
+            s.conns[index].sel_to_row, s.conns[index].sel_to_col)
+    }
     if shown == 0 && s.conns[index].view_wheel {
         set_mode(mut s, index, config.MODE_NORMAL)
         return
@@ -1589,6 +1594,8 @@ fn select_gesture(mut s: Server, index: int, kind: int, button: int, col: int, r
             }
             s.conns[index].sel_state = 2
         }
+        s.conns[index].sel_to_row = pr
+        s.conns[index].sel_to_col = pc
         vt.mark_view(mut s.conns[index].view, s.conns[index].sel_row, s.conns[index].sel_col, pr, pc)
         frame_moved(mut s, index)
         return true
@@ -2857,20 +2864,27 @@ pub fn serve() -> int {
             s.again = true
         }
         s.need_pane = false
-        // A window's buffers grow only here, outside the turn's region.
-        if s.need_view {
-            var v = 0
-            while v < s.conns.len {
-                if s.conns[v].live && s.conns[v].view_cols > 0 {
-                    vt.reserve_view(mut s.conns[v].view, s.conns[v].view_cols, s.conns[v].view_rows)
-                    s.conns[v].view_cols = 0
-                    s.conns[v].view_rows = 0
-                    mark_stale(mut s.conns[v], now_ns())
+        // A window's buffers grow only here, outside the turn's region: to
+        // its session's tab area once attached, so a gesture's first fill in
+        // a turn fits; a size asked for in the turn is grown as well.
+        var v = 0
+        while v < s.conns.len {
+            if s.conns[v].live && s.conns[v].member && s.conns[v].session >= 0 {
+                let vs = s.conns[v].session
+                let area = s.sessions[vs].rows - BAR_LINES
+                if area > 0 && !vt.view_fits(s.conns[v].view, s.sessions[vs].cols, area) {
+                    vt.reserve_view(mut s.conns[v].view, s.sessions[vs].cols, area)
                 }
-                v += 1
             }
-            s.again = true
+            if s.need_view && s.conns[v].live && s.conns[v].view_cols > 0 {
+                vt.reserve_view(mut s.conns[v].view, s.conns[v].view_cols, s.conns[v].view_rows)
+                s.conns[v].view_cols = 0
+                s.conns[v].view_rows = 0
+                mark_stale(mut s.conns[v], now_ns())
+            }
+            v += 1
         }
+        if s.need_view { s.again = true }
         s.need_view = false
     }
     trace(s, "stopped after {s.turns} turns; {s.prompt_frames} of {s.frames} frames composed in the turn that read their output")
