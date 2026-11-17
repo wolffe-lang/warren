@@ -37,13 +37,19 @@ fn parse(data: List[byte]) -> str {
     shows(all)
 }
 
-// A byte a read.
+// A byte a read, except that an ESC and the byte after it share one: a
+// read that ends in ESC is the Escape key (test_a_lone_escape_goes_at_once).
 fn parse_split(data: List[byte]) -> str {
     var p = client.parser()
     var all = List[client.Event]()
+    var one = List[byte]()
     for b in data {
-        var one = List[byte]()
         (mut one).push(b)
+        if b as int == 27 { continue }
+        for e in client.feed(mut p, one, 0) { (mut all).push(e) }
+        one = List[byte]()
+    }
+    if one.len > 0 {
         for e in client.feed(mut p, one, 0) { (mut all).push(e) }
     }
     for e in client.expire(mut p, 1000) { (mut all).push(e) }
