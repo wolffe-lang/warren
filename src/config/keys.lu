@@ -301,11 +301,11 @@ pub fn defaults() -> Keys {
     sticky(mut l, s)
 
     let v = MODE_SCROLL
-    letter(mut l, v, "k", A_VIEW_ROWS, 1, v, "row")
     letter(mut l, v, "j", A_VIEW_ROWS, -1, v, "row")
+    letter(mut l, v, "k", A_VIEW_ROWS, 1, v, "row")
     hidden(mut l, v, 0, NAMED, UP, A_VIEW_ROWS, 1, v)
     hidden(mut l, v, 0, NAMED, DOWN, A_VIEW_ROWS, -1, v)
-    bind(mut l, v, 0, NAMED, PAGE_UP, A_VIEW_PAGE, 2, v, "PgUp", "page")
+    bind(mut l, v, 0, NAMED, PAGE_UP, A_VIEW_PAGE, 2, v, "PgUp ", "page")
     bind(mut l, v, 0, NAMED, PAGE_DOWN, A_VIEW_PAGE, -2, v, "PgDn", "page")
     hidden(mut l, v, CTRL, SCALAR, 98, A_VIEW_PAGE, 2, v)
     hidden(mut l, v, CTRL, SCALAR, 102, A_VIEW_PAGE, -2, v)
