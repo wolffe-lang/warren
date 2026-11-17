@@ -1601,7 +1601,7 @@ fn select_gesture(mut s: Server, index: int, kind: int, button: int, col: int, r
         return true
     }
     s.conns[index].mouse_consumed = s.conns[index].mouse_consumed & 6
-    if state == 2 && s.conns[index].view.marked {
+    if state == 3 && s.conns[index].view.marked {
         vt.mark_view(mut s.conns[index].view, s.conns[index].sel_row, s.conns[index].sel_col, pr, pc)
         let si = s.conns[index].session
         if si >= 0 {
