@@ -2155,7 +2155,7 @@ fn row_mouse_tab_snapshot(mut r: Rig, legacy: bool) -> str {
     let _a = type_keys(a, "a")
     let _done1 = enter(a)
     let _new = prefix(a, 99)
-    if !until_active(mut a, "b", "2", 3000) { return "second tab" }
+    if !until_active(mut a, "b", "2", 3000) { return "second tab: active='" + active_label(a.image, "b") + "' screen='" + client.screen_text(a) + "'" }
     let _rename2 = prefix(a, 44)
     let _b = type_keys(a, "b")
     let _done2 = enter(a)
