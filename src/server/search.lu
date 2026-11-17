@@ -1,0 +1,68 @@
+//! member: true
+//! Search in scroll mode: `/` and `?` type a literal text on the hint line,
+//! found toward newer or older rows of the client's window's pane; `n` and
+//! `N` search again from the last match. The window moves to show a match,
+//! drawn inverse for that client. The search itself is the emulator's
+//! (vt.view_find), over retained history and the live rows; it allocates
+//! nothing, so it runs inside the turn.
+use config
+use vt
+
+// Scroll mode and its search prompt share the client's window.
+fn windowed(mode: int) -> bool {
+    mode == config.MODE_SCROLL || mode == config.MODE_SEARCH
+}
+
+// The window shows a match: it is drawn from the window, a snapshot, even at
+// the live rows.
+fn found_shown(s: Server, index: int) -> bool {
+    s.conns[index].view.found_id >= 0 && s.conns[index].view.marked
+}
+
+// `/` or `?` (arg 1: older) opens the prompt; n and N (arg 1: the other way)
+// search again. A search keeps a window the wheel opened.
+fn search_key(mut s: Server, index: int, action: int, arg: int) {
+    s.conns[index].view_wheel = false
+    if action == config.A_SEARCH {
+        s.conns[index].search_older = arg == 1
+        (mut s.conns[index].prompt).reset()
+        return
+    }
+    if s.conns[index].search.len == 0 { return }
+    search_step(mut s, index, s.conns[index].search_older != (arg == 1))
+}
+
+// The prompt's text, searched from the window's edge. An empty line keeps
+// the last search.
+fn search_run(mut s: Server, index: int) {
+    if s.conns[index].prompt.len == 0 { return }
+    (mut s.conns[index].search).reset()
+    for b in s.conns[index].prompt { (mut s.conns[index].search).push(b) }
+    (mut s.conns[index].prompt).reset()
+    vt.unfind_view(mut s.conns[index].view)
+    search_step(mut s, index, s.conns[index].search_older)
+}
+
+// Find the next match one way and show it, or say there is none.
+fn search_step(mut s: Server, index: int, older: bool) {
+    if !view_live(s, index) {
+        set_mode(mut s, index, config.MODE_NORMAL)
+        return
+    }
+    let text = str_from_utf8(s.conns[index].search[0..s.conns[index].search.len]) else ""
+    if !vt.needle_fits(s.conns[index].search) {
+        tell(mut s, index, "search for 1 to {vt.FIND_SCALARS} characters")
+        return
+    }
+    let k = s.conns[index].view_slot
+    let back = view_anchor(mut s, index)
+    var to = 0 - 1
+    if vt.view_find(mut s.conns[index].view, s.panes[k].screen, s.conns[index].search, older, back) {
+        to = vt.view_found_back(mut s.conns[index].view, s.panes[k].screen, back)
+    }
+    if to < 0 {
+        tell(mut s, index, (if older then "no older match: " else "no newer match: ") + text)
+        return
+    }
+    view_to(mut s, index, to)
+}
