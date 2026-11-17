@@ -137,16 +137,22 @@ environment:
 
 Colours a policy cannot show are downsampled: RGB to the nearest of the 6x6x6
 cube or the grey ramp, and either to the nearest of the sixteen. The console
-policy sends only CSI sequences: no OSC, DCS or APC. Rows render images into
+policy sends only CSI sequences: no OSC, DCS or APC. A delta is drawn from the
+runs it applied: when the terminal shows the image the delta was applied to,
+only those runs are compared, drawn where they changed, and copied into what
+the client keeps of the terminal; a full image, a new size or a screen the
+client no longer knows compares every cell. Each pen's escape is built once a
+render. Rows render images into
 warren's own emulator as the outer terminal and compare every cell, at every
 depth, for full repaints and deltas over a seeded soak; a model of a
-one-cell-a-code-point console holds the console policy.
+one-cell-a-code-point console holds the console policy
+(`src/client_spans_test.lu` holds a delta to its runs).
 
 ## Memory
 
 The client's memory does not grow with the frames it draws. It keeps one image
-of what the terminal shows and refills that image in place after each render
-(at 160x50 an image is 448,000 bytes). Each turn of its loop, one wait and what
+of what the terminal shows, refilled in place after a full image and changed in
+place by the runs each delta applied (at 160x50 an image is 448,000 bytes). Each turn of its loop, one wait and what
 it reported, runs in a region that is freed when the turn ends: the messages
 read, the bytes drawn and sent, and the events typed go with it. What outlives
 the turns is changed in place: the connection's received bytes and the texts
@@ -173,8 +179,8 @@ client starts, and `new -d` against a running server takes about 40 ms from
 its start to its exit.
 Attached to one 80x24 session, the client's resident size peaks at 4-5.2 MB
 on Linux and 10.3 MB on PAX (`MEASURE client`). Rendering a full 80x24 image
-takes about 0.8 ms on Linux and a one-cell delta about 0.08 ms
-(`MEASURE render` in the compose rows).
+takes about 0.8 ms on Linux; a one-cell delta, which reads only its run, takes
+about 5 µs at 80x24 and 7 µs at 320x90 (`MEASURE render` in the compose rows).
 On Linux, where /proc gives the resident set, the `memory-bounded` row holds a
 client at 160x50 drawing a pane that scrolls without pause: over 400 renders
 past a 50-render warm-up its resident set grows by no more than 4 MiB
