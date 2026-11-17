@@ -69,6 +69,20 @@ fn test_empty_maps_and_connection_reuse() {
     assert(server.tab_hit_at(c.tabs, 10, 23) == 0, "empty painted map cannot retain stale spans")
 }
 
+fn test_source_spans_are_independent_scalar_values() {
+    var state = server.tab_hits()
+    var spans = hits(1, 2)
+    server.stage_tab_hits(mut state, spans, 40, 23, 1)
+    spans[0].tab = 9
+    assert(state.pending.spans[0].tab == 1, "staged span does not alias its source")
+    let _one = server.ack_tab_hits(mut state, 1)
+    server.stage_tab_hits(mut state, spans, 40, 23, 2)
+    spans[0].tab = 7
+    assert(state.pending.spans[0].tab == 9 && state.drawn.spans[0].tab == 1, "both maps are independent values")
+    let _two = server.ack_tab_hits(mut state, 2)
+    assert(state.drawn.spans[0].tab == 9, "promoted map is independent of input mutation")
+}
+
 fn test_repeated_publication_has_no_retained_growth() {
     region frame(cap: 1048576) {
         let before = budget.charged(frame)
@@ -84,16 +98,26 @@ fn test_repeated_publication_has_no_retained_growth() {
         let stable = budget.charged(frame)
         i = 0
         while i < 256 {
-            spans[0].tab = 1 + i % 2
+            spans[0].tab = 101 + i % 2
+            let input_charge = budget.charged(frame) - stable
             server.stage_tab_hits(mut state, spans, 40, 23, 2 * i + 1)
+            let stage_charge = budget.charged(frame) - stable
             assert(server.ack_tab_hits(mut state, 2 * i + 1), "repeated exact ACK")
+            let ack_charge = budget.charged(frame) - stable
             server.stage_drawn_tab_hits(mut state, 2 * i + 2)
             assert(server.ack_tab_hits(mut state, 2 * i + 2), "repeated inherited ACK")
+            let carry_charge = budget.charged(frame) - stable
             assert(!server.ack_tab_hits(mut state, 2 * i + 1), "repeated stale ACK")
+            assert(server.tab_hit_at(state, 1, 23) == spans[0].tab, "repeated lookup")
+            assert(server.drawn_tab_hits_match(state, spans, 40, 23), "repeated identity comparison")
             if i % 17 == 0 { server.reset_tab_hits(mut state) }
             assert(state.pending.count == 0 && state.pending.seq == 0, "no superseded active map")
             assert(state.drawn.spans.len + state.pending.spans.len == 2 * server.MAX_PANES, "map buffers stay bounded")
-            assert(budget.charged(frame) == stable, "stage/ACK/reset allocates no retained storage")
+            let total_charge = budget.charged(frame) - stable
+            if total_charge != 0 {
+                print("MEASURE tab-hit-allocation cycle={i} input={input_charge} stage={stage_charge} ack={ack_charge} carry={carry_charge} total={total_charge}")
+            }
+            assert(total_charge == 0, "stage/ACK/reset allocates no retained storage")
             i += 1
         }
         print("MEASURE tab-hit-retention constructor={retained} publication-cycles=256 retained-growth=0")
@@ -119,6 +143,7 @@ fn main() -> int {
     test_exact_ack_promotes_only_its_pending_spans()
     test_geometry_bounds_and_independent_connections()
     test_empty_maps_and_connection_reuse()
+    test_source_spans_are_independent_scalar_values()
     test_repeated_publication_has_no_retained_growth()
     test_identity_only_frame_is_a_zero_cell_v1_delta()
     print("PASS tab-hit-ack-model")
