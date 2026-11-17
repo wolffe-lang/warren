@@ -51,7 +51,7 @@ const INVERSE: int = 64
 const FIELD: int = 65
 /// Idle hints, and the prefix table revealed after Ctrl-Space.
 const NORMAL_HINTS: str = " C-Space prefix"
-const PREFIX_HINTS: str = " C-Space prefix  M-\\ M-| |- split  M-t c new tab  M-w x close  ? keys  +15"
+const PREFIX_HINTS: str = " C-Space prefix  M-\\ M-| |- split  M-t c new tab  M-w x close  ? keys  +16"
 const PANE_HINTS: str = " |- split  hjkl focus  x close  z zoom  o next pane  = equalize  Esc back"
 
 fn now_ms() -> int {
@@ -2405,7 +2405,7 @@ fn row_scroll_keys(mut r: Rig) -> str {
     if at == 0 { return "no numbered output:\n" + client.screen_text(p) }
     let _enter = prefix(p, 91)
     if !until_mode(mut p, "SCROLL", 3000) { return "prefix [ did not enter scroll mode: '" + mode_of(p.image) + "'" }
-    if !until_hint(mut p, "k j row  PgUp PgDn page  u d half  g G oldest/live  q quit  Esc back", 1000) { return "scroll hints: '" + hint_of(p.image) + "'" }
+    if !until_hint(mut p, " jk row  PgUp PgDn page  ud half  gG oldest/live  q quit  Esc back", 1000) { return "scroll hints: '" + hint_of(p.image) + "'" }
     let _k = type_keys(p, "k")
     if !until_rect_line(mut p, "L79", 1, at, 80, 1, 3000) { return "k did not look back one row" }
     let _up = client.key(p, 0, 1, 1)
