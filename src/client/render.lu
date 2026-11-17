@@ -161,16 +161,37 @@ fn colour_sgr(mut out: List[byte], c: int, background: bool) {
     }
 }
 
-const FLAG_CODES: str = "1,2,3,4,21,5,7,8,9"
+// The SGR code of rendition flag bit k (bold, faint, italic, underline,
+// double underline, blink, inverse, invisible, crossed out).
+fn flag_code(k: int) -> int {
+    return match k {
+        0 => 1,
+        1 => 2,
+        2 => 3,
+        3 => 4,
+        4 => 21,
+        5 => 5,
+        6 => 7,
+        7 => 8,
+        _ => 9,
+    }
+}
+
+fn decimal(mut out: List[byte], n: int) {
+    if n >= 10 { decimal(mut out, n / 10) }
+    (mut out).push((48 + n % 10) as byte)
+}
 
 // The whole pen in one SGR, from a reset.
 fn pen(mut out: List[byte], flags: int, fg: int, bg: int, pol: Policy) {
     text(mut out, "\u{1b}[0")
-    let codes = FLAG_CODES.split(",")
     var bit = 1
     var k = 0
-    while k < codes.len {
-        if flags & bit != 0 { text(mut out, ";" + codes[k]) }
+    while k < 9 {
+        if flags & bit != 0 {
+            (mut out).push(59 as byte)
+            decimal(mut out, flag_code(k))
+        }
         bit = bit * 2
         k += 1
     }
@@ -180,7 +201,42 @@ fn pen(mut out: List[byte], flags: int, fg: int, bg: int, pol: Policy) {
         if f != 0 { colour_sgr(mut out, f, false) }
         if b != 0 { colour_sgr(mut out, b, true) }
     }
-    text(mut out, "m")
+    (mut out).push(109 as byte)
+}
+
+// The pens one render has built: each (flags, fg, bg) once, its SGR bytes
+// kept at `starts[k]` .. `starts[k + 1]` of `bytes`.
+struct Pens {
+    keys: List[int],
+    starts: List[int],
+    bytes: List[byte],
+}
+
+fn no_pens() -> Pens {
+    var starts = List[int]()
+    (mut starts).push(0)
+    Pens { keys: List[int](), starts: starts, bytes: List[byte]() }
+}
+
+// Send a pen: its bytes from the render's pens, built the first time.
+fn send_pen(mut out: List[byte], mut pens: Pens, flags: int, fg: int, bg: int, pol: Policy) {
+    var k = 0
+    while k * 3 < pens.keys.len {
+        if pens.keys[k * 3] == flags && pens.keys[k * 3 + 1] == fg && pens.keys[k * 3 + 2] == bg { break }
+        k += 1
+    }
+    if k * 3 == pens.keys.len {
+        pen(mut pens.bytes, flags, fg, bg, pol)
+        (mut pens.keys).push(flags)
+        (mut pens.keys).push(fg)
+        (mut pens.keys).push(bg)
+        (mut pens.starts).push(pens.bytes.len)
+    }
+    var i = pens.starts[k]
+    while i < pens.starts[k + 1] {
+        (mut out).push(pens.bytes[i])
+        i += 1
+    }
 }
 
 fn cell_same(a: proto.Image, b: proto.Image, i: int) -> bool {
@@ -196,9 +252,9 @@ struct Pen {
     bg: int,
 }
 
-fn draw_cell(mut out: List[byte], mut cur: Pen, img: proto.Image, i: int, pol: Policy) {
+fn draw_cell(mut out: List[byte], mut cur: Pen, mut pens: Pens, img: proto.Image, i: int, pol: Policy) {
     if !cur.known || cur.flags != img.flags[i] || cur.fg != img.fg[i] || cur.bg != img.bg[i] {
-        pen(mut out, img.flags[i], img.fg[i], img.bg[i], pol)
+        send_pen(mut out, mut pens, img.flags[i], img.fg[i], img.bg[i], pol)
         cur.known = true
         cur.flags = img.flags[i]
         cur.fg = img.fg[i]
@@ -262,6 +318,7 @@ pub fn render(mut drawn: proto.Image, img: proto.Image, pol: Policy) -> List[byt
     let full = !drawn.valid || drawn.cols != img.cols || drawn.rows != img.rows
     if full { text(mut out, "\u{1b}[0m\u{1b}[H\u{1b}[2J") }
     var cur = Pen { known: false, flags: 0, fg: 0, bg: 0 }
+    var pens = no_pens()
     var row = 1
     while row <= img.rows {
         var col = 1
@@ -280,7 +337,7 @@ pub fn render(mut drawn: proto.Image, img: proto.Image, pol: Policy) -> List[byt
                 continue
             }
             if placed != lead_col { cup(mut out, row, lead_col) }
-            draw_cell(mut out, mut cur, img, lead, pol)
+            draw_cell(mut out, mut cur, mut pens, img, lead, pol)
             let w = if img.width[lead] == 2 then 2 else 1
             placed = lead_col + w
             col = lead_col + w
