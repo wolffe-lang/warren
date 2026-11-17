@@ -1,0 +1,82 @@
+//! member: false
+//! The client draws only what an image's delta applied: the cells outside
+//! its runs are what the terminal already shows (the image the delta was
+//! applied to), so they are neither read nor drawn, and what the terminal
+//! shows is kept in step one run at a time. Native and the checked machine.
+use client
+use proto
+use server
+use vt
+
+struct Rig {
+    pane: vt.Vt,
+    shadow: server.Shadow,
+    img: proto.Image,
+    drawn: proto.Image,
+    seq: int,
+}
+
+fn rig(cols: int, rows: int, text: str) -> Rig {
+    var r = Rig { pane: vt.new(cols, rows, 0), shadow: server.no_shadow(), img: proto.image(),
+        drawn: proto.image(), seq: 0 }
+    vt.feed(mut r.pane, text.bytes())
+    assert(next_image(mut r, true) == 0, "spans-full-apply")
+    let _bytes = client.render(mut r.drawn, r.img, policy())
+    r
+}
+
+fn policy() -> client.Policy {
+    client.policy_for("xterm-256color", "truecolor", false)
+}
+
+// Compose the pane's next image and apply it: 0, or the applier's code.
+fn next_image(mut r: Rig, full: bool) -> int {
+    let payload = server.compose(mut r.shadow, r.pane, r.seq + 1, full)
+    if payload.len == 0 { return 0 }
+    r.seq += 1
+    proto.apply(mut r.img, payload)
+}
+
+fn render_text(mut r: Rig) -> str {
+    let bytes = client.render(mut r.drawn, r.img, policy())
+    str_from_utf8(bytes) else ""
+}
+
+// A cell of what the terminal shows, changed behind the renderer's back:
+// a renderer that diffs the whole grid draws it again; one that draws only
+// the delta's runs leaves it.
+fn test_a_delta_draws_only_its_runs() {
+    var r = rig(20, 6, "abcdefghij\r\nklmnop\u{1b}[5;5H")
+    r.drawn.base[0] = 90
+    vt.feed(mut r.pane, "\u{1b}[3;4H#\u{1b}[5;5H".bytes())
+    assert(next_image(mut r, false) == 0, "spans-delta-apply")
+    let text = render_text(mut r)
+    assert(text.contains("\u{1b}[3;4H"), "spans-delta-drawn")
+    assert(!text.contains("\u{1b}[1;1H"), "spans-outside-not-drawn")
+}
+
+// After a delta is drawn, what the terminal shows is the image, every
+// plane of every cell, with its sequence and cursor.
+fn test_drawn_keeps_step_with_the_image() {
+    var r = rig(20, 6, "\u{1b}[1;31mred\u{1b}[0m \u{4e2d}x\r\nsecond e\u{301}")
+    vt.feed(mut r.pane, "\u{1b}[1;2H\u{1b}[4mUN\u{1b}[0m\u{1b}[2;1H\u{3042}\u{1b}[6;20Hz".bytes())
+    assert(next_image(mut r, false) == 0, "spans-step-apply")
+    let _text = render_text(mut r)
+    var i = 0
+    while i < r.img.cols * r.img.rows {
+        assert(r.drawn.base[i] == r.img.base[i] && r.drawn.mark1[i] == r.img.mark1[i] &&
+            r.drawn.mark2[i] == r.img.mark2[i] && r.drawn.width[i] == r.img.width[i] &&
+            r.drawn.flags[i] == r.img.flags[i] && r.drawn.fg[i] == r.img.fg[i] && r.drawn.bg[i] == r.img.bg[i],
+            "spans-drawn-cell")
+        i += 1
+    }
+    assert(r.drawn.seq == r.img.seq && r.drawn.cursor_row == r.img.cursor_row && r.drawn.cursor_col == r.img.cursor_col,
+        "spans-drawn-fields")
+}
+
+fn main() -> int {
+    test_a_delta_draws_only_its_runs()
+    test_drawn_keeps_step_with_the_image()
+    print("PASS client-spans")
+    0
+}
