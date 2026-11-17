@@ -7,9 +7,15 @@ fn keyboard_events(text: str, split: bool) -> List[client.Event] {
     var p = client.parser()
     var out = List[client.Event]()
     if split {
+        // A byte a read; an ESC shares its read with the byte after it.
+        var one = List[byte]()
         for b in text.bytes() {
-            var one = List[byte]()
             (mut one).push(b)
+            if b as int == 27 { continue }
+            for e in client.feed(mut p, one, 0) { (mut out).push(e) }
+            one = List[byte]()
+        }
+        if one.len > 0 {
             for e in client.feed(mut p, one, 0) { (mut out).push(e) }
         }
     } else {
