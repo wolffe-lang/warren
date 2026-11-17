@@ -1,6 +1,17 @@
 //! member: true
 //! Pure bar predicates shared by test entries, not the terminal client.
 
+fn default_label_is(token: str, number: int) -> bool {
+    let prefix = "{number}"
+    if !token.starts_with(prefix) { return false }
+    let suffix = token[prefix.len..token.len]
+    // tab_label paints each mark at most once, in Z/+ /! order.
+    for allowed in ["", "Z", "+", "!", "Z+", "Z!", "+!", "Z+!"] {
+        if suffix == allowed { return true }
+    }
+    false
+}
+
 /// Count a fixture's default numbered tab labels, or -1 for a malformed
 /// bar. Session and labels are read only from the caller's tab-area slice.
 pub fn default_tab_count(line: str, session: str) -> int {
@@ -8,7 +19,7 @@ pub fn default_tab_count(line: str, session: str) -> int {
     if tokens.len < 2 || tokens[0] != session { return 0 - 1 }
     var n = 1
     while n < tokens.len {
-        if tokens[n] != "{n}" { return 0 - 1 }
+        if !default_label_is(tokens[n], n) { return 0 - 1 }
         n += 1
     }
     n - 1
