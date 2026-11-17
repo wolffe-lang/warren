@@ -54,6 +54,8 @@ pub struct Server {
     rotate: int,
     trace: bool,
     turns: int,
+    frames: int,
+    prompt_frames: int,
     master_read: int,
     budget: int,
     uid: int,
@@ -1858,6 +1860,7 @@ fn read_master(mut s: Server, k: int, now: int) {
     if nothing || got.len == 0 { return }
     vt.feed(mut s.panes[k].screen, got)
     s.panes[k].last_output = now
+    s.panes[k].read_turn = s.turns
     s.panes[k].damage = s.panes[k].damage + 1
     let answers = vt.take_answers(mut s.panes[k].screen)
     if answers.len > 0 {
@@ -2037,9 +2040,13 @@ fn compose_now(mut s: Server, index: int, now: int) {
     s.conns[index].seen_layout = gen
     s.conns[index].seen_bar = s.sessions[si].bar_gen
     if s.conns[index].message_until != 0 && s.conns[index].message_until <= now { s.conns[index].message_until = 0 }
+    var read_turn = 0 - 1
     k = 0
     while k < s.panes.len {
-        if s.panes[k].live && s.panes[k].shown && s.panes[k].session == si { s.conns[index].seen_damage[k] = s.panes[k].damage }
+        if s.panes[k].live && s.panes[k].shown && s.panes[k].session == si {
+            s.conns[index].seen_damage[k] = s.panes[k].damage
+            if s.panes[k].read_turn > read_turn { read_turn = s.panes[k].read_turn }
+        }
         k += 1
     }
     if payload.len == 0 { return }
@@ -2053,6 +2060,11 @@ fn compose_now(mut s: Server, index: int, now: int) {
     s.conns[index].image_seq = seq
     s.conns[index].force_full = false
     s.conns[index].last_frame = now
+    // The loop counts the frames composed in the turn that read their
+    // panes' output: no wait stood between the read and the frame.
+    s.frames = s.frames + 1
+    if read_turn == s.turns { s.prompt_frames = s.prompt_frames + 1 }
+    if s.trace { trace(s, "frame conn {index} seq {seq} turn {s.turns} read-turn {read_turn}") }
     flush(mut s, index)
 }
 
@@ -2423,7 +2435,8 @@ pub fn serve() -> int {
         key_owner: List[int](), key_gen: List[int](), next_id: 0, next_pane: 1, stopping: false, stop_deadline: 0,
         started: now_ns(), idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
         version: vt.package_version(), again: false, need_slot: false, need_pane: false, want_cols: 0,
-        want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, master_read: master_read,
+        want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, frames: 0, prompt_frames: 0,
+        master_read: master_read,
         budget: budget, uid: env.euid() else 0 - 1, inherited: inherited, keys: keys, help: help,
         clock_hour: 0, clock_minute: 0, clock_next: 0,
     }
@@ -2447,7 +2460,7 @@ pub fn serve() -> int {
         }
         s.need_pane = false
     }
-    trace(s, "stopped after {s.turns} turns")
+    trace(s, "stopped after {s.turns} turns; {s.prompt_frames} of {s.frames} frames composed in the turn that read their output")
     var k = 0
     while k < s.conns.len {
         close_conn(mut s, k, "the server stopped")
