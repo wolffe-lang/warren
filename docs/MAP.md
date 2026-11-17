@@ -89,7 +89,16 @@ pane/tab close behavior in legacy and CSI-u encodings, including intentional
 repeats, ignored releases, final-session confirmation at 80 and 20 columns,
 Ctrl+t/Ctrl+w passthrough and the bare-Escape deadline. The bounded
 `client_keyboard_test` entry runs the input/routing table on native, the
-explicit checked machine and lupin.
+explicit checked machine and lupin. The tab checks cross an ordered HELP/
+normal-mode barrier, then require exactly three default labels, allowing only
+the canonical `Z`, `+` and `!` suffixes. They reject a fourth tab and use
+semantic counts for later closes, not fixed columns. `tab_labels_test` holds
+the pure predicate; `late-*` rows deliberately release output from inactive
+tab two after tab three exists in all three encodings.
+
+`focus-bytes` sends prefix/action in one batch; `focus-prefix-bytes` waits
+for the prefix image first. Both enforce zero unchanged emitted cells, and
+their byte bounds and arithmetic are in SERVER.md.
 
 ## The oracle, as measured
 

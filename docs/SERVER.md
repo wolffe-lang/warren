@@ -504,6 +504,19 @@ and hint line) is 626 bytes at 80x24, and entering pane mode 854 bytes. Resize
 mode has no idle timeout; its arrows and letter keys keep resizing until
 Escape, Enter or the prefix leaves it.
 
+The focus-byte rows distinguish two schedules at 80x24. A prefix and action
+sent together retain the 600/314-byte minima and 800/500-byte bounds. When
+the prefix is drawn and acknowledged first, its reveal costs
+`28 + 66 + 532 = 626` bytes (fixed frame fields, mode, hints). The action
+then costs `28 + 572 + 66 + 260 = 926` bytes for two panes, or
+`28 + 286 + 66 + 260 = 640` for three: border, mode and hint erasure all
+changed. Necessary totals are 1552 and 1266; bounds of 1720 and 1400 add
+168 and 134 bytes of headroom (about 11%). Every emitted cell is checked
+against the preceding image: repainting an unchanged cell fails even below
+the byte bound. No tab label, session name or clock cell is repainted by
+these focus changes. Optional `WARREN_FOCUS_CAPTURE=1` prints exact frame
+hex and per-run attribution after the measurements.
+
 **Rows.** `src/pane_rows.lu` drives a real server through key events: split
 sizes, keys reaching the focused pane, the window change a pane's program hears
 after a split, a border move, zoom and a client resize (`--winch`), the hangup
