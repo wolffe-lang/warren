@@ -75,6 +75,10 @@ fn clear_screen(mut screen: Screen, cols: int, rows: int, background: int) {
 }
 
 fn alternate_state(mut pane: Vt, enabled: bool) {
+    // The screen now shown differs from the one before in every row.
+    if pane.active_alternate != enabled {
+        if enabled { touch_rows(mut pane.alternate, pane.rows) } else { touch_rows(mut pane.primary, pane.rows) }
+    }
     pane.active_alternate = enabled
     let value = if enabled { 1 } else { 0 }
     change_mode_value(mut pane, 16, value)

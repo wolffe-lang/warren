@@ -1,0 +1,70 @@
+//! member: true
+//! Row and span damage. Each screen row keeps the pane's tick at its last
+//! change, the columns changed at that tick, and the tick of the change
+//! before it, so a compositor reads only what changed since its client's
+//! last image. The tick advances once a feed and once a real resize; the
+//! cell writers every visible change goes through stamp their row. A
+//! cell's `written` flag alone is not visible and is not stamped.
+
+// Stamp row `row` (0-based) as changed at the screen's tick over columns
+// first..last (0-based, inclusive). A row's first stamp at a tick starts
+// its span; later stamps at the same tick widen it. A resize stamps every
+// row when it ends, so a stamp outside the rows kept is dropped.
+fn touch(mut screen: Screen, row: int, first: int, last: int) {
+    if row < 0 || row >= screen.row_tick.len { return }
+    if screen.row_tick[row] != screen.tick {
+        screen.prior_tick[row] = screen.row_tick[row]
+        screen.row_tick[row] = screen.tick
+        screen.span_first[row] = first
+        screen.span_last[row] = last
+        return
+    }
+    if first < screen.span_first[row] { screen.span_first[row] = first }
+    if last > screen.span_last[row] { screen.span_last[row] = last }
+}
+
+// Stamp the cell at flat index `at`.
+fn touch_at(mut screen: Screen, at: int) {
+    let row = at / screen.damage_cols
+    let col = at - row * screen.damage_cols
+    touch(mut screen, row, col, col)
+}
+
+// Stamp every column of the first `rows` rows.
+fn touch_rows(mut screen: Screen, rows: int) {
+    var row = 0
+    while row < rows {
+        touch(mut screen, row, 0, screen.damage_cols - 1)
+        row += 1
+    }
+}
+
+// Advance the pane's tick and hand it to both screens' stamps.
+fn begin_tick(mut pane: Vt) {
+    pane.tick += 1
+    pane.primary.tick = pane.tick
+    pane.alternate.tick = pane.tick
+}
+
+/// The pane's tick: every change stamped so far is at or before it.
+pub fn damage_tick(pane: Vt) -> int {
+    pane.tick
+}
+
+fn screen_span(screen: Screen, r: int, seen: int, cols: int) -> (int, int) {
+    if screen.row_tick[r] <= seen { return (0, 0 - 1) }
+    if screen.prior_tick[r] > seen { return (0, cols - 1) }
+    let first = if screen.span_first[r] < 0 then 0 else screen.span_first[r]
+    let last = if screen.span_last[r] > cols - 1 then cols - 1 else screen.span_last[r]
+    (first, last)
+}
+
+/// The columns (0-based, inclusive) of shown row `row` (1-based) that
+/// changed after tick `seen`: none (first > last) when the row did not; its
+/// span when every earlier change was at or before `seen`; else the whole
+/// row.
+pub fn changed_span(pane: Vt, row: int, seen: int) -> (int, int) {
+    if row < 1 || row > pane.rows { return (0, 0 - 1) }
+    if pane.active_alternate { return screen_span(pane.alternate, row - 1, seen, pane.cols) }
+    screen_span(pane.primary, row - 1, seen, pane.cols)
+}
