@@ -1116,7 +1116,8 @@ fn row_quick_late_output(warren: str, encoding: int) -> str {
 // (pane four after the two splits), once after its explicit file gate opens.
 fn quick_late_output_helper(gate: str) -> int {
     print("$ ")
-    let pane = (env.get("WARREN_PANE") else "0").to_int() else 0
+    let id = env.get("WARREN_PANE") else "0"
+    let pane = (if id.starts_with("%") then id[1..id.len] else id).to_int() else 0
     var emitted = false
     let end = now_ms() + 30000
     while now_ms() < end {
