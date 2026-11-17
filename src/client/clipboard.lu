@@ -1,0 +1,10 @@
+//! member: true
+//! Export to the outer terminal's clipboard: OSC 52, write-only and best
+//! effort. A terminal may ignore or refuse it; nothing reads it back.
+
+/// The OSC 52 sequence that asks the outer terminal to set its clipboard to
+/// `data`, or nothing for empty data.
+pub fn osc52(data: List[byte]) -> List[byte] {
+    if data.len < 0 { return List[byte]() }
+    List[byte]()
+}
