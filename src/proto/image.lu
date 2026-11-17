@@ -7,6 +7,9 @@
 
 /// A client's image: cells in row-major order, each a base scalar, up to
 /// two marks, a width (1, 2, or 0 for a continuation) and its rendition.
+/// `applied` holds the runs the last image applied, three ints each (row,
+/// column, columns), and `applied_base` that image's base: 0 for a full
+/// image, else the image it was a delta on.
 pub struct Image {
     valid: bool,
     seq: int,
@@ -23,13 +26,15 @@ pub struct Image {
     cursor_col: int,
     shape: int,
     visible: int,
+    applied: List[int],
+    applied_base: int,
 }
 
 /// An image holding nothing: only a full image (base 0) applies to it.
 pub fn image() -> Image {
     Image { valid: false, seq: 0, cols: 0, rows: 0, base: List[int](), mark1: List[int](),
         mark2: List[int](), width: List[int](), flags: List[int](), fg: List[int](), bg: List[int](),
-        cursor_row: 1, cursor_col: 1, shape: 0, visible: 1 }
+        cursor_row: 1, cursor_col: 1, shape: 0, visible: 1, applied: List[int](), applied_base: 0 }
 }
 
 fn le(b: List[byte], at: int, width: int) -> int {
@@ -161,6 +166,16 @@ pub fn apply(mut img: Image, payload: List[byte]) -> int {
     img.visible = le(payload, 17, 1)
     img.seq = seq
     img.valid = true
+    // The runs applied, in place, for a renderer to draw only them.
+    (mut img.applied).reset()
+    var q = 0
+    while q < spans.len {
+        (mut img.applied).push(spans[q].row)
+        (mut img.applied).push(spans[q].col)
+        (mut img.applied).push(spans[q].columns)
+        q = q + 1
+    }
+    img.applied_base = base
     0
 }
 
