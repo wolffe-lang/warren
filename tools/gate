@@ -169,6 +169,8 @@ step compose-build "$WOLF" build --deny-warnings src/compose_rows.lu -o "$root/t
 step compose-native "$root/target/native/compose-rows"
 step compose-damage-build "$WOLF" build --deny-warnings src/compose_damage_test.lu -o "$root/target/native/compose-damage"
 step compose-damage-native "$root/target/native/compose-damage" 12
+step compose-damage-corpus-build "$WOLF" build --deny-warnings src/compose_corpus_rows.lu -o "$root/target/native/compose-corpus"
+step compose-damage-corpus python3 -I tests/vt/compose_damage_corpus.py "$root/target/native/compose-corpus"
 step session-build "$WOLF" build --deny-warnings src/session_rows.lu -o "$root/target/native/session-rows"
 step session-rows session_rows
 # Panes and tabs: a scripted client drives a real server's splits, tabs,
