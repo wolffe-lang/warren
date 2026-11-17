@@ -22,7 +22,9 @@ use layout
 /// mode, `view` is the client's window over pane slot `view_slot` (pane id
 /// `view_pane`), `view_back` rows above its live rows and anchored on logical
 /// line `view_id` at cell `view_offset`; a window the wheel opened
-/// (`view_wheel`) closes when it reaches the live rows.
+/// (`view_wheel`) closes when it reaches the live rows. A window too small
+/// for its pane asks to grow to `view_cols` by `view_rows` between turns and
+/// is filled `view_retry` rows back on the next.
 pub struct Conn {
     live: bool,
     fd: int,
@@ -75,6 +77,9 @@ pub struct Conn {
     view_wheel: bool,
     view_id: int,
     view_offset: int,
+    view_cols: int,
+    view_rows: int,
+    view_retry: int,
     hello: List[byte],
     hello_len: int,
     hello_ready: bool,
@@ -119,6 +124,7 @@ pub fn new_conn() -> Conn {
         mode: 0, back: 0, prompt: List[byte](), confirm: 0, help_top: 0, mouse_consumed: 0, tabs: tab_hits(),
         drag: layout.no_border_hit(), drag_layout: 0 - 1,
         view: vt.new_view(), view_slot: 0 - 1, view_pane: 0 - 1, view_back: 0, view_wheel: false, view_id: 0 - 1, view_offset: 0,
+        view_cols: 0, view_rows: 0, view_retry: 0 - 1,
         hello: List[byte](), hello_len: 0, hello_ready: false,
         resize_ready: false, resize_cols: 0, resize_rows: 0, command_ready: false, command: List[byte](),
         command_len: 0, stop_after: false, pending: 0, pending_arg: 0, message: List[byte](), message_until: 0,
@@ -175,6 +181,9 @@ pub fn reset_conn(mut c: Conn, fd: int, id: int, now: int) {
     c.view_wheel = false
     c.view_id = 0 - 1
     c.view_offset = 0
+    c.view_cols = 0
+    c.view_rows = 0
+    c.view_retry = 0 - 1
     c.hello_len = 0
     c.hello_ready = false
     c.resize_ready = false
