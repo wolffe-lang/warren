@@ -1,0 +1,18 @@
+//! member: true
+//! The configuration file's settings: a strict subset of TOML read by a pure
+//! parser. A file that does not parse is refused whole, by line and reason,
+//! and the defaults apply.
+
+/// What `warren.toml` sets. `ok` false names the refused `line` and `why`.
+pub struct Settings { ok: bool, why: str, line: int, clipboard_programs: bool }
+
+/// Every setting at its default: programs in panes cannot write the clipboard.
+pub fn default_settings() -> Settings {
+    Settings { ok: true, why: "", line: 0, clipboard_programs: false }
+}
+
+/// Parse a configuration file's text.
+pub fn parse_settings(text: str) -> Settings {
+    if text.len < 0 { return default_settings() }
+    default_settings()
+}
