@@ -25,25 +25,119 @@ fn ensure_view_buffers(mut view: View, cols: int, rows: int) {
     view.rows = rows
 }
 
+// The first record of the logical line whose last record is `at`. A line's
+// fragments are consecutive records with one id.
+fn view_line_start(history: History, at: int) -> int {
+    let id = history_get_word(history, at, 8, 8)
+    var start = at
+    var more = true
+    while more {
+        let previous = history_previous(history, start)
+        if previous < 0 || history_get_word(history, previous, 8, 8) != id { more = false }
+        else { start = previous }
+    }
+    start
+}
+
+// Lay the line's records start..last at `cols`, emitting its rows first..last
+// (1-based within the line) into the scratch rows 1.. when `emit`. Returns the
+// line's row count. The scratch holds at least one window of rows.
+fn view_lay_line(mut view: View, history: History, start: int, last: int, cols: int,
+        first_row: int, last_row: int, emit: bool) -> int {
+    reflow_start(mut view.flow)
+    var at = start
+    var more = true
+    while more {
+        reflow_record(mut view.flow, history, at, mut view.reader, mut view.scratch, cols, first_row, last_row, emit)
+        if at == last { more = false }
+        else { at = (at + history_get_word(history, at, 0, 4)) % history.bytes.len }
+    }
+    view.flow.row
+}
+
+// Fill window rows 1..rows that history covers for a window `back` rows up.
+// Walks back from the newest line only as far as the window reaches. Returns
+// how many history rows lie at or below the window's top, at most `back`.
+fn view_history_rows(mut view: View, history: History, cols: int, rows: int, back: int) -> int {
+    if history.records == 0 || history.bytes.len == 0 { return 0 }
+    var below = 0
+    var at = history_newest_at(history)
+    while at >= 0 && below < back {
+        let start = view_line_start(history, at)
+        let n = view_lay_line(mut view, history, start, at, cols, 1, 1, false)
+        // Row i of this line (1-based) is `below + n - i + 1` rows above the
+        // live screen; window row r (0-based) is `back - r` rows above it.
+        var high = below + n
+        if high > back { high = back }
+        var low = below + 1
+        if low < back - rows + 1 { low = back - rows + 1 }
+        if low <= high {
+            let first = below + n - high + 1
+            let last = below + n - low + 1
+            var row = 1
+            while row <= last - first + 1 { blank_row(mut view.scratch, cols, row, 0 - 1); row += 1 }
+            let _laid = view_lay_line(mut view, history, start, at, cols, first, last, true)
+            let to = back - high + 1
+            row = 0
+            while row <= last - first {
+                copy_screen_row(mut view.screen, view.scratch, cols, to + row, row + 1)
+                row += 1
+            }
+        }
+        below += n
+        at = history_previous(history, start)
+    }
+    if below > back { back } else { below }
+}
+
 /// Fill the window whose top row is `back` rows above the live screen's first
-/// row, at the pane's current size. Returns the back shown.
+/// row, at the pane's current size, and return the back shown: clamped to the
+/// rows history retains, and 0 on the alternate screen, which has none. History
+/// holds only what is above the screen's first row, so no row appears twice.
 pub fn fill_view(mut view: View, pane: Vt, back: int) -> int {
-    ensure_view_buffers(mut view, pane.cols, pane.rows)
-    var row = 1
-    while row <= pane.rows {
-        if pane.active_alternate { copy_screen_row(mut view.screen, pane.alternate, pane.cols, row, row) }
-        else { copy_screen_row(mut view.screen, pane.primary, pane.cols, row, row) }
+    let cols = pane.cols
+    let rows = pane.rows
+    ensure_view_buffers(mut view, cols, rows)
+    var shown = if back < 0 || pane.active_alternate { 0 } else { back }
+    if shown > 0 {
+        let found = view_history_rows(mut view, pane.history, cols, rows, shown)
+        if found < shown {
+            shown = found
+            if shown > 0 { let _again = view_history_rows(mut view, pane.history, cols, rows, shown) }
+        }
+    }
+    var row = shown + 1
+    while row <= rows {
+        if pane.active_alternate { copy_screen_row(mut view.screen, pane.alternate, cols, row, row - shown) }
+        else { copy_screen_row(mut view.screen, pane.primary, cols, row, row - shown) }
         row += 1
     }
-    view.back = 0
-    if back < 0 { return 0 }
-    0
+    view.back = shown
+    shown
 }
 
 /// How many rows above the live screen's first row the row holding logical
 /// line `id` at cell `offset` now is, or -1 when history no longer holds it.
 pub fn view_back_of(mut view: View, pane: Vt, id: int, offset: int) -> int {
-    ensure_view_buffers(mut view, pane.cols, pane.rows)
-    if id < 0 || offset < 0 { return 0 - 1 }
+    if id < 0 || pane.history.records == 0 || pane.history.bytes.len == 0 { return 0 - 1 }
+    let cols = pane.cols
+    ensure_view_buffers(mut view, cols, pane.rows)
+    var below = 0
+    var at = history_newest_at(pane.history)
+    while at >= 0 {
+        let start = view_line_start(pane.history, at)
+        if history_get_word(pane.history, start, 8, 8) == id {
+            view.flow.cursor.id = id
+            view.flow.cursor.offset = offset
+            let n = view_lay_line(mut view, pane.history, start, at, cols, 1, 1, false)
+            let found = view.flow.cursor.found
+            let row = view.flow.cursor.row
+            view.flow.cursor.id = 0 - 1
+            if !found { return 0 - 1 }
+            return below + n - row + 1
+        }
+        below += view_lay_line(mut view, pane.history, start, at, cols, 1, 1, false)
+        at = history_previous(pane.history, start)
+    }
     0 - 1
 }
