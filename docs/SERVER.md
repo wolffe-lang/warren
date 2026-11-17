@@ -509,9 +509,12 @@ unless the size changed. Output in a tab that is not shown composes nothing.
 Measured on Linux (`MEASURE` in the pane rows): a focus change between two
 panes side by side at 80x24 is a 600-byte image and among three panes 314
 bytes; a keystroke's image holds only the focused pane's cells; a split's new
-prompt is drawn 18 ms after the key; a keystroke in a split is drawn in 0.3 ms
-(p50; 2.4 ms while echoes waited 2 ms for quiet panes) and 13.7 ms beside a
-flooding neighbour in the same tab, which still streams. A client's mode
+prompt is drawn 18 ms after the key; a keystroke in a split is drawn in 2.4 ms
+(p50) and 13.6 ms beside a flooding neighbour in the same tab. Those two were
+measured while echoes waited 2 ms for quiet panes. On one Linux host, before
+and after that wait went, in turn, twice each: a keystroke in a split went from
+2.6 ms to 0.5 ms (p50), and beside the flooding neighbour, which still streams,
+from 19 ms to 17 ms. A client's mode
 change repaints only its own bar: revealing the prefix table (the mode field
 and hint line) is 626 bytes at 80x24, and entering pane mode 854 bytes. Resize
 mode has no idle timeout; its arrows and letter keys keep resizing until
