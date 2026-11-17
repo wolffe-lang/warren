@@ -167,6 +167,8 @@ session_rows() (
 step deps-rows python3 -I tests/deps/run.py --wolf "$WOLF" --lupin "$LUPIN" --std "$WOLF_STD"
 step compose-build "$WOLF" build --deny-warnings src/compose_rows.lu -o "$root/target/native/compose-rows"
 step compose-native "$root/target/native/compose-rows"
+step compose-damage-build "$WOLF" build --deny-warnings src/compose_damage_test.lu -o "$root/target/native/compose-damage"
+step compose-damage-native "$root/target/native/compose-damage"
 step session-build "$WOLF" build --deny-warnings src/session_rows.lu -o "$root/target/native/session-rows"
 step session-rows session_rows
 # Panes and tabs: a scripted client drives a real server's splits, tabs,
