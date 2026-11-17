@@ -833,7 +833,11 @@ fn tab_bar(s: Server, si: int) -> TabBar {
 }
 
 fn tab_at(s: Server, index: int, col: int, row: int) -> int {
-    tab_hit_at(s.conns[index].tabs, col, row)
+    let si = s.conns[index].session
+    if row != s.sessions[si].rows - 1 { return 0 }
+    let bar = tab_bar(s, si)
+    for hit in bar.hits { if col >= hit.first && col < hit.end { return hit.tab } }
+    0
 }
 
 /// The client's cells over the frame's last rows: the bar's two lines,
