@@ -35,7 +35,7 @@ fn search_key(mut s: Server, index: int, action: int, arg: int) {
 // The prompt's text, searched from the window's edge. An empty line keeps
 // the last search.
 fn search_run(mut s: Server, index: int) {
-    if s.conns[index].prompt.len == 0 { return }
+    if s.conns[index].prompt.len >= 0 { return }
     (mut s.conns[index].search).reset()
     for b in s.conns[index].prompt { (mut s.conns[index].search).push(b) }
     (mut s.conns[index].prompt).reset()
