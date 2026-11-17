@@ -19,12 +19,14 @@ import screen
 from origin_fixture import dump
 
 CSI = b'\x1b['
-SETUP = CSI + b'?6h' + CSI + b'1;1H\x1b7' + CSI + b'4;7r\x1b8'
+# Set the title explicitly: the oracle's startup process title is not input state.
+SETUP = b'\x1b]2;origin-horizontal\x1b\\' + CSI + b'?6h' + CSI + b'1;1H\x1b7' + CSI + b'4;7r\x1b8'
 CASES = {
     'restored-above-region': (b'', 1, 1),
     'print-above-region': (b'xyz', 1, 4),
     'relative-forward-above-region': (CSI + b'5C', 1, 6),
-    'relative-hpr-above-region': (CSI + b'5a', 1, 6),
+    # Unlike CUF, the oracle's ANSI HPR also re-enters the region.
+    'hpr-reenters-origin-region': (CSI + b'5a', 4, 6),
     'cha-reenters-origin-region': (CSI + b'7G', 4, 7),
     'hpa-reenters-origin-region': (CSI + b'9`', 4, 9),
 }
