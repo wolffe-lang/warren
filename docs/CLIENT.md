@@ -130,8 +130,10 @@ pixel-identical replacement publishes an ACKable zero-cell image so the new
 identity becomes clickable. A plain border click is inert; dragging moves that
 split with minimum-size clamps, even when the pointer leaves its original pane
 area. The terminal client requests all-motion reporting (1003) and disables it
-on exit, so programs inside can receive hover when they ask for it. Wheel
-scrollback controls remain planned.
+on exit, so programs inside can receive hover when they ask for it. The wheel
+goes to the focused pane's program when it asked for reports; otherwise, over
+a pane on its primary screen, it opens this client's scroll mode there
+(SERVER.md §8). On the alternate screen without reports it does nothing.
 
 ## Rendering
 
