@@ -136,6 +136,7 @@ fn wrap_line(mut pane: Vt) {
 }
 
 fn print_scalar(mut pane: Vt, cp: int) {
+    pane.glyph_calls += 1
     // Interlinear annotation controls have width zero but are not cell marks.
     if cp >= 0xFFF9 && cp <= 0xFFFB { return }
     var width = scalar_width(cp)
