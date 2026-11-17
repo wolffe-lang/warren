@@ -71,18 +71,17 @@ fn test_each_real_repeat_acts_once() {
     assert(splits == 2, "one split per press or intentional repeat, no release action")
 }
 
-fn test_bare_escape_keeps_its_deadline() {
+fn test_bare_escape_goes_at_once() {
     var p = client.parser()
-    assert(client.feed(mut p, "\u{1b}".bytes(), 100).len == 0, "bare Escape waits")
-    assert(client.expire(mut p, 100 + client.ESC_MS - 1).len == 0, "no early Escape")
-    assert(keyboard_show(client.expire(mut p, 100 + client.ESC_MS)) == "K0:1:14", "bare Escape expires normally")
-    assert(keyboard_show(client.feed(mut p, "w".bytes(), 100 + client.ESC_MS + 1)) == "K0:0:119", "late w is not Alt-w")
+    assert(keyboard_show(client.feed(mut p, "\u{1b}".bytes(), 100)) == "K0:1:14", "bare Escape at once")
+    assert(client.deadline(p) == 0 - 1, "no Escape deadline")
+    assert(keyboard_show(client.feed(mut p, "w".bytes(), 101)) == "K0:0:119", "a later w is not Alt-w")
 }
 
 fn main() -> int {
     test_quick_keyboard_encodings()
     test_each_real_repeat_acts_once()
-    test_bare_escape_keeps_its_deadline()
+    test_bare_escape_goes_at_once()
     print("PASS keyboard-quick-input")
     0
 }
