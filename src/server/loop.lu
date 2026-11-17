@@ -752,13 +752,14 @@ fn prompt_tail(prompt: List[byte], room: int) -> str {
     str_from_utf8(prompt[off..prompt.len]) else ""
 }
 
-/// The hint line's text in a prompt mode (rename, command), the cursor
-/// after it; "" in any other mode.
+/// The hint line's text in a prompt mode (rename, command, search), the
+/// cursor after it; "" in any other mode.
 fn prompt_line(s: Server, index: int, cols: int) -> str {
     let mode = s.conns[index].mode
     var lead = ""
     if mode == config.MODE_COMMAND { lead = " :" }
     if mode == config.MODE_RENAME { lead = " rename tab: " }
+    if mode == config.MODE_SEARCH { lead = if s.conns[index].search_older then " ?" else " /" }
     if lead.len == 0 { return "" }
     lead + prompt_tail(s.conns[index].prompt, cols - text_width(lead) - 1)
 }
@@ -1198,12 +1199,14 @@ fn passing(mode: int) -> bool {
 }
 
 fn sticky(mode: int) -> bool {
-    mode == config.MODE_PANE || mode == config.MODE_TAB || mode == config.MODE_RESIZE || mode == config.MODE_SESSION
+    mode == config.MODE_PANE || mode == config.MODE_TAB || mode == config.MODE_RESIZE || mode == config.MODE_SESSION ||
+        mode == config.MODE_SCROLL
 }
 
 // Confirm, help and the prompts: left for the mode they came from.
 fn passing_through(mode: int) -> bool {
-    mode == config.MODE_CONFIRM || mode == config.MODE_HELP || mode == config.MODE_COMMAND || mode == config.MODE_RENAME
+    mode == config.MODE_CONFIRM || mode == config.MODE_HELP || mode == config.MODE_COMMAND || mode == config.MODE_RENAME ||
+        mode == config.MODE_SEARCH
 }
 
 // The client's bar is drawn again (its mode, prompt or question changed).
@@ -1223,7 +1226,7 @@ fn set_mode(mut s: Server, index: int, mode: int) {
     let was = s.conns[index].mode
     if was == mode { return }
     s.conns[index].mode = mode
-    if was == config.MODE_SCROLL { leave_view(mut s, index) }
+    if windowed(was) && !windowed(mode) { leave_view(mut s, index) }
     if was == config.MODE_HELP || mode == config.MODE_HELP { frame_moved(mut s, index) } else { bar_moved(mut s, index) }
 }
 
@@ -1258,6 +1261,10 @@ fn rename_active(mut s: Server, index: int, name: str) {
 // The prompt's line, run as the mode it was typed in says: a rename, or a
 // command of the key table's action names.
 fn run_prompt(mut s: Server, index: int, was: int) {
+    if was == config.MODE_SEARCH {
+        search_run(mut s, index)
+        return
+    }
     let text = str_from_utf8(s.conns[index].prompt[0..s.conns[index].prompt.len]) else ""
     (mut s.conns[index].prompt).reset()
     if was == config.MODE_RENAME {
@@ -1390,6 +1397,10 @@ fn key_event(mut s: Server, index: int, mods: int, kind: int, code: int) {
         paste_register(mut s, index)
         return
     }
+    if a == config.A_SEARCH || a == config.A_SEARCH_AGAIN {
+        search_key(mut s, index, a, st.arg)
+        return
+    }
     act(mut s, index, a, st.arg, 1)
 }
 
@@ -1411,6 +1422,7 @@ fn leave_view(mut s: Server, index: int) {
     s.conns[index].sel_slot = 0 - 1
     s.conns[index].sel_opened = false
     vt.unmark_view(mut s.conns[index].view)
+    vt.unfind_view(mut s.conns[index].view)
     frame_moved(mut s, index)
 }
 
@@ -1457,11 +1469,12 @@ fn view_to(mut s: Server, index: int, back: int) {
     s.conns[index].view_back = shown
     s.conns[index].view_id = s.conns[index].view.screen.line_ids[0]
     s.conns[index].view_offset = s.conns[index].view.screen.line_offsets[0]
-    // A drag whose window was filled a turn late is marked again on it.
+    // A drag whose window was filled a turn late is marked again on it; a
+    // search's match is marked wherever the window shows it.
     if s.conns[index].sel_state == 2 {
         vt.mark_view(mut s.conns[index].view, s.conns[index].sel_row, s.conns[index].sel_col,
             s.conns[index].sel_to_row, s.conns[index].sel_to_col)
-    }
+    } else { let _found = vt.mark_found(mut s.conns[index].view) }
     if shown == 0 && s.conns[index].view_wheel {
         set_mode(mut s, index, config.MODE_NORMAL)
         return
@@ -1536,6 +1549,7 @@ fn select_start(mut s: Server, index: int, hit: int, from: int, mods: int, col: 
             s.panes[hit].screen.mode_values[10] == 1
         if reports && mods & 1 == 0 { return false }
     }
+    vt.unfind_view(mut s.conns[index].view)
     s.conns[index].sel_state = 1
     s.conns[index].sel_slot = hit
     s.conns[index].sel_row = row - s.panes[hit].at_row + 1
@@ -2410,7 +2424,7 @@ fn compose_now(mut s: Server, index: int, now: int) {
             let retry = s.conns[index].view_retry
             s.conns[index].view_retry = 0 - 1
             view_to(mut s, index, retry)
-        } else if s.conns[index].view_back > 0 {
+        } else if s.conns[index].view_back > 0 || found_shown(s, index) {
             let vk = s.conns[index].view_slot
             if s.conns[index].view.cols != s.panes[vk].screen.cols || s.conns[index].view.rows != s.panes[vk].screen.rows {
                 let back = view_anchor(mut s, index)
@@ -2418,7 +2432,7 @@ fn compose_now(mut s: Server, index: int, now: int) {
             }
         }
     }
-    let vslot = if s.conns[index].view_back > 0 || s.conns[index].sel_state == 2 then s.conns[index].view_slot else 0 - 1
+    let vslot = if s.conns[index].view_back > 0 || s.conns[index].sel_state == 2 || found_shown(s, index) then s.conns[index].view_slot else 0 - 1
     let full = s.conns[index].force_full
     let gen = s.sessions[si].layout_gen
     let all = s.conns[index].seen_layout != gen
