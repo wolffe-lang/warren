@@ -32,8 +32,10 @@ pub const MODE_RENAME: int = 8
 pub const MODE_CONFIRM: int = 9
 /// The key list over the tab area, for this client only.
 pub const MODE_HELP: int = 10
+/// Sticky: a window over the pane's history; left with `q`, Esc or Enter.
+pub const MODE_SCROLL: int = 11
 /// How many modes there are.
-pub const MODES: int = 11
+pub const MODES: int = 12
 /// A step's next mode: the mode the client was in before confirm, help or a
 /// prompt (a sticky mode, or normal). The server keeps it.
 pub const MODE_BACK: int = -1
@@ -94,6 +96,14 @@ pub const A_CLEAR: int = 25
 pub const A_RUN: int = 26
 /// Close immediately except that the final pane of the session asks first.
 pub const A_QUICK_CLOSE: int = 27
+/// Look back through the focused pane's history (scroll mode).
+pub const A_VIEW_ENTER: int = 28
+/// Move the window arg rows back (negative: toward the live rows).
+pub const A_VIEW_ROWS: int = 29
+/// Move the window arg half windows back (negative: toward the live rows).
+pub const A_VIEW_PAGE: int = 30
+/// The oldest retained row (arg 1) or the live rows (arg 0).
+pub const A_VIEW_END: int = 31
 
 const SHIFT: int = 1
 const ALT: int = 2
@@ -105,6 +115,8 @@ const DOWN: int = 2
 const RIGHT: int = 3
 const LEFT: int = 4
 const BACKSPACE: int = 11
+const PAGE_UP: int = 7
+const PAGE_DOWN: int = 8
 const ENTER: int = 13
 const ESC: int = 14
 
@@ -242,6 +254,7 @@ pub fn defaults() -> Keys {
     letter(mut l, p, "r", A_NONE, 0, MODE_RESIZE, "RESIZE")
     letter(mut l, p, "s", A_NONE, 0, MODE_SESSION, "SESSION")
     letter(mut l, p, "g", A_NONE, 0, MODE_LOCKED, "LOCK")
+    letter(mut l, p, "[", A_VIEW_ENTER, 0, MODE_SCROLL, "SCROLL")
     hidden(mut l, p, CTRL, SCALAR, 32, A_SEND_PREFIX, 0, n)
 
     let w = MODE_PANE
@@ -286,6 +299,22 @@ pub fn defaults() -> Keys {
     let s = MODE_SESSION
     letter(mut l, s, "d", A_DETACH, 0, n, "detach")
     sticky(mut l, s)
+
+    let v = MODE_SCROLL
+    letter(mut l, v, "k", A_VIEW_ROWS, 1, v, "row")
+    letter(mut l, v, "j", A_VIEW_ROWS, -1, v, "row")
+    hidden(mut l, v, 0, NAMED, UP, A_VIEW_ROWS, 1, v)
+    hidden(mut l, v, 0, NAMED, DOWN, A_VIEW_ROWS, -1, v)
+    bind(mut l, v, 0, NAMED, PAGE_UP, A_VIEW_PAGE, 2, v, "PgUp", "page")
+    bind(mut l, v, 0, NAMED, PAGE_DOWN, A_VIEW_PAGE, -2, v, "PgDn", "page")
+    hidden(mut l, v, CTRL, SCALAR, 98, A_VIEW_PAGE, 2, v)
+    hidden(mut l, v, CTRL, SCALAR, 102, A_VIEW_PAGE, -2, v)
+    letter(mut l, v, "u", A_VIEW_PAGE, 1, v, "half")
+    letter(mut l, v, "d", A_VIEW_PAGE, -1, v, "half")
+    letter(mut l, v, "g", A_VIEW_END, 1, v, "oldest/live")
+    letter(mut l, v, "G", A_VIEW_END, 0, v, "oldest/live")
+    letter(mut l, v, "q", A_NONE, 0, n, "quit")
+    sticky(mut l, v)
 
     bind(mut l, MODE_LOCKED, CTRL, SCALAR, 103, A_NONE, 0, n, "C-g", "unlock")
 
@@ -350,7 +379,7 @@ pub fn step(k: Keys, mode: int, mods: int, kind: int, code: int) -> Step {
 /// The mode's name, as the bar's mode field shows it.
 pub fn mode_name(mode: int) -> str {
     let names = ["NORMAL", "PREFIX", "PANE", "TAB", "RESIZE", "SESSION", "LOCKED", "COMMAND", "RENAME",
-        "CONFIRM", "HELP"]
+        "CONFIRM", "HELP", "SCROLL"]
     if mode < 0 || mode >= MODES { return "" }
     names[mode]
 }
@@ -501,6 +530,21 @@ fn verb(action: int, arg: int) -> str {
     if action == A_SCROLL {
         if arg > 0 { return "scroll down" }
         return "scroll up"
+    }
+    if action == A_VIEW_ENTER { return "look back (scroll mode)" }
+    if action == A_VIEW_ROWS {
+        if arg > 0 { return "one row back" }
+        return "one row forward"
+    }
+    if action == A_VIEW_PAGE {
+        if arg == 2 { return "a window back" }
+        if arg == 0 - 2 { return "a window forward" }
+        if arg > 0 { return "half a window back" }
+        return "half a window forward"
+    }
+    if action == A_VIEW_END {
+        if arg == 1 { return "the oldest row" }
+        return "the live rows"
     }
     if action == A_RUN { return "run" }
     if action == A_ERASE { return "erase" }
