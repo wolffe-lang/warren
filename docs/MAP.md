@@ -6,7 +6,7 @@
 | W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | pure core, CLI/replay and frozen complete-frame comparisons; final measurements pending |
 | W2 | server, client, protocol v1; one pane; detach and attach | codec, server, terminal client, lifecycle (new, attach, detach, second client, the server outliving its client); session and client rows; PAX console logout waits on PAX |
 | W3 | split tree, tabs, modes, the hint bar, configuration v1 | pure layout module (tabs, split tree, geometry, operations) with golden and property rows; panes and tabs in the server, the compositor's borders and focus mark, the bar's two lines (session, tabs with their marks, mode and clock; hints, prompts and messages), modes per client from the key table, the split end to end through the real client (`keys_test`, `pane_rows`, `client_rows`, SERVER.md §8); configuration planned |
-| W4 | mouse, scrollback, copy mode, search, OSC 52 | pane focus and tab-label clicks with SGR/legacy reports, captured border dragging and all-motion transport, wheel and key scrollback per client; copy, search and OSC 52 planned |
+| W4 | mouse, scrollback, copy mode, search, OSC 52 | pane focus and tab-label clicks with SGR/legacy reports, captured border dragging and all-motion transport, wheel and key scrollback per client, drag selection copied on release, register paste, OSC 52 export of copies and warren.toml's gate on programs' writes; search planned |
 | W5 | command socket, CLI verbs, layout files, save and restore | planned |
 | W6 | static on the PAX image; rows in PAX's own suites | planned |
 
@@ -117,6 +117,16 @@ register the session's), selecting history rows while looking back, and one
 bracket pair when the program asked for bracketed paste. `vt_view_test` holds
 the selected text: reading order either way round, soft-wrap joins, trailing
 blanks, wide and combining glyphs, history rows, and the cap refused whole.
+
+Clipboard rows (`clip-*`, `config-refused` in `pane_rows`; `clipboard-osc52`
+and `clipboard-console` in `client_rows`) hold a copy exported only to the
+client that made it and only when it takes OSC 52 writes, a program's write
+kept back by default and passed with `[clipboard] programs = true` to OSC 52
+clients only, a refused warren.toml named on the hint line with its setting
+not applied, and the terminal client writing OSC 52 for a copy, and none at the
+console. `config_test` holds the settings parser (defaults, comments, both
+values, and each refusal by line and reason) and `client_clipboard_test` the
+OSC 52 sequence, on native, explicit checked and lupin.
 
 A row that tests an interrupt writes the byte 0x03 into the pseudo-terminal.
 No row sends a signal from a script.
