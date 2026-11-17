@@ -134,6 +134,27 @@ fn test_no_new_damage_reads_nothing() {
     assert(reads == 0, "no-new-damage-reads-nothing")
 }
 
+// Another session's pane, shown at the same place in its own frame: its
+// damage says nothing about this frame's cells, which only this frame's
+// own pane (the owner map's) limits.
+fn test_another_sessions_pane_limits_nothing() {
+    var r = rig(40, 10)
+    var other = pane(40, 10)
+    other.id = 2
+    other.session = 1
+    (mut r.panes).push(other)
+    fill(mut r)
+    let _whole = compose(mut r, true)
+    vt.feed(mut r.panes[1].screen, "\u{1b}[2;1Hz".bytes())
+    r.panes[1].damage += 1
+    let _quiet = compose(mut r, false)
+    feed(mut r, "\u{1b}[7;5Hhello".bytes())
+    vt.feed(mut r.panes[1].screen, "\u{1b}[3;1Hy".bytes())
+    r.panes[1].damage += 1
+    let _image = compose(mut r, false)
+    assert(differs(r.panes, r.ses, r.sh) == 0 - 1, "other-session-pane-limits-nothing")
+}
+
 // ---- the damage-limited image equals a full rescan ----
 
 struct Rng { state: int }
@@ -302,6 +323,7 @@ fn main() -> int {
     test_one_cell_reads_one()
     test_a_redraw_reads_its_rows()
     test_no_new_damage_reads_nothing()
+    test_another_sessions_pane_limits_nothing()
     let args = env.args()
     var rounds = 1
     if args.len > 0 { rounds = args[0].to_int() else 1 }
