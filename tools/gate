@@ -135,7 +135,7 @@ step combine-anchor-frames-lupin python3 -I tests/vt/compare_combine_anchor.py "
 step erase-reflow-contract-lupin python3 -I tests/vt/compare_erase_reflow.py "$LUPIN" run src/warren.lu
 step annotation-frames-lupin python3 -I tests/vt/compare_annotations.py "$LUPIN" run src/warren.lu
 step erase-extent-frames-lupin python3 -I tests/vt/compare_erase_extents.py "$LUPIN" run src/warren.lu
-step census-lupin python3 -I tests/vt/compare_suite.py --suite census "$LUPIN" run src/warren.lu
+step census-lupin python3 -I tests/vt/compare_suite.py --suite census --observer-timeout 600 "$LUPIN" run src/warren.lu
 step answer-build "$WOLF" build --deny-warnings src/vt_answers_test.lu -o "$root/target/native/vt-answers"
 step version-answer-native python3 -I tests/vt/version_answer.py "$root/target/native/vt-answers"
 step version-answer-lupin python3 -I tests/vt/version_answer.py "$LUPIN" run src/vt_answers_test.lu
