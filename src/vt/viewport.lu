@@ -6,18 +6,22 @@
 /// and offset. The window's top row is `back` rows above the live screen's
 /// first row; 0 is the live screen. `scratch`, `flow` and `reader` are reused
 /// working storage. Buffers grow to the largest pane filled and are kept.
+/// The last search's match is logical line `found_id` (-1: none) from cell
+/// `found_from` to `found_to`; `find` is that search's working state.
 pub struct View {
     cols: int, rows: int, back: int,
     screen: Screen, scratch: Screen,
     flow: ReflowState, reader: HistoryReader,
     marked: bool, mark_r0: int, mark_c0: int, mark_r1: int, mark_c1: int,
+    found_id: int, found_from: int, found_to: int, find: FindState,
 }
 
 /// An empty window: one cell until `reserve_view` grows it.
 pub fn new_view() -> View {
     View { cols: 0, rows: 0, back: 0, screen: new_screen(1, 1), scratch: new_screen(1, 1),
         flow: new_reflow_state(), reader: new_history_reader(),
-        marked: false, mark_r0: 0, mark_c0: 0, mark_r1: 0, mark_c1: 0 }
+        marked: false, mark_r0: 0, mark_c0: 0, mark_r1: 0, mark_c1: 0,
+        found_id: 0 - 1, found_from: 0, found_to: 0, find: new_find_state() }
 }
 
 /// Whether the window's buffers hold a pane of this size.

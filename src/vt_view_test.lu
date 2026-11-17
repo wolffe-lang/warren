@@ -218,6 +218,141 @@ fn test_marked_history_rows() {
     assert(vt.view_marked_text(view, mut out, 100) == 8 && text(out) == "a5\na6\na7", "history and live rows: " + text(out))
 }
 
+// Find, place the window and mark the match: "back:r0,c0-r1,c1:text", or
+// "none" when nothing is found and "gone" when it cannot be placed.
+fn find_shown(mut view: vt.View, pane: vt.Vt, needle: str, older: bool, back: int) -> str {
+    if !vt.view_find(mut view, pane, needle.bytes(), older, back) { return "none" }
+    let to = vt.view_found_back(mut view, pane, back)
+    if to < 0 { return "gone" }
+    let shown = vt.fill_view(mut view, pane, to)
+    if !vt.mark_found(mut view) { return "{shown}:unmarked" }
+    var out = List[byte]()
+    let _n = vt.view_marked_text(view, mut out, 4096)
+    "{shown}:{view.mark_r0},{view.mark_c0}-{view.mark_r1},{view.mark_c1}:" + text(out)
+}
+
+fn test_find_from_the_window_edges() {
+    var pane = vt.new(6, 3, 4096)
+    vt.feed(mut pane, numbered(9))
+    var view = view_for(pane)
+    var got = find_shown(mut view, pane, "a", true, 0)
+    assert(got == "0:3,1-3,1:a", "older from the live rows' bottom counts the bottom row: " + got)
+    vt.unfind_view(mut view)
+    got = find_shown(mut view, pane, "a5", true, 0)
+    assert(got == "3:2,1-2,2:a5", "a match out of the window is placed in its middle: " + got)
+    vt.unfind_view(mut view)
+    let _f = vt.fill_view(mut view, pane, 6)
+    got = find_shown(mut view, pane, "a", false, 6)
+    assert(got == "6:1,1-1,1:a", "newer from the oldest window's top counts the top row: " + got)
+    vt.unfind_view(mut view)
+    got = find_shown(mut view, pane, "a8", false, 6)
+    assert(got == "0:2,1-2,2:a8", "placing stops at the live rows: " + got)
+    vt.unfind_view(mut view)
+    got = find_shown(mut view, pane, "a1", true, 0)
+    assert(got == "6:1,1-1,2:a1", "placing stops at the oldest row: " + got)
+}
+
+fn test_find_again_goes_strictly_past_the_match() {
+    var pane = vt.new(6, 3, 4096)
+    vt.feed(mut pane, numbered(9))
+    var view = view_for(pane)
+    var got = find_shown(mut view, pane, "a", true, 0)
+    assert(got == "0:3,1-3,1:a", "the first match: " + got)
+    got = find_shown(mut view, pane, "a", true, 0)
+    assert(got == "0:2,1-2,1:a", "again: the row above: " + got)
+    got = find_shown(mut view, pane, "a", true, 0)
+    assert(got == "0:1,1-1,1:a", "again: the top row: " + got)
+    got = find_shown(mut view, pane, "a", true, 0)
+    assert(got == "2:2,1-2,1:a", "again: into history: " + got)
+    got = find_shown(mut view, pane, "a", false, 2)
+    assert(got == "2:3,1-3,1:a", "the other way: the row below: " + got)
+    assert(view.found_from == 0 && view.found_to == 0, "one cell")
+    vt.unfind_view(mut view)
+    assert(find_shown(mut view, pane, "zz", true, 0) == "none", "no match")
+    var top = find_shown(mut view, pane, "a", false, 0)
+    assert(top == "0:1,1-1,1:a", "newer from the live rows' top counts the top row: " + top)
+}
+
+fn test_find_no_match_keeps_the_last() {
+    var pane = vt.new(6, 3, 4096)
+    vt.feed(mut pane, numbered(9))
+    var view = view_for(pane)
+    assert(find_shown(mut view, pane, "a8", true, 0) == "0:2,1-2,2:a8", "a8")
+    let id = view.found_id
+    assert(!vt.view_find(mut view, pane, "a8".bytes(), false, 0), "nothing newer than the only a8")
+    assert(view.found_id == id && view.found_from == 0 && view.found_to == 1, "the last match is kept")
+}
+
+fn test_find_across_a_soft_wrap() {
+    var pane = vt.new(4, 2, 4096)
+    vt.feed(mut pane, "abcdefghij\r\nx".bytes())
+    var view = view_for(pane)
+    var got = find_shown(mut view, pane, "ghij", true, 0)
+    assert(got == "1:1,3-2,2:ghij", "a match from history across the wrap into the live rows: " + got)
+    let _whole = vt.fill_view(mut view, pane, 0)
+    assert(vt.mark_found(mut view) && vt.view_marked(view, 1, 1) && vt.view_marked(view, 1, 2) && !vt.view_marked(view, 1, 3),
+        "partly shown: the rows the window holds")
+    let _above = vt.fill_view(mut view, pane, 2)
+    assert(vt.mark_found(mut view) && view.mark_r0 == 2 && view.mark_c0 == 3 && view.mark_r1 == 2 && view.mark_c1 == 4,
+        "partly shown: up to the window's last cell")
+    vt.unfind_view(mut view)
+    let _live = vt.fill_view(mut view, pane, 0)
+    assert(find_shown(mut view, pane, "cd", false, 0) == "none", "a match starting above the top row is not newer")
+}
+
+fn test_find_wide_and_combining() {
+    var pane = vt.new(6, 2, 4096)
+    vt.feed(mut pane, "\u{3042}\u{3044}x\r\ne\u{301}y".bytes())
+    var view = view_for(pane)
+    var got = find_shown(mut view, pane, "\u{3044}x", true, 0)
+    assert(got == "0:1,3-1,5:\u{3044}x", "a wide glyph is two cells: " + got)
+    vt.unfind_view(mut view)
+    got = find_shown(mut view, pane, "e\u{301}y", true, 0)
+    assert(got == "0:2,1-2,2:e\u{301}y", "a combining mark is matched after its base: " + got)
+    vt.unfind_view(mut view)
+    assert(find_shown(mut view, pane, "ey", true, 0) == "none", "a mark between two scalars keeps them apart")
+}
+
+fn test_find_after_eviction() {
+    var pane = vt.new(6, 3, 120)
+    vt.feed(mut pane, numbered(9))
+    var view = view_for(pane)
+    assert(vt.fill_view(mut view, pane, 99) == 3 && lines(view) == "a4|a5|a6", "three rows retained: " + lines(view))
+    assert(find_shown(mut view, pane, "a5", true, 0) == "3:2,1-2,2:a5", "a5 in history")
+    vt.feed(mut pane, "\r\na10\r\na11".bytes())
+    assert(!vt.view_find(mut view, pane, "a".bytes(), true, 0), "nothing is older than a match no longer retained")
+    var got = find_shown(mut view, pane, "a", false, 0)
+    assert(got == "3:1,1-1,1:a", "newer than it: the oldest retained match: " + got)
+}
+
+fn test_find_the_alternate_screen() {
+    var pane = vt.new(6, 2, 4096)
+    vt.feed(mut pane, numbered(5))
+    vt.feed(mut pane, "\u{1b}[?1049h\u{1b}[Halt".bytes())
+    var view = view_for(pane)
+    assert(!vt.view_find(mut view, pane, "a".bytes(), true, 0), "the alternate screen has no history to search")
+    assert(vt.view_found_back(mut view, pane, 0) == 0 - 1, "nor a match to place")
+}
+
+fn test_find_marks_only_a_shown_match() {
+    var pane = vt.new(6, 3, 4096)
+    vt.feed(mut pane, numbered(9))
+    var view = view_for(pane)
+    assert(find_shown(mut view, pane, "a5", true, 0) == "3:2,1-2,2:a5", "a5")
+    let _live = vt.fill_view(mut view, pane, 0)
+    assert(!vt.mark_found(mut view) && !view.marked, "a window without the match marks nothing")
+    vt.unfind_view(mut view)
+    assert(!vt.mark_found(mut view), "no match, no marks")
+}
+
+fn test_needles_that_fit() {
+    assert(!vt.needle_fits("".bytes()), "an empty needle")
+    assert(vt.needle_fits("x".repeat(vt.FIND_SCALARS).bytes()), "the longest needle")
+    assert(!vt.needle_fits("x".repeat(vt.FIND_SCALARS + 1).bytes()), "one scalar too many")
+    assert(vt.needle_fits("\u{3042}".repeat(vt.FIND_SCALARS).bytes()), "counted in scalars, not bytes")
+    assert(!vt.needle_fits("\u{301}".bytes()), "a needle with no width")
+}
+
 fn main() -> int {
     test_history_above_live()
     test_fills_need_reserved_buffers()
@@ -232,6 +367,15 @@ fn main() -> int {
     test_marked_wide_and_combining()
     test_marked_text_over_the_cap_is_refused_whole()
     test_marked_history_rows()
+    test_find_from_the_window_edges()
+    test_find_again_goes_strictly_past_the_match()
+    test_find_no_match_keeps_the_last()
+    test_find_across_a_soft_wrap()
+    test_find_wide_and_combining()
+    test_find_after_eviction()
+    test_find_the_alternate_screen()
+    test_find_marks_only_a_shown_match()
+    test_needles_that_fit()
     print("PASS vt-view")
     0
 }
