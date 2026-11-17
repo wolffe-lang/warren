@@ -1,0 +1,64 @@
+//! member: false
+//! The tab spans belong to the exact image acknowledged by one connection.
+use server
+
+fn hits(a: int, b: int) -> List[server.TabHit] {
+    [server.TabHit { first: 4, end: 9, tab: a }, server.TabHit { first: 9, end: 14, tab: b }]
+}
+
+fn test_exact_ack_promotes_only_its_pending_spans() {
+    var state = server.tab_hits()
+    server.stage_tab_hits(mut state, hits(1, 2), 40, 23, 1)
+    assert(server.tab_hit_at(state, 10, 23) == 0, "unacknowledged first frame has no drawn spans")
+    assert(!server.ack_tab_hits(mut state, 0), "zero ACK cannot promote")
+    assert(!server.ack_tab_hits(mut state, 2), "future ACK cannot promote")
+    assert(server.ack_tab_hits(mut state, 1), "exact ACK promotes")
+    assert(server.tab_hit_at(state, 10, 23) == 2, "tab two is drawn")
+    server.stage_tab_hits(mut state, hits(7, 8), 40, 23, 2)
+    assert(!server.ack_tab_hits(mut state, 1), "stale ACK cannot promote next frame")
+    assert(server.tab_hit_at(state, 10, 23) == 2, "pending map never changes hits")
+    assert(!server.ack_tab_hits(mut state, 99), "future ACK keeps drawn spans")
+    assert(server.ack_tab_hits(mut state, 2), "new exact ACK promotes")
+    assert(server.tab_hit_at(state, 10, 23) == 8, "new drawn span")
+    assert(!server.ack_tab_hits(mut state, 2), "duplicate ACK has nothing to promote")
+}
+
+fn test_geometry_bounds_and_independent_connections() {
+    var a = server.tab_hits()
+    var b = server.tab_hits()
+    server.stage_tab_hits(mut a, hits(1, 2), 40, 23, 1)
+    server.stage_tab_hits(mut b, hits(3, 4), 80, 29, 1)
+    let _a = server.ack_tab_hits(mut a, 1)
+    let _b = server.ack_tab_hits(mut b, 1)
+    assert(server.tab_hit_at(a, 4, 23) == 1, "span includes first cell")
+    assert(server.tab_hit_at(a, 8, 23) == 1, "wide continuation cell belongs to its span")
+    assert(server.tab_hit_at(a, 9, 23) == 2, "span end is exclusive")
+    assert(server.tab_hit_at(a, 14, 23) == 0, "non-label cell is inert")
+    for c in [0, 3, 41, 65535] { assert(server.tab_hit_at(a, c, 23) == 0, "outside label/image") }
+    assert(server.tab_hit_at(a, 10, 22) == 0 && server.tab_hit_at(a, 10, 24) == 0, "only painted bar row")
+    assert(server.tab_hit_at(b, 10, 29) == 4, "connection maps differ")
+    assert(server.tab_hit_at(a, 10, 23) == 2, "other connection did not overwrite map")
+}
+
+fn test_empty_maps_and_connection_reuse() {
+    var c = server.new_conn()
+    server.stage_tab_hits(mut c.tabs, hits(1, 2), 40, 23, 1)
+    let _ack = server.ack_tab_hits(mut c.tabs, 1)
+    server.stage_tab_hits(mut c.tabs, hits(7, 8), 80, 29, 2)
+    let capacity = c.tabs.pending.spans.len + c.tabs.drawn.spans.len
+    server.reset_conn(mut c, 12, 44, 0)
+    assert(server.tab_hit_at(c.tabs, 10, 23) == 0, "reuse clears drawn map")
+    assert(!server.ack_tab_hits(mut c.tabs, 2), "reuse clears old pending map")
+    assert(c.tabs.pending.spans.len + c.tabs.drawn.spans.len == capacity, "reuse retains fixed buffers")
+    server.stage_tab_hits(mut c.tabs, List[server.TabHit](), 40, 23, 1)
+    assert(server.ack_tab_hits(mut c.tabs, 1), "new connection sequence starts again")
+    assert(server.tab_hit_at(c.tabs, 10, 23) == 0, "empty painted map cannot retain stale spans")
+}
+
+fn main() -> int {
+    test_exact_ack_promotes_only_its_pending_spans()
+    test_geometry_bounds_and_independent_connections()
+    test_empty_maps_and_connection_reuse()
+    print("PASS tab-hit-ack-model")
+    0
+}
