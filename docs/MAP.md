@@ -85,7 +85,13 @@ Mouse rows (`mouse-*` in `pane_rows` and `client_rows`) cross SGR and legacy
 outer reports with inner SGR, legacy and no reports. They hold first-gesture
 consumption, relative coordinates, independent clients, wide and narrow tab
 labels, and inert borders and bar cells. The client input table also holds
-raw legacy coordinates and reports split across reads.
+raw legacy coordinates and reports split across reads. Snapshot rows hold a
+client's drawn labels while another client renames or removes tabs; both outer
+encodings must target the acknowledged ids, not live label positions.
+`tab_hits_test` holds exact/stale/future ACKs, independent maps, reuse,
+pending-map release, zero-cell identity publication and a full-capacity
+stage/ACK/reset allocation plateau. The identity-frame row also replaces a
+tab without changing pixels, then clicks its newly acknowledged identity.
 
 A row that tests an interrupt writes the byte 0x03 into the pseudo-terminal.
 No row sends a signal from a script.

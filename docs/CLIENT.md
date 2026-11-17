@@ -115,8 +115,13 @@ does (the prefix, the modes, the prompts) is the server's key table, per client
 Mouse coordinates are outer-frame cells. Clicking a pane focuses it; that
 first gesture does not reach its program. Later clicks in the focused pane
 reach programs that requested mouse reports, in their chosen encoding.
-Clicking a tab label switches tabs. Border clicks are inert; dragging and
-wheel scrollback controls remain planned.
+Clicking a tab label switches tabs using the spans of the image this client
+acknowledged, even if output has since changed live activity marks or another
+client renamed a label. A removed tab's stale label consumes the gesture,
+rather than selecting a different tab that shifted into its place. Even a
+pixel-identical replacement publishes an ACKable zero-cell image so the new
+identity becomes clickable. Border clicks are inert; dragging and wheel
+scrollback controls remain planned.
 
 ## Rendering
 

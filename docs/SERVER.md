@@ -46,9 +46,9 @@ the emulator surface the server reads.
 The projection counts every pane slot at its measured cost (six times its
 history cap, both screens at its size, 1 MiB of fixed buffers; a free slot
 keeps its emulator and is counted too) and each connection (one physical
-frame's receive buffer, a paste assembly, the 256 KiB event queue, and, when
-attached, one worst-case image and a 64-byte-a-cell shadow of what its client
-holds).
+frame's receive buffer, a paste assembly, the 256 KiB event queue, a 4 KiB
+allowance for two fixed tab-hit maps, and, when attached, one worst-case image
+and a 64-byte-a-cell shadow of what its client holds).
 
 Most of a pane's resident size is the emulator's history ring: it is made
 whole, with a copy, when the emulator is made (16.4 MB resident for an 8 MiB
@@ -467,6 +467,22 @@ name, mode, clock and hint line stay inert; border dragging is planned. Mouse
 actions remain limited to normal and locked mode. When focus moves, a pane that asked for focus reports hears it lose
 or take focus, and the clients take the new pane's title. A bell from the
 active tab reaches the clients; titles come from the focused pane only.
+
+**Tab hits and ACKs.** The painter's half-open display-cell spans are stored
+with each connection's one immutable pending image. Only its exact, fully
+sent image's ACK promotes those spans; duplicate or stale ACKs never promote
+a newer map. Clicks use the last acknowledged spans, not labels recomputed
+from live activity/name state. A stored id for a removed tab consumes the
+gesture without selecting its successor. Mouse input waits for matching
+acknowledged geometry after a size change.
+
+There are exactly two fixed-capacity maps per connection, at most 32
+scalar-only spans each. Publication and ACK overwrite those buffers in place;
+promotion clears the pending map's active metadata immediately, and connection
+reuse clears both maps. They retain no frame bytes or strings. If a close/
+recreate batch changes tab ids but leaves all pixels and the cursor identical,
+a 28-byte zero-cell v1 delta publishes the new identities for acknowledgement.
+It repaints no unchanged cells; unchanged pixels and identities send nothing.
 
 **The frame** is the session's size: the tab area, then line one of the bar
 (the session's name and the tabs, the active one inverse; tabs that do not fit
