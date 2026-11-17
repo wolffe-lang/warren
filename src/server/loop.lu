@@ -1434,7 +1434,7 @@ fn view_to(mut s: Server, index: int, back: int) {
         return
     }
     let k = s.conns[index].view_slot
-    let shown = vt.fill_view(mut s.conns[index].view, s.panes[k].screen, back)
+    let shown = vt.fill_view(mut s.conns[index].view, s.panes[k].screen, if back > 0 then 0 else back)
     if shown < 0 {
         // Too small for the pane: grown between turns, filled on the next.
         s.conns[index].view_cols = s.panes[k].screen.cols
