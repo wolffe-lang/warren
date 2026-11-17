@@ -1219,6 +1219,7 @@ fn set_mode(mut s: Server, index: int, mode: int) {
     let was = s.conns[index].mode
     if was == mode { return }
     s.conns[index].mode = mode
+    if was == config.MODE_SCROLL { leave_view(mut s, index) }
     if was == config.MODE_HELP || mode == config.MODE_HELP { frame_moved(mut s, index) } else { bar_moved(mut s, index) }
 }
 
@@ -1372,13 +1373,131 @@ fn key_event(mut s: Server, index: int, mods: int, kind: int, code: int) {
         s.conns[index].help_top = 0
         return
     }
+    if a == config.A_VIEW_ENTER {
+        let f = if si >= 0 then focused_slot(s, si) else 0 - 1
+        if f >= 0 { enter_view(mut s, index, f, false) } else { set_mode(mut s, index, config.MODE_NORMAL) }
+        return
+    }
+    if a == config.A_VIEW_ROWS || a == config.A_VIEW_PAGE || a == config.A_VIEW_END {
+        view_key(mut s, index, a, st.arg)
+        return
+    }
     act(mut s, index, a, st.arg, 1)
+}
+
+// ---- scroll mode: one client's window over one pane's history ----
+
+// The window's pane still holds the slot it was opened on.
+fn view_live(s: Server, index: int) -> bool {
+    let k = s.conns[index].view_slot
+    k >= 0 && k < s.panes.len && s.panes[k].live && s.panes[k].id == s.conns[index].view_pane
+}
+
+// Scroll mode ended: the pane's live rows are drawn again.
+fn leave_view(mut s: Server, index: int) {
+    if s.conns[index].view_slot < 0 { return }
+    s.conns[index].view_slot = 0 - 1
+    s.conns[index].view_back = 0
+    frame_moved(mut s, index)
+}
+
+// Open a window on pane slot `k` at its live rows. The wheel's windows close
+// again at the live rows; prefix [ keeps its window until q or Esc.
+fn enter_view(mut s: Server, index: int, k: int, wheel: bool) {
+    s.conns[index].view_slot = k
+    s.conns[index].view_pane = s.panes[k].id
+    s.conns[index].view_back = 0
+    s.conns[index].view_wheel = wheel
+    s.conns[index].view_id = 0 - 1
+    s.conns[index].view_offset = 0
+    set_mode(mut s, index, config.MODE_SCROLL)
+}
+
+// Where the window's top row's content is now: output since the last fill
+// pushed it further back. Content no longer retained keeps the old count,
+// which the next fill clamps.
+fn view_anchor(mut s: Server, index: int) -> int {
+    let back = s.conns[index].view_back
+    if back <= 0 || !view_live(s, index) { return back }
+    let k = s.conns[index].view_slot
+    let now = vt.view_back_of(mut s.conns[index].view, s.panes[k].screen, s.conns[index].view_id, s.conns[index].view_offset)
+    if now < 0 { return back }
+    now
+}
+
+// Fill the window `back` rows up, anchor it on its top row, and repaint.
+fn view_to(mut s: Server, index: int, back: int) {
+    if !view_live(s, index) {
+        set_mode(mut s, index, config.MODE_NORMAL)
+        return
+    }
+    let k = s.conns[index].view_slot
+    let shown = vt.fill_view(mut s.conns[index].view, s.panes[k].screen, back)
+    s.conns[index].view_back = shown
+    s.conns[index].view_id = s.conns[index].view.screen.line_ids[0]
+    s.conns[index].view_offset = s.conns[index].view.screen.line_offsets[0]
+    if shown == 0 && s.conns[index].view_wheel {
+        set_mode(mut s, index, config.MODE_NORMAL)
+        return
+    }
+    frame_moved(mut s, index)
+}
+
+// Move the window `rows` rows back (negative: toward the live rows) from
+// where its content is now.
+fn view_move(mut s: Server, index: int, rows: int) {
+    var back = view_anchor(mut s, index) + rows
+    if back < 0 { back = 0 }
+    view_to(mut s, index, back)
+}
+
+fn view_key(mut s: Server, index: int, action: int, arg: int) {
+    if !view_live(s, index) {
+        set_mode(mut s, index, config.MODE_NORMAL)
+        return
+    }
+    let rows = s.panes[s.conns[index].view_slot].screen.rows
+    if action == config.A_VIEW_ROWS { view_move(mut s, index, arg) }
+    else if action == config.A_VIEW_PAGE { view_move(mut s, index, arg * rows / 2) }
+    else if arg == 1 { view_to(mut s, index, VIEW_OLDEST) }
+    else { view_to(mut s, index, 0) }
+}
+
+// A wheel notch over a pane: to its program when it is focused and asked for
+// reports; else, over a primary screen, up opens or moves this client's
+// window on that pane and down moves it toward the live rows. The alternate
+// screen without reports keeps the wheel inert, as tmux does.
+fn wheel(mut s: Server, index: int, si: int, up: bool, mods: int, col: int, row: int) {
+    let cols = s.sessions[si].cols
+    let area = s.sessions[si].rows - BAR_LINES
+    let id = layout.pane_at(s.sessions[si].layout, s.sessions[si].layout.active, cols, area, col, row)
+    let hit = slot_of(s, id)
+    if hit < 0 { return }
+    let mode = s.conns[index].mode
+    if mode == config.MODE_SCROLL && s.conns[index].view_slot == hit && view_live(s, index) {
+        view_move(mut s, index, if up then WHEEL_ROWS else 0 - WHEEL_ROWS)
+        return
+    }
+    let reports = s.panes[hit].screen.mode_values[8] == 1 || s.panes[hit].screen.mode_values[9] == 1 ||
+        s.panes[hit].screen.mode_values[10] == 1
+    if reports {
+        if hit == focused_slot(s, si) && passing(mode) {
+            let pc = col - s.panes[hit].at_col + 1
+            let pr = row - s.panes[hit].at_row + 1
+            queue_to(mut s, hit, mouse_bytes(s.panes[hit].screen, if up then 3 else 4, 0, mods, pc, pr))
+        }
+        return
+    }
+    if !up || s.panes[hit].screen.active_alternate { return }
+    if mode != config.MODE_NORMAL && mode != config.MODE_SCROLL { return }
+    enter_view(mut s, index, hit, true)
+    view_move(mut s, index, WHEEL_ROWS)
 }
 
 // Prompts/help/confirmation own their input; the other modes keep chrome usable.
 fn mouse_chrome(mode: int) -> bool {
     passing(mode) || mode == config.MODE_PREFIX || mode == config.MODE_PANE || mode == config.MODE_TAB ||
-        mode == config.MODE_RESIZE || mode == config.MODE_SESSION
+        mode == config.MODE_RESIZE || mode == config.MODE_SESSION || mode == config.MODE_SCROLL
 }
 
 // A captured border owns every motion and the matching release even outside
@@ -1447,6 +1566,10 @@ fn mouse_event(mut s: Server, index: int, body: List[byte]) {
         return
     }
     let tab = s.sessions[si].layout.active
+    if kind == 3 || kind == 4 {
+        wheel(mut s, index, si, kind == 3, mods, col, row)
+        return
+    }
     if kind == 0 && button == 1 && mods == 0 {
         let border = layout.border_at(s.sessions[si].layout, tab, cols, area, col, row)
         if border.node >= 0 {
@@ -2097,6 +2220,19 @@ fn compose_now(mut s: Server, index: int, now: int) {
     }
     let si = s.conns[index].session
     ensure_chrome(mut s, si)
+    // A window whose pane closed ends scroll mode; a resized pane's window is
+    // filled again at its new size, on the same content.
+    if s.conns[index].view_slot >= 0 {
+        if !view_live(s, index) { set_mode(mut s, index, config.MODE_NORMAL) }
+        else if s.conns[index].view_back > 0 {
+            let vk = s.conns[index].view_slot
+            if s.conns[index].view.cols != s.panes[vk].screen.cols || s.conns[index].view.rows != s.panes[vk].screen.rows {
+                let back = view_anchor(mut s, index)
+                view_to(mut s, index, back)
+            }
+        }
+    }
+    let vslot = if s.conns[index].view_back > 0 then s.conns[index].view_slot else 0 - 1
     let full = s.conns[index].force_full
     let gen = s.sessions[si].layout_gen
     let all = s.conns[index].seen_layout != gen
@@ -2138,11 +2274,12 @@ fn compose_now(mut s: Server, index: int, now: int) {
         (mut cursor).push(0)
         (mut cursor).push(0)
     } else if f >= 0 && s.panes[f].shown {
+        // The pane's cursor is not drawn over a window looking back.
         let (cr, cc, shape, visible) = cursor_of(s.panes[f].screen)
         (mut cursor).push(s.panes[f].at_row + cr - 1)
         (mut cursor).push(s.panes[f].at_col + cc - 1)
         (mut cursor).push(shape)
-        (mut cursor).push(visible)
+        (mut cursor).push(if f == vslot then 0 else visible)
     } else {
         (mut cursor).push(1)
         (mut cursor).push(1)
@@ -2159,7 +2296,8 @@ fn compose_now(mut s: Server, index: int, now: int) {
         tabbar = tab_bar(s, si)
         bar = bar_cells(s, si, index, now, tabbar.cells)
     }
-    var payload = compose_frame(mut s.conns[index].shadow, s.panes, s.sessions[si], bar, seq, full, all, scans, cursor)
+    var payload = compose_frame(mut s.conns[index].shadow, s.panes, s.sessions[si], bar, s.conns[index].view, vslot, seq,
+        full, all, scans, cursor)
     if payload.len == 0 && paint_bar && !drawn_tab_hits_match(s.conns[index].tabs, tabbar.hits, s.sessions[si].cols, area + 1) {
         payload = identity_frame(s.conns[index].shadow, seq)
     }
