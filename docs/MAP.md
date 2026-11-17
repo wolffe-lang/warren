@@ -108,6 +108,16 @@ the oldest row, a soft wrap laid again at a new width, wide and combining
 glyphs, renditions, the alternate screen, eviction under a small cap, the
 anchor after more output, and no retained growth over repeated fills.
 
+Selection rows (`select-*`, `paste-bracketed` in `pane_rows`) hold a drag's
+snapshot, its inverse highlight and copy on release in both outer encodings, a
+plain click that copies nothing, prefix `]` pasting the register, a program
+that asked for reports (plain drags its own, Shift drags selecting), the far
+end clamped to the origin pane, two clients (the highlight one's own, the
+register the session's), selecting history rows while looking back, and one
+bracket pair when the program asked for bracketed paste. `vt_view_test` holds
+the selected text: reading order either way round, soft-wrap joins, trailing
+blanks, wide and combining glyphs, history rows, and the cap refused whole.
+
 A row that tests an interrupt writes the byte 0x03 into the pseudo-terminal.
 No row sends a signal from a script.
 
