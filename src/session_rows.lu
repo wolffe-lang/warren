@@ -6,8 +6,9 @@
 //!
 //!   session_rows WARREN [ROW...]
 //!
-//! `close-causes` reads the server's trace (WARREN_TRACE, its standard
-//! error kept in a file): every close names its cause.
+//! `close-causes` and `prompt-frame` read the server's trace (WARREN_TRACE,
+//! its standard error kept in a file): every close names its cause, and
+//! every echo is composed in the turn that read it.
 //!
 //! Prints `PASS <row>` or `FAIL <row> <why>` per row, then
 //! `SESSION-ROWS rows=N failed=M`; exits 1 when any row is red.
@@ -1013,6 +1014,68 @@ fn row_too_slow(mut r: Rig) -> str {
     ""
 }
 
+// The number after `word` in a line, or -1.
+fn number_in(line: str, word: str) -> int {
+    let at = line.find(word) else 0 - 1
+    if at < 0 { return 0 - 1 }
+    let rest = line[at + word.len..line.len]
+    let end = rest.find(" ") else rest.len
+    rest[0..end].to_int() else 0 - 1
+}
+
+// Each echo is composed in the turn that read it. A key's echo is a short
+// read that leaves the master empty, so no timer stands between it and
+// its frame. The server's trace gives each frame's turn and the turn that
+// last read its panes; the summary counts the frames composed in the
+// turn of their read.
+fn row_prompt_frame(mut r: Rig) -> str {
+    let path = (env.cwd() else ".") + "/" + r.dir + "-trace"
+    fs.remove(path) else |_| {}
+    let why = start_traced(mut r, "/bin/cat", 60000, path)
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut p, 131, 5000) { return "no first image" }
+    var quiet = 0
+    while quiet < 1000 && client.step(mut p, 300) > 0 { quiet += 1 }
+    let warm = fs.read_text(path) else |e| { return "the trace: {e}" }
+    var before = 0
+    for line in warm.lines() {
+        if line.starts_with("warren-server: frame conn ") { before += 1 }
+    }
+    var typed = ""
+    var n = 0
+    while n < 20 {
+        time.sleep(time.millis(30))
+        let _k = client.input(p, "q")
+        typed = typed + "q"
+        if !client.until_text(mut p, typed, 3000) { return "echo {n} not shown: " + client.screen_text(p) }
+        n += 1
+    }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    let text = fs.read_text(path) else |e| { return "the trace: {e}" }
+    var seen = 0
+    var frames = 0
+    var prompt = 0
+    var late = ""
+    for line in text.lines() {
+        if !line.starts_with("warren-server: frame conn ") { continue }
+        seen += 1
+        if seen <= before { continue }
+        frames += 1
+        let turn = number_in(line, " turn ")
+        let read = number_in(line, " read-turn ")
+        if turn >= 0 && turn == read { prompt += 1 } else if late.len == 0 { late = "turn {turn}, read in turn {read}" }
+    }
+    for line in text.lines() {
+        if line.starts_with("warren-server: stopped after") { print("MEASURE prompt-frame {line[15..line.len]}") }
+    }
+    print("MEASURE prompt-frame echoes={n} frames={frames} in-read-turn={prompt}")
+    if prompt < n { return "{prompt} of {n} echoes composed in the turn that read them; the first other frame: {late}" }
+    ""
+}
+
 fn run_row(warren: str, name: str) -> str {
     var r = rig(warren, name)
     var why = "no such row"
@@ -1045,13 +1108,14 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "resize-crossing-image" { why = row_resize_crossing(mut r) }
     else if name == "too-slow" { why = row_too_slow(mut r) }
     else if name == "close-causes" { why = row_close_causes(mut r) }
+    else if name == "prompt-frame" { why = row_prompt_frame(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame".split(" ") {
         (mut x).push(n)
     }
     x

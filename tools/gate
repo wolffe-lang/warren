@@ -105,6 +105,7 @@ step resource-smoke-build "$WOLF" build --deny-warnings src/vt_resource_test.lu 
 step resource-smoke-native "$root/target/native/measure-child" "$root/target/native/resource-smoke"
 step checked-vt python3 -I tests/vt/checked_rows.py "$WOLF"
 step checked-keys python3 -I tests/vt/checked_rows.py --out "$root/target/checked-keys" --label checked-keys "$WOLF" keys_test
+step checked-pacing python3 -I tests/vt/checked_rows.py --out "$root/target/checked-pacing" --label checked-pacing "$WOLF" pacing_test
 step build "$WOLF" build --deny-warnings src/warren.lu -o "$root/target/native/warren"
 step cli-native python3 -I tests/vt/cli_rows.py "$root/target/native/warren"
 step cases-native python3 -I tests/vt/compare_cases.py "$root/target/native/warren"
@@ -128,6 +129,7 @@ step modules-run modules_run "$root/target/native/warren"
 step wolf-test "$WOLF" test --deny-warnings src
 step lupin-pure "$LUPIN" run src/pure_test.lu
 step keys-lupin "$LUPIN" run src/keys_test.lu
+step pacing-lupin "$LUPIN" run src/pacing_test.lu
 step cli-lupin python3 -I tests/vt/cli_rows.py "$LUPIN" run src/warren.lu
 step cases-lupin python3 -I tests/vt/compare_cases.py "$LUPIN" run src/warren.lu
 step combining-frames-lupin python3 -I tests/vt/compare_combining.py "$LUPIN" run src/warren.lu
@@ -159,7 +161,8 @@ session_rows() (
   rows=(echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack
     fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte
     inherited-ignore-reset session-end last-output last-output-after-ack late-child-reaped command start-lock max-pending
-    max-sessions max-connections memory-budget resize-crossing-image too-slow flood-beside-quiet close-causes)
+    max-sessions max-connections memory-budget resize-crossing-image too-slow flood-beside-quiet close-causes
+    prompt-frame)
   if [ "$mode" = linux ]; then rows+=(pane-signals-and-handles threads rss-flat); fi
   rm -rf target/rows && mkdir -p target/rows && cd target/rows
   "$root/target/native/session-rows" "$root/target/native/warren" "${rows[@]}"
