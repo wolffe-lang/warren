@@ -859,25 +859,91 @@ fn row_damage_in_rect(mut r: Rig) -> str {
     ""
 }
 
-// The wire bytes of the images up to the one that holds the golden.
-fn bytes_until_golden_two(mut p: client.Peer, left: bool, ms: int) -> int {
+// Diagnostic capture happens after applying each image, against a saved
+// pre-image. Raw frames and per-run byte/unchanged counts are printed only
+// after the focus measurements, so output does not pace the server.
+fn capture_focus(mut out: List[str], before: proto.Image, after: proto.Image, body: List[byte], label: str) {
+    if (env.get("WARREN_FOCUS_CAPTURE") else "") != "1" { return }
+    let wire = proto.encode(131, 0, body)
+    assert(wire.code == 0, "focus capture frame")
+    var hex = "WIRE {label} seq={after.seq} "
+    let digits = "0123456789abcdef"
+    for b in wire.bytes {
+        let n = b as int
+        hex = hex + digits[n / 16..n / 16 + 1] + digits[n % 16..n % 16 + 1]
+    }
+    (mut out).push(hex)
+    (mut out).push("CURSOR {label} seq={after.seq} {before.cursor_row},{before.cursor_col},{before.shape},{before.visible}->{after.cursor_row},{after.cursor_col},{after.shape},{after.visible} fixed-wire=28")
+    var at = 22
+    var k = 0
+    let count = le(body, 18, 4)
+    while k < count {
+        let start = at
+        let row = le(body, at, 2)
+        let col = le(body, at + 2, 2)
+        let columns = le(body, at + 14, 2)
+        let records = le(body, at + 16, 2)
+        at += 18
+        var j = 0
+        while j < records { at += 4 + 4 * le(body, at + 3, 1); j += 1 }
+        var unchanged = 0
+        var c = col
+        while c < col + columns {
+            let i = (row - 1) * after.cols + c - 1
+            if before.base[i] == after.base[i] && before.mark1[i] == after.mark1[i] &&
+                before.mark2[i] == after.mark2[i] && before.width[i] == after.width[i] &&
+                before.flags[i] == after.flags[i] && before.fg[i] == after.fg[i] && before.bg[i] == after.bg[i] { unchanged += 1 }
+            c += 1
+        }
+        let part = if row == after.rows then "hints" else if row == after.rows - 1 then "bar" else "pane-border"
+        (mut out).push("RUN {label} seq={after.seq} part={part} row={row} col={col} columns={columns} wire={at - start} unchanged={unchanged}")
+        k += 1
+    }
+    assert(at == body.len, "focus capture consumes payload")
+}
+
+fn focus_before(p: client.Peer) -> proto.Image {
+    if (env.get("WARREN_FOCUS_CAPTURE") else "") == "1" { return copy p.image }
+    proto.image()
+}
+
+fn bytes_until_focus_mode(mut p: client.Peer, want: str, ms: int, mut captured: List[str], label: str) -> int {
     let until = now_ms() + ms
     var total = 0
     while now_ms() < until {
+        let before = focus_before(p)
         let body = next_image(mut p, until - now_ms())
         if body.len == 0 { return 0 - 1 }
+        capture_focus(mut captured, before, p.image, body, label)
+        total += 6 + body.len
+        if mode_of(p.image) == want { return total }
+    }
+    0 - 1
+}
+
+// The wire bytes of the images up to the one that holds the golden.
+fn bytes_until_golden_two(mut p: client.Peer, left: bool, ms: int, mut captured: List[str]) -> int {
+    let until = now_ms() + ms
+    var total = 0
+    while now_ms() < until {
+        let before = focus_before(p)
+        let body = next_image(mut p, until - now_ms())
+        if body.len == 0 { return 0 - 1 }
+        capture_focus(mut captured, before, p.image, body, "two-action")
         total += 6 + body.len
         if golden_two(p.image, left).len == 0 { return total }
     }
     0 - 1
 }
 
-fn bytes_until_golden_three(mut p: client.Peer, focus: int, name: str, ms: int) -> int {
+fn bytes_until_golden_three(mut p: client.Peer, focus: int, name: str, ms: int, mut captured: List[str]) -> int {
     let until = now_ms() + ms
     var total = 0
     while now_ms() < until {
+        let before = focus_before(p)
         let body = next_image(mut p, until - now_ms())
         if body.len == 0 { return 0 - 1 }
+        capture_focus(mut captured, before, p.image, body, "three-action")
         total += 6 + body.len
         if golden_three(p.image, focus, name).len == 0 { return total }
     }
@@ -895,9 +961,18 @@ fn row_focus_bytes(mut r: Rig) -> str {
     if w2.len > 0 { return "two panes: " + w2 }
     drain(mut p, 300)
     p.auto_ack = false
-    let _h = prefix(p, 104)
-    let two_bytes = bytes_until_golden_two(mut p, true, 3000)
-    if two_bytes < 0 { return "no image completed the focus change" }
+    var captured = List[str]()
+    let separate = (env.get("WARREN_FOCUS_SPLIT") else "") == "1"
+    var two_prefix = 0
+    if separate {
+        let _p = ctrl_space(p)
+        two_prefix = bytes_until_focus_mode(mut p, "PREFIX", 3000, mut captured, "two-prefix")
+        if two_prefix < 0 { return "no prefix image before two-pane focus" }
+        let _h = client.key(p, 0, 0, 104)
+    } else { let _h = prefix(p, 104) }
+    let two_action = bytes_until_golden_two(mut p, true, 3000, mut captured)
+    if two_action < 0 { return "no image completed the focus change" }
+    let two_bytes = two_prefix + two_action
     p.auto_ack = true
     let _l = prefix(p, 108)
     let _d = prefix(p, 45)
@@ -905,10 +980,18 @@ fn row_focus_bytes(mut r: Rig) -> str {
     if w3.len > 0 { return "three panes: " + w3 }
     drain(mut p, 300)
     p.auto_ack = false
-    let _b = prefix(p, 104)
-    let three_bytes = bytes_until_golden_three(mut p, 1, "default", 3000)
-    if three_bytes < 0 { return "no image completed the second focus change" }
+    var three_prefix = 0
+    if separate {
+        let _p = ctrl_space(p)
+        three_prefix = bytes_until_focus_mode(mut p, "PREFIX", 3000, mut captured, "three-prefix")
+        if three_prefix < 0 { return "no prefix image before three-pane focus" }
+        let _b = client.key(p, 0, 0, 104)
+    } else { let _b = prefix(p, 104) }
+    let three_action = bytes_until_golden_three(mut p, 1, "default", 3000, mut captured)
+    if three_action < 0 { return "no image completed the second focus change" }
+    let three_bytes = three_prefix + three_action
     p.auto_ack = true
+    for line in captured { print(line) }
     print("MEASURE focus-change 80x24 two-panes-wire-bytes={two_bytes} three-panes-wire-bytes={three_bytes}")
     client.hang_up(mut p)
     let st = stop_server(mut r)
