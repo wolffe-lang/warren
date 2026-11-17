@@ -129,6 +129,10 @@ pub fn fill_view(mut view: View, pane: Vt, back: int) -> int {
         else { copy_screen_row(mut view.screen, pane.primary, cols, row, row - shown) }
         row += 1
     }
+    // A line that goes on from history into the live rows wraps between them.
+    if shown > 0 && shown < rows && view.screen.line_ids[shown] == view.screen.line_ids[shown - 1] {
+        view.screen.wrapped[shown - 1] = true
+    }
     view.back = shown
     shown
 }
