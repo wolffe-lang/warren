@@ -1,7 +1,8 @@
 //! member: false
 //! The client's input parser: what the outer terminal sends becomes the
-//! events the server takes, whatever the reads' boundaries; a lone ESC
-//! waits ESC_MS; the server's own key encoding parses back to its event.
+//! events the server takes, whatever the reads' boundaries, except that a
+//! read ending in ESC is the Escape key at once; a sequence a read cut waits
+//! ESC_MS; the server's own key encoding parses back to its event.
 use client
 use server
 use vt
@@ -100,16 +101,29 @@ fn test_invalid_utf8() {
     assert(parse(cut) == "I2:228:184", "input-cut-scalar-at-deadline")
 }
 
+// A read that ends in ESC, with nothing behind it, is the Escape key: it
+// goes at once, with no timer. ESC_MS is kept for a sequence a read cut.
+fn test_a_lone_escape_goes_at_once() {
+    var p = client.parser()
+    assert(shows(client.feed(mut p, bytes_of("\u{1b}"), 100)) == "K0:1:14", "lone-escape-at-once")
+    assert(client.deadline(p) == 0 - 1, "lone-escape-no-timer")
+    assert(shows(client.feed(mut p, bytes_of("ab\u{1b}"), 150)) == "K0:0:97 K0:0:98 K0:1:14", "trailing-escape-at-once")
+    assert(client.deadline(p) == 0 - 1, "trailing-escape-no-timer")
+    assert(shows(client.feed(mut p, bytes_of("\u{1b}\u{1b}"), 160)) == "K2:1:14", "escape-escape-at-once")
+    assert(client.deadline(p) == 0 - 1, "escape-escape-no-timer")
+    assert(shows(client.feed(mut p, bytes_of("\u{1b}w"), 170)) == "K2:0:119", "alt-key-in-one-read")
+    assert(shows(client.feed(mut p, bytes_of("x"), 180)) == "K0:0:120", "nothing-left-after-escape")
+}
+
 fn test_escape_waits() {
     var p = client.parser()
-    assert(client.feed(mut p, bytes_of("\u{1b}"), 100).len == 0, "escape-held")
-    assert(client.deadline(p) == 100 + client.ESC_MS, "escape-deadline")
-    assert(client.expire(mut p, 100 + client.ESC_MS - 1).len == 0, "escape-not-early")
-    assert(shows(client.expire(mut p, 100 + client.ESC_MS)) == "K0:1:14", "escape-at-deadline")
-    assert(client.deadline(p) == 0 - 1, "escape-nothing-left")
+    // A sequence cut after ESC [ waits for the rest.
+    assert(client.feed(mut p, bytes_of("\u{1b}["), 100).len == 0, "cut-csi-held")
+    assert(client.deadline(p) == 100 + client.ESC_MS, "cut-csi-deadline")
+    assert(client.expire(mut p, 100 + client.ESC_MS - 1).len == 0, "cut-csi-not-early")
     // The rest of a sequence inside the wait completes it.
-    assert(client.feed(mut p, bytes_of("\u{1b}["), 200).len == 0, "csi-held")
-    assert(shows(client.feed(mut p, bytes_of("A"), 210)) == "K0:1:1", "csi-completed")
+    assert(shows(client.feed(mut p, bytes_of("A"), 110)) == "K0:1:1", "csi-completed")
+    assert(client.deadline(p) == 0 - 1, "csi-nothing-left")
     // ESC [ alone at the deadline is Alt with '['.
     let _f = client.feed(mut p, bytes_of("\u{1b}["), 300)
     assert(shows(client.expire(mut p, 400)) == "K2:0:91", "esc-bracket-alt")
