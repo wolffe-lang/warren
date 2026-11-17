@@ -218,8 +218,42 @@ fn cup(mut out: List[byte], row: int, col: int) {
     text(mut out, "\u{1b}[{row};{col}H")
 }
 
+// `to` holds the first `n` values of `from`, in its own storage: emptied
+// and refilled, never replaced.
+fn refill(mut to: List[int], from: List[int], n: int) {
+    (mut to).reset()
+    var i = 0
+    while i < n {
+        (mut to).push(from[i])
+        i += 1
+    }
+}
+
+/// `drawn` becomes `img`, in place: its planes hold the image's cells,
+/// refilled in their own storage, and its other fields are the image's.
+/// A client keeps one such image for as long as it draws, so it costs that
+/// image's storage once, never once a frame.
+pub fn keep(mut drawn: proto.Image, img: proto.Image) {
+    let area = img.cols * img.rows
+    refill(mut drawn.base, img.base, area)
+    refill(mut drawn.mark1, img.mark1, area)
+    refill(mut drawn.mark2, img.mark2, area)
+    refill(mut drawn.width, img.width, area)
+    refill(mut drawn.flags, img.flags, area)
+    refill(mut drawn.fg, img.fg, area)
+    refill(mut drawn.bg, img.bg, area)
+    drawn.valid = img.valid
+    drawn.seq = img.seq
+    drawn.cols = img.cols
+    drawn.rows = img.rows
+    drawn.cursor_row = img.cursor_row
+    drawn.cursor_col = img.cursor_col
+    drawn.shape = img.shape
+    drawn.visible = img.visible
+}
+
 /// The bytes that turn what the terminal shows (`drawn`, invalid for an
-/// unknown screen) into `img`; `drawn` becomes `img`.
+/// unknown screen) into `img`; `drawn` becomes `img` (`keep`, in place).
 pub fn render(mut drawn: proto.Image, img: proto.Image, pol: Policy) -> List[byte] {
     var out = List[byte]()
     if !img.valid { return out }
@@ -261,6 +295,6 @@ pub fn render(mut drawn: proto.Image, img: proto.Image, pol: Policy) -> List[byt
     if pol.shape { text(mut out, "\u{1b}[{img.shape} q") }
     if img.visible == 1 { text(mut out, "\u{1b}[?25h") }
     if pol.sync { text(mut out, "\u{1b}[?2026l") }
-    drawn = copy img
+    keep(mut drawn, img)
     out
 }
