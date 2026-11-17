@@ -63,7 +63,7 @@ fn shift_characters(mut screen: Screen, cols: int, row: int, col: int,
 }
 
 fn copy_row(mut screen: Screen, cols: int, to: int, from: int) {
-    touch(mut screen, to - 1, 0, cols - 1)
+    // plant: a copied row is not stamped
     var col = 0
     while col < cols { move_cell(mut screen, (to - 1) * cols + col, (from - 1) * cols + col); col += 1 }
     screen.extents[to - 1] = screen.extents[from - 1]
