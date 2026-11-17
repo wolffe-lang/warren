@@ -98,16 +98,23 @@ modifiers. Super/Hyper/Meta chords, unsupported functional key presses and malfo
 reports remain raw input rather than being mistaken for an Alt shortcut.
 Modifier-only reports for representable modifiers are consumed. This does
 not enable or negotiate a new terminal keyboard mode, and is not a claim of
-complete kitty functional-key support. A bare ESC still waits the same 30 ms.
+complete kitty functional-key support. A bare ESC is the Escape key at once
+(below).
 
 
 What the terminal sends becomes protocol events: Unicode scalars and C0
 controls as keys (Ctrl-Space is the prefix), cursor, editing and function keys
 with xterm's modifier parameter, keypad keys in application mode, SGR and
 legacy mouse reports, bracketed paste (at most 64 KiB a PASTE; a longer paste goes as
-several) and focus reports. A lone ESC waits 30 ms for the rest of a sequence
-before it is the Escape key; an unfinished sequence at that point, or one
-longer than 64 bytes, goes to the pane unchanged. The server's own encoding of
+several) and focus reports. A read that ends in ESC is the Escape key at once
+(ESC ESC, Escape with Alt): a terminal writes a key's sequence whole, so
+nothing behind it is coming, and the program behind the pane, which may wait
+for its own escape timeout, is not kept waiting for the client's too. Only a
+sequence that a read cut after `ESC [`, `ESC O` or inside a scalar waits
+30 ms for the rest; an unfinished sequence at that point, or one longer than
+64 bytes, goes to the pane unchanged. So the events do not depend on where the
+reads split the input, except right after a leading ESC, as in any terminal:
+there a split reads as the Escape key and then the rest. The server's own encoding of
 every named key and modifier parses back to the same event (a row). What a key
 does (the prefix, the modes, the prompts) is the server's key table, per client
 (SERVER.md §8); the client sends every key as it is.
