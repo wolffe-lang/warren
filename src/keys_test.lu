@@ -99,9 +99,10 @@ fn test_the_prefix_table() {
     assert(key_is(scalar(k, p, 44), config.A_RENAME_TAB, 0, config.MODE_RENAME), ",")
     assert(key_is(scalar(k, p, 58), config.A_COMMAND, 0, config.MODE_COMMAND), ":")
     assert(key_is(scalar(k, p, 63), config.A_HELP, 0, config.MODE_HELP), "?")
-    // Unbound after the prefix: dropped, back to normal. No scroll mode yet.
+    // Unbound after the prefix: dropped, back to normal. `[` is scroll mode's
+    // (test_scroll_mode).
     assert(key_is(scalar(k, p, 113), config.A_NONE, 0, n), "q unbound")
-    assert(key_is(scalar(k, p, 91), config.A_NONE, 0, n), "[ unbound")
+    assert(key_is(scalar(k, p, 93), config.A_NONE, 0, n), "] unbound")
     assert(key_is(named(k, p, 14), config.A_NONE, 0, n), "Esc")
     assert(key_is(ctrl(k, p, 112), config.A_NONE, 0, n), "C-p is no mode key")
 }
