@@ -137,6 +137,15 @@ a pane on its primary screen, it opens this client's scroll mode there
 left drag in such a pane (or a Shift drag in one that asked for reports)
 selects text for this client; release copies it into the session's register.
 
+The client tells the server (HELLO feature bit 3) that its terminal takes OSC
+52 clipboard writes, except at the console (`WARREN_RENDER=console`), which
+never gets one. For each CLIPBOARD the server sends, it writes
+`ESC ] 52 ; c ; base64 BEL` to the terminal: best effort, write-only, never
+read back, so a terminal may refuse or ignore it and the register still holds
+the text. The server sends CLIPBOARD for this client's own copies; a program's
+own OSC 52 write in a pane reaches the terminal only when `warren.toml` allows
+it ([CONFIG](CONFIG.md)).
+
 ## Rendering
 
 The client keeps what the terminal shows and sends only the cells that change,
