@@ -142,6 +142,20 @@ warren's own emulator as the outer terminal and compare every cell, at every
 depth, for full repaints and deltas over a seeded soak; a model of a
 one-cell-a-code-point console holds the console policy.
 
+## Memory
+
+The client's memory does not grow with the frames it draws. It keeps one image
+of what the terminal shows and refills that image in place after each render
+(at 160x50 an image is 448,000 bytes). Each turn of its loop, one wait and what
+it reported, runs in a region that is freed when the turn ends: the messages
+read, the bytes drawn and sent, and the events typed go with it. What outlives
+the turns is changed in place: the connection's received bytes and the texts
+its messages carried (the title, the session's name, the reason it ended), the
+image, the input parser's pending bytes and paste, and the window last sent.
+The compiler holds the loop to this, since a call inside the turn's region may
+not keep anything of the region in what it was handed. A client row on Linux
+(where /proc gives the resident set) holds it: see Measured.
+
 ## Measured
 
 The client rows run natively on Linux and macOS, and on PAX under QEMU from a
@@ -161,3 +175,8 @@ Attached to one 80x24 session, the client's resident size peaks at 4-5.2 MB
 on Linux and 10.3 MB on PAX (`MEASURE client`). Rendering a full 80x24 image
 takes about 0.8 ms on Linux and a one-cell delta about 0.08 ms
 (`MEASURE render` in the compose rows).
+On Linux, where /proc gives the resident set, the `memory-bounded` row holds a
+client at 160x50 drawing a pane that scrolls without pause: over 400 renders
+past a 50-render warm-up its resident set grows by no more than 4 MiB
+(`MEASURE client-rss`, read every 25 renders; the row stops at the first
+reading past the bound).
