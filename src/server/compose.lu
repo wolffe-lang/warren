@@ -48,7 +48,11 @@ fn frame_cell(panes: List[Pane], ses: Session, bar: List[vt.Cell], view: vt.View
     if pr < 0 || pc < 0 || pc >= pcols || pr >= panes[o].screen.rows { return blank_cell() }
     // A client looking back sees its window in place of the pane's screen.
     let viewed = o == view_slot && view.cols == pcols && view.rows == panes[o].screen.rows
-    let cell = if viewed then view.screen.cells[pr * pcols + pc] else active_cell(panes[o].screen, pr * pcols + pc)
+    var cell = if viewed then view.screen.cells[pr * pcols + pc] else active_cell(panes[o].screen, pr * pcols + pc)
+    // This client's selection is drawn inverse over its window.
+    if viewed && vt.view_marked(view, pr + 1, pc + 1) {
+        cell.flags = if cell.flags & INVERSE != 0 then cell.flags - INVERSE else cell.flags + INVERSE
+    }
     if cell.width == 2 && pc == pcols - 1 {
         return vt.Cell { base: cell.base, mark1: cell.mark1, mark2: cell.mark2, width: 1, flags: cell.flags,
             foreground: cell.foreground, background: cell.background, written: cell.written }
