@@ -104,6 +104,8 @@ pub const A_VIEW_ROWS: int = 29
 pub const A_VIEW_PAGE: int = 30
 /// The oldest retained row (arg 1) or the live rows (arg 0).
 pub const A_VIEW_END: int = 31
+/// The session's register into the focused pane.
+pub const A_PASTE: int = 32
 
 const SHIFT: int = 1
 const ALT: int = 2
@@ -255,6 +257,7 @@ pub fn defaults() -> Keys {
     letter(mut l, p, "s", A_NONE, 0, MODE_SESSION, "SESSION")
     letter(mut l, p, "g", A_NONE, 0, MODE_LOCKED, "LOCK")
     letter(mut l, p, "[", A_VIEW_ENTER, 0, MODE_SCROLL, "SCROLL")
+    letter(mut l, p, "]", A_PASTE, 0, n, "paste")
     hidden(mut l, p, CTRL, SCALAR, 32, A_SEND_PREFIX, 0, n)
 
     let w = MODE_PANE
@@ -546,6 +549,7 @@ fn verb(action: int, arg: int) -> str {
         if arg == 1 { return "the oldest row" }
         return "the live rows"
     }
+    if action == A_PASTE { return "paste the register" }
     if action == A_RUN { return "run" }
     if action == A_ERASE { return "erase" }
     if action == A_CLEAR { return "clear the line" }
