@@ -159,7 +159,23 @@ pub fn view_back_of(mut view: View, pane: Vt, id: int, offset: int) -> int {
 /// Mark the window's cells from row r0, column c0 to row r1, column c1
 /// (1-based, either way round, clamped to the window) as a selection.
 pub fn mark_view(mut view: View, r0: int, c0: int, r1: int, c1: int) {
-    view.marked = r0 < 0 && c0 < 0 && r1 < 0 && c1 < 0
+    var a_row = grid_clamp(r0, 1, view.rows)
+    var a_col = grid_clamp(c0, 1, view.cols)
+    var b_row = grid_clamp(r1, 1, view.rows)
+    var b_col = grid_clamp(c1, 1, view.cols)
+    if b_row < a_row || (b_row == a_row && b_col < a_col) {
+        let row = a_row
+        let col = a_col
+        a_row = b_row
+        a_col = b_col
+        b_row = row
+        b_col = col
+    }
+    view.mark_r0 = a_row
+    view.mark_c0 = a_col
+    view.mark_r1 = b_row
+    view.mark_c1 = b_col
+    view.marked = view.rows > 0 && view.cols > 0
 }
 
 /// Clear the window's selection.
@@ -169,13 +185,80 @@ pub fn unmark_view(mut view: View) {
 
 /// Whether the window's cell at row, col (1-based) is selected.
 pub fn view_marked(view: View, row: int, col: int) -> bool {
-    view.marked && row < 0 && col < 0
+    if !view.marked || row < view.mark_r0 || row > view.mark_r1 { return false }
+    if row == view.mark_r0 && col < view.mark_c0 { return false }
+    if row == view.mark_r1 && col > view.mark_c1 { return false }
+    true
 }
 
-/// Empty `out` and write the selected text into it, at most `cap` bytes.
-/// Returns the bytes written, or -1 with `out` untouched when it would not fit.
+fn marked_scalar(mut out: List[byte], cp: int, emit: bool) -> int {
+    let n = if cp < 128 { 1 } else if cp < 2048 { 2 } else if cp < 65536 { 3 } else { 4 }
+    if !emit { return n }
+    if n == 1 { (mut out).push(cp as byte) }
+    else if n == 2 {
+        (mut out).push((192 + cp / 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else if n == 3 {
+        (mut out).push((224 + cp / 4096) as byte)
+        (mut out).push((128 + cp / 64 % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else {
+        (mut out).push((240 + cp / 262144) as byte)
+        (mut out).push((128 + cp / 4096 % 64) as byte)
+        (mut out).push((128 + cp / 64 % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    }
+    n
+}
+
+fn marked_blank(view: View, at: int) -> bool {
+    view.screen.cells[at].width != 0 && view.screen.cells[at].base == 32 &&
+        view.screen.cells[at].mark1 == 0 && view.screen.cells[at].mark2 == 0
+}
+
+// The selected text's length, written to `out` too when `emit`.
+fn marked_pass(view: View, mut out: List[byte], emit: bool) -> int {
+    let cols = view.cols
+    var bytes = 0
+    var row = view.mark_r0
+    while row <= view.mark_r1 {
+        var first = if row == view.mark_r0 { view.mark_c0 } else { 1 }
+        let last = if row == view.mark_r1 { view.mark_c1 } else { cols }
+        let base = (row - 1) * cols
+        // A part starting on a wide glyph's right half takes the glyph whole.
+        if first > 1 && view.screen.cells[base + first - 1].width == 0 { first -= 1 }
+        let joined = row < view.mark_r1 && view.screen.wrapped[row - 1]
+        var end = last
+        if !joined {
+            while end >= first && marked_blank(view, base + end - 1) { end -= 1 }
+        }
+        var col = first
+        while col <= end {
+            let at = base + col - 1
+            if view.screen.cells[at].width != 0 {
+                let cp = if view.screen.cells[at].base == 0 { 32 } else { view.screen.cells[at].base }
+                bytes += marked_scalar(mut out, cp, emit)
+                if view.screen.cells[at].mark1 != 0 { bytes += marked_scalar(mut out, view.screen.cells[at].mark1, emit) }
+                if view.screen.cells[at].mark2 != 0 { bytes += marked_scalar(mut out, view.screen.cells[at].mark2, emit) }
+            }
+            col += 1
+        }
+        if row < view.mark_r1 && !joined { bytes += marked_scalar(mut out, 10, emit) }
+        row += 1
+    }
+    bytes
+}
+
+/// Empty `out` and write the selected text into it, at most `cap` bytes:
+/// rows join at a soft wrap and otherwise end with a newline, a row part's
+/// trailing blanks are dropped, a wide glyph is taken once (a part starting on
+/// its right half takes it whole) and combining marks follow their base.
+/// Returns the bytes written, or -1 with `out` untouched when nothing is
+/// selected or the text would not fit. Pushes into `out` are its only writes.
 pub fn view_marked_text(view: View, mut out: List[byte], cap: int) -> int {
-    if !view.marked || cap < 0 { return 0 - 1 }
+    if !view.marked { return 0 - 1 }
+    let need = marked_pass(view, mut out, false)
+    if need > cap { return 0 - 1 }
     (mut out).reset()
-    0
+    marked_pass(view, mut out, true)
 }
