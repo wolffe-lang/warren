@@ -1053,7 +1053,11 @@ fn row_quick_e2e(warren: str, encoding: int) -> str {
     if !until_horizontal(mut r, true) { close_run(r); return "Alt-pipe did not split rows" }
     // One press plus one real repeat, followed by release, makes two tabs.
     type_text(mut r, quick_bytes(116, encoding, 1) + quick_bytes(116, encoding, 2) + quick_bytes(116, encoding, 3))
-    if !until_screen(mut r, " q  1  2  3 ", 5000) { close_run(r); return "press/repeat did not create exactly two tabs" }
+    if !until_screen(mut r, " q  1  2  3 ", 5000) {
+        let shown = cells_at(r.screen, 23, 1, 64)
+        close_run(r)
+        return "press/repeat did not create exactly two tabs: drawn='" + shown + "'"
+    }
     if cells_at(r.screen, 23, 13, 3).trim() != "" { close_run(r); return "release created a fourth tab" }
     quick_press(mut r, 119, encoding)
     let tab_end = now_ms() + 5000
