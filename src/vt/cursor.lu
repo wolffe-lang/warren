@@ -130,6 +130,11 @@ fn dispatch_csi(mut pane: Vt, final: int) {
             pane.cursor_col = grid_clamp(grid_param(pane.parser, 1, 1, true), 1, pane.cols)
         }
         if final == 69 || final == 70 { pane.cursor_col = 1 }
+        // CHA/HPA and ANSI HPR re-enter origin bounds after an above-region
+        // restore. DEC CUF/CUB and printing keep that restored absolute row.
+        if pane.modes.origin && (final == 71 || final == 96 || final == 97) {
+            pane.cursor_row = grid_clamp(pane.cursor_row, pane.region_top, pane.region_bottom)
+        }
     } else if final == 114 {
         if pane.parser.param_count > 2 { return }
         let top = grid_param(pane.parser, 0, 1, true)
