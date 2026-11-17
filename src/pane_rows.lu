@@ -2216,6 +2216,46 @@ fn row_mouse_tab_removed(mut r: Rig, legacy: bool) -> str {
     finish(mut r, mut a)
 }
 
+// Replacing a tab can leave every pixel and the cursor identical. Its new
+// identity still needs an ACKable (zero-cell) FRAME, not a stale map until
+// unrelated output or the next clock tick happens to repaint something.
+fn row_mouse_tab_identity_frame(mut r: Rig) -> str {
+    let phase = time.unix_ms() % 60000
+    if phase > 55000 { time.sleep(time.millis(60100 - phase)) }
+    let why = start_server(mut r, "cat")
+    if why.len > 0 { return why }
+    var a = attach(r, 40, 24, "b", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut a, 131, 3000) { return "first frame" }
+    let _two = prefix(a, 99)
+    let ready = until_line_one(mut a, " b  1  2 ", [1, 3, 7, 9], 3000)
+    if ready.len > 0 { return "two tabs: " + ready }
+    var b = attach(r, 40, 24, "b", 0) else |e| { return "second-client-{e}" }
+    if !client.until_kind(mut b, 131, 3000) { return "second client frame" }
+    drain(mut a, 50)
+    let previous = a.image.seq
+    var batch = List[byte]()
+    for code in [0, 120, 121, 0, 99] {
+        var key = List[byte]()
+        proto.put(mut key, if code == 0 then 4 else 0, 1)
+        proto.put(mut key, 0, 1)
+        proto.put(mut key, if code == 0 then 32 else code, 4)
+        let frame = proto.encode(2, 0, key)
+        if frame.code != 0 { return "identity fixture key encoding" }
+        for x in frame.bytes { (mut batch).push(x) }
+    }
+    if !client.send_raw(b, batch) { return "replacement batch" }
+    let frame = next_image(mut a, 3000)
+    if frame.len == 0 { client.hang_up(mut b); return "changed tab identities never published an ACKable image" }
+    if le(frame, 0, 4) != previous + 1 || le(frame, 4, 4) != previous || le(frame, 18, 4) != 0 {
+        client.hang_up(mut b)
+        return "identity-only publication must be a consecutive zero-cell delta"
+    }
+    let unchanged = line_one_is(a.image, " b  1  2 ", [1, 3, 7, 9])
+    if unchanged.len > 0 { return "replacement changed visible labels: " + unchanged }
+    client.hang_up(mut b)
+    finish(mut r, mut a)
+}
+
 fn run_row(warren: str, name: str) -> str {
     var r = rig(warren, name)
     var why = "no such row"
@@ -2224,6 +2264,7 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "mouse-tab-snapshot-x10" { why = row_mouse_tab_snapshot(mut r, true) }
     else if name == "mouse-tab-removed-sgr" { why = row_mouse_tab_removed(mut r, false) }
     else if name == "mouse-tab-removed-x10" { why = row_mouse_tab_removed(mut r, true) }
+    else if name == "mouse-tab-identity-frame" { why = row_mouse_tab_identity_frame(mut r) }
     else if name == "mouse-sgr-off" { why = row_mouse_focus(mut r, false, 0) }
     else if name == "mouse-sgr-sgr" { why = row_mouse_focus(mut r, false, 1) }
     else if name == "mouse-sgr-legacy" { why = row_mouse_focus(mut r, false, 2) }
@@ -2275,7 +2316,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
+    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
         (mut x).push(n)
     }
     x

@@ -1,6 +1,7 @@
 //! member: false
 //! The tab spans belong to the exact image acknowledged by one connection.
 use server
+use std.mem.budget
 
 fn hits(a: int, b: int) -> List[server.TabHit] {
     [server.TabHit { first: 4, end: 9, tab: a }, server.TabHit { first: 9, end: 14, tab: b }]
@@ -13,6 +14,7 @@ fn test_exact_ack_promotes_only_its_pending_spans() {
     assert(!server.ack_tab_hits(mut state, 0), "zero ACK cannot promote")
     assert(!server.ack_tab_hits(mut state, 2), "future ACK cannot promote")
     assert(server.ack_tab_hits(mut state, 1), "exact ACK promotes")
+    assert(state.pending.seq == 0 && state.pending.count == 0 && state.pending.cols == 0 && state.pending.row == 0, "promotion drops superseded pending metadata")
     assert(server.tab_hit_at(state, 10, 23) == 2, "tab two is drawn")
     server.stage_tab_hits(mut state, hits(7, 8), 40, 23, 2)
     assert(!server.ack_tab_hits(mut state, 1), "stale ACK cannot promote next frame")
@@ -61,10 +63,42 @@ fn test_empty_maps_and_connection_reuse() {
     assert(server.tab_hit_at(c.tabs, 10, 23) == 0, "empty painted map cannot retain stale spans")
 }
 
+fn test_repeated_publication_has_no_retained_growth() {
+    region frame(cap: 1048576) {
+        let before = budget.charged(frame)
+        var state = server.tab_hits()
+        let retained = budget.charged(frame) - before
+        var spans = List[server.TabHit]()
+        (mut spans).reserve(server.MAX_PANES)
+        var i = 0
+        while i < server.MAX_PANES {
+            (mut spans).push(server.TabHit { first: i + 1, end: i + 2, tab: i + 1 })
+            i += 1
+        }
+        let stable = budget.charged(frame)
+        i = 0
+        while i < 256 {
+            spans[0].tab = 1 + i % 2
+            server.stage_tab_hits(mut state, spans, 40, 23, 2 * i + 1)
+            assert(server.ack_tab_hits(mut state, 2 * i + 1), "repeated exact ACK")
+            server.stage_drawn_tab_hits(mut state, 2 * i + 2)
+            assert(server.ack_tab_hits(mut state, 2 * i + 2), "repeated inherited ACK")
+            assert(!server.ack_tab_hits(mut state, 2 * i + 1), "repeated stale ACK")
+            if i % 17 == 0 { server.reset_tab_hits(mut state) }
+            assert(state.pending.count == 0 && state.pending.seq == 0, "no superseded active map")
+            assert(state.drawn.spans.len + state.pending.spans.len == 2 * server.MAX_PANES, "map buffers stay bounded")
+            assert(budget.charged(frame) == stable, "stage/ACK/reset allocates no retained storage")
+            i += 1
+        }
+        print("MEASURE tab-hit-retention constructor={retained} publication-cycles=256 retained-growth=0")
+    }
+}
+
 fn main() -> int {
     test_exact_ack_promotes_only_its_pending_spans()
     test_geometry_bounds_and_independent_connections()
     test_empty_maps_and_connection_reuse()
+    test_repeated_publication_has_no_retained_growth()
     print("PASS tab-hit-ack-model")
     0
 }
