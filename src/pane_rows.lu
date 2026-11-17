@@ -2320,6 +2320,181 @@ fn row_mouse_border(mut r: Rig, legacy: bool) -> str {
     finish(mut r, mut p)
 }
 
+// ---------------- scrollback: the wheel and scroll mode ----------------
+
+/// A wheel notch from the outer terminal, up or down, in either encoding.
+fn outer_wheel(p: client.Peer, legacy: bool, up: bool, col: int, row: int) -> bool {
+    let b = if up then 64 else 65
+    var raw = List[byte]()
+    if legacy {
+        raw = "\u{1b}[M".bytes()
+        for n in [32 + b, 32 + col, 32 + row] { (mut raw).push(n as byte) }
+    } else {
+        raw = "\u{1b}[<{b};{col};{row}M".bytes()
+    }
+    var parser = client.parser()
+    let events = client.feed(mut parser, raw, 0)
+    if events.len != 1 || events[0].kind != 3 { return false }
+    let e = events[0]
+    var body = List[byte]()
+    proto.put(mut body, e.key, 1)
+    proto.put(mut body, e.code, 1)
+    proto.put(mut body, e.mods, 1)
+    proto.put(mut body, e.col, 2)
+    proto.put(mut body, e.row, 2)
+    client.send(p, 3, body)
+}
+
+/// The pane row (1..AREA) whose text is exactly `text`, or 0.
+fn row_reading(img: proto.Image, text: str, col: int, cols: int) -> int {
+    var r = 1
+    while r <= AREA {
+        if cells(img, r, col, cols) == text { return r }
+        r += 1
+    }
+    0
+}
+
+/// Print L1..Ln in the shell and wait until Ln and the next prompt are drawn.
+/// Returns the row Ln is on, or 0.
+fn numbered_output(mut p: client.Peer, n: int, col: int, cols: int) -> int {
+    let _cmd = client.input(p, "i=1; while [ $i -le {n} ]; do echo L$i; i=$((i+1)); done\r")
+    if !until_rect_line(mut p, "L{n}", col, 1, cols, AREA, 5000) { return 0 }
+    let at = row_reading(p.image, "L{n}", col, cols)
+    if at == 0 || !until_rect_line(mut p, "$", col, at + 1, cols, 1, 5000) { return 0 }
+    at
+}
+
+// The wheel over a pane whose program asked for no reports looks back
+// through its history, three rows a notch, in scroll mode; scrolling back
+// to the live rows leaves scroll mode. The oldest retained row is a limit.
+fn row_scroll_wheel(mut r: Rig, legacy: bool) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let at = numbered_output(mut p, 60, 1, 80)
+    if at == 0 { return "no numbered output:\n" + client.screen_text(p) }
+    let _up = outer_wheel(p, legacy, true, 10, 5)
+    if !until_rect_line(mut p, "L57", 1, at, 80, 1, 3000) { return "one notch did not look back three rows:\n" + client.screen_text(p) }
+    if !until_mode(mut p, "SCROLL", 1000) { return "the wheel did not enter scroll mode: '" + mode_of(p.image) + "'" }
+    let _up2 = outer_wheel(p, legacy, true, 10, 5)
+    if !until_rect_line(mut p, "L54", 1, at, 80, 1, 3000) { return "a second notch did not look back:\n" + client.screen_text(p) }
+    let _down = outer_wheel(p, legacy, false, 10, 5)
+    if !until_rect_line(mut p, "L57", 1, at, 80, 1, 3000) { return "a notch down did not come forward:\n" + client.screen_text(p) }
+    let _down2 = outer_wheel(p, legacy, false, 10, 5)
+    if !until_rect_line(mut p, "L60", 1, at, 80, 1, 3000) { return "the live rows did not come back:\n" + client.screen_text(p) }
+    if !until_mode(mut p, "NORMAL", 1000) { return "the live rows did not leave scroll mode: '" + mode_of(p.image) + "'" }
+    var n = 0
+    while n < 30 { let _w = outer_wheel(p, legacy, true, 10, 5); n += 1 }
+    if !until_rect(mut p, "while", 1, 1, 80, 1, 3000) { return "the oldest retained row is not the window's top:\n" + client.screen_text(p) }
+    let _typed = client.input(p, "x")
+    drain(mut p, 100)
+    if !rect_has(p.image, "while", 1, 1, 80, 1) { return "a key in scroll mode reached the shell or moved the window" }
+    let _esc = client.key(p, 0, 1, 14)
+    if !until_rect_line(mut p, "L60", 1, at, 80, 1, 3000) || !until_mode(mut p, "NORMAL", 1000) { return "Esc did not leave scroll mode" }
+    finish(mut r, mut p)
+}
+
+// Prefix [ enters scroll mode on the focused pane; its keys move the window
+// and it stays at the live rows until q or Esc.
+fn row_scroll_keys(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let at = numbered_output(mut p, 80, 1, 80)
+    if at == 0 { return "no numbered output:\n" + client.screen_text(p) }
+    let _enter = prefix(p, 91)
+    if !until_mode(mut p, "SCROLL", 3000) { return "prefix [ did not enter scroll mode: '" + mode_of(p.image) + "'" }
+    if !until_hint(mut p, "k j row  PgUp PgDn page  u d half  g G oldest/live  q quit  Esc back", 1000) { return "scroll hints: '" + hint_of(p.image) + "'" }
+    let _k = type_keys(p, "k")
+    if !until_rect_line(mut p, "L79", 1, at, 80, 1, 3000) { return "k did not look back one row" }
+    let _up = client.key(p, 0, 1, 1)
+    if !until_rect_line(mut p, "L78", 1, at, 80, 1, 3000) { return "Up did not look back one row" }
+    let _page = client.key(p, 0, 1, 7)
+    if !until_rect_line(mut p, "L56", 1, at, 80, 1, 3000) { return "PageUp did not look back a window" }
+    let _half = type_keys(p, "d")
+    if !until_rect_line(mut p, "L67", 1, at, 80, 1, 3000) { return "d did not come forward half a window" }
+    let _cb = client.key(p, 4, 0, 98)
+    if !until_rect_line(mut p, "L45", 1, at, 80, 1, 3000) { return "C-b did not look back a window" }
+    let _j = type_keys(p, "j")
+    if !until_rect_line(mut p, "L46", 1, at, 80, 1, 3000) { return "j did not come forward one row" }
+    let _top = type_keys(p, "g")
+    if !until_rect(mut p, "while", 1, 1, 80, 1, 3000) { return "g did not show the oldest row" }
+    let _live = type_keys(p, "G")
+    if !until_rect_line(mut p, "L80", 1, at, 80, 1, 3000) { return "G did not show the live rows" }
+    let _past = type_keys(p, "j")
+    drain(mut p, 100)
+    if mode_of(p.image) != "SCROLL" { return "j at the live rows left a key-entered scroll mode" }
+    let _q = type_keys(p, "q")
+    if !until_mode(mut p, "NORMAL", 3000) { return "q did not leave scroll mode" }
+    let _echo = client.input(p, "echo after-$((1+1))\r")
+    if !until_rect(mut p, "after-2", 1, 1, 80, AREA, 3000) { return "keys after scroll mode do not reach the shell" }
+    finish(mut r, mut p)
+}
+
+// A program that asked for mouse reports gets the wheel as it did before.
+fn row_scroll_reporting_child(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let log = out_file(r, "wheel-input.txt")
+    fs.remove(log) else |_| {}
+    let _probe = client.input(p, "exec {self_path()} --mouse-probe {log} 1\r")
+    if !until_file(log, "ready", 5000) { return "reporting child did not start" }
+    let _up = outer_wheel(p, false, true, 10, 5)
+    var want = ""
+    for b in "\u{1b}[<64;10;5M".bytes() { want = want + "b {b as int}\n" }
+    let until = now_ms() + 3000
+    while mouse_probe_text(log) != want && now_ms() < until { time.sleep(time.millis(10)) }
+    if mouse_probe_text(log) != want { return "the wheel did not reach the reporting child: " + mouse_probe_text(log).replace("\n", " ") }
+    drain(mut p, 100)
+    if mode_of(p.image) != "NORMAL" { return "the wheel entered scroll mode over a reporting child" }
+    finish(mut r, mut p)
+}
+
+// One client looks back while another watches the live pane; output goes on
+// and the first client's window stays on the same content.
+fn row_scroll_two_clients(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    var b = attach(r, 80, 24, "", 0) else |e| { return "second-{e}" }
+    if !client.until_kind(mut b, 131, 3000) { return "second client no frame" }
+    let at = numbered_output(mut a, 60, 1, 80)
+    if at == 0 { return "no numbered output:\n" + client.screen_text(a) }
+    let _up = outer_wheel(a, false, true, 10, 5)
+    if !until_rect_line(mut a, "L57", 1, at, 80, 1, 3000) { return "the first client did not look back" }
+    if !until_rect_line(mut b, "L60", 1, at, 80, 1, 3000) { return "the second client's pane moved:\n" + client.screen_text(b) }
+    if mode_of(b.image) != "NORMAL" { return "the second client's mode changed" }
+    let _more = client.input(b, "echo M1; echo M2; echo M3\r")
+    if !until_rect(mut b, "M3", 1, 1, 80, AREA, 3000) { return "the second client did not see new output" }
+    drain(mut a, 200)
+    if row_reading(a.image, "L57", 1, 80) != at { return "output moved the first client's window:\n" + client.screen_text(a) }
+    if rect_has(a.image, "M3", 1, 1, 80, AREA) { return "the first client's window showed live output while it looked back" }
+    let _up2 = outer_wheel(a, false, true, 10, 5)
+    if !until_rect_line(mut a, "L54", 1, at, 80, 1, 3000) { return "the next notch did not keep the content in place:\n" + client.screen_text(a) }
+    var n = 0
+    while n < 4 { let _d = outer_wheel(a, false, false, 10, 5); n += 1 }
+    if !until_rect(mut a, "M3", 1, 1, 80, AREA, 3000) || !until_mode(mut a, "NORMAL", 1000) { return "coming back did not show the live rows:\n" + client.screen_text(a) }
+    client.hang_up(mut b)
+    finish(mut r, mut a)
+}
+
+// On the alternate screen without reports the wheel is inert, as tmux.
+fn row_scroll_alternate(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let at = numbered_output(mut p, 40, 1, 80)
+    if at == 0 { return "no numbered output" }
+    let _alt = client.input(p, "printf '\\033[?1049h\\033[HALT-SCREEN'; read x\r")
+    if !until_rect(mut p, "ALT-SCREEN", 1, 1, 80, 1, 3000) { return "no alternate screen:\n" + client.screen_text(p) }
+    let _up = outer_wheel(p, false, true, 10, 5)
+    drain(mut p, 200)
+    if mode_of(p.image) != "NORMAL" || !rect_has(p.image, "ALT-SCREEN", 1, 1, 80, 1) { return "the wheel acted on the alternate screen:\n" + client.screen_text(p) }
+    finish(mut r, mut p)
+}
+
 fn run_row(warren: str, name: str) -> str {
     var r = rig(warren, name)
     var why = "no such row"
@@ -2331,6 +2506,12 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "mouse-tab-identity-frame" { why = row_mouse_tab_identity_frame(mut r) }
     else if name == "mouse-border-sgr" { why = row_mouse_border(mut r, false) }
     else if name == "mouse-border-legacy" { why = row_mouse_border(mut r, true) }
+    else if name == "scroll-wheel-sgr" { why = row_scroll_wheel(mut r, false) }
+    else if name == "scroll-wheel-legacy" { why = row_scroll_wheel(mut r, true) }
+    else if name == "scroll-keys" { why = row_scroll_keys(mut r) }
+    else if name == "scroll-reporting-child" { why = row_scroll_reporting_child(mut r) }
+    else if name == "scroll-two-clients" { why = row_scroll_two_clients(mut r) }
+    else if name == "scroll-alternate" { why = row_scroll_alternate(mut r) }
     else if name == "mouse-sgr-off" { why = row_mouse_focus(mut r, false, 0) }
     else if name == "mouse-sgr-sgr" { why = row_mouse_focus(mut r, false, 1) }
     else if name == "mouse-sgr-legacy" { why = row_mouse_focus(mut r, false, 2) }
@@ -2382,7 +2563,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
+    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-reporting-child scroll-two-clients scroll-alternate mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
         (mut x).push(n)
     }
     x
