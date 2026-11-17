@@ -517,6 +517,16 @@ have changed: the rects of the shown panes whose grids changed since its last
 image, the bar's rows when they changed, and the whole frame after a layout
 change (a split, a close, focus, a tab, zoom, a size), which is still a delta
 unless the size changed. Output in a tab that is not shown composes nothing.
+Within a shown pane's rect, only the rows its emulator changed since that
+client's last image are read, and in each of them only the columns changed,
+when every earlier change of the row was already in that image (else the whole
+row). The emulator stamps each row's last change, its columns and the change
+before it with the pane's tick, which moves once a feed and once a resize; the
+client's shadow keeps each pane slot's gen and the tick it was composed
+through, so a reused slot, a full image or a layout change reads every cell.
+Each frame cell is computed once an image (`src/compose_damage_test.lu`; the
+damage-limited image equals a full rescan for two clients over seeded streams
+and over every corpus stream, `src/compose_corpus_rows.lu`).
 Measured on Linux (`MEASURE` in the pane rows): a focus change between two
 panes side by side at 80x24 is a 600-byte image and among three panes 314
 bytes; a keystroke's image holds only the focused pane's cells; a split's new
