@@ -2147,7 +2147,7 @@ fn mouse_probe_helper(path: str, encoding: int) -> int {
 // Freeze one client's painted spans while a second client changes the live
 // labels. The press names the tab still drawn, not the new label under it.
 fn row_mouse_tab_snapshot(mut r: Rig, legacy: bool) -> str {
-    let why = start_server(mut r, "/bin/cat")
+    let why = start_server(mut r, "cat")
     if why.len > 0 { return why }
     var a = attach(r, 40, 24, "b", 1) else |e| { return "dial-{e}" }
     if !client.until_kind(mut a, 131, 3000) { return "first frame" }
