@@ -186,3 +186,43 @@ fn test_round_trip_scalars() {
     }
     assert(parse(server.key_bytes(pane, 4, 0, 32)) == "K4:0:32", "round-trip-ctrl-space")
 }
+
+fn legacy_mouse(b: int, col: int, row: int) -> List[byte] {
+    var out = "\u{1b}[M".bytes()
+    for x in [b + 32, col + 32, row + 32] { (mut out).push(x as byte) }
+    out
+}
+
+fn test_legacy_mouse() {
+    assert(parse(legacy_mouse(0, 10, 5)) == "M0:0:1:10:5", "legacy mouse press")
+    assert(parse_split(legacy_mouse(0, 10, 5)) == "M0:0:1:10:5", "legacy mouse bytewise")
+    assert(parse(legacy_mouse(20, 2, 2)) == "M5:0:1:2:2", "legacy mouse modifiers")
+    assert(parse(legacy_mouse(64, 3, 4)) == "M0:3:0:3:4", "legacy wheel up")
+    assert(parse(legacy_mouse(65, 3, 4)) == "M0:4:0:3:4", "legacy wheel down")
+    assert(parse(legacy_mouse(35, 7, 8)) == "M0:2:0:7:8", "legacy hover")
+    assert(parse(legacy_mouse(0, 223, 223)) == "M0:0:1:223:223", "legacy raw high coordinate bytes")
+    var p = client.parser()
+    var all = client.feed(mut p, legacy_mouse(2, 10, 5), 0)
+    for e in client.feed(mut p, legacy_mouse(3, 10, 5), 1) { (mut all).push(e) }
+    assert(shows(all) == "M0:0:3:10:5 M0:1:3:10:5", "legacy release remembers its button")
+    let cut = legacy_mouse(0, 10, 5)
+    let short = cut[0..5]
+    assert(parse(short) == "I5:27:91:77:32:42", "truncated legacy report stays whole")
+    assert(parse(legacy_mouse(0, 0, 1)) == "I6:27:91:77:32:32:33", "zero coordinate is not a mouse event")
+    assert(parse(legacy_mouse(128, 1, 1)) == "I6:27:91:77:160:33:33", "unsupported legacy button stays whole")
+    var followed = legacy_mouse(0, 10, 5)
+    (mut followed).push(97 as byte)
+    assert(parse(followed) == "M0:0:1:10:5 K0:0:97", "one legacy report does not swallow the next key")
+}
+
+fn main() -> int {
+    test_legacy_mouse()
+    test_table()
+    test_invalid_utf8()
+    test_escape_waits()
+    test_overlong_sequence()
+    // The bounded entry is for native/checked/interpreter input tables.
+    // The larger existing paste and exhaustive key rows remain wolf tests.
+    print("PASS client-input-table")
+    0
+}

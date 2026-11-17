@@ -19,6 +19,8 @@
 //!                       terminal hangs up, and exits
 //!   --read-bytes FILE N appends `ready`, reads N bytes from its terminal in
 //!                       raw mode, appends `bytes HEX...`, and exits
+//!   --mouse-probe FILE ENCODING  logs raw input bytes until its terminal
+//!                       hangs up; ENCODING is 0 off, 1 SGR, 2 legacy
 //! No row sends a signal: a helper reports what reached it.
 use std.env
 use std.fs
@@ -1848,10 +1850,204 @@ fn row_pane_cost(mut r: Rig) -> str {
     ""
 }
 
+// Encode independent outer-terminal bytes, parse them, then send mouse events.
+fn outer_mouse(p: client.Peer, legacy: bool, kind: int, col: int, row: int) -> bool {
+    var raw = List[byte]()
+    if legacy {
+        raw = "\u{1b}[M".bytes()
+        let b = if kind == 1 then 3 else if kind == 2 then 32 else 0
+        for n in [32 + b, 32 + col, 32 + row] { (mut raw).push(n as byte) }
+    } else {
+        let b = if kind == 2 then 32 else 0
+        let end = if kind == 1 then "m" else "M"
+        raw = "\u{1b}[<{b};{col};{row}{end}".bytes()
+    }
+    var parser = client.parser()
+    let events = client.feed(mut parser, raw, 0)
+    if events.len != 1 || events[0].kind != 3 { return false }
+    let e = events[0]
+    var body = List[byte]()
+    proto.put(mut body, e.key, 1)
+    proto.put(mut body, e.code, 1)
+    proto.put(mut body, e.mods, 1)
+    proto.put(mut body, e.col, 2)
+    proto.put(mut body, e.row, 2)
+    client.send(p, 3, body)
+}
+
+fn wire_mouse_button(p: client.Peer, kind: int, button: int, col: int, row: int) -> bool {
+    var body = List[byte]()
+    for n in [kind, button, 0] { proto.put(mut body, n, 1) }
+    proto.put(mut body, col, 2)
+    proto.put(mut body, row, 2)
+    client.send(p, 3, body)
+}
+
+fn mouse_click(p: client.Peer, legacy: bool, col: int, row: int) -> bool {
+    outer_mouse(p, legacy, 0, col, row) && outer_mouse(p, legacy, 1, col, row)
+}
+
+fn mouse_probe_text(path: str) -> str {
+    let log = fs.read_text(path) else ""
+    var out = ""
+    for line in log.lines() {
+        if line.starts_with("b ") { out = out + line + "\n" }
+    }
+    out
+}
+
+fn mouse_expected(encoding: int) -> str {
+    var out = ""
+    if encoding == 1 {
+        for b in "\u{1b}[<0;5;3M\u{1b}[<0;5;3m".bytes() { out = out + "b {b as int}\n" }
+    } else if encoding == 2 {
+        // ESC [ M, button 32/35, col 37, row 35.
+        for b in [27, 91, 77, 32, 37, 35, 27, 91, 77, 35, 37, 35] { out = out + "b {b}\n" }
+    }
+    out
+}
+
+fn until_mouse_bytes(path: str, want: str) -> bool {
+    let end = now_ms() + 3000
+    while now_ms() < end {
+        if mouse_probe_text(path) == want { return true }
+        time.sleep(time.millis(10))
+    }
+    mouse_probe_text(path) == want
+}
+
+fn until_mouse_focus(mut p: client.Peer, left: bool) -> bool {
+    let end = now_ms() + 3000
+    while now_ms() < end {
+        if p.image.valid && p.image.cols == 80 && p.image.fg[39] == (if left then GREEN else 0) { return true }
+        let k = client.step(mut p, 100)
+        if k < 0 { return false }
+    }
+    false
+}
+
+// Each outer encoding crossed with inner SGR, legacy, and no reports.
+// The first focus gesture (including motion/release) is not delivered;
+// another client's focused click is unaffected by that gesture's state.
+fn row_mouse_focus(mut r: Rig, legacy: bool, encoding: int) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = session(r, 80, 24, "m") else |e| { return "dial-{e}" }
+    let left = out_file(r, "left.txt")
+    let right = out_file(r, "right.txt")
+    fs.remove(left) else |_| {}
+    fs.remove(right) else |_| {}
+    let _lp = client.input(a, "exec {self_path()} --mouse-probe {left} {encoding}\r")
+    if !until_file(left, "ready", 5000) { return "left probe did not start" }
+    let _split = prefix(a, 124)
+    if !until_borders(mut a, AREA, 5000) { return "no split" }
+    let _rp = client.input(a, "exec {self_path()} --mouse-probe {right} {encoding}\r")
+    if !until_file(right, "ready", 5000) { return "right probe did not start" }
+    var b = attach(r, 80, 24, "m", 1) else |e| { return "second-dial-{e}" }
+    if !client.until_kind(mut b, 131, 5000) { return "second image" }
+    let expected = mouse_expected(encoding)
+    if !mouse_click(a, legacy, 45, 3) { return "focused outer mouse was not decoded" }
+    if !until_mouse_bytes(right, expected) { return "focused right click was not relative to its pane: " + mouse_probe_text(right) }
+    if !outer_mouse(a, legacy, 0, 5, 3) { return "outer mouse press was not decoded" }
+    if !until_mouse_focus(mut a, true) || !until_mouse_focus(mut b, true) { return "click did not focus the left pane for both clients" }
+    if mouse_probe_text(left) != "" { return "the focus press reached its program" }
+    if !mouse_click(b, legacy, 5, 3) { return "second client mouse" }
+    if !until_mouse_bytes(left, expected) { return "the first client's focus gesture swallowed the second client's click" }
+    let _drag = outer_mouse(a, legacy, 2, 6, 3)
+    let _release = outer_mouse(a, legacy, 1, 5, 3)
+    drain(mut a, 100)
+    if mouse_probe_text(left) != expected { return "the focus gesture leaked a motion or release" }
+    if !mouse_click(a, legacy, 5, 3) { return "focused outer click" }
+    if !until_mouse_bytes(left, expected + expected) { return "focused click did not reach its program" }
+    let _border = outer_mouse(a, legacy, 0, 40, 3)
+    let _motion = outer_mouse(a, legacy, 2, 5, 3)
+    let _up = outer_mouse(a, legacy, 1, 5, 3)
+    let _hint = mouse_click(a, legacy, 5, 24)
+    let _outside = mouse_click(a, legacy, 81, 25)
+    drain(mut a, 100)
+    if mouse_probe_text(left) != expected + expected { return "an inert border/bar gesture reached the program" }
+    if !until_mouse_focus(mut a, true) { return "an inert gesture changed focus" }
+    for button in [2, 3] {
+        let _down_right = wire_mouse_button(a, 0, button, 45, 3)
+        let _up_right = wire_mouse_button(a, 1, button, 45, 3)
+        if !until_mouse_focus(mut a, false) { return "middle/right click did not focus right" }
+        let _down_left = wire_mouse_button(a, 0, button, 5, 3)
+        let _up_left = wire_mouse_button(a, 1, button, 5, 3)
+        if !until_mouse_focus(mut a, true) { return "middle/right click did not focus left" }
+    }
+    drain(mut a, 100)
+    if mouse_probe_text(left) != expected + expected || mouse_probe_text(right) != expected { return "middle/right focus gestures leaked" }
+    client.hang_up(mut b)
+    finish(mut r, mut a)
+}
+
+fn row_mouse_tabs(mut r: Rig, legacy: bool) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "b") else |e| { return "dial-{e}" }
+    let f = out_file(r, "tab.txt")
+    fs.remove(f) else |_| {}
+    let _probe = client.input(p, "exec {self_path()} --mouse-probe {f} 1\r")
+    if !until_file(f, "ready", 5000) { return "tab probe did not start" }
+    // Wide label: both display cells of its glyph must hit the same tab.
+    let _rename = prefix(p, 44)
+    let _wide = client.key(p, 0, 0, 20013)
+    let _enter = enter(p)
+    let _new = prefix(p, 99)
+    if !until_active(mut p, "b", "2", 5000) { return "new tab" }
+    if !mouse_click(p, legacy, 8, 23) { return "tab click decode" }
+    if !until_active(mut p, "b", "1:中", 3000) { return "wide continuation cell did not select tab one" }
+    drain(mut p, 100)
+    if mouse_probe_text(f) != "" { return "tab click release reached the new tab's program" }
+    let _next = prefix(p, 110)
+    if !until_active(mut p, "b", "2", 3000) { return "tab two" }
+    let _name = prefix(p, 44)
+    let _long = type_keys(p, "a-very-long-label")
+    let _done = enter(p)
+    var n = 2
+    while n < 9 { let _c = prefix(p, 99); n += 1 }
+    let _size = client.resize(p, 40, 24)
+    let w = until_line_one(mut p, " b < 4  5  6  7  8  9 ", [1, 3, 20, 22], 3000)
+    if w.len > 0 { return "narrow before click: " + w }
+    if !mouse_click(p, legacy, 6, 23) { return "narrow click decode" }
+    if !until_active(mut p, "b", "4", 3000) { return "visible tab four was confused with its screen position" }
+    // Neither the session name, mode/clock, nor hint line is a tab.
+    let _session = mouse_click(p, legacy, 2, 23)
+    let _field = mouse_click(p, legacy, 30, 23)
+    let _hints = mouse_click(p, legacy, 6, 24)
+    drain(mut p, 100)
+    if active_label(p.image, "b") != "4" { return "a non-tab bar cell switched tabs" }
+    finish(mut r, mut p)
+}
+
+fn mouse_probe_helper(path: str, encoding: int) -> int {
+    let was = term.mode(fs.stdin()) else { return 1 }
+    term.set_mode(fs.stdin(), term.raw_bytes(was)) else { return 1 }
+    if encoding != 0 { print("\u{1b}[?1003h") }
+    if encoding == 1 { print("\u{1b}[?1006h") }
+    fs.write_text(path, "ready\n") else { return 1 }
+    var tty = fs.stdin()
+    while true {
+        let got = fs.read_chunk(mut tty, 256) else { break }
+        if got.len == 0 { break }
+        for b in got { fs.append_text(path, "b {b as int}\n") else |_| {} }
+    }
+    term.set_mode(fs.stdin(), was) else |_| {}
+    0
+}
+
 fn run_row(warren: str, name: str) -> str {
     var r = rig(warren, name)
     var why = "no such row"
     if name == "split-sizes" { why = row_split_sizes(mut r) }
+    else if name == "mouse-sgr-off" { why = row_mouse_focus(mut r, false, 0) }
+    else if name == "mouse-sgr-sgr" { why = row_mouse_focus(mut r, false, 1) }
+    else if name == "mouse-sgr-legacy" { why = row_mouse_focus(mut r, false, 2) }
+    else if name == "mouse-tabs-sgr" { why = row_mouse_tabs(mut r, false) }
+    else if name == "mouse-legacy-off" { why = row_mouse_focus(mut r, true, 0) }
+    else if name == "mouse-legacy-sgr" { why = row_mouse_focus(mut r, true, 1) }
+    else if name == "mouse-legacy-legacy" { why = row_mouse_focus(mut r, true, 2) }
+    else if name == "mouse-tabs-legacy" { why = row_mouse_tabs(mut r, true) }
     else if name == "keys-reach-focused" { why = row_keys_reach_focused(mut r) }
     else if name == "sigwinch-on-change" { why = row_sigwinch(mut r) }
     else if name == "close-hangs-up" { why = row_close_hangs_up(mut r) }
@@ -1894,7 +2090,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
+    for n in "mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
         (mut x).push(n)
     }
     x
@@ -1981,6 +2177,7 @@ fn read_bytes_helper(path: str, count: int) -> int {
 
 fn main() -> int {
     let args = env.args()
+    if args.len == 3 && args[0] == "--mouse-probe" { return mouse_probe_helper(args[1], args[2].to_int() else 0) }
     if args.len == 3 && args[0] == "--read-bytes" { return read_bytes_helper(args[1], args[2].to_int() else 1) }
     if args.len == 2 && args[0] == "--print-size" { return print_size(args[1]) }
     if args.len == 3 && args[0] == "--winch" { return winch_helper(args[1], args[2]) }

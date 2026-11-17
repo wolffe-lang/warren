@@ -103,14 +103,20 @@ complete kitty functional-key support. A bare ESC still waits the same 30 ms.
 
 What the terminal sends becomes protocol events: Unicode scalars and C0
 controls as keys (Ctrl-Space is the prefix), cursor, editing and function keys
-with xterm's modifier parameter, keypad keys in application mode, SGR mouse
-reports, bracketed paste (at most 64 KiB a PASTE; a longer paste goes as
+with xterm's modifier parameter, keypad keys in application mode, SGR and
+legacy mouse reports, bracketed paste (at most 64 KiB a PASTE; a longer paste goes as
 several) and focus reports. A lone ESC waits 30 ms for the rest of a sequence
 before it is the Escape key; an unfinished sequence at that point, or one
 longer than 64 bytes, goes to the pane unchanged. The server's own encoding of
 every named key and modifier parses back to the same event (a row). What a key
 does (the prefix, the modes, the prompts) is the server's key table, per client
 (SERVER.md §8); the client sends every key as it is.
+
+Mouse coordinates are outer-frame cells. Clicking a pane focuses it; that
+first gesture does not reach its program. Later clicks in the focused pane
+reach programs that requested mouse reports, in their chosen encoding.
+Clicking a tab label switches tabs. Border clicks are inert; dragging and
+wheel scrollback controls remain planned.
 
 ## Rendering
 

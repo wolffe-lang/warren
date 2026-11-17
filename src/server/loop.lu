@@ -774,34 +774,23 @@ fn put_hints(mut line: List[vt.Cell], col: int, cols: int, h: config.HintLine) {
     }
 }
 
-/// The client's cells over the frame's last rows: the bar's two lines,
-/// with the key list over the tab area above them while it is open. Line
-/// one: the session's name, its tabs (the active one inverse; tabs that do
-/// not fit are left out on the far side of the active one, marked `<` and
-/// `>`), and the client's mode in a fixed field at the right end. Line two:
-/// the prompt being typed, the confirm question, the client's message while
-/// it lasts, or the mode's hints with their keys inverse.
-fn bar_cells(s: Server, si: int, index: int, now: int) -> List[vt.Cell] {
+struct TabHit { first: int, end: int, tab: int }
+struct TabBar { cells: List[vt.Cell], hits: List[TabHit] }
+
+fn mode_field_at(cols: int) -> int {
+    if cols >= CLOCK_MIN_COLS { return cols - MODE_FIELD - CLOCK_FIELD + 1 }
+    cols - MODE_FIELD + 1
+}
+
+// Paint and hit-test the exact same label spans, in display cells, including
+// clipped and wide labels. Session text and overflow markers have no hit.
+fn tab_bar(s: Server, si: int) -> TabBar {
     let cols = s.sessions[si].cols
-    let area = s.sessions[si].rows - BAR_LINES
-    let mode = s.conns[index].mode
-    var bar = List[vt.Cell]()
-    if mode == config.MODE_HELP && area > 0 {
-        var r = 0
-        while r < area {
-            var help = blank_line(cols)
-            let at = s.conns[index].help_top + r
-            if at < s.help.len { let _h = put_text(mut help, 1, cols, s.help[at], 0) }
-            for cell in help { (mut bar).push(cell) }
-            r += 1
-        }
-    }
+    var hits = List[TabHit]()
     var line = blank_line(cols)
     // The mode field, left of the clock from CLOCK_MIN_COLS; the tabs end
     // one column before it.
-    let clock = cols >= CLOCK_MIN_COLS
-    let field = if clock then cols - MODE_FIELD - CLOCK_FIELD + 1 else cols - MODE_FIELD + 1
-    let tab_end = field - 2
+    let tab_end = mode_field_at(cols) - 2
     var col = put_text(mut line, 1, tab_end, " " + name_of(s.sessions[si]) + " ", INVERSE)
     var labels = List[str]()
     var active = 0
@@ -830,11 +819,49 @@ fn bar_cells(s: Server, si: int, index: int, now: int) -> List[vt.Cell] {
         if from > 0 { col = put_text(mut line, col, tab_end, "<", 0) }
         t = from
         while t <= to {
+            let first = col
             col = put_text(mut line, col, tab_end, labels[t], if t == active then INVERSE else 0)
+            if col > first {
+                (mut hits).push(TabHit { first: first, end: col, tab: s.sessions[si].layout.tabs[t].id })
+            }
             t += 1
         }
         if to + 1 < labels.len { col = put_text(mut line, col, tab_end, ">", 0) }
     }
+    TabBar { cells: line, hits: hits }
+}
+
+fn tab_at(s: Server, si: int, col: int) -> int {
+    let bar = tab_bar(s, si)
+    for h in bar.hits { if col >= h.first && col < h.end { return h.tab } }
+    0
+}
+
+/// The client's cells over the frame's last rows: the bar's two lines,
+/// with the key list over the tab area above them while it is open. Line
+/// one: the session's name, its tabs (the active one inverse; tabs that do
+/// not fit are left out on the far side of the active one, marked `<` and
+/// `>`), and the client's mode in a fixed field at the right end. Line two:
+/// the prompt being typed, the confirm question, the client's message while
+/// it lasts, or the mode's hints with their keys inverse.
+fn bar_cells(s: Server, si: int, index: int, now: int) -> List[vt.Cell] {
+    let cols = s.sessions[si].cols
+    let area = s.sessions[si].rows - BAR_LINES
+    let mode = s.conns[index].mode
+    var bar = List[vt.Cell]()
+    if mode == config.MODE_HELP && area > 0 {
+        var r = 0
+        while r < area {
+            var help = blank_line(cols)
+            let at = s.conns[index].help_top + r
+            if at < s.help.len { let _h = put_text(mut help, 1, cols, s.help[at], 0) }
+            for cell in help { (mut bar).push(cell) }
+            r += 1
+        }
+    }
+    let clock = cols >= CLOCK_MIN_COLS
+    let field = mode_field_at(cols)
+    var line = tab_bar(s, si).cells
     if field >= 1 {
         var c = field - 1
         while c < field - 1 + MODE_FIELD {
@@ -1349,6 +1376,65 @@ fn key_event(mut s: Server, index: int, mods: int, kind: int, code: int) {
     act(mut s, index, a, st.arg, 1)
 }
 
+/// A mouse gesture consumed by the UI never sends an orphan motion/release
+/// to a pane. This state belongs to the client, just like its key mode.
+fn mouse_event(mut s: Server, index: int, body: List[byte]) {
+    let kind = u(body, 0, 1)
+    let button = u(body, 1, 1)
+    let mods = u(body, 2, 1)
+    let col = u(body, 3, 2)
+    let row = u(body, 5, 2)
+    let bit = if button == 1 then 1 else if button == 2 then 2 else 4
+    if kind == 1 && s.conns[index].mouse_consumed & bit != 0 {
+        s.conns[index].mouse_consumed = s.conns[index].mouse_consumed & (7 - bit)
+        return
+    }
+    if kind == 2 && s.conns[index].mouse_consumed != 0 { return }
+    if kind == 0 { s.conns[index].mouse_consumed = s.conns[index].mouse_consumed & (7 - bit) }
+    let si = s.conns[index].session
+    if si < 0 || !s.sessions[si].live { return }
+    let cols = s.sessions[si].cols
+    let rows = s.sessions[si].rows
+    let area = rows - BAR_LINES
+    if !passing(s.conns[index].mode) || col < 1 || col > cols || row < 1 || row > rows {
+        if kind == 0 { s.conns[index].mouse_consumed = s.conns[index].mouse_consumed | bit }
+        return
+    }
+    if row > area {
+        if kind == 0 {
+            s.conns[index].mouse_consumed = s.conns[index].mouse_consumed | bit
+            if row == area + 1 {
+                let tab = tab_at(s, si, col)
+                if tab > 0 && tab != s.sessions[si].layout.active {
+                    let from = focused_slot(s, si)
+                    layout.select_tab_id(mut s.sessions[si].layout, tab) else |_| { return }
+                    layout_changed(mut s, si)
+                    focus_moved(mut s, si, from)
+                }
+            }
+        }
+        return
+    }
+    let tab = s.sessions[si].layout.active
+    let id = layout.pane_at(s.sessions[si].layout, tab, cols, area, col, row)
+    let hit = slot_of(s, id)
+    let from = focused_slot(s, si)
+    if hit < 0 || hit != from {
+        if kind == 0 {
+            s.conns[index].mouse_consumed = s.conns[index].mouse_consumed | bit
+            if hit >= 0 {
+                layout.focus_pane(mut s.sessions[si].layout, id) else |_| { return }
+                layout_changed(mut s, si)
+                focus_moved(mut s, si, from)
+            }
+        }
+        return
+    }
+    let pc = col - s.panes[hit].at_col + 1
+    let pr = row - s.panes[hit].at_row + 1
+    queue_to(mut s, hit, mouse_bytes(s.panes[hit].screen, kind, button, mods, pc, pr))
+}
+
 fn attached_message(mut s: Server, index: int, kind: int, body: List[byte]) {
     let si = s.conns[index].session
     // A client whose session ended takes only its ACK.
@@ -1356,20 +1442,7 @@ fn attached_message(mut s: Server, index: int, kind: int, body: List[byte]) {
     if kind == 2 {
         key_event(mut s, index, u(body, 0, 1), u(body, 1, 1), u(body, 2, 4))
     } else if kind == 3 {
-        // A mouse event inside the focused pane goes to it, relative to
-        // its rect; any other is dropped, and every one outside normal and
-        // locked mode.
-        if si >= 0 && passing(s.conns[index].mode) {
-            let f = focused_slot(s, si)
-            let col = u(body, 3, 2)
-            let row = u(body, 5, 2)
-            if f >= 0 && s.panes[f].shown && col >= s.panes[f].at_col && col < s.panes[f].at_col + s.panes[f].screen.cols &&
-                row >= s.panes[f].at_row && row < s.panes[f].at_row + s.panes[f].screen.rows {
-                let pc = col - s.panes[f].at_col + 1
-                let pr = row - s.panes[f].at_row + 1
-                queue_to(mut s, f, mouse_bytes(s.panes[f].screen, u(body, 0, 1), u(body, 1, 1), u(body, 2, 1), pc, pr))
-            }
-        }
+        mouse_event(mut s, index, body)
     } else if kind == 4 {
         if si >= 0 && passing(s.conns[index].mode) {
             let f = focused_slot(s, si)

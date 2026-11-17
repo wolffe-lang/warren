@@ -456,8 +456,15 @@ explicitly names the session, even at 20 columns.
 **Closing.** A pane closes on `x` and `y` or when its program's terminal
 ends; a tab closes with all its panes on `x` and `y` in tab mode; the last pane
 of the last tab ends the session (as one pane did before). Keys, pastes, INPUT,
-focus reports and mouse events go to the focused pane of the active tab; a mouse event outside it is dropped, one inside is made relative to
-its rect. When focus moves, a pane that asked for focus reports hears it lose
+and focus reports go to the focused pane of the active tab. A mouse press
+inside a shown pane focuses it. The first gesture into an unfocused pane
+(press, motion and release) is consumed by the UI; later clicks in the focused
+pane reach its program only when it asked for reports, relative to its rect.
+The consumed gesture is tracked per client, so it does not swallow another
+client's clicks. Clicking a painted tab label selects that tab, including a
+wide glyph's continuation cell. Border clicks, overflow markers, the session
+name, mode, clock and hint line stay inert; border dragging is planned. Mouse
+actions remain limited to normal and locked mode. When focus moves, a pane that asked for focus reports hears it lose
 or take focus, and the clients take the new pane's title. A bell from the
 active tab reaches the clients; titles come from the focused pane only.
 
