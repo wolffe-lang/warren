@@ -545,7 +545,13 @@ newline, a row part's trailing blanks are dropped, a wide glyph once, combining
 marks after their base) and the hint line says `copied N bytes`; more than
 65524 bytes is refused whole and the register keeps its text. A window the drag
 opened closes at release; one that was looking back stays. A press and release
-on one cell copies nothing. Prefix `]` pastes the register into the focused
+on one cell copies nothing. A copy is also sent, as CLIPBOARD, to the client
+that made it when its HELLO set feature bit 3, and to no other client. A
+program's own OSC 52 write is sent as CLIPBOARD to the session's clients with
+that bit only when warren.toml's `[clipboard] programs` is true (CONFIG.md); by
+default it goes nowhere. The server reads warren.toml once at start; a file it
+refuses changes nothing and is named on each attaching client's hint line.
+Prefix `]` pastes the register into the focused
 pane under PASTE's rules: one bracketed paste when the program asked for 2004,
 otherwise the text with control bytes other than tab, CR and LF removed. The
 register is the session's, shared by its clients, and empty when the session
