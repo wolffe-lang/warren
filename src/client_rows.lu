@@ -966,6 +966,53 @@ fn terminal_mouse(mut r: Run, legacy: bool, col: int, row: int) {
     terminal_pointer(mut r, legacy, 1, col, row)
 }
 
+// The terminal client writes a copy to its outer terminal as OSC 52, which
+// this row's emulator reads back as a clipboard write; at the console it
+// advertises no OSC 52 and writes none.
+fn row_clipboard_e2e(warren: str, console: bool) -> str {
+    let name = if console then "clipboard-console" else "clipboard-osc52"
+    var extra = List[str]()
+    (mut extra).push("XDG_CONFIG_HOME=" + row_dir(name) + "-config")
+    if console { (mut extra).push("WARREN_RENDER=console") }
+    var r = launch_window(warren, name, "", words("new -s c"), 80, 24, 80, 24, extra) else |e| { return "launch: {e}" }
+    if !until_screen(mut r, "$", 10000) { close_run(r); return "no prompt" }
+    type_text(mut r, "printf 'S1 alpha\\nS2 beta\\n'\r")
+    if !until_screen(mut r, "S2 beta", 5000) { close_run(r); return "no rows" }
+    var at = 0
+    var y = 1
+    while y <= 22 {
+        if cells_at(r.screen, y, 1, 8) == "S1 alpha" { at = y }
+        y += 1
+    }
+    if at == 0 { close_run(r); return "no S1 row:\n" + screen_text(r.screen) }
+    let _drop = vt.take_events(mut r.screen)
+    terminal_pointer(mut r, false, 0, 1, at)
+    terminal_pointer(mut r, false, 2, 4, at + 1)
+    terminal_pointer(mut r, false, 2, 7, at + 1)
+    terminal_pointer(mut r, false, 1, 7, at + 1)
+    if !until_terminal_hint(mut r, "copied 16 bytes", 5000) { close_run(r); return "no copy: '" + cells_at(r.screen, 24, 1, 80).trim() + "'" }
+    pump(mut r, 200)
+    var writes = 0
+    var got = ""
+    for ev in vt.take_events(mut r.screen) {
+        if ev.kind == 4 {
+            writes += 1
+            got = str_from_utf8(ev.payload[0..ev.payload.len]) else "?"
+        }
+    }
+    if console {
+        if writes != 0 { close_run(r); return "the console client wrote OSC 52" }
+    } else if writes != 1 || got != "S1 alpha\nS2 beta" {
+        close_run(r)
+        return "the terminal's clipboard writes: {writes} '{got}'"
+    }
+    type_text(mut r, "exit\r")
+    let why = ends_with(mut r, 0, "ended]")
+    close_run(r)
+    if why.len > 0 { return "session end: " + why }
+    ""
+}
+
 fn row_mouse_e2e(warren: str, legacy: bool) -> str {
     let name = if legacy then "mouse-legacy" else "mouse-sgr"
     var r = launch(warren, name, words("new -s m"), 80, 24) else |e| { return "launch: {e}" }
@@ -1372,6 +1419,8 @@ fn run_row(warren: str, name: str) -> str {
     if name == "split-e2e" { return row_split_e2e(warren) }
     if name == "mouse-sgr" { return row_mouse_e2e(warren, false) }
     if name == "mouse-legacy" { return row_mouse_e2e(warren, true) }
+    if name == "clipboard-osc52" { return row_clipboard_e2e(warren, false) }
+    if name == "clipboard-console" { return row_clipboard_e2e(warren, true) }
     if name == "zero-window" { return row_zero_window(warren) }
     if name == "zero-window-env" { return row_zero_window_env(warren) }
     if name == "quick-legacy" { return row_quick_e2e(warren, 0) }
@@ -1410,7 +1459,7 @@ fn main() -> int {
     }
     let quick_defaults = rows.len == 0
     if rows.len == 0 {
-        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names split-e2e mouse-sgr mouse-legacy zero-window zero-window-env window-too-large")
+        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names split-e2e mouse-sgr mouse-legacy clipboard-osc52 clipboard-console zero-window zero-window-env window-too-large")
     }
     if !fs.exists("/proc") { print("NOTE leftovers unchecked here: no /proc to read") }
     // Every row's socket lives in a short directory under this one; a
