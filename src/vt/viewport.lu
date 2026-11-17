@@ -12,17 +12,25 @@ pub struct View {
     flow: ReflowState, reader: HistoryReader,
 }
 
-/// An empty window; its buffers are made at the first fill.
+/// An empty window: one cell until `reserve_view` grows it.
 pub fn new_view() -> View {
     View { cols: 0, rows: 0, back: 0, screen: new_screen(1, 1), scratch: new_screen(1, 1),
         flow: new_reflow_state(), reader: new_history_reader() }
 }
 
-fn ensure_view_buffers(mut view: View, cols: int, rows: int) {
-    if view.screen.cells.len < cols * rows || view.screen.extents.len < rows { view.screen = new_screen(cols, rows) }
-    if view.scratch.cells.len < cols * rows || view.scratch.extents.len < rows { view.scratch = new_screen(cols, rows) }
-    view.cols = cols
-    view.rows = rows
+/// Whether the window's buffers hold a pane of this size.
+pub fn view_fits(view: View, cols: int, rows: int) -> bool {
+    view.screen.cells.len >= cols * rows && view.screen.extents.len >= rows &&
+        view.scratch.cells.len >= cols * rows && view.scratch.extents.len >= rows
+}
+
+/// Grow the window's buffers to hold a pane of this size; smaller sizes keep
+/// them. The only allocation a window makes, so a caller with a per-turn
+/// region calls it outside that region; fills and lookups never allocate.
+pub fn reserve_view(mut view: View, cols: int, rows: int) {
+    if view_fits(view, cols, rows) { return }
+    view.screen = new_screen(cols, rows)
+    view.scratch = new_screen(cols, rows)
 }
 
 // The first record of the logical line whose last record is `at`. A line's
@@ -94,10 +102,13 @@ fn view_history_rows(mut view: View, history: History, cols: int, rows: int, bac
 /// row, at the pane's current size, and return the back shown: clamped to the
 /// rows history retains, and 0 on the alternate screen, which has none. History
 /// holds only what is above the screen's first row, so no row appears twice.
+/// -1, and nothing filled, when the buffers do not hold the pane's size.
 pub fn fill_view(mut view: View, pane: Vt, back: int) -> int {
     let cols = pane.cols
     let rows = pane.rows
-    ensure_view_buffers(mut view, cols, rows)
+    if !view_fits(view, cols, rows) { return 0 - 1 }
+    view.cols = cols
+    view.rows = rows
     var shown = if back < 0 || pane.active_alternate { 0 } else { back }
     if shown > 0 {
         let found = view_history_rows(mut view, pane.history, cols, rows, shown)
@@ -117,11 +128,12 @@ pub fn fill_view(mut view: View, pane: Vt, back: int) -> int {
 }
 
 /// How many rows above the live screen's first row the row holding logical
-/// line `id` at cell `offset` now is, or -1 when history no longer holds it.
+/// line `id` at cell `offset` now is, or -1 when history no longer holds it
+/// (or the buffers do not hold the pane's size).
 pub fn view_back_of(mut view: View, pane: Vt, id: int, offset: int) -> int {
     if id < 0 || pane.history.records == 0 || pane.history.bytes.len == 0 { return 0 - 1 }
     let cols = pane.cols
-    ensure_view_buffers(mut view, cols, pane.rows)
+    if !view_fits(view, cols, pane.rows) { return 0 - 1 }
     var below = 0
     var at = history_newest_at(pane.history)
     while at >= 0 {

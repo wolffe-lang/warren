@@ -30,6 +30,13 @@ fn lines(view: vt.View) -> str {
     out
 }
 
+// A window whose buffers hold the pane's size.
+fn view_for(pane: vt.Vt) -> vt.View {
+    var view = vt.new_view()
+    vt.reserve_view(mut view, pane.cols, pane.rows)
+    view
+}
+
 fn numbered(count: int) -> List[byte] {
     var text = ""
     var i = 1
@@ -44,7 +51,7 @@ fn numbered(count: int) -> List[byte] {
 fn test_history_above_live() {
     var pane = vt.new(6, 3, 4096)
     vt.feed(mut pane, numbered(9))
-    var view = vt.new_view()
+    var view = view_for(pane)
     assert(vt.fill_view(mut view, pane, 0) == 0 && lines(view) == "a7|a8|a9", "back 0 is the live screen")
     assert(vt.fill_view(mut view, pane, 2) == 2, "two rows back")
     assert(lines(view) == "a5|a6|a7", "history rows above live rows: " + lines(view))
@@ -55,10 +62,22 @@ fn test_history_above_live() {
     assert(vt.fill_view(mut view, pane, 0 - 3) == 0 && lines(view) == "a7|a8|a9", "a negative back is the live screen")
 }
 
+fn test_fills_need_reserved_buffers() {
+    var pane = vt.new(6, 3, 4096)
+    vt.feed(mut pane, numbered(9))
+    var view = vt.new_view()
+    assert(!vt.view_fits(view, 6, 3), "a new window holds one cell")
+    assert(vt.fill_view(mut view, pane, 2) == 0 - 1 && view.cols == 0, "a fill never grows the buffers")
+    assert(vt.view_back_of(mut view, pane, 0, 0) == 0 - 1, "nor does a lookup")
+    vt.reserve_view(mut view, 6, 3)
+    assert(vt.view_fits(view, 6, 3) && vt.view_fits(view, 3, 3) && !vt.view_fits(view, 6, 4), "reserved for the pane's size")
+    assert(vt.fill_view(mut view, pane, 2) == 2 && lines(view) == "a5|a6|a7", "a reserved window fills")
+}
+
 fn test_soft_wrap_relaid_at_the_current_width() {
     var pane = vt.new(4, 2, 4096)
     vt.feed(mut pane, "abcdefghij\r\nx".bytes())
-    var view = vt.new_view()
+    var view = view_for(pane)
     // The long line's first two rows are history; its third row and x are live.
     assert(vt.fill_view(mut view, pane, 2) == 2 && lines(view) == "abcd|efgh", "wrapped history rows: " + lines(view))
     assert(view.screen.wrapped[0], "a soft wrap is marked")
@@ -73,7 +92,7 @@ fn test_soft_wrap_relaid_at_the_current_width() {
 fn test_wide_and_combining_glyphs() {
     var pane = vt.new(6, 1, 4096)
     vt.feed(mut pane, "\u{3042}\u{3044}x\r\ne\u{301}y\r\nz".bytes())
-    var view = vt.new_view()
+    var view = view_for(pane)
     assert(vt.fill_view(mut view, pane, 2) == 2, "two history rows")
     assert(view.screen.cells[0].base == 12354 && view.screen.cells[0].width == 2 && view.screen.cells[1].width == 0 &&
         view.screen.cells[2].base == 12356 && view.screen.cells[4].base == 120, "wide glyphs kept")
@@ -84,7 +103,7 @@ fn test_wide_and_combining_glyphs() {
 fn test_renditions_kept() {
     var pane = vt.new(6, 1, 4096)
     vt.feed(mut pane, "\u{1b}[1;31mr\u{1b}[0m\r\nq".bytes())
-    var view = vt.new_view()
+    var view = view_for(pane)
     assert(vt.fill_view(mut view, pane, 1) == 1, "one history row")
     assert(view.screen.cells[0].base == 114 && view.screen.cells[0].flags % 2 == 1 && view.screen.cells[0].foreground == 1, "bold red kept")
 }
@@ -93,7 +112,7 @@ fn test_alternate_screen_has_no_history() {
     var pane = vt.new(6, 2, 4096)
     vt.feed(mut pane, numbered(5))
     vt.feed(mut pane, "\u{1b}[?1049h\u{1b}[Halt".bytes())
-    var view = vt.new_view()
+    var view = view_for(pane)
     assert(vt.fill_view(mut view, pane, 3) == 0, "no history behind the alternate screen")
     assert(text_of(view, 1) == "alt", "the window is the alternate screen")
 }
@@ -101,7 +120,7 @@ fn test_alternate_screen_has_no_history() {
 fn test_eviction_clamps_to_the_oldest_retained_row() {
     var pane = vt.new(6, 2, 256)
     vt.feed(mut pane, numbered(60))
-    var view = vt.new_view()
+    var view = view_for(pane)
     let total = vt.fill_view(mut view, pane, 1000)
     assert(total > 0 && total < 58, "a small cap keeps a suffix: {total}")
     let oldest = text_of(view, 1)
@@ -111,7 +130,7 @@ fn test_eviction_clamps_to_the_oldest_retained_row() {
 fn test_anchor_follows_content() {
     var pane = vt.new(6, 3, 4096)
     vt.feed(mut pane, numbered(9))
-    var view = vt.new_view()
+    var view = view_for(pane)
     assert(vt.fill_view(mut view, pane, 2) == 2 && lines(view) == "a5|a6|a7", "window before output")
     let id = view.screen.line_ids[0]
     let offset = view.screen.line_offsets[0]
@@ -126,7 +145,7 @@ fn test_repeated_fills_have_no_retained_growth() {
     var pane = vt.new(10, 4, 4096)
     vt.feed(mut pane, numbered(80))
     region frame(cap: 1048576) {
-        var view = vt.new_view()
+        var view = view_for(pane)
         let _first = vt.fill_view(mut view, pane, 4)
         let stable = budget.charged(frame)
         var i = 0
@@ -143,6 +162,7 @@ fn test_repeated_fills_have_no_retained_growth() {
 
 fn main() -> int {
     test_history_above_live()
+    test_fills_need_reserved_buffers()
     test_soft_wrap_relaid_at_the_current_width()
     test_wide_and_combining_glyphs()
     test_renditions_kept()
