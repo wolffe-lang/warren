@@ -224,20 +224,100 @@ fn dispatch_grid_token(mut pane: Vt, kind: int, value: int) {
     else if kind == 5 { dispatch_osc(mut pane) }
 }
 
+fn feed_byte(mut pane: Vt, b: byte) {
+    advance_in_place(mut pane.parser, b)
+    if pane.parser.output_count > 0 {
+        dispatch_grid_token(mut pane, pane.parser.first_kind, pane.parser.first_value)
+    }
+    if pane.parser.output_count > 1 {
+        dispatch_grid_token(mut pane, pane.parser.second_kind, pane.parser.second_value)
+    }
+}
+
+fn printable_ascii(b: byte) -> bool {
+    let c = b as int
+    c >= 32 && c <= 126
+}
+
+// Whether a printable ASCII byte would reach print_scalar unchanged: the
+// parser in ground state with no UTF-8 sequence pending (it then only hands
+// the byte on), the ASCII charset in use (mapped_graphic is the identity),
+// and insert mode off (no characters shift).
+fn runs_allowed(pane: Vt) -> bool {
+    let charset = if pane.shifted { pane.g1 } else { pane.g0 }
+    pane.parser.state == 0 && pane.parser.utf_left == 0 && charset == 0 && !pane.modes.insert
+}
+
+// Print data[from..to], all printable ASCII, as print_scalar would one at a
+// time. Cells strictly before the right margin are written in a batch: each
+// through write_narrow (its wide-pair repair, stores and extent), then the
+// cursor, the combining anchor and the last printed scalar once. The margin's
+// cell, a pending wrap and a wrapped primary row (whose lineage a write may
+// repair) take print_scalar.
+fn print_ascii_run(mut pane: Vt, data: List[byte], from: int, to: int) {
+    var k = from
+    while k < to {
+        let row = pane.cursor_row
+        let room = pane.cols - pane.cursor_col
+        if pane.pending_wrap || room <= 0 || (!pane.active_alternate && pane.primary.wrapped[row - 1]) {
+            print_scalar(mut pane, data[k] as int)
+            k += 1
+            continue
+        }
+        var m = to - k
+        if m > room { m = room }
+        let first = pane.cursor_col
+        var t = 0
+        if pane.active_alternate {
+            while t < m {
+                write_narrow(mut pane.alternate, pane.cols, row, first + t, data[k + t] as int,
+                    pane.pen.flags, pane.pen.foreground, pane.pen.background)
+                t += 1
+            }
+        } else {
+            while t < m {
+                write_narrow(mut pane.primary, pane.cols, row, first + t, data[k + t] as int,
+                    pane.pen.flags, pane.pen.foreground, pane.pen.background)
+                t += 1
+            }
+        }
+        pane.combine_row = row
+        pane.combine_col = first + m - 1
+        pane.last_printed = data[k + m - 1] as int
+        pane.last_mark1 = 0
+        pane.last_mark2 = 0
+        pane.cursor_col = first + m
+        k += m
+    }
+}
+
 /// Consume bytes with incremental parsing, width-aware screen operations,
 /// bounded final-state events and query answers. Primary upward scrolling
 /// retains whole encoded history fragments only for a region starting at
 /// row one; alternate scrolling never enters that history. Feeding mutates
-/// preallocated storage, not an input-sized event or answer log.
+/// preallocated storage, not an input-sized event or answer log. A run of
+/// printable ASCII in ground state is written without the per-byte parser
+/// (print_ascii_run); the result equals `feed_reference`'s.
 pub fn feed(mut pane: Vt, data: List[byte]) {
     if data.len > 0 { pane.resize_state.active = false }
-    for b in data {
-        advance_in_place(mut pane.parser, b)
-        if pane.parser.output_count > 0 {
-            dispatch_grid_token(mut pane, pane.parser.first_kind, pane.parser.first_value)
-        }
-        if pane.parser.output_count > 1 {
-            dispatch_grid_token(mut pane, pane.parser.second_kind, pane.parser.second_value)
+    let n = data.len
+    var i = 0
+    while i < n {
+        if printable_ascii(data[i]) && runs_allowed(pane) {
+            var j = i + 1
+            while j < n && printable_ascii(data[j]) { j += 1 }
+            print_ascii_run(mut pane, data, i, j)
+            i = j
+        } else {
+            feed_byte(mut pane, data[i])
+            i += 1
         }
     }
+}
+
+/// `feed` one byte at a time through the parser and its tokens' dispatch,
+/// with no run path: the reference the fast path is held to.
+pub fn feed_reference(mut pane: Vt, data: List[byte]) {
+    if data.len > 0 { pane.resize_state.active = false }
+    for b in data { feed_byte(mut pane, b) }
 }
