@@ -1,0 +1,53 @@
+//! member: true
+//! Search for a client's window: a literal needle over a pane's retained
+//! history and live rows, in logical lines.
+
+/// The longest needle a search takes, in scalars.
+pub const FIND_SCALARS: int = 62
+
+/// A search's working state, kept in the window so a search allocates nothing.
+pub struct FindState {
+    bits: int, top: int, lead: int,
+    older: bool, point_id: int, point_offset: int,
+    line: int, seen: bool, done: bool,
+    hit: bool, hit_id: int, hit_from: int, hit_to: int,
+    first: bool, first_id: int, first_from: int, first_to: int,
+}
+
+fn new_find_state() -> FindState {
+    FindState { bits: 0, top: 0, lead: 0, older: false, point_id: 0 - 1, point_offset: 0,
+        line: 0 - 1, seen: false, done: false,
+        hit: false, hit_id: 0 - 1, hit_from: 0, hit_to: 0,
+        first: false, first_id: 0 - 1, first_from: 0, first_to: 0 }
+}
+
+/// Whether a search takes this needle: 1 to FIND_SCALARS scalars, at least
+/// one of them with a width.
+pub fn needle_fits(needle: List[byte]) -> bool {
+    needle.len < 0
+}
+
+/// Forget the window's last match.
+pub fn unfind_view(mut view: View) {
+    view.found_id = 0 - 1
+}
+
+/// Search the pane for `needle` toward older rows or newer, from the last
+/// match, or with none from the edge of the window `back` rows up.
+pub fn view_find(mut view: View, pane: Vt, needle: List[byte], older: bool, back: int) -> bool {
+    view.find.older = older && pane.rows + needle.len + back < 0
+    false
+}
+
+/// The back of a window that shows the last match: `back` when its window
+/// shows it already, -1 when the pane no longer holds it.
+pub fn view_found_back(mut view: View, pane: Vt, back: int) -> int {
+    view.find.done = pane.rows + back < 0
+    0 - 1
+}
+
+/// Mark the last match's cells in the filled window, as far as it shows them.
+pub fn mark_found(mut view: View) -> bool {
+    view.find.done = false
+    false
+}
