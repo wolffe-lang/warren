@@ -322,6 +322,10 @@ pub fn defaults() -> Keys {
     letter(mut l, v, "d", A_VIEW_PAGE, -1, v, "half")
     letter(mut l, v, "g", A_VIEW_END, 1, v, "oldest/live")
     letter(mut l, v, "G", A_VIEW_END, 0, v, "oldest/live")
+    letter(mut l, v, "/", A_SEARCH, 0, MODE_SEARCH, "search")
+    letter(mut l, v, "?", A_SEARCH, 1, MODE_SEARCH, "search")
+    letter(mut l, v, "n", A_SEARCH_AGAIN, 0, v, "search")
+    letter(mut l, v, "N", A_SEARCH_AGAIN, 1, v, "search")
     letter(mut l, v, "q", A_NONE, 0, n, "quit")
     sticky(mut l, v)
 
@@ -329,6 +333,7 @@ pub fn defaults() -> Keys {
 
     prompt_keys(mut l, MODE_COMMAND)
     prompt_keys(mut l, MODE_RENAME)
+    prompt_keys(mut l, MODE_SEARCH)
 
     let c = MODE_CONFIRM
     letter(mut l, c, "y", A_YES, 0, MODE_BACK, "yes")
@@ -375,7 +380,7 @@ pub fn step(k: Keys, mode: int, mods: int, kind: int, code: int) -> Step {
         return found(A_NONE, 0, MODE_NORMAL)
     }
     if mode == MODE_CONFIRM { return found(A_NONE, 0, MODE_BACK) }
-    if mode == MODE_COMMAND || mode == MODE_RENAME {
+    if mode == MODE_COMMAND || mode == MODE_RENAME || mode == MODE_SEARCH {
         if kind == SCALAR && m == 0 && code >= 32 && code != 127 && !(code >= 128 && code < 160) {
             return found(A_TYPE, code, mode)
         }
@@ -556,6 +561,14 @@ fn verb(action: int, arg: int) -> str {
         return "the live rows"
     }
     if action == A_PASTE { return "paste the register" }
+    if action == A_SEARCH {
+        if arg == 1 { return "search toward older rows" }
+        return "search toward newer rows"
+    }
+    if action == A_SEARCH_AGAIN {
+        if arg == 1 { return "search again the other way" }
+        return "search again"
+    }
     if action == A_RUN { return "run" }
     if action == A_ERASE { return "erase" }
     if action == A_CLEAR { return "clear the line" }
