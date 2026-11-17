@@ -1,0 +1,155 @@
+//! member: false
+//! A client's window over a pane's retained history and live screen.
+use vt
+use std.mem.budget
+
+// ASCII rows only: any other scalar reads as `?`; trailing blanks dropped.
+fn text_of(view: vt.View, row: int) -> str {
+    var out = List[byte]()
+    var col = 0
+    while col < view.cols {
+        let base = view.screen.cells[(row - 1) * view.cols + col].base
+        if view.screen.cells[(row - 1) * view.cols + col].width != 0 {
+            (mut out).push((if base >= 32 && base < 127 then base else 63) as byte)
+        }
+        col += 1
+    }
+    var end = out.len
+    while end > 0 && out[end - 1] == 32 as byte { end -= 1 }
+    str_from_utf8(out[0..end]) else ""
+}
+
+fn lines(view: vt.View) -> str {
+    var out = ""
+    var row = 1
+    while row <= view.rows {
+        if row > 1 { out = out + "|" }
+        out = out + text_of(view, row)
+        row += 1
+    }
+    out
+}
+
+fn numbered(count: int) -> List[byte] {
+    var text = ""
+    var i = 1
+    while i <= count {
+        if i > 1 { text = text + "\r\n" }
+        text = text + "a{i}"
+        i += 1
+    }
+    text.bytes()
+}
+
+fn test_history_above_live() {
+    var pane = vt.new(6, 3, 65536)
+    vt.feed(mut pane, numbered(9))
+    var view = vt.new_view()
+    assert(vt.fill_view(mut view, pane, 0) == 0 && lines(view) == "a7|a8|a9", "back 0 is the live screen")
+    assert(vt.fill_view(mut view, pane, 2) == 2, "two rows back")
+    assert(lines(view) == "a5|a6|a7", "history rows above live rows: " + lines(view))
+    assert(view.back == 2, "the window records its back")
+    assert(vt.fill_view(mut view, pane, 6) == 6 && lines(view) == "a1|a2|a3", "the oldest window: " + lines(view))
+    assert(vt.fill_view(mut view, pane, 40) == 6 && lines(view) == "a1|a2|a3", "back is clamped to the retained rows")
+    assert(vt.fill_view(mut view, pane, 1) == 1 && lines(view) == "a6|a7|a8", "one row back")
+    assert(vt.fill_view(mut view, pane, 0 - 3) == 0 && lines(view) == "a7|a8|a9", "a negative back is the live screen")
+}
+
+fn test_soft_wrap_relaid_at_the_current_width() {
+    var pane = vt.new(4, 2, 65536)
+    vt.feed(mut pane, "abcdefghij\r\nx".bytes())
+    var view = vt.new_view()
+    // The long line's first two rows are history; its third row and x are live.
+    assert(vt.fill_view(mut view, pane, 2) == 2 && lines(view) == "abcd|efgh", "wrapped history rows: " + lines(view))
+    assert(view.screen.wrapped[0], "a soft wrap is marked")
+    assert(vt.fill_view(mut view, pane, 1) == 1 && lines(view) == "efgh|ij", "history then live: " + lines(view))
+    vt.feed(mut pane, "\r\ny\r\nz".bytes())
+    assert(vt.resize(mut pane, 3, 2) == "")
+    let total = vt.fill_view(mut view, pane, 99)
+    assert(lines(view) == "abc|def", "history re-laid at three columns: " + lines(view))
+    assert(vt.fill_view(mut view, pane, total - 2) == total - 2 && lines(view) == "ghi|j", "the line's last rows: " + lines(view))
+}
+
+fn test_wide_and_combining_glyphs() {
+    var pane = vt.new(6, 1, 65536)
+    vt.feed(mut pane, "\u{3042}\u{3044}x\r\ne\u{301}y\r\nz".bytes())
+    var view = vt.new_view()
+    assert(vt.fill_view(mut view, pane, 2) == 2, "two history rows")
+    assert(view.screen.cells[0].base == 12354 && view.screen.cells[0].width == 2 && view.screen.cells[1].width == 0 &&
+        view.screen.cells[2].base == 12356 && view.screen.cells[4].base == 120, "wide glyphs kept")
+    assert(vt.fill_view(mut view, pane, 1) == 1, "one history row")
+    assert(view.screen.cells[0].base == 101 && view.screen.cells[0].mark1 == 769 && view.screen.cells[1].base == 121, "combining mark kept")
+}
+
+fn test_renditions_kept() {
+    var pane = vt.new(6, 1, 65536)
+    vt.feed(mut pane, "\u{1b}[1;31mr\u{1b}[0m\r\nq".bytes())
+    var view = vt.new_view()
+    assert(vt.fill_view(mut view, pane, 1) == 1, "one history row")
+    assert(view.screen.cells[0].base == 114 && view.screen.cells[0].flags % 2 == 1 && view.screen.cells[0].foreground == 1, "bold red kept")
+}
+
+fn test_alternate_screen_has_no_history() {
+    var pane = vt.new(6, 2, 65536)
+    vt.feed(mut pane, numbered(5))
+    vt.feed(mut pane, "\u{1b}[?1049h\u{1b}[Halt".bytes())
+    var view = vt.new_view()
+    assert(vt.fill_view(mut view, pane, 3) == 0, "no history behind the alternate screen")
+    assert(text_of(view, 1) == "alt", "the window is the alternate screen")
+}
+
+fn test_eviction_clamps_to_the_oldest_retained_row() {
+    var pane = vt.new(6, 2, 256)
+    vt.feed(mut pane, numbered(60))
+    var view = vt.new_view()
+    let total = vt.fill_view(mut view, pane, 1000)
+    assert(total > 0 && total < 58, "a small cap keeps a suffix: {total}")
+    let oldest = text_of(view, 1)
+    assert(oldest == "a{59 - total}", "the oldest retained row is shown first: " + oldest)
+}
+
+fn test_anchor_follows_content() {
+    var pane = vt.new(6, 3, 65536)
+    vt.feed(mut pane, numbered(9))
+    var view = vt.new_view()
+    assert(vt.fill_view(mut view, pane, 2) == 2 && lines(view) == "a5|a6|a7", "window before output")
+    let id = view.screen.line_ids[0]
+    let offset = view.screen.line_offsets[0]
+    vt.feed(mut pane, "\r\na10\r\na11\r\na12".bytes())
+    let back = vt.view_back_of(mut view, pane, id, offset)
+    assert(back == 5, "three new rows push the anchor three rows further back: {back}")
+    assert(vt.fill_view(mut view, pane, back) == 5 && lines(view) == "a5|a6|a7", "the same content again: " + lines(view))
+    assert(vt.view_back_of(mut view, pane, id + 1000, 0) == 0 - 1, "an unknown line is not retained")
+}
+
+fn test_repeated_fills_have_no_retained_growth() {
+    var pane = vt.new(10, 4, 65536)
+    vt.feed(mut pane, numbered(200))
+    region frame(cap: 4194304) {
+        var view = vt.new_view()
+        let _first = vt.fill_view(mut view, pane, 4)
+        let stable = budget.charged(frame)
+        var i = 0
+        while i < 64 {
+            let _f = vt.fill_view(mut view, pane, i * 3)
+            let _b = vt.view_back_of(mut view, pane, view.screen.line_ids[0], view.screen.line_offsets[0])
+            i += 1
+        }
+        let growth = budget.charged(frame) - stable
+        print("MEASURE view-fills fills=64 retained-growth={growth}")
+        assert(growth == 0, "window fills reuse their buffers")
+    }
+}
+
+fn main() -> int {
+    test_history_above_live()
+    test_soft_wrap_relaid_at_the_current_width()
+    test_wide_and_combining_glyphs()
+    test_renditions_kept()
+    test_alternate_screen_has_no_history()
+    test_eviction_clamps_to_the_oldest_retained_row()
+    test_anchor_follows_content()
+    test_repeated_fills_have_no_retained_growth()
+    print("PASS vt-view")
+    0
+}
