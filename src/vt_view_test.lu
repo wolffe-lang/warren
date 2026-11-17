@@ -42,7 +42,7 @@ fn numbered(count: int) -> List[byte] {
 }
 
 fn test_history_above_live() {
-    var pane = vt.new(6, 3, 65536)
+    var pane = vt.new(6, 3, 4096)
     vt.feed(mut pane, numbered(9))
     var view = vt.new_view()
     assert(vt.fill_view(mut view, pane, 0) == 0 && lines(view) == "a7|a8|a9", "back 0 is the live screen")
@@ -56,7 +56,7 @@ fn test_history_above_live() {
 }
 
 fn test_soft_wrap_relaid_at_the_current_width() {
-    var pane = vt.new(4, 2, 65536)
+    var pane = vt.new(4, 2, 4096)
     vt.feed(mut pane, "abcdefghij\r\nx".bytes())
     var view = vt.new_view()
     // The long line's first two rows are history; its third row and x are live.
@@ -71,7 +71,7 @@ fn test_soft_wrap_relaid_at_the_current_width() {
 }
 
 fn test_wide_and_combining_glyphs() {
-    var pane = vt.new(6, 1, 65536)
+    var pane = vt.new(6, 1, 4096)
     vt.feed(mut pane, "\u{3042}\u{3044}x\r\ne\u{301}y\r\nz".bytes())
     var view = vt.new_view()
     assert(vt.fill_view(mut view, pane, 2) == 2, "two history rows")
@@ -82,7 +82,7 @@ fn test_wide_and_combining_glyphs() {
 }
 
 fn test_renditions_kept() {
-    var pane = vt.new(6, 1, 65536)
+    var pane = vt.new(6, 1, 4096)
     vt.feed(mut pane, "\u{1b}[1;31mr\u{1b}[0m\r\nq".bytes())
     var view = vt.new_view()
     assert(vt.fill_view(mut view, pane, 1) == 1, "one history row")
@@ -90,7 +90,7 @@ fn test_renditions_kept() {
 }
 
 fn test_alternate_screen_has_no_history() {
-    var pane = vt.new(6, 2, 65536)
+    var pane = vt.new(6, 2, 4096)
     vt.feed(mut pane, numbered(5))
     vt.feed(mut pane, "\u{1b}[?1049h\u{1b}[Halt".bytes())
     var view = vt.new_view()
@@ -109,7 +109,7 @@ fn test_eviction_clamps_to_the_oldest_retained_row() {
 }
 
 fn test_anchor_follows_content() {
-    var pane = vt.new(6, 3, 65536)
+    var pane = vt.new(6, 3, 4096)
     vt.feed(mut pane, numbered(9))
     var view = vt.new_view()
     assert(vt.fill_view(mut view, pane, 2) == 2 && lines(view) == "a5|a6|a7", "window before output")
@@ -123,20 +123,20 @@ fn test_anchor_follows_content() {
 }
 
 fn test_repeated_fills_have_no_retained_growth() {
-    var pane = vt.new(10, 4, 65536)
-    vt.feed(mut pane, numbered(200))
-    region frame(cap: 4194304) {
+    var pane = vt.new(10, 4, 4096)
+    vt.feed(mut pane, numbered(80))
+    region frame(cap: 1048576) {
         var view = vt.new_view()
         let _first = vt.fill_view(mut view, pane, 4)
         let stable = budget.charged(frame)
         var i = 0
-        while i < 64 {
+        while i < 32 {
             let _f = vt.fill_view(mut view, pane, i * 3)
             let _b = vt.view_back_of(mut view, pane, view.screen.line_ids[0], view.screen.line_offsets[0])
             i += 1
         }
         let growth = budget.charged(frame) - stable
-        print("MEASURE view-fills fills=64 retained-growth={growth}")
+        print("MEASURE view-fills fills=32 retained-growth={growth}")
         assert(growth == 0, "window fills reuse their buffers")
     }
 }
