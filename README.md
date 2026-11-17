@@ -47,7 +47,9 @@ the hint line shows only Ctrl-Space; pressing it reveals its actions, and
 leaving the prefix or a mode hides them again. In normal mode, Alt+\ splits
 side by side, Alt+| stacks panes, Alt+t opens a tab and Alt+w closes a pane
 (or its empty tab), asking before the session's final pane closes. Ctrl+t
-and Ctrl+w remain available to programs. `vt-dump` is a diagnostic command.
+and Ctrl+w remain available to programs. Tab clicks use the spans of the
+client's acknowledged image, not labels shifted by later activity or renames;
+per-connection hit maps are fixed-size and reused. `vt-dump` is a diagnostic command.
 [MAP](docs/MAP.md) separates what is planned from what is measured.
 
 ## What is planned
