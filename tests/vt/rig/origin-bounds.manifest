@@ -1,0 +1,13 @@
+# Emulator-only origin-mode module record in the pinned oracle image.
+floor 35
+rig origin-bounds-step.sh sha256=fc79212b3e3abdb6871997c8faeeec9d16ea4b5bd4da485154f873d09a9f5ac3
+step origin-pins tools=sha256sum,diff script=origin-bounds-step.sh -- pins
+step origin-unit tools=python3 script=origin-bounds-step.sh -- unit
+step origin-build tools=python3,cc script=origin-bounds-step.sh -- build
+step origin-native needs=origin-build script=origin-bounds-step.sh -- native
+step origin-checked needs=origin-build tools=python3 script=origin-bounds-step.sh -- checked
+step origin-lupin needs=origin-build script=origin-bounds-step.sh -- lupin
+step origin-oracle needs=origin-build tools=python3 script=origin-bounds-step.sh -- oracle
+step origin-frozen needs=origin-build tools=python3 script=origin-bounds-step.sh -- frozen
+step origin-pr-fresh needs=origin-build tools=python3 script=origin-bounds-step.sh -- fresh
+step origin-known-cases needs=origin-build tools=python3 script=origin-bounds-step.sh -- known
