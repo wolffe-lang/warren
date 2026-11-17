@@ -24,7 +24,7 @@ pub fn chrome_cell(base: int, flags: int, fg: int) -> vt.Cell {
 /// owner map's pane (its active screen at the rect offset) or the border
 /// cell. A wide glyph on a pane's last column (which the emulator does not
 /// make) would cross a border: it is sent one column wide.
-fn frame_cell(panes: List[Pane], ses: Session, bar: List[vt.Cell], i: int) -> vt.Cell {
+fn frame_cell(panes: List[Pane], ses: Session, bar: List[vt.Cell], view: vt.View, view_slot: int, i: int) -> vt.Cell {
     let cols = ses.cols
     let area = ses.rows - BAR_LINES
     let r0 = i / cols
@@ -46,7 +46,9 @@ fn frame_cell(panes: List[Pane], ses: Session, bar: List[vt.Cell], i: int) -> vt
     let pc = c0 - (panes[o].at_col - 1)
     let pcols = panes[o].screen.cols
     if pr < 0 || pc < 0 || pc >= pcols || pr >= panes[o].screen.rows { return blank_cell() }
-    let cell = active_cell(panes[o].screen, pr * pcols + pc)
+    // A client looking back sees its window in place of the pane's screen.
+    let viewed = o == view_slot && view.cols == pcols && view.rows == panes[o].screen.rows
+    let cell = if viewed then view.screen.cells[pr * pcols + pc] else active_cell(panes[o].screen, pr * pcols + pc)
     if cell.width == 2 && pc == pcols - 1 {
         return vt.Cell { base: cell.base, mark1: cell.mark1, mark2: cell.mark2, width: 1, flags: cell.flags,
             foreground: cell.foreground, background: cell.background, written: cell.written }
@@ -56,26 +58,26 @@ fn frame_cell(panes: List[Pane], ses: Session, bar: List[vt.Cell], i: int) -> vt
 
 // Emit the runs covering columns a..b (1-based, inclusive) of one row of
 // the frame; as `emit_span` for one pane.
-fn emit_frame_span(mut body: List[byte], panes: List[Pane], ses: Session, bar: List[vt.Cell], row: int, a: int,
-    b: int) -> int {
+fn emit_frame_span(mut body: List[byte], panes: List[Pane], ses: Session, bar: List[vt.Cell], view: vt.View,
+    view_slot: int, row: int, a: int, b: int) -> int {
     let cols = ses.cols
     var runs = 0
     var col = a
     while col <= b {
-        let lead = frame_cell(panes, ses, bar, (row - 1) * cols + col - 1)
+        let lead = frame_cell(panes, ses, bar, view, view_slot, (row - 1) * cols + col - 1)
         var records = List[byte]()
         var record_count = 0
         var covered = 0
         var c = col
         while c <= b {
-            let cell = frame_cell(panes, ses, bar, (row - 1) * cols + c - 1)
+            let cell = frame_cell(panes, ses, bar, view, view_slot, (row - 1) * cols + c - 1)
             if !same_rendition(cell, lead) && c > col { break }
             let orphan = cell.width == 0
             let w = sent_width(cell, c, cols)
             var times = 1
             var next = c + w
             while next + w - 1 <= b && times < 65535 && !orphan {
-                let other = frame_cell(panes, ses, bar, (row - 1) * cols + next - 1)
+                let other = frame_cell(panes, ses, bar, view, view_slot, (row - 1) * cols + next - 1)
                 if !same_glyph(other, cell) || !same_rendition(other, lead) || sent_width(other, next, cols) != w { break }
                 times += 1
                 next += w
@@ -99,11 +101,12 @@ fn emit_frame_span(mut body: List[byte], panes: List[Pane], ses: Session, bar: L
     runs
 }
 
-fn store_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[vt.Cell], row: int, a: int, b: int) {
+fn store_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[vt.Cell], view: vt.View, view_slot: int,
+    row: int, a: int, b: int) {
     var c = a
     while c <= b {
         let i = (row - 1) * ses.cols + c - 1
-        sh.cells[i] = frame_cell(panes, ses, bar, i)
+        sh.cells[i] = frame_cell(panes, ses, bar, view, view_slot, i)
         c += 1
     }
 }
@@ -113,9 +116,11 @@ fn store_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[vt.Cel
 /// or the shadow is not of this size; otherwise a delta on seq - 1 over
 /// the scanned regions: every cell when `all`, else the rects in `scans`
 /// (col, row, cols, rows, four ints each). Empty when nothing changed.
-/// The cursor is the caller's (`cursor`: row, col, shape, visible).
-pub fn compose_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[vt.Cell], seq: int, full: bool,
-    all: bool, scans: List[int], cursor: List[int]) -> List[byte] {
+/// The cursor is the caller's (`cursor`: row, col, shape, visible). Pane
+/// slot `view_slot` (-1: none) shows the client's window `view` instead of
+/// its screen.
+pub fn compose_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[vt.Cell], view: vt.View,
+    view_slot: int, seq: int, full: bool, all: bool, scans: List[int], cursor: List[int]) -> List[byte] {
     let cols = ses.cols
     let rows = ses.rows
     let whole = full || !sh.valid || sh.cols != cols || sh.rows != rows
@@ -133,8 +138,8 @@ pub fn compose_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[
     var row = 1
     while row <= rows {
         if whole {
-            runs += emit_frame_span(mut body, panes, ses, bar, row, 1, cols)
-            store_frame(mut sh, panes, ses, bar, row, 1, cols)
+            runs += emit_frame_span(mut body, panes, ses, bar, view, view_slot, row, 1, cols)
+            store_frame(mut sh, panes, ses, bar, view, view_slot, row, 1, cols)
         } else {
             var any_scan = all
             var c = 1
@@ -164,7 +169,7 @@ pub fn compose_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[
                     changed[c] = false
                     if scan[c] {
                         let i = (row - 1) * cols + c - 1
-                        changed[c] = !same(frame_cell(panes, ses, bar, i), sh.cells[i])
+                        changed[c] = !same(frame_cell(panes, ses, bar, view, view_slot, i), sh.cells[i])
                         if changed[c] { any = true }
                     }
                     c += 1
@@ -178,7 +183,7 @@ pub fn compose_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[
                         while c <= cols {
                             if changed[c] {
                                 let i = (row - 1) * cols + c - 1
-                                let live = frame_cell(panes, ses, bar, i)
+                                let live = frame_cell(panes, ses, bar, view, view_slot, i)
                                 let old = copy sh.cells[i]
                                 if (live.width == 0 || old.width == 0) && c > 1 && !changed[c - 1] {
                                     changed[c - 1] = true
@@ -197,8 +202,8 @@ pub fn compose_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[
                         if changed[c] {
                             var e = c
                             while e + 1 <= cols && changed[e + 1] { e += 1 }
-                            runs += emit_frame_span(mut body, panes, ses, bar, row, c, e)
-                            store_frame(mut sh, panes, ses, bar, row, c, e)
+                            runs += emit_frame_span(mut body, panes, ses, bar, view, view_slot, row, c, e)
+                            store_frame(mut sh, panes, ses, bar, view, view_slot, row, c, e)
                             c = e + 1
                         } else {
                             c += 1
