@@ -1393,7 +1393,7 @@ fn border_gesture(mut s: Server, index: int, kind: int, button: int, col: int, r
     let hit = copy s.conns[index].drag
     let valid = si >= 0 && s.sessions[si].live && s.sessions[si].layout.active == hit.tab &&
         s.sessions[si].layout_gen == s.conns[index].drag_layout && mouse_chrome(s.conns[index].mode)
-    if valid && (kind == 1 || button == 1) {
+    if valid && kind == 1 {
         let target = if hit.axis == layout.COLS then col else row
         let moved = layout.drag_border(mut s.sessions[si].layout, hit, target, s.sessions[si].cols,
             s.sessions[si].rows - BAR_LINES) else 0
