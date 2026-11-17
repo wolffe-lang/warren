@@ -47,8 +47,9 @@ The projection counts every pane slot at its measured cost (six times its
 history cap, both screens at its size, 1 MiB of fixed buffers; a free slot
 keeps its emulator and is counted too) and each connection (one physical
 frame's receive buffer, a paste assembly, the 256 KiB event queue, a 4 KiB
-allowance for two fixed tab-hit maps, and, when attached, one worst-case image
-and a 64-byte-a-cell shadow of what its client holds).
+allowance for two fixed tab-hit maps, and, when attached, one worst-case image,
+a 64-byte-a-cell shadow of what its client holds, and its scroll window and
+that window's scratch at the same cost a cell).
 
 Most of a pane's resident size is the emulator's history ring: it is made
 whole, with a copy, when the emulator is made (16.4 MB resident for an 8 MiB
@@ -505,7 +506,28 @@ and leaving the prefix or a mode restores the idle hint. A sticky mode keeps
 its own hints until it ends. The line can instead show a
 prompt with its cursor; the confirm question; or a message while one lasts.
 The key list (`?`) is drawn over the tab area for that client only, one line a
-binding, and scrolls with `j` and `k`. Each
+binding, and scrolls with `j` and `k`.
+
+**Scroll mode** is a client's window over one pane's retained history. Prefix
+`[` opens it on the focused pane; a wheel notch up over a pane whose program
+asked for no mouse reports, on its primary screen, opens it there. The window
+is filled from the emulator's history ring at the pane's current width (soft
+wraps, wide and combining glyphs and renditions as they were written), walking
+back from the newest line only as far as it reaches, and history holds only
+what is above the screen's first row, so no row shows twice. `j` and `k` (or
+Down and Up) move it a row, PageDown and PageUp (or `C-f` and `C-b`) a window,
+`d` and `u` half a window, `g` shows the oldest retained row and `G` the live
+rows; `q`, Esc and Enter leave, and the prefix leaves for its table. The wheel
+moves it three rows a notch. A window the wheel opened closes when it comes
+back to the live rows; one opened with `[` stays until it is left. The window
+is a snapshot: output goes on into the pane, other clients see it live, and
+this client sees it on its next step, which keeps the same content in place
+by its logical line and offset, or at the live rows. The pane's cursor is not
+drawn over a window. A window whose pane closes ends the mode; a resized pane's
+window is filled again at the new size on the same content. A window's two
+buffers belong to its client and grow only between turns, outside the turn's
+region, the first time a pane needs more; fills and lookups allocate nothing,
+and the step that asked waits for the next turn. Each
 shown pane's grid is drawn in its rect. Border cells are `│` and `─`, with
 `├ ┤ ┬ ┴ ┼` where borders meet. The border cells within one cell of the
 focused pane's rect are drawn in colour 2; when exactly two panes show they
