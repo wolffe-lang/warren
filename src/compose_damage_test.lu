@@ -254,11 +254,48 @@ fn differs(panes: List[server.Pane], ses: server.Session, sh: server.Shadow) -> 
     0 - 1
 }
 
+// Two panes of one session side by side (a border column between), and a
+// third of another session shown at the first one's place in its own
+// frame. Each client scans every pane's rect, as after output in both.
+fn split_rig(cols: int, rows: int) -> Rig {
+    var ses = server.idle_session()
+    ses.live = true
+    ses.cols = cols * 2 + 1
+    ses.rows = rows + 2
+    var i = 0
+    while i < ses.cols * rows {
+        let c = i % ses.cols
+        (mut ses.owner).push(if c < cols then 0 else if c == cols then 0 - 1 else 1)
+        i += 1
+    }
+    var panes = List[server.Pane]()
+    (mut panes).push(pane(cols, rows))
+    var right = pane(cols, rows)
+    right.id = 2
+    right.at_col = cols + 2
+    (mut panes).push(right)
+    var other = pane(cols, rows)
+    other.id = 3
+    other.session = 1
+    (mut panes).push(other)
+    Rig { panes: panes, ses: ses, sh: server.no_shadow(), seq: 0 }
+}
+
+fn compose_split(mut sh: server.Shadow, seq: int, r: Rig, full: bool) -> int {
+    let cols = r.panes[0].screen.cols
+    let rows = r.ses.rows - 2
+    let scans: List[int] = [1, 1, cols, rows, cols + 2, 1, cols, rows]
+    let cursor: List[int] = [1, 1, 0, 1]
+    let image = server.compose_frame(mut sh, r.panes, r.ses, List[vt.Cell](), seq + 1, full, false, scans, cursor)
+    if image.len > 0 { return seq + 1 }
+    seq
+}
+
 // Seeded streams at sizes that meet the edges often (the first `count`
-// of them), fed in random chunks. One client composes after every chunk,
-// another after every third; after each image, its shadow must equal the
-// full rescan. A difference is printed as `FAIL damage-equals-rescan` and
-// ends the comparison.
+// of them), one a pane, fed in random chunks to a pane chosen at random.
+// One client composes after every chunk, another after every third; after
+// each image, its shadow must equal the full rescan. A difference is
+// printed as `FAIL damage-equals-rescan` and ends the comparison.
 fn damage_agrees(rounds: int, count: int) -> bool {
     var g = Rng { state: 20261117 }
     let sizes = [1, 1, 2, 3, 7, 4, 13, 5, 20, 6, 40, 12]
@@ -270,41 +307,49 @@ fn damage_agrees(rounds: int, count: int) -> bool {
         let rows = sizes[k + 1]
         var round = 0
         while round < rounds {
-            let data = stream(mut g, rows, cols)
-            var r = rig(cols, rows)
-            var other = server.no_shadow()
-            var other_seq = 0
-            let _first = compose(mut r, true)
-            var at = 0
+            var data = List[List[byte]]()
+            var at = List[int]()
+            var q = 0
+            while q < 3 {
+                (mut data).push(stream(mut g, rows, cols))
+                (mut at).push(0)
+                q += 1
+            }
+            var r = split_rig(cols, rows)
+            var one = server.no_shadow()
+            var one_seq = compose_split(mut one, 0, r, true)
+            var two = server.no_shadow()
+            var two_seq = compose_split(mut two, 0, r, true)
             var chunk = 0
-            while at < data.len {
-                var end = at + 1 + next(mut g, 24)
-                if end > data.len { end = data.len }
-                feed(mut r, data[at..end])
-                let _reads = compose(mut r, false)
-                let one = differs(r.panes, r.ses, r.sh)
-                if one >= 0 {
-                    print("FAIL damage-equals-rescan size {cols}x{rows} round {round} client 1 chunk ending at byte {end} of {data.len} cell {one}")
+            var left = data[0].len + data[1].len + data[2].len
+            while left > 0 {
+                var p = next(mut g, 3)
+                while at[p] >= data[p].len { p = (p + 1) % 3 }
+                var end = at[p] + 1 + next(mut g, 24)
+                if end > data[p].len { end = data[p].len }
+                vt.feed(mut r.panes[p].screen, data[p][at[p]..end])
+                r.panes[p].damage += 1
+                left -= end - at[p]
+                at[p] = end
+                one_seq = compose_split(mut one, one_seq, r, false)
+                let a = differs(r.panes, r.ses, one)
+                if a >= 0 {
+                    print("FAIL damage-equals-rescan size {cols}x{rows} round {round} client 1 pane {p} chunk {chunk} cell {a}")
                     return false
                 }
                 chunk += 1
                 images += 1
-                if chunk % 3 == 0 || end == data.len {
-                    let cursor: List[int] = [1, 1, 0, 1]
-                    let scans: List[int] = [1, 1, cols, rows]
-                    let image = server.compose_frame(mut other, r.panes, r.ses, List[vt.Cell](), other_seq + 1,
-                        other_seq == 0, false, scans, cursor)
-                    if image.len > 0 { other_seq += 1 }
-                    let two = differs(r.panes, r.ses, other)
-                    if two >= 0 {
-                        print("FAIL damage-equals-rescan size {cols}x{rows} round {round} client 2 chunk ending at byte {end} of {data.len} cell {two}")
+                if chunk % 3 == 0 || left == 0 {
+                    two_seq = compose_split(mut two, two_seq, r, false)
+                    let b = differs(r.panes, r.ses, two)
+                    if b >= 0 {
+                        print("FAIL damage-equals-rescan size {cols}x{rows} round {round} client 2 pane {p} chunk {chunk} cell {b}")
                         return false
                     }
                     images += 1
                 }
-                at = end
             }
-            streams += 1
+            streams += 3
             round += 1
         }
         k += 2
@@ -313,9 +358,9 @@ fn damage_agrees(rounds: int, count: int) -> bool {
     true
 }
 
-// The checked machine's step budget holds the three smallest sizes.
+// The checked machine's step budget holds the two smallest sizes.
 fn test_damage_equals_a_full_rescan() {
-    assert(damage_agrees(1, 3), "damage-equals-rescan")
+    assert(damage_agrees(1, 2), "damage-equals-rescan")
 }
 
 fn main() -> int {
