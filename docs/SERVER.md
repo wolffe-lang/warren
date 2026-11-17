@@ -48,8 +48,9 @@ history cap, both screens at its size, 1 MiB of fixed buffers; a free slot
 keeps its emulator and is counted too) and each connection (one physical
 frame's receive buffer, a paste assembly, the 256 KiB event queue, a 4 KiB
 allowance for two fixed tab-hit maps, and, when attached, one worst-case image,
-a 64-byte-a-cell shadow of what its client holds, and its scroll window and
-that window's scratch at the same cost a cell).
+a 64-byte-a-cell shadow of what its client holds, its scroll window and that
+window's scratch at the same cost a cell, and its session's 65524-byte
+register, counted for every attached client as an upper bound).
 
 Most of a pane's resident size is the emulator's history ring: it is made
 whole, with a copy, when the emulator is made (16.4 MB resident for an 8 MiB
@@ -543,7 +544,27 @@ drawn over a window. A window whose pane closes ends the mode; a resized pane's
 window is filled again at the new size on the same content. A window's two
 buffers belong to its client and grow only between turns, outside the turn's
 region, the first time a pane needs more; fills and lookups allocate nothing,
-and the step that asked waits for the next turn. Each
+and the step that asked waits for the next turn.
+
+**Selection and the register.** A left press in the focused pane in normal
+mode, when its program asked for no mouse reports (with Shift, even when it
+did), or in the pane a client is looking back at, may begin a selection; Alt
+and Ctrl presses stay the program's. Nothing happens until the pointer moves.
+The first move opens the client's window at the pane's live rows as a snapshot
+(scroll mode), unless it is already looking back, so output cannot shift the
+text under the drag; the selection runs in reading order from the press cell
+to the pointer, clamped to the pane it started in, and is drawn inverse for
+that client alone. The wheel waits while a drag is held. Release copies the
+text into the session's register (soft-wrapped rows join, other rows end with a
+newline, a row part's trailing blanks are dropped, a wide glyph once, combining
+marks after their base) and the hint line says `copied N bytes`; more than
+65524 bytes is refused whole and the register keeps its text. A window the drag
+opened closes at release; one that was looking back stays. A press and release
+on one cell copies nothing. Prefix `]` pastes the register into the focused
+pane under PASTE's rules: one bracketed paste when the program asked for 2004,
+otherwise the text with control bytes other than tab, CR and LF removed. The
+register is the session's, shared by its clients, and empty when the session
+starts. Each
 shown pane's grid is drawn in its rect. Border cells are `│` and `─`, with
 `├ ┤ ┬ ┴ ┼` where borders meet. The border cells within one cell of the
 focused pane's rect are drawn in colour 2; when exactly two panes show they
