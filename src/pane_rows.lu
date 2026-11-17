@@ -2147,7 +2147,7 @@ fn row_mouse_tabs(mut r: Rig, legacy: bool) -> str {
     let w = until_line_one(mut p, " b < 4  5  6  7  8  9 ", [1, 3, 20, 22], 3000)
     if w.len > 0 { return "narrow before click: " + w }
     if !mouse_click(p, legacy, 6, 23) { return "narrow click decode" }
-    if !until_active(mut p, "b", "4", 3000) { return "visible tab four was confused with its screen position" }
+    if !until_active(mut p, "b", "4", 3000) { return "visible tab four was confused with its screen position: active='" + active_label(p.image, "b") + "' line='" + cells(p.image, 23, 1, 40) + "'" }
     // Neither the session name, mode/clock, nor hint line is a tab.
     let _session = mouse_click(p, legacy, 2, 23)
     let _field = mouse_click(p, legacy, 30, 23)
@@ -2298,6 +2298,10 @@ fn row_mouse_border(mut r: Rig, legacy: bool) -> str {
     if !client.until_kind(mut p, 131, 5000) { return "no image" }
     let _split = prefix(p, 124)
     if !until_rect(mut p, "│", 40, 1, 1, AREA, 5000) { return "no vertical split" }
+    let log = out_file(r, "border-input.txt")
+    fs.remove(log) else |_| {}
+    let _probe = client.input(p, "exec {self_path()} --mouse-probe {log} 1\r")
+    if !until_file(log, "ready", 5000) { return "reporting child did not start" }
     let _click = mouse_click(p, legacy, 40, 3)
     drain(mut p, 100)
     if !rect_has(p.image, "│", 40, 1, 1, AREA) { return "plain border click resized" }
@@ -2322,6 +2326,18 @@ fn row_mouse_border(mut r: Rig, legacy: bool) -> str {
     let _hmove = outer_mouse(p, legacy, 2, 1, 15)
     if !until_rect(mut p, "─", 41, 15, 40, 1, 3000) { return "origin horizontal split lost on cross-pane motion" }
     let _hup = outer_mouse(p, legacy, 1, 1, 15)
+    if mouse_probe_text(log) != "" { return "border gesture leaked to a reporting child" }
+    var b = attach(r, 80, 24, "", 0) else |e| { return "second-client-{e}" }
+    if !client.until_kind(mut b, 131, 3000) { return "second client no frame" }
+    let _capture = outer_mouse(p, legacy, 0, 40, 3)
+    let _other = prefix(b, 61)
+    if !until_rect(mut p, "─", 41, 11, 40, 1, 3000) { return "other client's layout change" }
+    let _stale = outer_mouse(p, legacy, 2, 50, 3)
+    let _release = outer_mouse(p, legacy, 1, 50, 3)
+    drain(mut p, 100)
+    if !rect_has(p.image, "│", 40, 1, 1, AREA) { return "stale capture resized after another client's change" }
+    if mouse_probe_text(log) != "" { return "cancelled border release leaked" }
+    client.hang_up(mut b)
     finish(mut r, mut p)
 }
 
