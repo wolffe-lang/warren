@@ -1,0 +1,87 @@
+//! member: true
+//! Bounded tab geometry belonging to one connection's immutable images.
+
+/// A painted tab label's half-open display-cell span and stable tab id.
+pub struct TabHit { first: int, end: int, tab: int }
+
+/// A fixed-capacity span map for one image. Only count entries are active.
+pub struct TabHitMap { spans: List[TabHit], count: int, cols: int, row: int, seq: int }
+
+/// Last acknowledged geometry and the one image awaiting its exact ACK.
+pub struct TabHits { drawn: TabHitMap, pending: TabHitMap }
+
+fn new_tab_hit_map() -> TabHitMap {
+    var spans = List[TabHit]()
+    (mut spans).reserve(MAX_PANES)
+    var i = 0
+    while i < MAX_PANES { (mut spans).push(TabHit { first: 0, end: 0, tab: 0 }); i += 1 }
+    TabHitMap { spans: spans, count: 0, cols: 0, row: 0, seq: 0 }
+}
+
+/// Allocate two bounded maps once, outside the server's per-turn region.
+pub fn tab_hits() -> TabHits {
+    TabHits { drawn: new_tab_hit_map(), pending: new_tab_hit_map() }
+}
+
+fn copy_tab_hit_map(mut to: TabHitMap, from: TabHitMap) {
+    var i = 0
+    while i < from.count { to.spans[i] = copy from.spans[i]; i += 1 }
+    to.count = from.count
+    to.cols = from.cols
+    to.row = from.row
+    to.seq = from.seq
+}
+
+/// Stage the painter's actual spans alongside the immutable FRAME.
+/// The server's stop-and-wait image policy allows only one pending map.
+pub fn stage_tab_hits(mut state: TabHits, spans: List[TabHit], cols: int, row: int, seq: int) {
+    assert(spans.len <= MAX_PANES && cols > 0 && row > 0, "tab-hit-map-bound")
+    assert(state.pending.seq == 0 && seq > state.drawn.seq, "tab-hit-image-sequence")
+    var i = 0
+    while i < spans.len { state.pending.spans[i] = copy spans[i]; i += 1 }
+    state.pending.count = spans.len
+    state.pending.cols = cols
+    state.pending.row = row
+    state.pending.seq = seq
+}
+
+/// A cursor/pane-only delta inherits the last acknowledged tab geometry;
+/// it does not recompute labels from mutable session state.
+pub fn stage_drawn_tab_hits(mut state: TabHits, seq: int) {
+    assert(state.pending.seq == 0 && seq > state.drawn.seq, "tab-hit-image-sequence")
+    copy_tab_hit_map(mut state.pending, state.drawn)
+    state.pending.seq = seq
+}
+
+/// Promote only the pending image's exact sequence. The dispatcher first
+/// validates ACK against the wire's fully-sent outstanding image.
+pub fn ack_tab_hits(mut state: TabHits, seq: int) -> bool {
+    if seq == 0 || seq != state.pending.seq || seq <= state.drawn.seq { return false }
+    copy_tab_hit_map(mut state.drawn, state.pending)
+    state.pending.seq = 0
+    true
+}
+
+/// Hit the spans the client acknowledged drawing, never live tab labels.
+pub fn tab_hit_at(state: TabHits, col: int, row: int) -> int {
+    if state.drawn.seq == 0 || row != state.drawn.row || col < 1 || col > state.drawn.cols { return 0 }
+    var i = 0
+    while i < state.drawn.count {
+        let h = copy state.drawn.spans[i]
+        if col >= h.first && col < h.end { return h.tab }
+        i += 1
+    }
+    0
+}
+
+/// Reuse keeps fixed buffers but makes all previous geometry unreachable.
+pub fn reset_tab_hits(mut state: TabHits) {
+    state.drawn.count = 0
+    state.drawn.cols = 0
+    state.drawn.row = 0
+    state.drawn.seq = 0
+    state.pending.count = 0
+    state.pending.cols = 0
+    state.pending.row = 0
+    state.pending.seq = 0
+}

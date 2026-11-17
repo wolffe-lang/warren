@@ -37,10 +37,14 @@ pub fn image_bytes(cols: int, rows: int) -> int {
     payload + 6 * (payload / 1048576 + 1)
 }
 
+/// Conservative retained bytes for two fixed tab-span maps and metadata.
+/// There are at most MAX_PANES labels in a session; buffers are reused.
+pub const TAB_HIT_BYTES: int = 4096
+
 /// Projected bytes of a connection before it is attached: one physical
-/// frame's receive buffer, a paste assembly and the event queue.
+/// frame's receive buffer, a paste assembly, tab maps and the event queue.
 pub fn connection_bytes() -> int {
-    1048582 + 65540 + EVENT_QUEUE
+    1048582 + 65540 + EVENT_QUEUE + TAB_HIT_BYTES
 }
 
 /// Projected bytes of an attached connection at its session's size: the

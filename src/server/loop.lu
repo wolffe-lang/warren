@@ -774,7 +774,6 @@ fn put_hints(mut line: List[vt.Cell], col: int, cols: int, h: config.HintLine) {
     }
 }
 
-struct TabHit { first: int, end: int, tab: int }
 struct TabBar { cells: List[vt.Cell], hits: List[TabHit] }
 
 fn mode_field_at(cols: int) -> int {
@@ -831,10 +830,8 @@ fn tab_bar(s: Server, si: int) -> TabBar {
     TabBar { cells: line, hits: hits }
 }
 
-fn tab_at(s: Server, si: int, col: int) -> int {
-    let bar = tab_bar(s, si)
-    for h in bar.hits { if col >= h.first && col < h.end { return h.tab } }
-    0
+fn tab_at(s: Server, index: int, col: int, row: int) -> int {
+    tab_hit_at(s.conns[index].tabs, col, row)
 }
 
 /// The client's cells over the frame's last rows: the bar's two lines,
@@ -844,7 +841,7 @@ fn tab_at(s: Server, si: int, col: int) -> int {
 /// `>`), and the client's mode in a fixed field at the right end. Line two:
 /// the prompt being typed, the confirm question, the client's message while
 /// it lasts, or the mode's hints with their keys inverse.
-fn bar_cells(s: Server, si: int, index: int, now: int) -> List[vt.Cell] {
+fn bar_cells(s: Server, si: int, index: int, now: int, tab_cells: List[vt.Cell]) -> List[vt.Cell] {
     let cols = s.sessions[si].cols
     let area = s.sessions[si].rows - BAR_LINES
     let mode = s.conns[index].mode
@@ -861,7 +858,7 @@ fn bar_cells(s: Server, si: int, index: int, now: int) -> List[vt.Cell] {
     }
     let clock = cols >= CLOCK_MIN_COLS
     let field = mode_field_at(cols)
-    var line = tab_bar(s, si).cells
+    var line = copy tab_cells
     if field >= 1 {
         var c = field - 1
         while c < field - 1 + MODE_FIELD {
@@ -1396,7 +1393,8 @@ fn mouse_event(mut s: Server, index: int, body: List[byte]) {
     let cols = s.sessions[si].cols
     let rows = s.sessions[si].rows
     let area = rows - BAR_LINES
-    if !passing(s.conns[index].mode) || col < 1 || col > cols || row < 1 || row > rows {
+    if !passing(s.conns[index].mode) || col < 1 || col > cols || row < 1 || row > rows ||
+        s.conns[index].tabs.drawn.cols != cols || s.conns[index].tabs.drawn.row != area + 1 {
         if kind == 0 { s.conns[index].mouse_consumed = s.conns[index].mouse_consumed | bit }
         return
     }
@@ -1404,7 +1402,7 @@ fn mouse_event(mut s: Server, index: int, body: List[byte]) {
         if kind == 0 {
             s.conns[index].mouse_consumed = s.conns[index].mouse_consumed | bit
             if row == area + 1 {
-                let tab = tab_at(s, si, col)
+                let tab = tab_at(s, index, col, row)
                 if tab > 0 && tab != s.sessions[si].layout.active {
                     let from = focused_slot(s, si)
                     layout.select_tab_id(mut s.sessions[si].layout, tab) else |_| { return }
@@ -1468,10 +1466,17 @@ fn attached_message(mut s: Server, index: int, kind: int, body: List[byte]) {
     } else if kind == 7 {
         if passing(s.conns[index].mode) { to_pane(mut s, index, body[4..body.len]) }
     } else if kind == 8 {
-        if proto.ack(mut s.conns[index].ack, u(body, 0, 4)) != 0 {
+        let seq = u(body, 0, 4)
+        let pending = s.conns[index].ack.pending
+        if proto.ack(mut s.conns[index].ack, seq) != 0 {
             protocol_error(mut s, index, "ack of an image not sent")
-        } else if s.conns[index].ending && s.conns[index].image_end < 0 && s.conns[index].ack.pending == 0 {
-            finish_ending(mut s, index)
+        } else {
+            // A stale ACK succeeds as a no-op in proto, but must never
+            // promote geometry belonging to the next outstanding image.
+            if pending != 0 && seq == pending { let _tabs = ack_tab_hits(mut s.conns[index].tabs, seq) }
+            if s.conns[index].ending && s.conns[index].image_end < 0 && s.conns[index].ack.pending == 0 {
+                finish_ending(mut s, index)
+            }
         }
     } else if kind == 9 {
         s.conns[index].force_full = true
@@ -2102,9 +2107,14 @@ fn compose_now(mut s: Server, index: int, now: int) {
     }
     // The client's own cells are made only when a row of theirs is read.
     var bar = List[vt.Cell]()
+    var tabbar = TabBar { cells: List[vt.Cell](), hits: List[TabHit]() }
     let whole = full || !s.conns[index].shadow.valid || s.conns[index].shadow.cols != s.sessions[si].cols ||
         s.conns[index].shadow.rows != s.sessions[si].rows
-    if whole || all || bar_scan || mode == config.MODE_HELP { bar = bar_cells(s, si, index, now) }
+    let paint_bar = whole || all || bar_scan || mode == config.MODE_HELP
+    if paint_bar {
+        tabbar = tab_bar(s, si)
+        bar = bar_cells(s, si, index, now, tabbar.cells)
+    }
     let payload = compose_frame(mut s.conns[index].shadow, s.panes, s.sessions[si], bar, seq, full, all, scans, cursor)
     s.conns[index].stale = false
     s.conns[index].seen_layout = gen
@@ -2122,6 +2132,9 @@ fn compose_now(mut s: Server, index: int, now: int) {
         protocol_error(mut s, index, "server image invalid")
         return
     }
+    if paint_bar {
+        stage_tab_hits(mut s.conns[index].tabs, tabbar.hits, s.sessions[si].cols, area + 1, seq)
+    } else { stage_drawn_tab_hits(mut s.conns[index].tabs, seq) }
     let _q = enqueue(mut s.conns[index], wire, true)
     s.conns[index].image_seq = seq
     s.conns[index].force_full = false
