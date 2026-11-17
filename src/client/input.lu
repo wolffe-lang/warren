@@ -78,14 +78,19 @@ pub fn expire(mut p: Parser, now_ms: int) -> List[Event] {
     out
 }
 
+// Drop the first `n` pending bytes, in place: what follows moves to the
+// front and the tail is popped, so the parser's buffer is reused for as
+// long as the client runs (a parser outlives every turn's region).
 fn take_front(mut p: Parser, n: int) {
-    var rest = List[byte]()
-    var i = n
-    while i < p.pending.len {
-        (mut rest).push(p.pending[i])
+    let left = p.pending.len - n
+    var i = 0
+    while i < left {
+        p.pending[i] = p.pending[i + n]
         i += 1
     }
-    p.pending = rest
+    while p.pending.len > left {
+        let _gone = (mut p.pending).pop() else { break }
+    }
 }
 
 fn at(p: Parser, i: int) -> int {
@@ -119,7 +124,7 @@ fn drain(mut p: Parser, mut out: List[Event], force: bool) {
 fn flush_paste(mut p: Parser, mut out: List[Event]) {
     if p.paste.len == 0 { return }
     (mut out).push(bytes_event(4, take copy p.paste))
-    p.paste = List[byte]()
+    (mut p.paste).reset()
 }
 
 fn add_paste(mut p: Parser, mut out: List[Event], n: int) {
