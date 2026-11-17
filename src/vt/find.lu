@@ -6,6 +6,10 @@
 pub const FIND_SCALARS: int = 62
 
 /// A search's working state, kept in the window so a search allocates nothing.
+/// `bits` is the shift-and state over the needle's scalars, `top` the last
+/// scalar's bit and `lead` the width of the scalars before it. The search runs
+/// from line `point_id` at cell `point_offset`; `line` is the line being read
+/// and `seen` whether the walk has reached the point's line.
 pub struct FindState {
     bits: int, top: int, lead: int,
     older: bool, point_id: int, point_offset: int,
@@ -21,10 +25,72 @@ fn new_find_state() -> FindState {
         first: false, first_id: 0 - 1, first_from: 0, first_to: 0 }
 }
 
+// The scalar at byte `at` of a UTF-8 needle and its length in bytes.
+fn needle_at(needle: List[byte], at: int) -> (int, int) {
+    let b = needle[at] as int
+    let n = if b < 128 { 1 } else if b < 224 { 2 } else if b < 240 { 3 } else { 4 }
+    var cp = if n == 1 { b } else if n == 2 { b - 192 } else if n == 3 { b - 224 } else { b - 240 }
+    var i = 1
+    while i < n && at + i < needle.len {
+        cp = cp * 64 + (needle[at + i] as int) - 128
+        i += 1
+    }
+    (cp, n)
+}
+
+// The needle's scalars equal to `cp`, as bits (scalar i is bit i).
+fn needle_mask(needle: List[byte], cp: int) -> int {
+    var mask = 0
+    var bit = 1
+    var at = 0
+    while at < needle.len {
+        let (scalar, n) = needle_at(needle, at)
+        if scalar == cp { mask += bit }
+        bit *= 2
+        at += n
+    }
+    mask
+}
+
+// Set up the matcher for `needle`; false when a search does not take it.
+fn find_needle(mut view: View, needle: List[byte]) -> bool {
+    var count = 0
+    var lead = 0
+    var last = 0
+    var width = 0
+    var top = 1
+    var at = 0
+    while at < needle.len {
+        let (cp, n) = needle_at(needle, at)
+        let w = scalar_width(cp)
+        if count > 0 { top *= 2 }
+        lead += last
+        last = w
+        width += w
+        count += 1
+        if count > FIND_SCALARS { return false }
+        at += n
+    }
+    if count == 0 || width == 0 { return false }
+    view.find.bits = 0
+    view.find.top = top
+    view.find.lead = lead
+    true
+}
+
 /// Whether a search takes this needle: 1 to FIND_SCALARS scalars, at least
 /// one of them with a width.
 pub fn needle_fits(needle: List[byte]) -> bool {
-    needle.len < 0
+    var count = 0
+    var width = 0
+    var at = 0
+    while at < needle.len {
+        let (cp, n) = needle_at(needle, at)
+        width += scalar_width(cp)
+        count += 1
+        at += n
+    }
+    count >= 1 && count <= FIND_SCALARS && width > 0
 }
 
 /// Forget the window's last match.
@@ -32,22 +98,183 @@ pub fn unfind_view(mut view: View) {
     view.found_id = 0 - 1
 }
 
-/// Search the pane for `needle` toward older rows or newer, from the last
-/// match, or with none from the edge of the window `back` rows up.
+// The walk reaches logical line `id`: the matcher starts again, and an older
+// search is done once it leaves the point's line.
+fn find_line(mut view: View, id: int) {
+    if id == view.find.line { return }
+    if view.find.older && view.find.seen && view.find.line == view.find.point_id { view.find.done = true }
+    view.find.line = id
+    view.find.bits = 0
+    if id == view.find.point_id { view.find.seen = true }
+}
+
+// A match in the current line from cell `from` to `to`: kept when it is on the
+// search's side of the point (the nearest one: the last before it, the first
+// after it).
+fn find_match(mut view: View, from: int, to: int) {
+    let id = view.find.line
+    if !view.find.first {
+        view.find.first = true
+        view.find.first_id = id
+        view.find.first_from = from
+        view.find.first_to = to
+    }
+    let here = id == view.find.point_id
+    let before = if here then from < view.find.point_offset else !view.find.seen
+    let after = if here then from > view.find.point_offset else view.find.seen
+    if (view.find.older && before) || (!view.find.older && after) {
+        view.find.hit = true
+        view.find.hit_id = id
+        view.find.hit_from = from
+        view.find.hit_to = to
+        if !view.find.older { view.find.done = true }
+    }
+}
+
+// One scalar of the current line at cell `offset`, `width` cells wide (zero
+// for a combining mark, which follows its base's cells).
+fn find_scalar(mut view: View, needle: List[byte], cp: int, offset: int, width: int) {
+    let c = if cp == 0 then 32 else cp
+    view.find.bits = (view.find.bits * 2 + 1) & needle_mask(needle, c)
+    if view.find.bits & view.find.top != 0 {
+        find_match(mut view, offset - view.find.lead, offset + width - 1)
+    }
+}
+
+// The search's point when there is no last match: just past the window's
+// bottom row (older; a row holds at most `cols` cells of its line) or just
+// before its top row (newer), on the window's rows when it looks back and on
+// the live rows otherwise.
+fn find_edge(mut view: View, pane: Vt, older: bool, back: int) {
+    let filled = back > 0 && view.rows > 0 && view.cols > 0
+    let row = if older { if filled { view.rows } else { pane.rows } } else { 1 }
+    let id = if filled { view.screen.line_ids[row - 1] } else { pane.primary.line_ids[row - 1] }
+    let offset = if filled { view.screen.line_offsets[row - 1] } else { pane.primary.line_offsets[row - 1] }
+    let cols = if filled { view.cols } else { pane.cols }
+    view.find.point_id = id
+    view.find.point_offset = if older { offset + cols } else { offset - 1 }
+}
+
+/// Search the pane for `needle` toward older rows or newer: from the last
+/// match, or with none from the edge of the window `back` rows up (its bottom
+/// row for older, its top row for newer, whose own matches count). The needle
+/// is literal and case-sensitive and matches within one logical line, across
+/// soft wraps; combining marks are scalars of their own. The nearest match is
+/// the window's new last match; with none, the last match stays and the
+/// result is false. Retained history is read oldest first, then the live
+/// rows; the alternate screen is not searched. Allocates nothing.
 pub fn view_find(mut view: View, pane: Vt, needle: List[byte], older: bool, back: int) -> bool {
-    view.find.older = older && pane.rows + needle.len + back < 0
-    false
-}
-
-/// The back of a window that shows the last match: `back` when its window
-/// shows it already, -1 when the pane no longer holds it.
-pub fn view_found_back(mut view: View, pane: Vt, back: int) -> int {
-    view.find.done = pane.rows + back < 0
-    0 - 1
-}
-
-/// Mark the last match's cells in the filled window, as far as it shows them.
-pub fn mark_found(mut view: View) -> bool {
+    if pane.active_alternate || !find_needle(mut view, needle) { return false }
+    if view.found_id >= 0 {
+        view.find.point_id = view.found_id
+        view.find.point_offset = view.found_from
+    } else { find_edge(mut view, pane, older, back) }
+    view.find.older = older
+    view.find.line = 0 - 1
+    view.find.seen = false
     view.find.done = false
-    false
+    view.find.hit = false
+    view.find.first = false
+    if pane.history.records > 0 && pane.history.bytes.len > 0 {
+        var at = pane.history.head
+        var n = 0
+        while n < pane.history.records && !view.find.done {
+            find_line(mut view, history_get_word(pane.history, at, 8, 8))
+            var offset = history_get_word(pane.history, at, 16, 4)
+            history_reader_start(mut view.reader, pane.history, at)
+            while !view.find.done && history_reader_next(mut view.reader, pane.history) {
+                if view.reader.kind == 0 {
+                    let w = scalar_width(view.reader.value)
+                    find_scalar(mut view, needle, view.reader.value, offset, w)
+                    offset += w
+                }
+            }
+            at = (at + history_get_word(pane.history, at, 0, 4)) % pane.history.bytes.len
+            n += 1
+        }
+    }
+    let cols = pane.cols
+    var row = 1
+    while row <= pane.rows && !view.find.done {
+        find_line(mut view, pane.primary.line_ids[row - 1])
+        var offset = pane.primary.line_offsets[row - 1]
+        var col = 0
+        while col < pane.primary.extents[row - 1] && !view.find.done {
+            let at = (row - 1) * cols + col
+            if pane.primary.cells[at].width != 0 {
+                let w = history_natural_width(pane.primary, cols, at)
+                find_scalar(mut view, needle, pane.primary.cells[at].base, offset, w)
+                offset += w
+                if pane.primary.cells[at].mark1 != 0 { find_scalar(mut view, needle, pane.primary.cells[at].mark1, offset, 0) }
+                if pane.primary.cells[at].mark2 != 0 { find_scalar(mut view, needle, pane.primary.cells[at].mark2, offset, 0) }
+            }
+            col += 1
+        }
+        row += 1
+    }
+    if view.find.older && !view.find.seen { return false }
+    if !view.find.hit && !view.find.older && !view.find.seen && view.find.first {
+        // The point's line is no longer retained: the oldest match is newer.
+        view.find.hit = true
+        view.find.hit_id = view.find.first_id
+        view.find.hit_from = view.find.first_from
+        view.find.hit_to = view.find.first_to
+    }
+    if !view.find.hit { return false }
+    view.found_id = view.find.hit_id
+    view.found_from = view.find.hit_from
+    view.found_to = view.find.hit_to
+    true
+}
+
+/// The back of a window that shows the last match's first cell: `back` when
+/// that window shows it already, else one with it on the middle row, at least
+/// 0 (a fill clamps at the oldest row). -1 when there is no match or the pane
+/// no longer holds it. Allocates nothing.
+pub fn view_found_back(mut view: View, pane: Vt, back: int) -> int {
+    if view.found_id < 0 || pane.active_alternate { return 0 - 1 }
+    var live = 0
+    var row = 1
+    while row <= pane.rows {
+        if pane.primary.line_ids[row - 1] == view.found_id && pane.primary.line_offsets[row - 1] <= view.found_from { live = row }
+        row += 1
+    }
+    var height = 1 - live
+    if live == 0 {
+        height = view_back_of(mut view, pane, view.found_id, view.found_from)
+        if height < 0 { return 0 - 1 }
+    }
+    if back >= height && height >= back - pane.rows + 1 { return back }
+    let to = height + (pane.rows + 1) / 2 - 1
+    if to < 0 { 0 } else { to }
+}
+
+/// Mark the last match's cells in the filled window, as far as it shows them:
+/// a match starting above the window is marked from its first row, one
+/// running past it to its last cell. False, and nothing marked, when the
+/// window shows none of it (or there is no match).
+pub fn mark_found(mut view: View) -> bool {
+    if view.found_id < 0 { return false }
+    var any = 0
+    var r0 = 0
+    var c0 = 0
+    var r1 = 0
+    var c1 = 0
+    var row = 1
+    while row <= view.rows {
+        if view.screen.line_ids[row - 1] == view.found_id {
+            let start = view.screen.line_offsets[row - 1]
+            if any == 0 { any = row }
+            if start <= view.found_from { r0 = row; c0 = view.found_from - start + 1 }
+            if start <= view.found_to { r1 = row; c1 = view.found_to - start + 1 }
+        }
+        row += 1
+    }
+    if any == 0 || r1 == 0 || (r0 > 0 && c0 > view.cols) {
+        unmark_view(mut view)
+        return false
+    }
+    if r0 == 0 { r0 = any; c0 = 1 }
+    mark_view(mut view, r0, c0, r1, c1)
+    true
 }
