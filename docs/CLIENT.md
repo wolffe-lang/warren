@@ -127,7 +127,10 @@ acknowledged, even if output has since changed live activity marks or another
 client renamed a label. A removed tab's stale label consumes the gesture,
 rather than selecting a different tab that shifted into its place. Even a
 pixel-identical replacement publishes an ACKable zero-cell image so the new
-identity becomes clickable. Border clicks are inert; dragging and wheel
+identity becomes clickable. A plain border click is inert; dragging moves that
+split with minimum-size clamps, even when the pointer leaves its original pane
+area. The terminal client requests all-motion reporting (1003) and disables it
+on exit, so programs inside can receive hover when they ask for it. Wheel
 scrollback controls remain planned.
 
 ## Rendering
