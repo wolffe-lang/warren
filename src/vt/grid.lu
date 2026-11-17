@@ -15,13 +15,18 @@ pub struct Cell {
 /// One rectangular logical screen, stored flat. Backing arrays may retain a
 /// larger capacity; only cols*rows cells and rows metadata entries are active.
 /// Primary row addresses refer to logical lines; alternate addresses live in
-/// their own screen namespace and never enter primary history.
+/// their own screen namespace and never enter primary history. Each row's
+/// damage (damage.lu) is the tick of its last change, that tick's changed
+/// columns and the tick of the change before; `tick` is the pane's, and
+/// `damage_cols` the pane's width.
 pub struct Screen {
     cells: List[Cell],
     extents: List[int],
     wrapped: List[bool],
     line_ids: List[int], line_offsets: List[int], overflow_ids: List[int],
     next_line_id: int,
+    damage_cols: int, tick: int,
+    row_tick: List[int], prior_tick: List[int], span_first: List[int], span_last: List[int],
 }
 
 /// The current rendition, distinct from every cell already on the screen.
@@ -63,6 +68,7 @@ pub struct Vt {
     history: History, line_coordinate: LineCoordinate,
     resize_state: ResizeState,
     glyph_calls: int,
+    tick: int,
 }
 
 fn new_screen(cols: int, rows: int) -> Screen {
@@ -79,6 +85,14 @@ fn new_screen(cols: int, rows: int) -> Screen {
     var line_ids = List[int]()
     var line_offsets = List[int]()
     var overflow_ids = List[int]()
+    var row_tick = List[int]()
+    var prior_tick = List[int]()
+    var span_first = List[int]()
+    var span_last = List[int]()
+    (mut row_tick).reserve(rows)
+    (mut prior_tick).reserve(rows)
+    (mut span_first).reserve(rows)
+    (mut span_last).reserve(rows)
     (mut extents).reserve(rows)
     (mut wrapped).reserve(rows)
     (mut line_ids).reserve(rows)
@@ -91,11 +105,16 @@ fn new_screen(cols: int, rows: int) -> Screen {
         (mut line_ids).push(i)
         (mut line_offsets).push(0)
         (mut overflow_ids).push(0 - 1)
+        (mut row_tick).push(0)
+        (mut prior_tick).push(0)
+        (mut span_first).push(0)
+        (mut span_last).push(cols - 1)
         i += 1
     }
     Screen { cells: cells, extents: extents, wrapped: wrapped,
         line_ids: line_ids, line_offsets: line_offsets, overflow_ids: overflow_ids,
-        next_line_id: rows }
+        next_line_id: rows, damage_cols: cols, tick: 0,
+        row_tick: row_tick, prior_tick: prior_tick, span_first: span_first, span_last: span_last }
 }
 
 fn default_tabs(cols: int) -> List[bool] {
@@ -131,5 +150,6 @@ pub fn new(cols: int, rows: int, scrollback_cap_bytes: int) -> Vt {
         line_coordinate: LineCoordinate { id: 0, offset: 0, next_id: rows },
         resize_state: new_resize_state(cols),
         glyph_calls: 0,
+        tick: 0,
     }
 }

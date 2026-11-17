@@ -117,5 +117,11 @@ pub fn resize(mut pane: Vt, cols: int, rows: int) -> str {
     pane.region_bottom = rows
     pane.pending_wrap = false
     if pane.resize_state.lost { pane.resize_state.active = false }
+    // Every row of both screens is new at the new size.
+    begin_tick(mut pane)
+    pane.primary.damage_cols = cols
+    pane.alternate.damage_cols = cols
+    touch_rows(mut pane.primary, rows)
+    touch_rows(mut pane.alternate, rows)
     ""
 }

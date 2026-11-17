@@ -33,12 +33,20 @@ fn ensure_screen_capacity(mut screen: Screen, cells: int, rows: int) {
         (mut screen.line_ids).reserve(capacity)
         (mut screen.line_offsets).reserve(capacity)
         (mut screen.overflow_ids).reserve(capacity)
+        (mut screen.row_tick).reserve(capacity)
+        (mut screen.prior_tick).reserve(capacity)
+        (mut screen.span_first).reserve(capacity)
+        (mut screen.span_last).reserve(capacity)
         while screen.extents.len < capacity {
             (mut screen.extents).push(0)
             (mut screen.wrapped).push(false)
             (mut screen.line_ids).push(0 - 1)
             (mut screen.line_offsets).push(0)
             (mut screen.overflow_ids).push(0 - 1)
+            (mut screen.row_tick).push(0)
+            (mut screen.prior_tick).push(0)
+            (mut screen.span_first).push(0)
+            (mut screen.span_last).push(0)
         }
     }
 }
