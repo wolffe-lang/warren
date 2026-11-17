@@ -152,6 +152,19 @@ target, `ceil(target * 10000 / (E - 1))`, kept in 1..9999; when the border
 does not move, the share does not change. The answer is the number of cells
 the pane grew (negative when it shrank, 0 when the clamp held it).
 
+## Border gestures
+
+`border_at(layout, tab, cols, rows, col, row)` returns the split node on a
+drawn border, or a hit with `node=-1`. Junctions belong to the ancestor's
+border line. Zoomed, hidden and out-of-area borders cannot be hit.
+`drag_border(layout, hit, position, cols, rows)` moves that split to an
+absolute column or row using the same subtree minimums and share rounding
+as keyboard resize. It answers the signed movement, or `no_border` without
+changing anything. Zero displacement or a repeated clamp leaves shares
+unchanged. A hit is valid only in the caller's captured layout generation;
+the server cancels it on unrelated layout changes rather than trusting
+reusable arena indices. Dragging never changes focus or unzooms a tab.
+
 ## The canonical dump
 
 `dump(layout)` is the canonical text form of a layout: one line for the
