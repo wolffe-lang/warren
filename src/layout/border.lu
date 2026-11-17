@@ -1,0 +1,76 @@
+//! member: true
+//! Split-node border hits and the resize arithmetic shared with key resizing.
+
+/// A border capture. Node indices are valid only in the caller's captured
+/// layout generation; never retain a hit across an unrelated layout change.
+pub struct BorderHit { tab: int, node: int, axis: int, position: int }
+
+/// An absent border capture.
+pub fn no_border_hit() -> BorderHit {
+    BorderHit { tab: 0, node: 0 - 1, axis: COLS, position: 0 }
+}
+
+/// Hit the actual split on a drawn border. At a junction the ancestor
+/// border owns its complete line, as it does in pane_at's geometry.
+pub fn border_at(l: Layout, tab: int, cols: int, rows: int, col: int, row: int) -> BorderHit {
+    let ti = tab_index(l, tab)
+    if ti < 0 || col < 1 || row < 1 || col > cols || row > rows || l.tabs[ti].zoomed {
+        return no_border_hit()
+    }
+    var i = l.tabs[ti].root
+    var b = area(cols, rows)
+    while l.tabs[ti].nodes[i].kind == SPLIT {
+        let n = copy l.tabs[ti].nodes[i]
+        let c = cut(n.axis, n.share, b)
+        let at = if n.axis == COLS then col else row
+        if c.both && at == c.border { return BorderHit { tab: tab, node: i, axis: n.axis, position: c.border } }
+        if !c.both || at < c.border { i = n.first; b = c.first }
+        else { i = n.second; b = c.second }
+    }
+    no_border_hit()
+}
+
+// Positive delta moves the first child's far border right or down.
+fn move_split(mut tab: Tab, node: int, delta: int, cols: int, rows: int) -> int ! {no_border} {
+    let axis = tab.nodes[node].axis
+    let b = node_box(tab, node, cols, rows)
+    let extent = if axis == COLS then b.cols else b.rows
+    let m = minimum(axis)
+    if extent < 2 * m + 1 { return no_border }
+    let a = first_extent(extent, tab.nodes[node].share, m)
+    let lo = least(tab, tab.nodes[node].first, axis)
+    let hi = extent - 1 - least(tab, tab.nodes[node].second, axis)
+    var target = a + delta
+    if delta > 0 {
+        let top = if a > hi then a else hi
+        if target > top { target = top }
+    }
+    if delta < 0 {
+        let bottom = if a < lo then a else lo
+        if target < bottom { target = bottom }
+    }
+    if target < m { target = m }
+    if target > extent - 1 - m { target = extent - 1 - m }
+    if target == a { return 0 }
+    var share = (target * SHARE_ONE + extent - 2) / (extent - 1)
+    if share < 1 { share = 1 }
+    if share > SHARE_ONE - 1 { share = SHARE_ONE - 1 }
+    tab.nodes[node].share = share
+    first_extent(extent, share, m) - a
+}
+
+/// Move the captured split to an absolute column/row, with the same minimum
+/// clamps as keyboard resize. Unknown, hidden or zoomed splits are refused.
+/// The caller checks its layout generation before passing a captured hit.
+pub fn drag_border(mut l: Layout, hit: BorderHit, position: int, cols: int, rows: int) -> int ! {no_border} {
+    let ti = tab_index(l, hit.tab)
+    if ti < 0 || l.tabs[ti].zoomed || hit.node < 0 || hit.node >= l.tabs[ti].nodes.len { return no_border }
+    let n = copy l.tabs[ti].nodes[hit.node]
+    if n.kind != SPLIT || n.axis != hit.axis { return no_border }
+    let b = node_box(l.tabs[ti], hit.node, cols, rows)
+    let c = cut(n.axis, n.share, b)
+    if !c.both { return no_border }
+    let end = if n.axis == COLS then cols else rows
+    let target = if position < 1 then 1 else if position > end then end else position
+    move_split(mut l.tabs[ti], hit.node, target - c.border, cols, rows)?
+}

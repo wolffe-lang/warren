@@ -250,34 +250,9 @@ pub fn resize(
         s = n.parent
     }
     if s < 0 { return no_border }
-    let b = node_box(l.tabs[ti], s, cols, rows)
-    let extent = if axis == COLS then b.cols else b.rows
-    let m = minimum(axis)
-    if extent < 2 * m + 1 { return no_border }
-    let a = first_extent(extent, l.tabs[ti].nodes[s].share, m)
-    let lo = least(l.tabs[ti], l.tabs[ti].nodes[s].first, axis)
-    let hi = extent - 1 - least(l.tabs[ti], l.tabs[ti].nodes[s].second, axis)
-    let delta = if near_first then cells else 0 - cells
-    var target = a + delta
-    if delta > 0 {
-        let top = if a > hi then a else hi
-        if target > top { target = top }
-    }
-    if delta < 0 {
-        let bottom = if a < lo then a else lo
-        if target < bottom { target = bottom }
-    }
-    if target < m { target = m }
-    if target > extent - 1 - m { target = extent - 1 - m }
+    let moved = move_split(mut l.tabs[ti], s, if near_first then cells else 0 - cells, cols, rows)?
     l.tabs[ti].zoomed = false
-    if target == a { return 0 }
-    var share = (target * SHARE_ONE + extent - 2) / (extent - 1)
-    if share < 1 { share = 1 }
-    if share > SHARE_ONE - 1 { share = SHARE_ONE - 1 }
-    l.tabs[ti].nodes[s].share = share
-    let now = first_extent(extent, share, m)
-    if near_first { return now - a }
-    a - now
+    if near_first { moved } else { 0 - moved }
 }
 
 /// Toggle a tab's zoom.

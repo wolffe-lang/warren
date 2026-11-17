@@ -1,0 +1,57 @@
+//! member: false
+//! Pure border hit/resize rows, with independently computed cell positions.
+use layout
+
+fn test_border_hits_and_clamps() {
+    var l = layout.new(1, "main") else { assert(false, "new"); return }
+    layout.split(mut l, 1, 1, layout.COLS, 2, true, 80, 22) else { assert(false, "split"); return }
+    let h = layout.border_at(l, 1, 80, 22, 40, 3)
+    assert(h.node >= 0 && h.axis == layout.COLS && h.position == 40, "vertical border hit")
+    for c in [0, 1, 39, 41, 80, 81] { assert(layout.border_at(l, 1, 80, 22, c, 3).node < 0, "only border hits") }
+    assert(layout.border_at(l, 1, 80, 22, 40, 0).node < 0, "above")
+    assert(layout.border_at(l, 1, 80, 22, 40, 23).node < 0, "below")
+    let before = layout.dump(l)
+    assert((layout.drag_border(mut l, h, 40, 80, 22) else 999) == 0, "no displacement")
+    assert(layout.dump(l) == before, "no-motion leaves share identical")
+    assert((layout.drag_border(mut l, h, 46, 80, 22) else 999) == 6, "right six")
+    assert(layout.border_at(l, 1, 80, 22, 46, 3).node == h.node, "same captured split")
+    assert((layout.drag_border(mut l, h, 0, 80, 22) else 999) == 0 - 43, "left minimum")
+    assert(layout.border_at(l, 1, 80, 22, 3, 3).node == h.node, "two-column first pane")
+    assert((layout.drag_border(mut l, h, 65535, 80, 22) else 999) == 75, "right minimum")
+    assert(layout.border_at(l, 1, 80, 22, 78, 3).node == h.node, "two-column second pane")
+    let minimum = layout.dump(l)
+    assert((layout.drag_border(mut l, h, 65535, 80, 22) else 999) == 0, "repeat clamp")
+    assert(layout.dump(l) == minimum, "clamp leaves share identical")
+    layout.zoom(mut l, 1) else { assert(false, "zoom"); return }
+    assert(layout.border_at(l, 1, 80, 22, 78, 3).node < 0, "no zoomed border")
+    var refused = false
+    let _attempt = layout.drag_border(mut l, h, 40, 80, 22) else |_| { refused = true; 0 }
+    assert(refused, "zoomed drag refused")
+}
+
+fn test_nested_split_and_subtree_minimums() {
+    var l = layout.new(1, "main") else { assert(false, "new"); return }
+    layout.split(mut l, 1, 1, layout.COLS, 2, true, 80, 22) else { assert(false, "split"); return }
+    layout.split(mut l, 1, 2, layout.ROWS, 3, true, 80, 22) else { assert(false, "nested"); return }
+    let root = layout.border_at(l, 1, 80, 22, 40, 11)
+    let child = layout.border_at(l, 1, 80, 22, 45, 11)
+    assert(root.node != child.node && child.axis == layout.ROWS, "junction belongs to ancestor")
+    assert((layout.drag_border(mut l, child, 15, 80, 22) else 999) == 4, "horizontal movement")
+    assert(layout.border_at(l, 1, 80, 22, 45, 15).node == child.node, "nested border moved")
+    assert(layout.border_at(l, 1, 80, 22, 40, 15).node == root.node, "parent not moved")
+    assert((layout.drag_border(mut l, child, 1, 80, 22) else 999) == 0 - 13, "one-row minimum")
+    assert((layout.drag_border(mut l, child, 22, 80, 22) else 999) == 19, "bottom minimum")
+    // A same-axis subtree must retain both of its panes, not only one leaf.
+    layout.split(mut l, 1, 1, layout.COLS, 4, true, 80, 22) else { assert(false, "same-axis nested"); return }
+    let _m = layout.drag_border(mut l, root, 1, 80, 22) else 0
+    assert(layout.border_at(l, 1, 80, 22, 6, 3).node == root.node, "subtree minimum is 2+1+2")
+    for r in layout.rects(l, 1, 80, 22) { assert(r.cols >= 2 && r.rows >= 1, "drag never hides a leaf") }
+    assert(layout.border_at(l, 1, 4, 1, 3, 1).node < 0, "hidden border cannot be hit")
+}
+
+fn main() -> int {
+    test_border_hits_and_clamps()
+    test_nested_split_and_subtree_minimums()
+    print("PASS border-geometry")
+    0
+}
