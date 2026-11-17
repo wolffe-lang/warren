@@ -135,9 +135,12 @@ fn test_long_paste() {
     assert(events[0].data.len == client.PASTE_MAX && events[1].data.len == 70000 - client.PASTE_MAX, "paste-sizes")
 }
 
+// Every cut but the one right after the leading ESC: a read that ends in
+// ESC is the Escape key (test_a_lone_escape_goes_at_once), so that cut
+// reads as Escape and then the rest, as in any terminal.
 fn test_paste_end_cut_everywhere() {
     let text = bytes_of("\u{1b}[200~ab\u{1b}[201~c")
-    var cut = 1
+    var cut = 2
     while cut < text.len {
         var p = client.parser()
         var all = client.feed(mut p, text[0..cut], 0)
