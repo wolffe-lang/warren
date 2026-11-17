@@ -527,8 +527,9 @@ by its logical line and offset, or at the live rows. The pane's cursor is not
 drawn over a window. A window whose pane closes ends the mode; a resized pane's
 window is filled again at the new size on the same content. A window's two
 buffers belong to its client and grow only between turns, outside the turn's
-region, the first time a pane needs more; fills and lookups allocate nothing,
-and the step that asked waits for the next turn.
+region: to its session's tab area once the client is attached, and to any
+larger size a step asks for, which then waits for the next turn. Fills and
+lookups allocate nothing.
 
 **Selection and the register.** A left press in the focused pane in normal
 mode, when its program asked for no mouse reports (with Shift, even when it
