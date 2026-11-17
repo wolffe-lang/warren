@@ -1256,8 +1256,8 @@ fn rename_active(mut s: Server, index: int, name: str) {
     session_changed(mut s, si, now_ns())
 }
 
-// The prompt's line, run as the mode it was typed in says: a rename, or a
-// command of the key table's action names.
+// The prompt's line, run as the mode it was typed in says: a search, a
+// rename, or a command of the key table's action names.
 fn run_prompt(mut s: Server, index: int, was: int) {
     if was == config.MODE_SEARCH {
         search_run(mut s, index)
