@@ -49,6 +49,7 @@ pub struct Server {
     again: bool,
     need_slot: bool,
     need_pane: bool,
+    need_view: bool,
     want_cols: int,
     want_rows: int,
     rotate: int,
@@ -1398,6 +1399,7 @@ fn leave_view(mut s: Server, index: int) {
     if s.conns[index].view_slot < 0 { return }
     s.conns[index].view_slot = 0 - 1
     s.conns[index].view_back = 0
+    s.conns[index].view_retry = 0 - 1
     frame_moved(mut s, index)
 }
 
@@ -1433,6 +1435,14 @@ fn view_to(mut s: Server, index: int, back: int) {
     }
     let k = s.conns[index].view_slot
     let shown = vt.fill_view(mut s.conns[index].view, s.panes[k].screen, back)
+    if shown < 0 {
+        // Too small for the pane: grown between turns, filled on the next.
+        s.conns[index].view_cols = s.panes[k].screen.cols
+        s.conns[index].view_rows = s.panes[k].screen.rows
+        s.conns[index].view_retry = back
+        s.need_view = true
+        return
+    }
     s.conns[index].view_back = shown
     s.conns[index].view_id = s.conns[index].view.screen.line_ids[0]
     s.conns[index].view_offset = s.conns[index].view.screen.line_offsets[0]
@@ -2224,7 +2234,11 @@ fn compose_now(mut s: Server, index: int, now: int) {
     // filled again at its new size, on the same content.
     if s.conns[index].view_slot >= 0 {
         if !view_live(s, index) { set_mode(mut s, index, config.MODE_NORMAL) }
-        else if s.conns[index].view_back > 0 {
+        else if s.conns[index].view_retry >= 0 {
+            let retry = s.conns[index].view_retry
+            s.conns[index].view_retry = 0 - 1
+            view_to(mut s, index, retry)
+        } else if s.conns[index].view_back > 0 {
             let vk = s.conns[index].view_slot
             if s.conns[index].view.cols != s.panes[vk].screen.cols || s.conns[index].view.rows != s.panes[vk].screen.rows {
                 let back = view_anchor(mut s, index)
@@ -2693,7 +2707,7 @@ pub fn serve() -> int {
         conns: conns, sessions: List[Session](), panes: List[Pane](), orphans: List[int](), key_kind: List[int](),
         key_owner: List[int](), key_gen: List[int](), next_id: 0, next_pane: 1, stopping: false, stop_deadline: 0,
         started: now_ns(), idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
-        version: vt.package_version(), again: false, need_slot: false, need_pane: false, want_cols: 0,
+        version: vt.package_version(), again: false, need_slot: false, need_pane: false, need_view: false, want_cols: 0,
         want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, master_read: master_read,
         budget: budget, uid: env.euid() else 0 - 1, inherited: inherited, keys: keys, help: help,
         clock_hour: 0, clock_minute: 0, clock_next: 0,
@@ -2717,6 +2731,21 @@ pub fn serve() -> int {
             s.again = true
         }
         s.need_pane = false
+        // A window's buffers grow only here, outside the turn's region.
+        if s.need_view {
+            var v = 0
+            while v < s.conns.len {
+                if s.conns[v].live && s.conns[v].view_cols > 0 {
+                    vt.reserve_view(mut s.conns[v].view, s.conns[v].view_cols, s.conns[v].view_rows)
+                    s.conns[v].view_cols = 0
+                    s.conns[v].view_rows = 0
+                    mark_stale(mut s.conns[v], now_ns())
+                }
+                v += 1
+            }
+            s.again = true
+        }
+        s.need_view = false
     }
     trace(s, "stopped after {s.turns} turns")
     var k = 0
