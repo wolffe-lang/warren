@@ -1,0 +1,43 @@
+//! member: false
+//! Mouse transport policy, independent of the outer terminal's encoding.
+use client
+use server
+use vt
+
+fn text(bytes: List[byte]) -> str { str_from_utf8(bytes) else "" }
+
+fn test_outer_requests_and_restores_hover() {
+    let enter = text(client.enter_bytes(7))
+    let leave = text(client.leave_bytes(7))
+    assert(enter.contains("\u{1b}[?1003h"), "outer requests all-motion for 1003 children")
+    assert(leave.contains("\u{1b}[?1003l"), "outer restores all-motion")
+    assert(!text(client.enter_bytes(0)).contains("1003"), "no mouse when disabled")
+}
+
+fn test_inner_tracking_and_encoding() {
+    var p = vt.new(300, 20, 0)
+    for tracking in [1000, 1002, 1003] {
+        vt.feed(mut p, "\u{1b}[?1000l\u{1b}[?1002l\u{1b}[?1003l\u{1b}[?{tracking}h\u{1b}[?1006h".bytes())
+        assert(text(server.mouse_bytes(p, 0, 1, 0, 5, 3)) == "\u{1b}[<0;5;3M", "press")
+        assert(text(server.mouse_bytes(p, 1, 1, 0, 5, 3)) == "\u{1b}[<0;5;3m", "release")
+        let drag = server.mouse_bytes(p, 2, 1, 0, 5, 3)
+        let hover = server.mouse_bytes(p, 2, 0, 0, 5, 3)
+        assert((drag.len > 0) == (tracking != 1000), "button motion only when requested")
+        assert((hover.len > 0) == (tracking == 1003), "hover only for all-motion")
+        assert(text(server.mouse_bytes(p, 3, 0, 0, 5, 3)) == "\u{1b}[<64;5;3M", "wheel up")
+        assert(text(server.mouse_bytes(p, 4, 0, 0, 5, 3)) == "\u{1b}[<65;5;3M", "wheel down")
+        assert(text(server.mouse_bytes(p, 0, 1, 7, 300, 20)) == "\u{1b}[<28;300;20M", "SGR modifier and large coordinate")
+        vt.feed(mut p, "\u{1b}[?1006l".bytes())
+        assert(server.mouse_bytes(p, 0, 1, 0, 224, 3).len == 0, "legacy out-of-range is not wrapped")
+        assert(server.mouse_bytes(p, 0, 1, 0, 223, 3).len == 6, "legacy maximum")
+    }
+    vt.feed(mut p, "\u{1b}[?1000l\u{1b}[?1002l\u{1b}[?1003l\u{1b}[?1006h".bytes())
+    assert(server.mouse_bytes(p, 0, 1, 0, 5, 3).len == 0, "1006 alone does not request reports")
+}
+
+fn main() -> int {
+    test_outer_requests_and_restores_hover()
+    test_inner_tracking_and_encoding()
+    print("PASS mouse-transport")
+    0
+}
