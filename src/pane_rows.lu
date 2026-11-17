@@ -2252,6 +2252,11 @@ fn row_mouse_tab_identity_frame(mut r: Rig) -> str {
     }
     let unchanged = line_one_is(a.image, " b  1  2 ", [1, 3, 7, 9])
     if unchanged.len > 0 { return "replacement changed visible labels: " + unchanged }
+    let _first = prefix(b, 49)
+    if !until_active(mut b, "b", "1", 3000) { return "first tab after replacement" }
+    if !mouse_click(a, false, 8, 23) { return "replacement click encoding" }
+    if !until_active(mut b, "b", "2", 3000) { return "acknowledged identity map did not target the replacement tab" }
+    drain(mut a, 100)
     client.hang_up(mut b)
     finish(mut r, mut a)
 }

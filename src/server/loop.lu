@@ -2115,7 +2115,10 @@ fn compose_now(mut s: Server, index: int, now: int) {
         tabbar = tab_bar(s, si)
         bar = bar_cells(s, si, index, now, tabbar.cells)
     }
-    let payload = compose_frame(mut s.conns[index].shadow, s.panes, s.sessions[si], bar, seq, full, all, scans, cursor)
+    var payload = compose_frame(mut s.conns[index].shadow, s.panes, s.sessions[si], bar, seq, full, all, scans, cursor)
+    if payload.len == 0 && paint_bar && !drawn_tab_hits_match(s.conns[index].tabs, tabbar.hits, s.sessions[si].cols, area + 1) {
+        payload = identity_frame(s.conns[index].shadow, seq)
+    }
     s.conns[index].stale = false
     s.conns[index].seen_layout = gen
     s.conns[index].seen_bar = s.sessions[si].bar_gen

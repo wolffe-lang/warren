@@ -53,12 +53,33 @@ pub fn stage_drawn_tab_hits(mut state: TabHits, seq: int) {
     state.pending.seq = seq
 }
 
+fn clear_tab_hit_map(mut map: TabHitMap) {
+    map.count = 0
+    map.cols = 0
+    map.row = 0
+    map.seq = 0
+}
+
+/// Compare identities as well as geometry: equal pixels can still name
+/// different tabs after a close/recreate batch.
+pub fn drawn_tab_hits_match(state: TabHits, spans: List[TabHit], cols: int, row: int) -> bool {
+    if state.drawn.seq == 0 || state.drawn.count != spans.len || state.drawn.cols != cols || state.drawn.row != row { return false }
+    var i = 0
+    while i < spans.len {
+        let a = copy state.drawn.spans[i]
+        let b = copy spans[i]
+        if a.first != b.first || a.end != b.end || a.tab != b.tab { return false }
+        i += 1
+    }
+    true
+}
+
 /// Promote only the pending image's exact sequence. The dispatcher first
 /// validates ACK against the wire's fully-sent outstanding image.
 pub fn ack_tab_hits(mut state: TabHits, seq: int) -> bool {
     if seq == 0 || seq != state.pending.seq || seq <= state.drawn.seq { return false }
     copy_tab_hit_map(mut state.drawn, state.pending)
-    state.pending.seq = 0
+    clear_tab_hit_map(mut state.pending)
     true
 }
 
@@ -76,12 +97,6 @@ pub fn tab_hit_at(state: TabHits, col: int, row: int) -> int {
 
 /// Reuse keeps fixed buffers but makes all previous geometry unreachable.
 pub fn reset_tab_hits(mut state: TabHits) {
-    state.drawn.count = 0
-    state.drawn.cols = 0
-    state.drawn.row = 0
-    state.drawn.seq = 0
-    state.pending.count = 0
-    state.pending.cols = 0
-    state.pending.row = 0
-    state.pending.seq = 0
+    clear_tab_hit_map(mut state.drawn)
+    clear_tab_hit_map(mut state.pending)
 }

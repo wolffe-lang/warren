@@ -1,6 +1,8 @@
 //! member: false
 //! The tab spans belong to the exact image acknowledged by one connection.
 use server
+use proto
+use vt
 use std.mem.budget
 
 fn hits(a: int, b: int) -> List[server.TabHit] {
@@ -36,6 +38,10 @@ fn test_geometry_bounds_and_independent_connections() {
     server.stage_tab_hits(mut b, hits(3, 4), 80, 29, 1)
     let _a = server.ack_tab_hits(mut a, 1)
     let _b = server.ack_tab_hits(mut b, 1)
+    assert(server.drawn_tab_hits_match(a, hits(1, 2), 40, 23), "unchanged hit identities match")
+    assert(!server.drawn_tab_hits_match(a, hits(1, 9), 40, 23), "equal pixels with a new id need publication")
+    assert(!server.drawn_tab_hits_match(a, hits(1, 2), 80, 23), "changed width needs publication")
+    assert(!server.drawn_tab_hits_match(a, hits(1, 2), 40, 29), "changed bar row needs publication")
     assert(server.tab_hit_at(a, 4, 23) == 1, "span includes first cell")
     assert(server.tab_hit_at(a, 8, 23) == 1, "wide continuation cell belongs to its span")
     assert(server.tab_hit_at(a, 9, 23) == 2, "span end is exclusive")
@@ -94,11 +100,27 @@ fn test_repeated_publication_has_no_retained_growth() {
     }
 }
 
+fn test_identity_only_frame_is_a_zero_cell_v1_delta() {
+    var pane = vt.new(20, 6, 0)
+    vt.feed(mut pane, "A".bytes())
+    var shadow = server.no_shadow()
+    var image = proto.image()
+    let full = server.compose(mut shadow, pane, 1, true)
+    assert(proto.apply(mut image, full) == 0, "initial image")
+    let delta = server.identity_frame(shadow, 2)
+    assert(delta.len == 22 && server.frame_wire(delta).len == 28, "identity publication has no cell payload")
+    assert(proto.apply(mut image, delta) == 0 && image.seq == 2, "consecutive identity delta applies")
+    assert(proto.row_text(image, 1).starts_with("A"), "zero-cell delta preserves glyphs")
+    assert(image.cursor_row == shadow.cursor_row && image.cursor_col == shadow.cursor_col &&
+        image.shape == shadow.shape && image.visible == shadow.visible, "zero-cell delta preserves cursor")
+}
+
 fn main() -> int {
     test_exact_ack_promotes_only_its_pending_spans()
     test_geometry_bounds_and_independent_connections()
     test_empty_maps_and_connection_reuse()
     test_repeated_publication_has_no_retained_growth()
+    test_identity_only_frame_is_a_zero_cell_v1_delta()
     print("PASS tab-hit-ack-model")
     0
 }

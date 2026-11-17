@@ -1,0 +1,21 @@
+//! member: true
+//! An ACKable metadata publication when tab identities change but pixels do not.
+use proto
+
+/// A zero-cell v1 delta on the existing shadow. It advances the image's
+/// sequence so the client can acknowledge new hit semantics without
+/// repainting a single unchanged cell. The wire cost is 22 + 6 = 28 bytes.
+pub fn identity_frame(sh: Shadow, seq: int) -> List[byte] {
+    assert(sh.valid && seq > 1, "identity-frame-needs-previous-image")
+    var payload = List[byte]()
+    proto.put(mut payload, seq, 4)
+    proto.put(mut payload, seq - 1, 4)
+    proto.put(mut payload, sh.cols, 2)
+    proto.put(mut payload, sh.rows, 2)
+    proto.put(mut payload, sh.cursor_row, 2)
+    proto.put(mut payload, sh.cursor_col, 2)
+    proto.put(mut payload, sh.shape, 1)
+    proto.put(mut payload, sh.visible, 1)
+    proto.put(mut payload, 0, 4)
+    payload
+}
