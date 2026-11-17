@@ -383,7 +383,7 @@ pub fn render(mut drawn: proto.Image, img: proto.Image, pol: Policy) -> List[byt
             if row >= 1 && row <= img.rows && col >= 1 && end <= img.cols && col <= end {
                 placed = draw_row(mut out, mut cur, mut pens, drawn, img, row, col, end, placed, false, pol)
                 let first = (row - 1) * img.cols + col - 1
-                keep_cells(mut drawn, img, first, first + end - col)
+                keep_cells(mut drawn, img, first, first - 1)
             }
             last_row = row
             k += 3
