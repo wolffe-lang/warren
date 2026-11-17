@@ -209,7 +209,7 @@ fn test_confirm_and_help() {
 
 fn test_the_prompts() {
     let k = config.defaults()
-    for m in [config.MODE_COMMAND, config.MODE_RENAME] {
+    for m in [config.MODE_COMMAND, config.MODE_RENAME, config.MODE_SEARCH] {
         assert(key_is(scalar(k, m, 97), config.A_TYPE, 97, m), "a printable key types")
         assert(key_is(scalar(k, m, 32), config.A_TYPE, 32, m), "space types")
         assert(key_is(scalar(k, m, 233), config.A_TYPE, 233, m), "a non-ASCII scalar types")
@@ -239,6 +239,13 @@ fn test_scroll_mode() {
     }
     assert(key_is(ctrl(k, v, 32), config.A_NONE, 0, config.MODE_PREFIX), "the prefix leaves for the prefix table")
     assert(key_is(scalar(k, v, 120), config.A_NONE, 0, v), "an unbound key is dropped and the mode stays")
+    let f = config.MODE_SEARCH
+    assert(key_is(scalar(k, v, 63), config.A_SEARCH, 1, f), "? searches toward older rows")
+    assert(key_is(scalar(k, v, 47), config.A_SEARCH, 0, f), "/ searches toward newer rows")
+    assert(key_is(scalar(k, v, 110), config.A_SEARCH_AGAIN, 0, v), "n searches again the same way")
+    assert(key_is(scalar(k, v, 78), config.A_SEARCH_AGAIN, 1, v), "N searches again the other way")
+    assert(key_is(scalar(k, f, 110), config.A_TYPE, 110, f) && key_is(scalar(k, f, 63), config.A_TYPE, 63, f), "the search prompt types n and ?")
+    assert(config.mode_name(f) == "SEARCH", "the search prompt's name")
 }
 
 fn test_the_hint_lines() {
@@ -254,7 +261,7 @@ fn test_the_hint_lines() {
     assert(config.hint_text(k, config.MODE_SESSION, 80) == " d detach  Esc back", "session")
     assert(config.hint_text(k, config.MODE_LOCKED, 80) == " C-g unlock", "locked")
     assert(config.hint_text(k, config.MODE_HELP, 80) == " jk scroll  Esc close", "help")
-    assert(config.hint_text(k, config.MODE_SCROLL, 80) == " jk row  PgUp PgDn page  ud half  gG oldest/live  q quit  Esc back", "scroll")
+    assert(config.hint_text(k, config.MODE_SCROLL, 80) == " jk row  PgUp PgDn page  ud half  gG oldest/live  /?nN search  q quit  Esc back", "scroll")
     assert(config.mode_name(config.MODE_SCROLL) == "SCROLL", "scroll mode's name")
     assert(config.mode_name(config.MODE_NORMAL) == "NORMAL" && config.mode_name(config.MODE_SESSION) == "SESSION", "names")
     // Every hint line fits: nothing wider than the line at the minimum width.
