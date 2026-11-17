@@ -2297,7 +2297,8 @@ fn row_mouse_border(mut r: Rig, legacy: bool) -> str {
     let _hmove = outer_mouse(p, legacy, 2, 1, 15)
     if !until_rect(mut p, "─", 41, 15, 40, 1, 3000) { return "origin horizontal split lost on cross-pane motion" }
     let _hup = outer_mouse(p, legacy, 1, 1, 15)
-    if mouse_probe_text(log) != "" { return "border gesture leaked to a reporting child" }
+    let leaked = mouse_probe_text(log)
+    if leaked != "" { return "border gesture leaked to a reporting child: " + leaked.replace("\n", " ") }
     var b = attach(r, 80, 24, "", 0) else |e| { return "second-client-{e}" }
     if !client.until_kind(mut b, 131, 3000) { return "second client no frame" }
     let _capture = outer_mouse(p, legacy, 0, 40, 3)
@@ -2307,7 +2308,8 @@ fn row_mouse_border(mut r: Rig, legacy: bool) -> str {
     let _release = outer_mouse(p, legacy, 1, 50, 3)
     drain(mut p, 100)
     if !rect_has(p.image, "│", 40, 1, 1, AREA) { return "stale capture resized after another client's change" }
-    if mouse_probe_text(log) != "" { return "cancelled border release leaked" }
+    let late = mouse_probe_text(log)
+    if late != "" { return "cancelled border release leaked: " + late.replace("\n", " ") }
     client.hang_up(mut b)
     finish(mut r, mut p)
 }
