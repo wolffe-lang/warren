@@ -1935,10 +1935,16 @@ fn read_master(mut s: Server, k: int, now: int) {
         }
         return
     }
-    if nothing || got.len == 0 { return }
+    if nothing || got.len == 0 {
+        // Ready with nothing to read: whatever it gave is all read.
+        s.panes[k].streaming = false
+        return
+    }
     vt.feed(mut s.panes[k].screen, got)
     s.panes[k].last_output = now
     s.panes[k].read_turn = s.turns
+    s.panes[k].streaming = read_streams(got.len, s.master_read, s.panes[k].read_peak)
+    if got.len > s.panes[k].read_peak { s.panes[k].read_peak = got.len }
     s.panes[k].damage = s.panes[k].damage + 1
     let answers = vt.take_answers(mut s.panes[k].screen)
     if answers.len > 0 {
@@ -2157,33 +2163,26 @@ fn compose_now(mut s: Server, index: int, now: int) {
     flush(mut s, index)
 }
 
-// When the next frame for a client may be composed (monotonic ns), or -1:
-// damage at least 8 ms old or its session's shown panes quiet 2 ms, at
-// most one frame per 8 ms, one image outstanding, synchronized output in
-// a shown pane held up to 150 ms.
+// When the next frame for a client may be composed (monotonic ns), or -1
+// (pacing.lu's frame_at): one image outstanding; at most one frame per
+// 8 ms; damage at once when every shown pane of the session drained its
+// master, else when 8 ms old or the panes are quiet 2 ms; synchronized
+// output in a shown pane held up to 150 ms.
 fn frame_due(s: Server, index: int) -> int {
     if !s.conns[index].live || s.conns[index].phase != ATTACHED || s.conns[index].session < 0 || s.conns[index].ending { return 0 - 1 }
     if !s.conns[index].stale && !s.conns[index].force_full { return 0 - 1 }
     if s.conns[index].image_end >= 0 || s.conns[index].ack.pending != 0 { return 0 - 1 }
-    var at = s.conns[index].last_frame + FRAME_AGE_MS * 1000000
-    if !s.conns[index].force_full {
-        let si = s.conns[index].session
-        let by_age = s.conns[index].stale_since + FRAME_AGE_MS * 1000000
-        let by_quiet = s.sessions[si].last_output + FRAME_QUIET_MS * 1000000
-        var ready = if by_age < by_quiet then by_age else by_quiet
-        var sync_since = 0
-        for p in s.panes {
-            if p.live && p.shown && p.session == si && p.sync_since > 0 && (sync_since == 0 || p.sync_since < sync_since) {
-                sync_since = p.sync_since
-            }
+    let si = s.conns[index].session
+    var sync_since = 0
+    var streaming = false
+    for p in s.panes {
+        if p.live && p.shown && p.session == si {
+            if p.sync_since > 0 && (sync_since == 0 || p.sync_since < sync_since) { sync_since = p.sync_since }
+            if p.streaming { streaming = true }
         }
-        if sync_since > 0 {
-            let sync_end = sync_since + SYNC_MS * 1000000
-            if sync_end > ready { ready = sync_end }
-        }
-        if ready > at { at = ready }
     }
-    at
+    frame_at(s.conns[index].last_frame, s.conns[index].stale_since, s.sessions[si].last_output, sync_since, streaming,
+        s.conns[index].force_full)
 }
 
 // ---- the listener ----
