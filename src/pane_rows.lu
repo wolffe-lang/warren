@@ -2304,8 +2304,12 @@ fn row_mouse_border(mut r: Rig, legacy: bool) -> str {
     var b = attach(r, 80, 24, "", 0) else |e| { return "second-client-{e}" }
     if !client.until_kind(mut b, 131, 3000) { return "second client no frame" }
     let _capture = outer_mouse(p, legacy, 0, 40, 3)
+    // The two clients' sockets are not ordered. A visible move proves the
+    // capture is held before the other client changes the layout.
+    let _live = outer_mouse(p, legacy, 2, 42, 3)
+    if !until_rect(mut p, "│", 42, 1, 1, AREA, 3000) { return "capture did not move before the other client's change" }
     let _other = prefix(b, 61)
-    if !until_rect(mut p, "─", 41, 11, 40, 1, 3000) { return "other client's layout change" }
+    if !until_rect(mut p, "─", 41, 11, 40, 1, 3000) || !until_rect(mut p, "│", 40, 1, 1, AREA, 3000) { return "other client's layout change" }
     let _stale = outer_mouse(p, legacy, 2, 50, 3)
     let _release = outer_mouse(p, legacy, 1, 50, 3)
     drain(mut p, 100)
