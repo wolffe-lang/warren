@@ -13,7 +13,7 @@ pub fn enter_bytes(features: int) -> List[byte] {
     var t = "\u{1b}[?1049h\u{1b}[H\u{1b}[2J"
     if features & 1 != 0 { t = t + "\u{1b}[?2004h" }
     if features & 2 != 0 { t = t + "\u{1b}[?1004h" }
-    if features & 4 != 0 { t = t + "\u{1b}[?1000h\u{1b}[?1002h\u{1b}[?1006h" }
+    if features & 4 != 0 { t = t + "\u{1b}[?1000h\u{1b}[?1002h\u{1b}[?1003h\u{1b}[?1006h" }
     t.bytes()
 }
 
@@ -21,7 +21,7 @@ pub fn enter_bytes(features: int) -> List[byte] {
 /// its shape back to the terminal's default.
 pub fn leave_bytes(features: int) -> List[byte] {
     var t = "\u{1b}[0m"
-    if features & 4 != 0 { t = t + "\u{1b}[?1006l\u{1b}[?1002l\u{1b}[?1000l" }
+    if features & 4 != 0 { t = t + "\u{1b}[?1006l\u{1b}[?1003l\u{1b}[?1002l\u{1b}[?1000l" }
     if features & 2 != 0 { t = t + "\u{1b}[?1004l" }
     if features & 1 != 0 { t = t + "\u{1b}[?2004l" }
     t = t + "\u{1b}[?25h\u{1b}[0 q\u{1b}[?1049l"
