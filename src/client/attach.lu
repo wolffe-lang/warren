@@ -229,7 +229,8 @@ pub fn attach(target: str, create: bool) -> int {
     let console = (env.get("WARREN_RENDER") else "") == "console"
     let termname = env.get("TERM") else ""
     let pol = policy_for(termname, env.get("COLORTERM") else "", console)
-    let features = if console then 0 else 7
+    // Bit 3: the outer terminal takes OSC 52 clipboard writes; never the console.
+    let features = if console then 0 else 15
     let long = server.socket_path_problem(server.socket_path(server.runtime_dir()))
     if long.len > 0 {
         eprint("warren: the {long}")
@@ -377,6 +378,8 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
                         let _a = send(p, 8, number(p.image.seq, 4))
                     } else if k == 132 {
                         fs.write_chunk(mut out, "\u{7}".bytes()) else |_| {}
+                    } else if k == 133 && features & 8 != 0 {
+                        fs.write_chunk(mut out, osc52(p.clipboard)) else |_| {}
                     } else if k == 134 && !pol.explicit_wide {
                         fs.write_chunk(mut out, "\u{1b}]2;{sanitize(p.title)}\u{7}".bytes()) else |_| {}
                     } else if k == 135 {
