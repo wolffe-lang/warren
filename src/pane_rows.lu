@@ -2524,6 +2524,196 @@ fn row_scroll_alternate(mut r: Rig) -> str {
     finish(mut r, mut p)
 }
 
+// ---------------- selection: copy on release, the register, paste ----------------
+
+/// A mouse event with modifiers (1 Shift), as the client parser makes it.
+fn wire_mouse(p: client.Peer, kind: int, button: int, mods: int, col: int, row: int) -> bool {
+    var body = List[byte]()
+    for n in [kind, button, mods] { proto.put(mut body, n, 1) }
+    proto.put(mut body, col, 2)
+    proto.put(mut body, row, 2)
+    client.send(p, 3, body)
+}
+
+/// Press at the first cell, move through the middle, release at the last.
+fn drag(p: client.Peer, legacy: bool, c0: int, r0: int, c1: int, r1: int) -> bool {
+    outer_mouse(p, legacy, 0, c0, r0) && outer_mouse(p, legacy, 2, (c0 + c1) / 2 + 1, r1) &&
+        outer_mouse(p, legacy, 2, c1, r1) && outer_mouse(p, legacy, 1, c1, r1)
+}
+
+/// The probe's logged bytes as text, or "" while it logged none.
+fn probe_bytes(path: str) -> List[byte] {
+    var out = List[byte]()
+    let log = fs.read_text(path) else ""
+    for line in log.lines() {
+        if line.starts_with("b ") { (mut out).push((line[2..line.len].to_int() else 0) as byte) }
+    }
+    out
+}
+
+fn until_probe(path: str, want: str, ms: int) -> bool {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        let got = probe_bytes(path)
+        if (str_from_utf8(got[0..got.len]) else "") == want { return true }
+        time.sleep(time.millis(10))
+    }
+    let got = probe_bytes(path)
+    (str_from_utf8(got[0..got.len]) else "") == want
+}
+
+fn probe_text(path: str) -> str {
+    let got = probe_bytes(path)
+    (str_from_utf8(got[0..got.len]) else "?").replace("\u{1b}", "ESC")
+}
+
+/// Whether the image's cell is drawn inverse.
+fn inverse_at(img: proto.Image, col: int, row: int) -> bool {
+    img.valid && (img.flags[(row - 1) * img.cols + col - 1] & INVERSE) != 0
+}
+
+// Print two known rows in a shell pane; returns the first one's row or 0.
+fn two_rows(mut p: client.Peer) -> int {
+    let _cmd = client.input(p, "printf 'S1 alpha\\nS2 beta\\n'\r")
+    if !until_rect_line(mut p, "S2 beta", 1, 1, 80, AREA, 5000) { return 0 }
+    row_reading(p.image, "S1 alpha", 1, 80)
+}
+
+// A drag in a pane whose program asked for no reports selects; release copies
+// into the session's register and says so. The drag looks at a snapshot in
+// scroll mode, drawn inverse for this client, and leaves that mode at release.
+// A plain click copies nothing. Prefix ] pastes the register into the pane.
+fn row_select_drag(mut r: Rig, legacy: bool) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let at = two_rows(mut p)
+    if at == 0 { return "no rows to select:\n" + client.screen_text(p) }
+    let _down = outer_mouse(p, legacy, 0, 1, at)
+    let _move = outer_mouse(p, legacy, 2, 7, at + 1)
+    if !until_mode(mut p, "SCROLL", 3000) { return "a drag did not open a window: '" + mode_of(p.image) + "'" }
+    if !inverse_at(p.image, 1, at) || !inverse_at(p.image, 7, at + 1) || inverse_at(p.image, 8, at + 1) { return "the selection is not drawn inverse over S1..S2's seventh cell" }
+    let _up = outer_mouse(p, legacy, 1, 7, at + 1)
+    if !until_hint(mut p, "copied 16 bytes", 3000) { return "release did not copy: '" + hint_of(p.image) + "'" }
+    if mode_of(p.image) != "NORMAL" || inverse_at(p.image, 1, at) { return "release did not leave the window and its highlight" }
+    let _click = mouse_click(p, legacy, 3, at)
+    drain(mut p, 150)
+    if mode_of(p.image) != "NORMAL" { return "a plain click opened a window" }
+    let log = out_file(r, "paste-input.txt")
+    fs.remove(log) else |_| {}
+    let _probe = client.input(p, "exec {self_path()} --mouse-probe {log} 0\r")
+    if !until_file(log, "ready", 5000) { return "the paste probe did not start" }
+    let _paste = prefix(p, 93)
+    if !until_probe(log, "S1 alpha\nS2 beta", 3000) { return "prefix ] pasted '" + probe_text(log) + "'" }
+    finish(mut r, mut p)
+}
+
+// A program that asked for reports gets plain drags; Shift selects instead.
+fn row_select_reporting_child(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let at = two_rows(mut p)
+    if at == 0 { return "no rows to select" }
+    let log = out_file(r, "select-child.txt")
+    fs.remove(log) else |_| {}
+    let _probe = client.input(p, "exec {self_path()} --mouse-probe {log} 1\r")
+    if !until_file(log, "ready", 5000) { return "reporting child did not start" }
+    let _plain = drag(p, false, 1, at, 7, at + 1)
+    let until = now_ms() + 3000
+    while probe_bytes(log).len == 0 && now_ms() < until { time.sleep(time.millis(10)) }
+    if probe_bytes(log).len == 0 { return "a plain drag did not reach the reporting child" }
+    drain(mut p, 150)
+    if hint_of(p.image).contains("copied") || mode_of(p.image) != "NORMAL" { return "a plain drag over a reporting child selected" }
+    let before = probe_bytes(log).len
+    let _sd = wire_mouse(p, 0, 1, 1, 1, at)
+    let _sm = wire_mouse(p, 2, 1, 1, 7, at + 1)
+    let _su = wire_mouse(p, 1, 1, 1, 7, at + 1)
+    if !until_hint(mut p, "copied 16 bytes", 3000) { return "a Shift drag did not copy: '" + hint_of(p.image) + "'" }
+    drain(mut p, 150)
+    if probe_bytes(log).len != before { return "a Shift drag reached the reporting child: " + probe_text(log) }
+    finish(mut r, mut p)
+}
+
+// The selection belongs to the pane it started in: beyond its edge the far
+// end is clamped, and the release may land in another pane.
+fn row_select_origin_clamp(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let _split = prefix(p, 124)
+    if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "no right pane" }
+    let _right = client.input(p, "echo RIGHT-SIDE\r")
+    if !until_rect(mut p, "RIGHT-SIDE", 41, 1, 40, AREA, 3000) { return "right pane text" }
+    let _left = prefix(p, 104)
+    let _l = client.input(p, "echo LEFT-$((1+1))\r")
+    if !until_rect_line(mut p, "LEFT-2", 1, 1, 39, AREA, 3000) { return "left pane text" }
+    let at = row_reading(p.image, "LEFT-2", 1, 39)
+    let _d = drag(p, false, 1, at, 70, at)
+    if !until_hint(mut p, "copied 6 bytes", 3000) { return "the selection was not clamped to its pane: '" + hint_of(p.image) + "'" }
+    finish(mut r, mut p)
+}
+
+// One client's selection is drawn for it alone; the register is the session's.
+fn row_select_two_clients(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    var b = attach(r, 80, 24, "", 0) else |e| { return "second-{e}" }
+    if !client.until_kind(mut b, 131, 3000) { return "second client no frame" }
+    let at = two_rows(mut a)
+    if at == 0 { return "no rows to select" }
+    let _down = outer_mouse(a, false, 0, 1, at)
+    let _move = outer_mouse(a, false, 2, 7, at + 1)
+    if !until_mode(mut a, "SCROLL", 3000) { return "the first client's drag did not open its window" }
+    drain(mut b, 150)
+    if inverse_at(b.image, 1, at) || mode_of(b.image) != "NORMAL" { return "the second client sees the first client's selection" }
+    let _up = outer_mouse(a, false, 1, 7, at + 1)
+    if !until_hint(mut a, "copied 16 bytes", 3000) { return "the first client did not copy" }
+    let log = out_file(r, "paste-two.txt")
+    fs.remove(log) else |_| {}
+    let _probe = client.input(b, "exec {self_path()} --mouse-probe {log} 0\r")
+    if !until_file(log, "ready", 5000) { return "the paste probe did not start" }
+    let _paste = prefix(b, 93)
+    if !until_probe(log, "S1 alpha\nS2 beta", 3000) { return "the second client pasted '" + probe_text(log) + "'" }
+    client.hang_up(mut b)
+    finish(mut r, mut a)
+}
+
+// Looking back, a drag selects history rows; the window stays open after.
+fn row_select_in_scroll(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let at = numbered_output(mut p, 40, 1, 80)
+    if at == 0 { return "no numbered output" }
+    var n = 0
+    while n < 3 { let _w = outer_wheel(p, false, true, 10, 5); n += 1 }
+    if !until_rect_line(mut p, "L31", 1, at, 80, 1, 3000) { return "the window did not look back nine rows" }
+    let _d = drag(p, false, 1, at - 1, 3, at)
+    if !until_hint(mut p, "copied 7 bytes", 3000) { return "history rows were not copied: '" + hint_of(p.image) + "'" }
+    if mode_of(p.image) != "SCROLL" || !rect_has(p.image, "L31", 1, at, 80, 1) { return "copying left the window that was already open" }
+    finish(mut r, mut p)
+}
+
+// With bracketed paste requested, the register goes in as one bracket pair.
+fn row_paste_bracketed(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let at = two_rows(mut p)
+    if at == 0 { return "no rows to select" }
+    let _d = drag(p, false, 1, at, 8, at)
+    if !until_hint(mut p, "copied 8 bytes", 3000) { return "no copy: '" + hint_of(p.image) + "'" }
+    let log = out_file(r, "paste-bracketed.txt")
+    fs.remove(log) else |_| {}
+    let _probe = client.input(p, "printf '\\033[?2004h'; exec {self_path()} --mouse-probe {log} 0\r")
+    if !until_file(log, "ready", 5000) { return "the paste probe did not start" }
+    let _paste = prefix(p, 93)
+    if !until_probe(log, "\u{1b}[200~S1 alpha\u{1b}[201~", 3000) { return "bracketed paste was '" + probe_text(log) + "'" }
+    finish(mut r, mut p)
+}
+
 fn run_row(warren: str, name: str) -> str {
     var r = rig(warren, name)
     var why = "no such row"
@@ -2541,6 +2731,13 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "scroll-reporting-child" { why = row_scroll_reporting_child(mut r) }
     else if name == "scroll-two-clients" { why = row_scroll_two_clients(mut r) }
     else if name == "scroll-alternate" { why = row_scroll_alternate(mut r) }
+    else if name == "select-drag-sgr" { why = row_select_drag(mut r, false) }
+    else if name == "select-drag-legacy" { why = row_select_drag(mut r, true) }
+    else if name == "select-reporting-child" { why = row_select_reporting_child(mut r) }
+    else if name == "select-origin-clamp" { why = row_select_origin_clamp(mut r) }
+    else if name == "select-two-clients" { why = row_select_two_clients(mut r) }
+    else if name == "select-in-scroll" { why = row_select_in_scroll(mut r) }
+    else if name == "paste-bracketed" { why = row_paste_bracketed(mut r) }
     else if name == "mouse-sgr-off" { why = row_mouse_focus(mut r, false, 0) }
     else if name == "mouse-sgr-sgr" { why = row_mouse_focus(mut r, false, 1) }
     else if name == "mouse-sgr-legacy" { why = row_mouse_focus(mut r, false, 2) }
@@ -2592,7 +2789,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-reporting-child scroll-two-clients scroll-alternate mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
+    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-reporting-child scroll-two-clients scroll-alternate select-drag-sgr select-drag-legacy select-reporting-child select-origin-clamp select-two-clients select-in-scroll paste-bracketed mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
         (mut x).push(n)
     }
     x
