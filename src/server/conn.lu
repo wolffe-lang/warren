@@ -27,7 +27,8 @@ use layout
 /// is filled `view_retry` rows back on the next. A selection (`sel_state` 1
 /// pressed, 2 dragging) runs from window row `sel_row`, column `sel_col` to
 /// `sel_to_row`, `sel_to_col` in pane slot `sel_slot`; `sel_opened` says its
-/// drag opened the window.
+/// drag opened the window. `search` is the last search's text, run toward
+/// older rows when `search_older`; its match is the window's.
 pub struct Conn {
     live: bool,
     fd: int,
@@ -90,6 +91,8 @@ pub struct Conn {
     sel_to_row: int,
     sel_to_col: int,
     sel_opened: bool,
+    search: List[byte],
+    search_older: bool,
     hello: List[byte],
     hello_len: int,
     hello_ready: bool,
@@ -136,6 +139,7 @@ pub fn new_conn() -> Conn {
         view: vt.new_view(), view_slot: 0 - 1, view_pane: 0 - 1, view_back: 0, view_wheel: false, view_id: 0 - 1, view_offset: 0,
         view_cols: 0, view_rows: 0, view_retry: 0 - 1,
         sel_state: 0, sel_slot: 0 - 1, sel_row: 0, sel_col: 0, sel_to_row: 0, sel_to_col: 0, sel_opened: false,
+        search: List[byte](), search_older: false,
         hello: List[byte](), hello_len: 0, hello_ready: false,
         resize_ready: false, resize_cols: 0, resize_rows: 0, command_ready: false, command: List[byte](),
         command_len: 0, stop_after: false, pending: 0, pending_arg: 0, message: List[byte](), message_until: 0,
@@ -198,7 +202,10 @@ pub fn reset_conn(mut c: Conn, fd: int, id: int, now: int) {
     c.sel_state = 0
     c.sel_slot = 0 - 1
     c.sel_opened = false
+    (mut c.search).reset()
+    c.search_older = false
     vt.unmark_view(mut c.view)
+    vt.unfind_view(mut c.view)
     c.hello_len = 0
     c.hello_ready = false
     c.resize_ready = false
