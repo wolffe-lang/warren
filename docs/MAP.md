@@ -6,7 +6,7 @@
 | W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | pure core, CLI/replay and frozen complete-frame comparisons; final measurements pending |
 | W2 | server, client, protocol v1; one pane; detach and attach | codec, server, terminal client, lifecycle (new, attach, detach, second client, the server outliving its client); session and client rows; PAX console logout waits on PAX |
 | W3 | split tree, tabs, modes, the hint bar, configuration v1 | pure layout module (tabs, split tree, geometry, operations) with golden and property rows; panes and tabs in the server, the compositor's borders and focus mark, the bar's two lines (session, tabs with their marks, mode and clock; hints, prompts and messages), modes per client from the key table, the split end to end through the real client (`keys_test`, `pane_rows`, `client_rows`, SERVER.md §8); configuration planned |
-| W4 | mouse, scrollback, copy mode, search, OSC 52 | pane focus and tab-label clicks with SGR/legacy reports; border dragging, wheel scrollback and copy planned |
+| W4 | mouse, scrollback, copy mode, search, OSC 52 | pane focus and tab-label clicks with SGR/legacy reports, captured border dragging and all-motion transport; wheel scrollback and copy planned |
 | W5 | command socket, CLI verbs, layout files, save and restore | planned |
 | W6 | static on the PAX image; rows in PAX's own suites | planned |
 
@@ -84,7 +84,11 @@ width/resource/platform evidence remain separate pending measurements.
 Mouse rows (`mouse-*` in `pane_rows` and `client_rows`) cross SGR and legacy
 outer reports with inner SGR, legacy and no reports. They hold first-gesture
 consumption, relative coordinates, independent clients, wide and narrow tab
-labels, and inert borders and bar cells. The client input table also holds
+labels, inert border clicks and bar cells, captured border drags with minimum
+clamps, reporting children and cross-client cancellation. `border_test` holds
+pure split hits, junction ownership and subtree minimums; `mouse_transport_test`
+holds all-motion setup/restore and the 1000/1002/1003/1006 filtering table.
+The client input table also holds
 raw legacy coordinates and reports split across reads.
 
 A row that tests an interrupt writes the byte 0x03 into the pseudo-terminal.

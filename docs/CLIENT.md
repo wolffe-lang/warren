@@ -115,8 +115,11 @@ does (the prefix, the modes, the prompts) is the server's key table, per client
 Mouse coordinates are outer-frame cells. Clicking a pane focuses it; that
 first gesture does not reach its program. Later clicks in the focused pane
 reach programs that requested mouse reports, in their chosen encoding.
-Clicking a tab label switches tabs. Border clicks are inert; dragging and
-wheel scrollback controls remain planned.
+Clicking a tab label switches tabs. A plain border click is inert; dragging
+moves that split with minimum-size clamps, even when the pointer leaves its
+original pane area. The terminal client requests all-motion reporting (1003)
+and disables it on exit, so programs inside can receive hover when they ask
+for it. Wheel scrollback controls remain planned.
 
 ## Rendering
 
