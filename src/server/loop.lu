@@ -1610,7 +1610,7 @@ fn select_gesture(mut s: Server, index: int, kind: int, button: int, col: int, r
                 tell(mut s, index, "copied {n} bytes")
                 // Exported best effort to this client's terminal alone, when
                 // it takes OSC 52 writes.
-                if n > 0 && s.conns[index].features & 8 != 0 {
+                if n > 0 && s.conns[index].features & 16 != 0 {
                     if !send(mut s.conns[index], 133, bytes_payload(s.sessions[si].register)) {
                         terminal(mut s, index, 135, 5, "too slow")
                     }
