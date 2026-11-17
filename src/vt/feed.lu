@@ -282,7 +282,7 @@ fn print_ascii_run(mut pane: Vt, data: List[byte], from: int, to: int) {
             }
         }
         pane.combine_row = row
-        pane.combine_col = first + m - 1
+        pane.combine_col = first + m
         pane.last_printed = data[k + m - 1] as int
         pane.last_mark1 = 0
         pane.last_mark2 = 0
