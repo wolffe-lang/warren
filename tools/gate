@@ -128,6 +128,8 @@ step modules-run modules_run "$root/target/native/warren"
 step wolf-test "$WOLF" test --deny-warnings src
 step lupin-pure "$LUPIN" run src/pure_test.lu
 step keys-lupin "$LUPIN" run src/keys_test.lu
+step client-input-lupin "$LUPIN" run src/client_input_test.lu
+step client-keyboard-lupin "$LUPIN" run src/client_keyboard_test.lu
 step cli-lupin python3 -I tests/vt/cli_rows.py "$LUPIN" run src/warren.lu
 step cases-lupin python3 -I tests/vt/compare_cases.py "$LUPIN" run src/warren.lu
 step combining-frames-lupin python3 -I tests/vt/compare_combining.py "$LUPIN" run src/warren.lu
