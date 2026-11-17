@@ -2309,7 +2309,9 @@ fn row_mouse_border(mut r: Rig, legacy: bool) -> str {
     let _move = outer_mouse(p, legacy, 2, 46, 3)
     if !until_rect(mut p, "│", 46, 1, 1, AREA, 3000) { return "border did not follow drag" }
     let _up = outer_mouse(p, legacy, 1, 46, 3)
-    let _stray = outer_mouse(p, legacy, 2, 50, 3)
+    // After release the motion is no longer the gesture's. Over the unfocused pane it
+    // reaches no program, so the reporting child below sees only the gesture.
+    let _stray = outer_mouse(p, legacy, 2, 20, 3)
     drain(mut p, 100)
     if !rect_has(p.image, "│", 46, 1, 1, AREA) { return "released border kept moving" }
     let _again = outer_mouse(p, legacy, 0, 46, 3)
