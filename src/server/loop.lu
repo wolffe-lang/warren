@@ -1391,7 +1391,7 @@ fn border_gesture(mut s: Server, index: int, kind: int, button: int, col: int, r
     if kind == 0 { s.conns[index].drag = layout.no_border_hit(); return false }
     if kind != 2 && !(kind == 1 && button == 1) { return false }
     let si = s.conns[index].session
-    let hit = s.conns[index].drag
+    let hit = copy s.conns[index].drag
     let valid = si >= 0 && s.sessions[si].live && s.sessions[si].layout.active == hit.tab &&
         s.sessions[si].layout_gen == s.conns[index].drag_layout && mouse_chrome(s.conns[index].mode)
     if valid && (kind == 1 || button == 1) {
