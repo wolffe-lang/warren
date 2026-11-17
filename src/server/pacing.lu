@@ -1,0 +1,49 @@
+//! member: true
+//! Frame pacing: when a client's next image may be composed. Pure, so the
+//! rule is held by unit tests (src/pacing_test.lu) apart from the loop.
+//!
+//! A pane's master is read once a turn. A read that fills what it asked
+//! for, or the master's own buffer, leaves its writer more to give: the
+//! pane is still streaming. A shorter read drained the master, so the
+//! output that woke the server is all there is for now, and waiting for
+//! the pane to be quiet buys nothing. On a system whose clock moves in
+//! 10 ms ticks, that wait is a whole tick or two.
+
+/// The master's buffer is learned as the largest read it has given; a read
+/// shorter than this never counts as a full buffer, so a key's echo or a
+/// small redraw drains the master even before anything larger was read.
+pub const STREAM_MIN: int = 1024
+
+/// Whether a read of `n` bytes, asking for `asked`, leaves the pane still
+/// streaming: it filled what it asked for, or it reached the largest read
+/// the master has given (`peak`, before this read) once that is at least
+/// STREAM_MIN. A full buffer may have a writer blocked behind it.
+pub fn read_streams(n: int, asked: int, peak: int) -> bool {
+    n >= asked || (n >= STREAM_MIN && n >= peak)
+}
+
+/// When a stale client's next frame may be composed (monotonic ns).
+/// - At most one frame per FRAME_AGE_MS: never before `last_frame` plus that.
+/// - A full image (`force_full`) waits for nothing else.
+/// - While a shown pane of the session is `streaming`, damage waits until it
+///   is FRAME_AGE_MS old or the panes have been quiet FRAME_QUIET_MS.
+/// - Otherwise every shown pane drained its master: the damage is due at once.
+/// - Synchronized output in a shown pane (since `sync_since`, 0 for none)
+///   holds the frame up to SYNC_MS.
+pub fn frame_at(last_frame: int, stale_since: int, last_output: int, sync_since: int, streaming: bool,
+    force_full: bool) -> int {
+    var at = last_frame + FRAME_AGE_MS * 1000000
+    if force_full { return at }
+    var ready = stale_since
+    if streaming {
+        let by_age = stale_since + FRAME_AGE_MS * 1000000
+        let by_quiet = last_output + FRAME_QUIET_MS * 1000000
+        ready = if by_age < by_quiet then by_age else by_quiet
+    }
+    if sync_since > 0 {
+        let sync_end = sync_since + SYNC_MS * 1000000
+        if sync_end > ready { ready = sync_end }
+    }
+    if ready > at { at = ready }
+    at
+}
