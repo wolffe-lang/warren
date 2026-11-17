@@ -6,7 +6,7 @@
 | W1 | `src/vt`: parser, grid, scrollback, resize; `warren vt-dump` | pure core, CLI/replay and frozen complete-frame comparisons; final measurements pending |
 | W2 | server, client, protocol v1; one pane; detach and attach | codec, server, terminal client, lifecycle (new, attach, detach, second client, the server outliving its client); session and client rows; PAX console logout waits on PAX |
 | W3 | split tree, tabs, modes, the hint bar, configuration v1 | pure layout module (tabs, split tree, geometry, operations) with golden and property rows; panes and tabs in the server, the compositor's borders and focus mark, the bar's two lines (session, tabs with their marks, mode and clock; hints, prompts and messages), modes per client from the key table, the split end to end through the real client (`keys_test`, `pane_rows`, `client_rows`, SERVER.md §8); configuration planned |
-| W4 | mouse, scrollback, copy mode, search, OSC 52 | pane focus and tab-label clicks with SGR/legacy reports, captured border dragging and all-motion transport; wheel scrollback and copy planned |
+| W4 | mouse, scrollback, copy mode, search, OSC 52 | pane focus and tab-label clicks with SGR/legacy reports, captured border dragging and all-motion transport, wheel and key scrollback per client; copy, search and OSC 52 planned |
 | W5 | command socket, CLI verbs, layout files, save and restore | planned |
 | W6 | static on the PAX image; rows in PAX's own suites | planned |
 
@@ -96,6 +96,17 @@ independent maps, reuse, pending-map release, zero-cell identity publication
 and a full-capacity stage/ACK/reset allocation plateau. The identity-frame row
 also replaces a tab without changing pixels, then clicks its newly acknowledged
 identity.
+
+Scroll rows (`scroll-*` in `pane_rows`) hold the wheel in both outer
+encodings (entering, moving, leaving at the live rows, the oldest-row limit,
+keys dropped while looking back), every scroll-mode key and its exits, the
+wheel reaching a program that asked for reports, two clients (one looking
+back on a snapshot that keeps its content in place, one live), and the
+alternate screen's inert wheel. `vt_view_test` holds the window itself on
+native, explicit checked and lupin: history above the live rows, the clamp at
+the oldest row, a soft wrap laid again at a new width, wide and combining
+glyphs, renditions, the alternate screen, eviction under a small cap, the
+anchor after more output, and no retained growth over repeated fills.
 
 A row that tests an interrupt writes the byte 0x03 into the pseudo-terminal.
 No row sends a signal from a script.
