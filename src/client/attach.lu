@@ -294,104 +294,159 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
     }
     var drawn = proto.image()
     var par = parser()
-    var session = if p.welcome_session.len > 0 then kept_text(p.welcome_session) else "the session"
-    var last_cols = cols
-    var last_rows = rows
-    var in_file = copy t.file
-    while true {
-        var wait = 0 - 1
-        let d = deadline(par)
-        if d >= 0 {
-            wait = d - now_ms()
-            if wait < 0 { wait = 0 }
-        }
-        let ev = poll.wait(mut w, LISTENED, wait) else |e| {
-            return End { code: 1, line: "warren: wait failed: {e}", gone: false }
-        }
-        let m = ev.meaning
-        if m & signal.reload() != 0 {
-            // A hangup: the terminal may be gone; it is given back only if
-            // it still answers.
-            let alive = term.mode(t.file) else |_| term.Mode { canonical: false, echo: false, signals: false,
-                flow: false, extended: false, raw_cr: false, raw_output: false, strip8: false, min: 0 - 1, time: 0 }
-            return End { code: 1, line: "warren: ended by a signal", gone: alive.min < 0 }
-        }
-        if m & (signal.terminate() | signal.quit() | signal.interrupt()) != 0 {
-            return End { code: 1, line: "warren: ended by a signal", gone: false }
-        }
-        if m & signal.suspend() != 0 {
-            give_back(mut t)
-            // Stop as the suspend asked: its default action, raised again.
-            signal.reset_one(signal.suspend()) else |_| {}
-            signal.raise(signal.suspend()) else |_| {}
-            signal.listen(LISTENED) else |_| {}
-            take_again(mut t)
-            drawn = proto.image()
-            let _r = send(p, 9, List[byte]())
-        }
-        if m & signal.continued() != 0 {
-            take_again(mut t)
-            drawn = proto.image()
-            let _r = send(p, 9, List[byte]())
-        }
-        if m & signal.resize() != 0 {
-            // A dimension the window now reports as 0 keeps its last size; a
-            // window the protocol cannot carry is not sent.
-            let now = term.size(t.file) else |_| term.Size { rows: last_rows, columns: last_cols }
-            let s = term.Size { rows: if now.rows > 0 then now.rows else last_rows,
-                columns: if now.columns > 0 then now.columns else last_cols }
-            if window_problem(s).len == 0 && (s.columns != last_cols || s.rows != last_rows) {
-                last_cols = s.columns
-                last_rows = s.rows
-                var b = number(s.columns, 2)
-                proto.put(mut b, s.rows, 2)
-                let _r = send(p, 6, b)
-            }
-        }
-        for r in ev.ready {
-            if r.key == tty_key {
-                let got = fs.read_chunk(mut in_file, 4096) else |_| {
-                    return End { code: 1, line: "warren: the terminal closed", gone: true }
-                }
-                if got.len == 0 { return End { code: 1, line: "warren: the terminal closed", gone: true } }
-                for e in feed(mut par, got, now_ms()) {
-                    if !send_event(p, e) { return End { code: 1, line: "warren: the server closed the connection", gone: false } }
-                }
-            } else if r.key == sock_key {
-                let pulled = pull(mut p)
-                while true {
-                    let k = step(mut p, 0)
-                    if k == 0 { break }
-                    if k == 0 - 2 {
-                        return End { code: 1, line: "warren: the server sent an image that does not apply", gone: false }
-                    }
-                    if k == 0 - 1 { return End { code: 1, line: "warren: the server closed the connection", gone: false } }
-                    if k == 129 && p.welcome_session.len > 0 { session = kept_text(p.welcome_session) }
-                    if k == 131 {
-                        let bytes = render(mut drawn, p.image, pol)
-                        fs.write_chunk(mut out, bytes) else |_| {
-                            return End { code: 1, line: "warren: the terminal cannot be written", gone: false }
-                        }
-                        let _a = send(p, 8, number(p.image.seq, 4))
-                    } else if k == 132 {
-                        fs.write_chunk(mut out, "\u{7}".bytes()) else |_| {}
-                    } else if k == 134 && !pol.explicit_wide {
-                        fs.write_chunk(mut out, "\u{1b}]2;{sanitize(kept_text(p.title))}\u{7}".bytes()) else |_| {}
-                    } else if k == 135 {
-                        return bye_end(p.end_code, kept_text(p.end_text), session)
-                    } else if k == 130 {
-                        return End { code: 1, line: "warren: refused: {kept_text(p.end_text)}", gone: false }
-                    }
-                }
-                if pulled == 1 { return End { code: 1, line: "warren: the server closed the connection", gone: false } }
-                if pulled == 2 { return End { code: 1, line: "warren: the connection failed", gone: false } }
-            }
-        }
-        for e in expire(mut par, now_ms()) {
-            if !send_event(p, e) { return End { code: 1, line: "warren: the server closed the connection", gone: false } }
+    var l = Loop { cols: cols, rows: rows, tty_key: tty_key, sock_key: sock_key, note: List[byte]() }
+    // One turn at a time, each in a region of its own: what a turn builds
+    // (the wait's answer, the messages read, the bytes drawn and sent, the
+    // events typed) is freed when the turn ends. The peer, the terminal,
+    // the image drawn, the parser and the loop's state outlive every turn
+    // and are changed in place; the turn hands back only a number.
+    var why = GOES_ON
+    while why == GOES_ON {
+        region turn {
+            why = one_turn(mut p, mut t, mut out, mut w, mut drawn, mut par, mut l, pol)
         }
     }
-    End { code: 1, line: "", gone: false }
+    ended(why, p, l)
+}
+
+// How a turn ended the attach (GOES_ON: it did not). Each names an End
+// that `ended` makes once the loop is over, outside every turn's region.
+const GOES_ON: int = 0
+const BY_SIGNAL: int = 1
+const HANGUP_GONE: int = 2
+const WAIT_FAILED: int = 3
+const TERMINAL_CLOSED: int = 4
+const SERVER_CLOSED: int = 5
+const IMAGE_REFUSED: int = 6
+const NOT_WRITTEN: int = 7
+const SAID_BYE: int = 8
+const SAID_REFUSE: int = 9
+const CONNECTION_FAILED: int = 10
+
+// What the attach loop keeps between turns besides the peer, the
+// terminal, the image and the parser: the window last sent, the
+// readiness keys, and why a wait failed (bytes, emptied and refilled).
+struct Loop {
+    cols: int,
+    rows: int,
+    tty_key: int,
+    sock_key: int,
+    note: List[byte],
+}
+
+fn keep_note(mut note: List[byte], t: str) {
+    (mut note).reset()
+    for b in t.bytes() { (mut note).push(b) }
+}
+
+// One turn: a wait, then what it reported. Called inside the turn's
+// region; every long-lived value it is handed is changed in place.
+fn one_turn(mut p: Peer, mut t: Tty, mut out: fs.File, mut w: poll.Waiter, mut drawn: proto.Image,
+    mut par: Parser, mut l: Loop, pol: Policy) -> int {
+    var wait = 0 - 1
+    let d = deadline(par)
+    if d >= 0 {
+        wait = d - now_ms()
+        if wait < 0 { wait = 0 }
+    }
+    let ev = poll.wait(mut w, LISTENED, wait) else |e| {
+        keep_note(mut l.note, "{e}")
+        return WAIT_FAILED
+    }
+    let m = ev.meaning
+    if m & signal.reload() != 0 {
+        // A hangup: the terminal may be gone; it is given back only if
+        // it still answers.
+        let alive = term.mode(t.file) else |_| term.Mode { canonical: false, echo: false, signals: false,
+            flow: false, extended: false, raw_cr: false, raw_output: false, strip8: false, min: 0 - 1, time: 0 }
+        return if alive.min < 0 then HANGUP_GONE else BY_SIGNAL
+    }
+    if m & (signal.terminate() | signal.quit() | signal.interrupt()) != 0 { return BY_SIGNAL }
+    if m & signal.suspend() != 0 {
+        give_back(mut t)
+        // Stop as the suspend asked: its default action, raised again.
+        signal.reset_one(signal.suspend()) else |_| {}
+        signal.raise(signal.suspend()) else |_| {}
+        signal.listen(LISTENED) else |_| {}
+        take_again(mut t)
+        // The screen is unknown again: the next image is drawn whole.
+        drawn.valid = false
+        let _r = send(p, 9, List[byte]())
+    }
+    if m & signal.continued() != 0 {
+        take_again(mut t)
+        drawn.valid = false
+        let _r = send(p, 9, List[byte]())
+    }
+    if m & signal.resize() != 0 {
+        // A dimension the window now reports as 0 keeps its last size; a
+        // window the protocol cannot carry is not sent.
+        let now = term.size(t.file) else |_| term.Size { rows: l.rows, columns: l.cols }
+        let s = term.Size { rows: if now.rows > 0 then now.rows else l.rows,
+            columns: if now.columns > 0 then now.columns else l.cols }
+        if window_problem(s).len == 0 && (s.columns != l.cols || s.rows != l.rows) {
+            l.cols = s.columns
+            l.rows = s.rows
+            var b = number(s.columns, 2)
+            proto.put(mut b, s.rows, 2)
+            let _r = send(p, 6, b)
+        }
+    }
+    var in_file = copy t.file
+    for r in ev.ready {
+        if r.key == l.tty_key {
+            let got = fs.read_chunk(mut in_file, 4096) else |_| { return TERMINAL_CLOSED }
+            if got.len == 0 { return TERMINAL_CLOSED }
+            for e in feed(mut par, got, now_ms()) {
+                if !send_event(p, e) { return SERVER_CLOSED }
+            }
+        } else if r.key == l.sock_key {
+            let pulled = pull(mut p)
+            while true {
+                let k = step(mut p, 0)
+                if k == 0 { break }
+                if k == 0 - 2 { return IMAGE_REFUSED }
+                if k == 0 - 1 { return SERVER_CLOSED }
+                if k == 131 {
+                    let bytes = render(mut drawn, p.image, pol)
+                    fs.write_chunk(mut out, bytes) else |_| { return NOT_WRITTEN }
+                    let _a = send(p, 8, number(p.image.seq, 4))
+                } else if k == 132 {
+                    fs.write_chunk(mut out, "\u{7}".bytes()) else |_| {}
+                } else if k == 134 && !pol.explicit_wide {
+                    fs.write_chunk(mut out, "\u{1b}]2;{sanitize(kept_text(p.title))}\u{7}".bytes()) else |_| {}
+                } else if k == 135 {
+                    return SAID_BYE
+                } else if k == 130 {
+                    return SAID_REFUSE
+                }
+            }
+            if pulled == 1 { return SERVER_CLOSED }
+            if pulled == 2 { return CONNECTION_FAILED }
+        }
+    }
+    for e in expire(mut par, now_ms()) {
+        if !send_event(p, e) { return SERVER_CLOSED }
+    }
+    GOES_ON
+}
+
+// The End a turn's code names, made after the loop.
+fn ended(why: int, p: Peer, l: Loop) -> End {
+    let named = kept_text(p.welcome_session)
+    let session = if named.len > 0 then named else "the session"
+    if why == SAID_BYE { return bye_end(p.end_code, kept_text(p.end_text), session) }
+    if why == SAID_REFUSE { return End { code: 1, line: "warren: refused: {kept_text(p.end_text)}", gone: false } }
+    if why == WAIT_FAILED { return End { code: 1, line: "warren: wait failed: {kept_text(l.note)}", gone: false } }
+    if why == HANGUP_GONE { return End { code: 1, line: "warren: ended by a signal", gone: true } }
+    if why == BY_SIGNAL { return End { code: 1, line: "warren: ended by a signal", gone: false } }
+    if why == TERMINAL_CLOSED { return End { code: 1, line: "warren: the terminal closed", gone: true } }
+    if why == IMAGE_REFUSED {
+        return End { code: 1, line: "warren: the server sent an image that does not apply", gone: false }
+    }
+    if why == NOT_WRITTEN { return End { code: 1, line: "warren: the terminal cannot be written", gone: false } }
+    if why == CONNECTION_FAILED { return End { code: 1, line: "warren: the connection failed", gone: false } }
+    End { code: 1, line: "warren: the server closed the connection", gone: false }
 }
 
 /// A command's reply: its status (0 done, 1 refused, 2 usage, 3 no
