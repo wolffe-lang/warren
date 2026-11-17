@@ -35,35 +35,37 @@ fn recalculate_written_extent(mut screen: Screen, cols: int, row: int) {
 fn shift_characters(mut screen: Screen, cols: int, row: int, col: int,
         amount: int, background: int, insert: bool) {
     let n = grid_clamp(amount, 1, cols - col + 1)
+    touch(mut screen, row - 1, col - 1, cols - 1)
     if insert {
         var to = cols
         while to >= col + n {
-            copy_cell(mut screen, (row - 1) * cols + to - 1, (row - 1) * cols + to - n - 1)
+            move_cell(mut screen, (row - 1) * cols + to - 1, (row - 1) * cols + to - n - 1)
             to -= 1
         }
         var at = col
         while at < col + n {
             let cell_at = (row - 1) * cols + at - 1
-            blank_cell(mut screen, cell_at, background)
+            clear_cell(mut screen, cell_at, background)
             screen.cells[cell_at].written = true
             at += 1
         }
     } else {
         var to = col
         while to <= cols - n {
-            copy_cell(mut screen, (row - 1) * cols + to - 1, (row - 1) * cols + to + n - 1)
+            move_cell(mut screen, (row - 1) * cols + to - 1, (row - 1) * cols + to + n - 1)
             to += 1
         }
         var at = cols - n + 1
-        while at <= cols { blank_cell(mut screen, (row - 1) * cols + at - 1, background); at += 1 }
+        while at <= cols { clear_cell(mut screen, (row - 1) * cols + at - 1, background); at += 1 }
     }
     repair_row_pairs_policy(mut screen, cols, row, background, insert)
     recalculate_written_extent(mut screen, cols, row)
 }
 
 fn copy_row(mut screen: Screen, cols: int, to: int, from: int) {
+    touch(mut screen, to - 1, 0, cols - 1)
     var col = 0
-    while col < cols { copy_cell(mut screen, (to - 1) * cols + col, (from - 1) * cols + col); col += 1 }
+    while col < cols { move_cell(mut screen, (to - 1) * cols + col, (from - 1) * cols + col); col += 1 }
     screen.extents[to - 1] = screen.extents[from - 1]
     screen.wrapped[to - 1] = screen.wrapped[from - 1]
     screen.line_ids[to - 1] = screen.line_ids[from - 1]
@@ -72,8 +74,9 @@ fn copy_row(mut screen: Screen, cols: int, to: int, from: int) {
 }
 
 fn blank_row(mut screen: Screen, cols: int, row: int, background: int) {
+    touch(mut screen, row - 1, 0, cols - 1)
     var col = 0
-    while col < cols { blank_cell(mut screen, (row - 1) * cols + col, background); col += 1 }
+    while col < cols { clear_cell(mut screen, (row - 1) * cols + col, background); col += 1 }
     screen.extents[row - 1] = 0
     screen.wrapped[row - 1] = false
     fresh_row_line(mut screen, row)

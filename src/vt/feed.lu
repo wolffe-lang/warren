@@ -3,6 +3,11 @@
 
 fn blank_cell(mut screen: Screen, at: int, background: int) {
     touch_at(mut screen, at)
+    clear_cell(mut screen, at, background)
+}
+
+// Blank a cell whose row the caller has stamped.
+fn clear_cell(mut screen: Screen, at: int, background: int) {
     screen.cells[at].base = 32
     screen.cells[at].mark1 = 0
     screen.cells[at].mark2 = 0
@@ -20,8 +25,13 @@ fn blank_cell_preserving_written(mut screen: Screen, at: int, background: int) {
 }
 
 fn copy_cell(mut screen: Screen, to: int, from: int) {
-    // Cell is scalar-only: an independent value copy, with no region allocation.
     touch_at(mut screen, to)
+    move_cell(mut screen, to, from)
+}
+
+// Copy a cell into one whose row the caller has stamped.
+fn move_cell(mut screen: Screen, to: int, from: int) {
+    // Cell is scalar-only: an independent value copy, with no region allocation.
     screen.cells[to] = screen.cells[from]
 }
 

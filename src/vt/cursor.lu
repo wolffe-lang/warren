@@ -47,9 +47,10 @@ fn erase_row(mut screen: Screen, cols: int, row: int, first: int, last: int, bac
     break_pair(mut screen, cols, row, last, background)
     if starts_in_tail && first > 1 { screen.cells[start + first - 2].written = false }
     if ends_in_lead && last < cols { screen.cells[start + last].written = false }
+    touch(mut screen, row - 1, first - 1, last - 1)
     var col = first
     while col <= last {
-        blank_cell(mut screen, start + col - 1, background)
+        clear_cell(mut screen, start + col - 1, background)
         screen.cells[start + col - 1].written = last < cols
         col += 1
     }
