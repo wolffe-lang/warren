@@ -1007,6 +1007,15 @@ fn row_clipboard_e2e(warren: str, console: bool) -> str {
         return "the terminal's clipboard writes: {writes} '{got}'"
     }
     type_text(mut r, "exit\r")
+    if console {
+        // The console takes no mouse or paste modes, so it has none to leave.
+        if !until_end(mut r, 10000) { close_run(r); return "the console client did not end" }
+        pump(mut r, 100)
+        let status = r.status
+        close_run(r)
+        if status != 0 { return "the console client ended {status}" }
+        return ""
+    }
     let why = ends_with(mut r, 0, "ended]")
     close_run(r)
     if why.len > 0 { return "session end: " + why }
