@@ -308,50 +308,106 @@ pub fn keep(mut drawn: proto.Image, img: proto.Image) {
     drawn.visible = img.visible
 }
 
+// Copy cells first..last (flat, inclusive) of `img` into `drawn`.
+fn keep_cells(mut drawn: proto.Image, img: proto.Image, first: int, last: int) {
+    var i = first
+    while i <= last {
+        drawn.base[i] = img.base[i]
+        drawn.mark1[i] = img.mark1[i]
+        drawn.mark2[i] = img.mark2[i]
+        drawn.width[i] = img.width[i]
+        drawn.flags[i] = img.flags[i]
+        drawn.fg[i] = img.fg[i]
+        drawn.bg[i] = img.bg[i]
+        i += 1
+    }
+}
+
+// Draw columns a..b (1-based, inclusive) of a row where they differ from
+// what the terminal shows (or all of them when `full`). `placed` is the
+// column the terminal's cursor stands at after the last cell drawn in this
+// row (0: unknown); the new one is returned.
+fn draw_row(mut out: List[byte], mut cur: Pen, mut pens: Pens, drawn: proto.Image, img: proto.Image, row: int,
+    a: int, b: int, placed_in: int, full: bool, pol: Policy) -> int {
+    var placed = placed_in
+    var col = a
+    while col <= b {
+        let i = (row - 1) * img.cols + col - 1
+        var lead = i
+        var lead_col = col
+        if img.width[i] == 0 && col > 1 {
+            lead = i - 1
+            lead_col = col - 1
+        }
+        let changed = full || !cell_same(drawn, img, i) || !cell_same(drawn, img, lead)
+        if !changed || img.width[lead] == 0 {
+            col += 1
+            continue
+        }
+        if placed != lead_col { cup(mut out, row, lead_col) }
+        draw_cell(mut out, mut cur, mut pens, img, lead, pol)
+        let w = if img.width[lead] == 2 then 2 else 1
+        placed = lead_col + w
+        col = lead_col + w
+        // After a wide glyph the next cell is placed explicitly, unless
+        // the policy drew its continuation.
+        if w == 2 && !pol.explicit_wide { placed = 0 }
+    }
+    placed
+}
+
 /// The bytes that turn what the terminal shows (`drawn`, invalid for an
 /// unknown screen) into `img`; `drawn` becomes `img` (`keep`, in place).
+/// When `drawn` is the image `img`'s delta was applied to, only the runs
+/// it applied are read, drawn where they changed, and kept; else every
+/// cell is compared.
 pub fn render(mut drawn: proto.Image, img: proto.Image, pol: Policy) -> List[byte] {
     var out = List[byte]()
     if !img.valid { return out }
     if pol.sync { text(mut out, "\u{1b}[?2026h") }
     text(mut out, "\u{1b}[?25l")
     let full = !drawn.valid || drawn.cols != img.cols || drawn.rows != img.rows
+    let spans = !full && img.applied_base != 0 && img.applied_base == drawn.seq
     if full { text(mut out, "\u{1b}[0m\u{1b}[H\u{1b}[2J") }
     var cur = Pen { known: false, flags: 0, fg: 0, bg: 0 }
     var pens = no_pens()
-    var row = 1
-    while row <= img.rows {
-        var col = 1
+    if spans {
         var placed = 0
-        while col <= img.cols {
-            let i = (row - 1) * img.cols + col - 1
-            var lead = i
-            var lead_col = col
-            if img.width[i] == 0 && col > 1 {
-                lead = i - 1
-                lead_col = col - 1
+        var last_row = 0
+        var k = 0
+        while k + 2 < img.applied.len {
+            let row = img.applied[k]
+            let col = img.applied[k + 1]
+            let end = col + img.applied[k + 2] - 1
+            if row != last_row { placed = 0 }
+            if row >= 1 && row <= img.rows && col >= 1 && end <= img.cols && col <= end {
+                placed = draw_row(mut out, mut cur, mut pens, drawn, img, row, col, end, placed, false, pol)
+                let first = (row - 1) * img.cols + col - 1
+                keep_cells(mut drawn, img, first, first + end - col)
             }
-            let changed = full || !cell_same(drawn, img, i) || !cell_same(drawn, img, lead)
-            if !changed || img.width[lead] == 0 {
-                col += 1
-                continue
-            }
-            if placed != lead_col { cup(mut out, row, lead_col) }
-            draw_cell(mut out, mut cur, mut pens, img, lead, pol)
-            let w = if img.width[lead] == 2 then 2 else 1
-            placed = lead_col + w
-            col = lead_col + w
-            // After a wide glyph the next cell is placed explicitly, unless
-            // the policy drew its continuation.
-            if w == 2 && !pol.explicit_wide { placed = 0 }
+            last_row = row
+            k += 3
         }
-        row += 1
+    } else {
+        var row = 1
+        while row <= img.rows {
+            let _placed = draw_row(mut out, mut cur, mut pens, drawn, img, row, 1, img.cols, 0, full, pol)
+            row += 1
+        }
     }
     text(mut out, "\u{1b}[0m")
     cup(mut out, img.cursor_row, img.cursor_col)
     if pol.shape { text(mut out, "\u{1b}[{img.shape} q") }
     if img.visible == 1 { text(mut out, "\u{1b}[?25h") }
     if pol.sync { text(mut out, "\u{1b}[?2026l") }
-    keep(mut drawn, img)
+    if spans {
+        drawn.seq = img.seq
+        drawn.cursor_row = img.cursor_row
+        drawn.cursor_col = img.cursor_col
+        drawn.shape = img.shape
+        drawn.visible = img.visible
+    } else {
+        keep(mut drawn, img)
+    }
     out
 }
