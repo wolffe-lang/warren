@@ -102,8 +102,16 @@ EOF/read error closes or advances that owner, not the loop. Socket M2 must
 serve the same offset algorithm. Do not cast socket-table numbers into
 `fs.File`: the two runtime tables number independently.
 
-Damage becomes a frame when at least 8 ms old or the pane is quiet for 2 ms,
-never more often than every 8 ms per client. Synchronized output waits at
+A read that returns less than it asked for, and less than the master's
+buffer (the largest read the master has given, counted from 1 KiB), drains
+the master; a read that fills either leaves the pane streaming, since its
+writer may be blocked behind a full buffer. When every shown pane of a
+session has drained its master, the session's damage becomes a frame in that
+turn. While one is still streaming, damage becomes a frame when at least
+8 ms old or the panes are quiet for 2 ms. A client gets at most one frame
+every 8 ms and has one image outstanding (`src/server/pacing.lu`). On a
+clock that moves in 10 ms ticks, as PAX's does, a 2 ms wait lasts one or two
+ticks, so an echo waits for no timer at all. Synchronized output waits at
 most 150 ms before forced publication. Use monotonic deadlines for those,
 HELLO's 5 s, drain's 2 s, closing pane's 3 s, stopping server's 5 s, the
 clock-bar tick and save debounce. No deadline requires a timer descriptor.
@@ -323,7 +331,8 @@ pre-HELLO, connection, session and memory limits (the memory row lowers the
 budget through `WARREN_MEMORY_BUDGET`, which the server takes only below its
 own), a resize while an image is outstanding, a client too slow for its events
 beside one that keeps up, a keystroke's delay beside a flooding pane, a
-flat resident size over 10,000 keystrokes, and the trace's closes (below).
+flat resident size over 10,000 keystrokes, the trace's closes (below), and
+20 echoes each composed in the turn that read it (`prompt-frame`).
 `src/compose_rows.lu` holds every
 composed image, applied by the client's applier, to the emulator's stored
 cells, and holds the event queue's cap to the bytes a client has yet to take
@@ -341,7 +350,10 @@ that could not be queued, or the server stopping. A `new` at a terminal is two
 connections: the command that makes the session (`REPLY sent`), then the
 attach. The `close-causes` session row drives the ordinary closes, a first
 message that is not a HELLO, and a client gone before its WELCOME is written,
-and fails on any close in the trace that names no cause.
+and fails on any close in the trace that names no cause. Each frame is traced
+as `frame conn N seq S turn T read-turn R`, where R is the last turn that read
+output from a shown pane of the session, and the server's last line counts
+the frames composed in the turn that read their output.
 
 On PAX a pane ends when its program ends, not when the program closes its
 terminal: the late-child row measures the session's end about a second after
@@ -497,8 +509,9 @@ unless the size changed. Output in a tab that is not shown composes nothing.
 Measured on Linux (`MEASURE` in the pane rows): a focus change between two
 panes side by side at 80x24 is a 600-byte image and among three panes 314
 bytes; a keystroke's image holds only the focused pane's cells; a split's new
-prompt is drawn 18 ms after the key; a keystroke in a split is drawn in 2.4 ms
-(p50) and 13.6 ms beside a flooding neighbour in the same tab. A client's mode
+prompt is drawn 18 ms after the key; a keystroke in a split is drawn in 0.3 ms
+(p50; 2.4 ms while echoes waited 2 ms for quiet panes) and 13.7 ms beside a
+flooding neighbour in the same tab, which still streams. A client's mode
 change repaints only its own bar: revealing the prefix table (the mode field
 and hint line) is 626 bytes at 80x24, and entering pane mode 854 bytes. Resize
 mode has no idle timeout; its arrows and letter keys keep resizing until
