@@ -222,19 +222,38 @@ fn test_the_prompts() {
     }
 }
 
+fn test_scroll_mode() {
+    let k = config.defaults()
+    let v = config.MODE_SCROLL
+    assert(key_is(scalar(k, config.MODE_PREFIX, 91), config.A_VIEW_ENTER, 0, v), "prefix [ enters scroll mode")
+    assert(key_is(scalar(k, v, 107), config.A_VIEW_ROWS, 1, v) && key_is(named(k, v, 1), config.A_VIEW_ROWS, 1, v), "k and Up: a row back")
+    assert(key_is(scalar(k, v, 106), config.A_VIEW_ROWS, -1, v) && key_is(named(k, v, 2), config.A_VIEW_ROWS, -1, v), "j and Down: a row forward")
+    assert(key_is(named(k, v, 7), config.A_VIEW_PAGE, 2, v) && key_is(ctrl(k, v, 98), config.A_VIEW_PAGE, 2, v), "PageUp and C-b: a window back")
+    assert(key_is(named(k, v, 8), config.A_VIEW_PAGE, -2, v) && key_is(ctrl(k, v, 102), config.A_VIEW_PAGE, -2, v), "PageDown and C-f: a window forward")
+    assert(key_is(scalar(k, v, 117), config.A_VIEW_PAGE, 1, v) && key_is(scalar(k, v, 100), config.A_VIEW_PAGE, -1, v), "u and d: half a window")
+    assert(key_is(scalar(k, v, 103), config.A_VIEW_END, 1, v) && key_is(scalar(k, v, 71), config.A_VIEW_END, 0, v), "g and G: the ends")
+    for exit in [scalar(k, v, 113), named(k, v, 14), named(k, v, 13)] {
+        assert(key_is(exit, config.A_NONE, 0, config.MODE_NORMAL), "q, Esc and Enter leave")
+    }
+    assert(key_is(ctrl(k, v, 32), config.A_NONE, 0, config.MODE_PREFIX), "the prefix leaves for the prefix table")
+    assert(key_is(scalar(k, v, 120), config.A_NONE, 0, v), "an unbound key is dropped and the mode stays")
+}
+
 fn test_the_hint_lines() {
     let k = config.defaults()
-    let prefix = " C-Space prefix  M-\\ M-| |- split  M-t c new tab  M-w x close  ? keys  +15"
+    let prefix = " C-Space prefix  M-\\ M-| |- split  M-t c new tab  M-w x close  ? keys  +16"
     assert(config.hint_text(k, config.MODE_NORMAL, 80) == " C-Space prefix", "idle has only the prefix at 80")
     assert(config.hint_text(k, config.MODE_PREFIX, 80) == prefix, "prefix at 80")
     assert(config.hint_text(k, config.MODE_NORMAL, 40) == " C-Space prefix", "idle has only the prefix at 40")
-    assert(config.hint_text(k, config.MODE_PREFIX, 40) == " C-Space prefix  M-\\ M-| |- split  +18", "prefix at 40")
+    assert(config.hint_text(k, config.MODE_PREFIX, 40) == " C-Space prefix  M-\\ M-| |- split  +19", "prefix at 40")
     assert(config.hint_text(k, config.MODE_PANE, 80) == " |- split  hjkl focus  x close  z zoom  o next pane  = equalize  Esc back", "pane")
     assert(config.hint_text(k, config.MODE_TAB, 80) == " hl prev/next  c new  x close  r rename  1-9 go to  Esc back", "tab")
     assert(config.hint_text(k, config.MODE_RESIZE, 80) == " hjkl resize  = equalize  Esc back", "resize")
     assert(config.hint_text(k, config.MODE_SESSION, 80) == " d detach  Esc back", "session")
     assert(config.hint_text(k, config.MODE_LOCKED, 80) == " C-g unlock", "locked")
     assert(config.hint_text(k, config.MODE_HELP, 80) == " jk scroll  Esc close", "help")
+    assert(config.hint_text(k, config.MODE_SCROLL, 80) == " jk row  PgUp PgDn page  ud half  gG oldest/live  q quit  Esc back", "scroll")
+    assert(config.mode_name(config.MODE_SCROLL) == "SCROLL", "scroll mode's name")
     assert(config.mode_name(config.MODE_NORMAL) == "NORMAL" && config.mode_name(config.MODE_SESSION) == "SESSION", "names")
     // Every hint line fits: nothing wider than the line at the minimum width.
     var m = 0
@@ -315,6 +334,7 @@ fn main() -> int {
     test_locked_passes_everything_but_its_one_key()
     test_confirm_and_help()
     test_the_prompts()
+    test_scroll_mode()
     test_the_hint_lines()
     test_the_key_list()
     test_key_names()
