@@ -34,8 +34,10 @@ pub const MODE_CONFIRM: int = 9
 pub const MODE_HELP: int = 10
 /// Sticky: a window over the pane's history; left with `q`, Esc or Enter.
 pub const MODE_SCROLL: int = 11
+/// A search's text, typed on the hint line from scroll mode.
+pub const MODE_SEARCH: int = 12
 /// How many modes there are.
-pub const MODES: int = 12
+pub const MODES: int = 13
 /// A step's next mode: the mode the client was in before confirm, help or a
 /// prompt (a sticky mode, or normal). The server keeps it.
 pub const MODE_BACK: int = -1
@@ -106,6 +108,10 @@ pub const A_VIEW_PAGE: int = 30
 pub const A_VIEW_END: int = 31
 /// The session's register into the focused pane.
 pub const A_PASTE: int = 32
+/// Start the search prompt; arg 1 toward older rows, 0 toward newer.
+pub const A_SEARCH: int = 33
+/// Search again from the last match; arg 0 the same way, 1 the other way.
+pub const A_SEARCH_AGAIN: int = 34
 
 const SHIFT: int = 1
 const ALT: int = 2
@@ -382,7 +388,7 @@ pub fn step(k: Keys, mode: int, mods: int, kind: int, code: int) -> Step {
 /// The mode's name, as the bar's mode field shows it.
 pub fn mode_name(mode: int) -> str {
     let names = ["NORMAL", "PREFIX", "PANE", "TAB", "RESIZE", "SESSION", "LOCKED", "COMMAND", "RENAME",
-        "CONFIRM", "HELP", "SCROLL"]
+        "CONFIRM", "HELP", "SCROLL", "SEARCH"]
     if mode < 0 || mode >= MODES { return "" }
     names[mode]
 }
