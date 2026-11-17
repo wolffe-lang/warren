@@ -14,7 +14,10 @@
 //! split through the real client, its screen read back cell for cell. The
 //! window: a terminal reporting 0x0 attaches at the documented 80x24, or at
 //! COLUMNS x LINES when both are set; a window larger than the protocol
-//! carries is refused by name before anything starts.
+//! carries is refused by name before anything starts. Memory: a client at
+//! 160x50 drawing a pane that scrolls without pause keeps its resident set
+//! within a stated bound over hundreds of renders (Linux and PAX, where
+//! /proc gives the resident set).
 //!
 //! After every row nothing it started may still run (Linux reads /proc; a
 //! process whose environment names the row's runtime directory is red).
@@ -1083,6 +1086,106 @@ fn row_window_too_large(warren: str) -> str {
     why
 }
 
+/// The window the memory row draws at: 8,000 cells.
+const MEM_COLS: int = 160
+const MEM_ROWS: int = 50
+/// Renders before the first reading (the image and the buffers reach
+/// their size), the renders measured past it, and how often it is read.
+const MEM_WARM: int = 50
+const MEM_RENDERS: int = 400
+const MEM_CHECK: int = 25
+/// The most the client's resident set may grow over MEM_RENDERS renders.
+/// One image kept per render at this window is 448,000 bytes.
+const MEM_BOUND_KB: int = 4096
+
+// How many renders the client's output holds: each render hides the
+// cursor first (`CSI ? 25 l`), once. `at` is where the next count starts.
+struct Renders {
+    at: int,
+    n: int,
+}
+
+fn count_renders(r: Run, mut c: Renders) {
+    let hide = "\u{1b}[?25l".bytes()
+    var i = c.at
+    while i + hide.len <= r.out.len {
+        var k = 0
+        while k < hide.len && r.out[i + k] == hide[k] { k += 1 }
+        if k == hide.len {
+            c.n += 1
+            i += hide.len
+        } else {
+            i += 1
+        }
+    }
+    c.at = i
+}
+
+// The client draws in bounded memory: at 160x50 a pane that prints lines
+// without pause scrolls under every frame, so every render repaints most
+// of the screen. The client's resident set after MEM_RENDERS renders past
+// a warm-up stays within MEM_BOUND_KB of its reading at the warm-up. It is
+// read every MEM_CHECK renders and the row stops at the first reading past
+// the bound. Linux and PAX (it reads /proc).
+fn row_memory_bounded(warren: str) -> str {
+    var r = launch(warren, "mem", List[str](), MEM_COLS, MEM_ROWS) else |e| { return "launch: {e}" }
+    if !until_screen(mut r, "$", 10000) {
+        close_run(r)
+        return "no prompt: " + screen_text(r.screen)
+    }
+    var pad = ""
+    var k = 0
+    while k < 14 {
+        pad = pad + "0123456789"
+        k += 1
+    }
+    type_text(mut r, "i=0; while [ $i -lt 1000000 ]; do echo \"scroll $i {pad}\"; i=$((i+1)); done\r")
+    var c = Renders { at: 0, n: 0 }
+    let t0 = now_ms()
+    while c.n < MEM_WARM && now_ms() - t0 < 15000 {
+        pump(mut r, 20)
+        count_renders(r, mut c)
+    }
+    var why = ""
+    let warm_at = c.n
+    let warm = rss_kb(r.pid)
+    if warm_at < MEM_WARM {
+        why = "only {warm_at} renders in 15 s"
+    } else if warm <= 0 {
+        why = "no resident set to read for the client (pid {r.pid})"
+    }
+    var last = warm
+    var next = warm_at + MEM_CHECK
+    while why.len == 0 && c.n < warm_at + MEM_RENDERS && now_ms() - t0 < 35000 {
+        pump(mut r, 20)
+        count_renders(r, mut c)
+        if c.n >= next {
+            last = rss_kb(r.pid)
+            next = c.n + MEM_CHECK
+            if last - warm > MEM_BOUND_KB { why = "past the bound" }
+        }
+    }
+    let renders = c.n - warm_at
+    if warm > 0 {
+        last = rss_kb(r.pid)
+        let per = if renders > 0 then (last - warm) * 1000 / renders else 0
+        print("MEASURE client-rss {MEM_COLS}x{MEM_ROWS} warm-renders={warm_at} warm-kb={warm} renders={renders} kb={last} growth-kb={last - warm} bytes-per-render={per} bound-kb={MEM_BOUND_KB}")
+        if why == "past the bound" || last - warm > MEM_BOUND_KB {
+            why = "the client grew {last - warm} kB over {renders} renders at {MEM_COLS}x{MEM_ROWS} ({per} bytes a render), past {MEM_BOUND_KB} kB"
+        } else if why.len == 0 && renders < MEM_RENDERS {
+            why = "only {renders} renders past the warm-up in 35 s"
+        }
+    }
+    // Stop the printing, then leave the session to the server's stop.
+    type_text(mut r, "\u{3}")
+    pump(mut r, 200)
+    type_text(mut r, "\u{0}d")
+    let left = ends_with(mut r, 0, "[detached")
+    close_run(r)
+    if why.len == 0 && left.len > 0 { why = "detach: " + left }
+    why
+}
+
 fn run_row(warren: str, name: str) -> str {
     if name == "detach-reattach" { return row_detach_reattach(warren) }
     if name == "server-stopping" { return row_server_stopping(warren) }
@@ -1104,6 +1207,7 @@ fn run_row(warren: str, name: str) -> str {
     if name == "zero-window" { return row_zero_window(warren) }
     if name == "zero-window-env" { return row_zero_window_env(warren) }
     if name == "window-too-large" { return row_window_too_large(warren) }
+    if name == "memory-bounded" { return row_memory_bounded(warren) }
     "no such row"
 }
 
@@ -1130,6 +1234,12 @@ fn main() -> int {
     }
     if rows.len == 0 {
         rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names split-e2e zero-window zero-window-env window-too-large")
+        // The memory row reads the client's resident set from /proc.
+        if fs.exists("/proc/self/status") {
+            (mut rows).push("memory-bounded")
+        } else {
+            print("NOTE memory-bounded not run here: no /proc to read a resident set")
+        }
     }
     if !fs.exists("/proc") { print("NOTE leftovers unchecked here: no /proc to read") }
     // Every row's socket lives in a short directory under this one; a
