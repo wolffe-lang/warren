@@ -2,12 +2,14 @@
 //! The outer terminal's input bytes to protocol events: keys (scalars and
 //! named keys with their modifiers), SGR mouse reports, bracketed paste and
 //! focus reports. Pure: the attach loop feeds it what the terminal sends and
-//! asks it, at its deadline, for a lone ESC that no sequence followed.
+//! asks it, at its deadline, for a sequence that a read cut and nothing
+//! completed. A read that ends in ESC is the Escape key at once.
 
 const ESC: int = 27
 
-/// How long a lone ESC (or an unfinished sequence) waits for the rest
-/// before it is taken as it stands.
+/// How long an unfinished sequence (one a read cut after `ESC [`, `ESC O`
+/// or inside a scalar) waits for the rest before it is taken as it stands.
+/// A read that ends in ESC waits for nothing: it is the Escape key.
 pub const ESC_MS: int = 30
 /// The longest sequence kept while it is unfinished; past it the bytes go
 /// to the pane unchanged.
@@ -63,9 +65,23 @@ pub fn feed(mut p: Parser, data: List[byte], now_ms: int) -> List[Event] {
     var out = List[Event]()
     for b in data { (mut p.pending).push(b) }
     drain(mut p, mut out, false)
+    // A read that ends in ESC, with only ESCs waiting, has nothing behind it
+    // to wait for: a terminal writes a key's sequence whole, so this is the
+    // Escape key (or ESC ESC, Escape with Alt), taken now.
+    if !p.pasting && data.len > 0 && data[data.len - 1] as int == ESC && only_escapes(p) {
+        drain(mut p, mut out, true)
+    }
     // What still waits is timed from this read.
     p.since = now_ms
     out
+}
+
+fn only_escapes(p: Parser) -> bool {
+    if p.pending.len == 0 || p.pending.len > 2 { return false }
+    for b in p.pending {
+        if b as int != ESC { return false }
+    }
+    true
 }
 
 /// At or past the deadline: what waits is taken as it stands (a lone ESC
