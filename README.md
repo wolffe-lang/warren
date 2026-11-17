@@ -190,6 +190,13 @@ checked/lupin entry point. Live socket/pty and renderer/model-cell comparisons b
 to the [one-pane implementation contract](notes/wr02-draft-wr03-one-pane.md),
 not to the pure codec's evidence.
 
+Quick-key terminal rows require exact tab counts after an ordered UI barrier,
+including deliberately late activity marks in all three input encodings;
+`src/tab_labels_test.lu` holds their pure label predicate. Focus-byte rows
+cover both a coalesced prefix/action and a separately drawn prefix. Every
+emitted cell must differ from the preceding image; [SERVER](docs/SERVER.md)
+states the measured byte arithmetic and headroom.
+
 Unlabelled pull requests run the unit gate. The `ci` label requests the Linux
 gate, and `full-matrix` requests Linux and macOS. Pushes to `trunk`, the
 nightly run and a manual dispatch run everything.
