@@ -517,8 +517,9 @@ have changed: the rects of the shown panes whose grids changed since its last
 image, the bar's rows when they changed, and the whole frame after a layout
 change (a split, a close, focus, a tab, zoom, a size), which is still a delta
 unless the size changed. Output in a tab that is not shown composes nothing.
-Within a shown pane's rect, only the rows its emulator changed since that
-client's last image are read, and in each of them only the columns changed,
+Within the cells a pane owns in the frame, only the rows its emulator changed
+since that client's last image are read (another session's pane, shown at the
+same place in its own frame, limits nothing here), and in each of them only the columns changed,
 when every earlier change of the row was already in that image (else the whole
 row). The emulator stamps each row's last change, its columns and the change
 before it with the pane's tick, which moves once a feed and once a resize; the
