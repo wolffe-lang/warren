@@ -1,0 +1,20 @@
+//! member: false
+//! The client's export to the outer terminal's clipboard: OSC 52 with the
+//! data base64-encoded. Pure: native, checked and lupin.
+use client
+
+fn text(b: List[byte]) -> str { str_from_utf8(b[0..b.len]) else "?" }
+
+fn test_osc52() {
+    assert(client.osc52("hello".bytes()).len > 0, "data makes a sequence")
+    assert(text(client.osc52("hello".bytes())) == "\u{1b}]52;c;aGVsbG8=\u{7}", "hello: " + text(client.osc52("hello".bytes())))
+    assert(text(client.osc52("S1 alpha\nS2 beta".bytes())) == "\u{1b}]52;c;UzEgYWxwaGEKUzIgYmV0YQ==\u{7}", "two rows")
+    assert(text(client.osc52("\u{3042}".bytes())) == "\u{1b}]52;c;44GC\u{7}", "UTF-8 bytes")
+    assert(client.osc52(List[byte]()).len == 0, "nothing for empty data")
+}
+
+fn main() -> int {
+    test_osc52()
+    print("PASS client-clipboard")
+    0
+}
