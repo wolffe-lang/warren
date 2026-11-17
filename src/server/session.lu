@@ -21,7 +21,9 @@ use vt
 /// once the master has reported its end (eof or a pty master's io).
 /// `damage` counts every change to its cells; `shown` says it is drawn
 /// now (in its session's active tab, not hidden), at `at_col`,`at_row`.
-/// `read_turn` is the server's turn that last read output from the master.
+/// `read_turn` is the server's turn that last read output from the master;
+/// `streaming` says that read left more behind (pacing.lu), and
+/// `read_peak` is the largest read the master has given, its buffer.
 pub struct Pane {
     live: bool,
     id: int,
@@ -43,6 +45,8 @@ pub struct Pane {
     last_output: int,
     sync_since: int,
     read_turn: int,
+    streaming: bool,
+    read_peak: int,
     damage: int,
     shown: bool,
     at_col: int,
@@ -102,7 +106,8 @@ pub fn idle_pane(cols: int, rows: int) -> Pane {
         live: false, id: 0, session: 0 - 1, session_gen: 0, gen: 0,
         master: 0 - 1, key: 0 - 1, child: 0 - 1, pid: 0 - 1, child_live: false, status: 0 - 1,
         ended: true, screen: vt.new(cols, rows, HISTORY_BYTES), input: input, in_off: 0, in_len: 0, write_on: false,
-        last_output: 0, sync_since: 0, read_turn: 0 - 1, damage: 0, shown: false, at_col: 0, at_row: 0,
+        last_output: 0, sync_since: 0, read_turn: 0 - 1, streaming: false,
+        read_peak: 0, damage: 0, shown: false, at_col: 0, at_row: 0,
     }
 }
 
@@ -296,6 +301,8 @@ pub fn start_pane(mut pane: Pane, session_name: str, sp: Spawn, argv: List[str],
     pane.child_live = true
     pane.status = 0 - 1
     pane.ended = false
+    pane.streaming = false
+    pane.read_peak = 0
     pane.in_off = 0
     pane.in_len = 0
     pane.write_on = false
