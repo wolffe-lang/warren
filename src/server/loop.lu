@@ -50,6 +50,7 @@ pub struct Server {
     need_slot: bool,
     need_pane: bool,
     need_view: bool,
+    settings: config.Settings,
     want_cols: int,
     want_rows: int,
     rotate: int,
@@ -1605,7 +1606,16 @@ fn select_gesture(mut s: Server, index: int, kind: int, button: int, col: int, r
         if si >= 0 {
             let n = vt.view_marked_text(s.conns[index].view, mut s.sessions[si].register, REGISTER_BYTES)
             if n < 0 { tell(mut s, index, "selection too large: {REGISTER_BYTES} bytes at most") }
-            else { tell(mut s, index, "copied {n} bytes") }
+            else {
+                tell(mut s, index, "copied {n} bytes")
+                // Exported best effort to this client's terminal alone, when
+                // it takes OSC 52 writes.
+                if n > 0 && s.conns[index].features & 8 != 0 {
+                    if !send(mut s.conns[index], 133, bytes_payload(s.sessions[si].register)) {
+                        terminal(mut s, index, 135, 5, "too slow")
+                    }
+                }
+            }
         }
     }
     select_end(mut s, index)
@@ -2007,6 +2017,31 @@ fn read_conn(mut s: Server, index: int) {
     parse(mut s, index)
 }
 
+// ---- the configuration file ----
+
+// `$XDG_CONFIG_HOME/warren/warren.toml`, or `~/.config/warren/warren.toml`.
+fn settings_path() -> str {
+    let xdg = env.get("XDG_CONFIG_HOME") else ""
+    if xdg.len > 0 { return xdg + "/warren/warren.toml" }
+    let home = env.get("HOME") else ""
+    if home.len == 0 { return "" }
+    home + "/.config/warren/warren.toml"
+}
+
+/// The settings warren.toml makes, read once when the server starts. No file
+/// is the defaults; a file that cannot be read or parsed is refused whole.
+fn load_settings() -> config.Settings {
+    let path = settings_path()
+    if path.len == 0 || !fs.exists(path) { return config.default_settings() }
+    let text = fs.read_text(path) else |e| {
+        var refused = config.default_settings()
+        refused.ok = false
+        refused.why = "cannot be read: {e}"
+        return refused
+    }
+    config.parse_settings(text)
+}
+
 // ---- HELLO, after the frame that carried it ----
 
 fn welcome_conn(mut s: Server, index: int, session: str) -> bool {
@@ -2180,6 +2215,11 @@ fn hello(mut s: Server, index: int) {
     s.sessions[si].members = s.sessions[si].members + 1
     mark_stale(mut s.conns[index], now_ns())
     recompute_size(mut s, si)
+    // A warren.toml that did not parse is named to every attaching client.
+    if !s.settings.ok {
+        let at = if s.settings.line > 0 then " line {s.settings.line}" else ""
+        tell(mut s, index, "warren.toml{at}: {s.settings.why}")
+    }
     flush(mut s, index)
 }
 
@@ -2253,7 +2293,9 @@ fn read_master(mut s: Server, k: int, now: int) {
                     ok = send(mut s.conns[i], 134, title_payload(title))
                 } else if ev.kind == 2 && active {
                     ok = send(mut s.conns[i], 132, List[byte]())
-                } else if ev.kind == 4 && ev.payload.len <= 65536 {
+                } else if ev.kind == 4 && ev.payload.len <= 65536 && s.settings.clipboard_programs &&
+                        s.conns[i].features & 8 != 0 {
+                    // A program's own clipboard write, only when warren.toml allows it.
                     ok = send(mut s.conns[i], 133, bytes_payload(ev.payload))
                 }
                 if !ok { terminal(mut s, i, 135, 5, "too slow") }
@@ -2828,7 +2870,7 @@ pub fn serve() -> int {
         conns: conns, sessions: List[Session](), panes: List[Pane](), orphans: List[int](), key_kind: List[int](),
         key_owner: List[int](), key_gen: List[int](), next_id: 0, next_pane: 1, stopping: false, stop_deadline: 0,
         started: now_ns(), idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
-        version: vt.package_version(), again: false, need_slot: false, need_pane: false, need_view: false, want_cols: 0,
+        version: vt.package_version(), again: false, need_slot: false, need_pane: false, need_view: false, settings: load_settings(), want_cols: 0,
         want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, master_read: master_read,
         budget: budget, uid: env.euid() else 0 - 1, inherited: inherited, keys: keys, help: help,
         clock_hour: 0, clock_minute: 0, clock_next: 0,
