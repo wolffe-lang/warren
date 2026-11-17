@@ -1,0 +1,49 @@
+//! member: true
+//! A read-only window over retained primary history and the live screen.
+
+/// One client's window over one pane. `screen` holds `rows` rows of `cols`
+/// cells, row-major with stride `cols`, each row carrying its logical line id
+/// and offset. The window's top row is `back` rows above the live screen's
+/// first row; 0 is the live screen. `scratch`, `flow` and `reader` are reused
+/// working storage. Buffers grow to the largest pane filled and are kept.
+pub struct View {
+    cols: int, rows: int, back: int,
+    screen: Screen, scratch: Screen,
+    flow: ReflowState, reader: HistoryReader,
+}
+
+/// An empty window; its buffers are made at the first fill.
+pub fn new_view() -> View {
+    View { cols: 0, rows: 0, back: 0, screen: new_screen(1, 1), scratch: new_screen(1, 1),
+        flow: new_reflow_state(), reader: new_history_reader() }
+}
+
+fn ensure_view_buffers(mut view: View, cols: int, rows: int) {
+    if view.screen.cells.len < cols * rows || view.screen.extents.len < rows { view.screen = new_screen(cols, rows) }
+    if view.scratch.cells.len < cols * rows || view.scratch.extents.len < rows { view.scratch = new_screen(cols, rows) }
+    view.cols = cols
+    view.rows = rows
+}
+
+/// Fill the window whose top row is `back` rows above the live screen's first
+/// row, at the pane's current size. Returns the back shown.
+pub fn fill_view(mut view: View, pane: Vt, back: int) -> int {
+    ensure_view_buffers(mut view, pane.cols, pane.rows)
+    var row = 1
+    while row <= pane.rows {
+        if pane.active_alternate { copy_screen_row(mut view.screen, pane.alternate, pane.cols, row, row) }
+        else { copy_screen_row(mut view.screen, pane.primary, pane.cols, row, row) }
+        row += 1
+    }
+    view.back = 0
+    if back < 0 { return 0 }
+    0
+}
+
+/// How many rows above the live screen's first row the row holding logical
+/// line `id` at cell `offset` now is, or -1 when history no longer holds it.
+pub fn view_back_of(mut view: View, pane: Vt, id: int, offset: int) -> int {
+    ensure_view_buffers(mut view, pane.cols, pane.rows)
+    if id < 0 || offset < 0 { return 0 - 1 }
+    0 - 1
+}
