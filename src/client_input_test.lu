@@ -242,6 +242,7 @@ fn main() -> int {
     test_legacy_mouse()
     test_table()
     test_invalid_utf8()
+    test_a_lone_escape_goes_at_once()
     test_escape_waits()
     test_overlong_sequence()
     // The bounded entry is for native/checked/interpreter input tables.
