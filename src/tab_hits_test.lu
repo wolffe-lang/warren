@@ -21,6 +21,10 @@ fn test_exact_ack_promotes_only_its_pending_spans() {
     assert(server.ack_tab_hits(mut state, 2), "new exact ACK promotes")
     assert(server.tab_hit_at(state, 10, 23) == 8, "new drawn span")
     assert(!server.ack_tab_hits(mut state, 2), "duplicate ACK has nothing to promote")
+    server.stage_drawn_tab_hits(mut state, 3)
+    assert(!server.ack_tab_hits(mut state, 2), "cursor-only pending image ignores stale ACK")
+    assert(server.ack_tab_hits(mut state, 3), "cursor-only exact ACK")
+    assert(server.tab_hit_at(state, 10, 23) == 8, "cursor-only delta retains painted geometry")
 }
 
 fn test_geometry_bounds_and_independent_connections() {
@@ -46,6 +50,8 @@ fn test_empty_maps_and_connection_reuse() {
     let _ack = server.ack_tab_hits(mut c.tabs, 1)
     server.stage_tab_hits(mut c.tabs, hits(7, 8), 80, 29, 2)
     let capacity = c.tabs.pending.spans.len + c.tabs.drawn.spans.len
+    assert(capacity == 2 * server.MAX_PANES, "fixed span capacity")
+    assert(server.connection_bytes() == 1048582 + 65540 + server.EVENT_QUEUE + server.TAB_HIT_BYTES, "span maps counted in admission")
     server.reset_conn(mut c, 12, 44, 0)
     assert(server.tab_hit_at(c.tabs, 10, 23) == 0, "reuse clears drawn map")
     assert(!server.ack_tab_hits(mut c.tabs, 2), "reuse clears old pending map")
