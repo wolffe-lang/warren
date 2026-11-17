@@ -1,0 +1,49 @@
+//! member: false
+//! The feed's printable fast path: a run of printable ASCII in ground state
+//! is written to the row without the per-byte parser and per-glyph calls,
+//! and every feed agrees, cell for cell, with the per-byte reference.
+//! Pure: native, the checked machine and lupin.
+use vt
+
+fn repeat(text: str, n: int) -> str {
+    var out = ""
+    var i = 0
+    while i < n {
+        out = out + text
+        i += 1
+    }
+    out
+}
+
+// A redraw's row as a full-screen editor writes it: the cursor placed, a
+// rendition, a line of text, the rendition reset.
+fn test_a_text_row_takes_the_run_path() {
+    var pane = vt.new(320, 90, 0)
+    let text = repeat("lorem ipsum dolor sit amet, ", 10) + "consectetur adipiscing elit, "
+    assert(text.len == 309, "fast-row-length")
+    vt.feed(mut pane, ("\u{1b}[5;1H\u{1b}[1;31m" + text + "\u{1b}[0m").bytes())
+    assert(pane.primary.cells[4 * 320].base == 108 && pane.primary.cells[4 * 320 + 308].base == 32, "fast-row-cells")
+    assert(pane.primary.cells[4 * 320].flags == 1 && pane.primary.cells[4 * 320].foreground == 1, "fast-row-pen")
+    assert(pane.cursor_row == 5 && pane.cursor_col == 310 && !pane.pending_wrap, "fast-row-cursor")
+    assert(pane.primary.extents[4] == 309, "fast-row-extent")
+    // Every printable byte of the row took the run path: no per-glyph call.
+    assert(pane.glyph_calls == 0, "fast-row-glyph-calls")
+}
+
+// A row that reaches the right margin: only the margin's cell takes the
+// per-glyph path (it sets the pending wrap), and the next byte wraps.
+fn test_the_margin_takes_the_per_glyph_path() {
+    var pane = vt.new(20, 3, 0)
+    vt.feed(mut pane, repeat("x", 20).bytes())
+    assert(pane.cursor_col == 20 && pane.pending_wrap, "margin-pending-wrap")
+    assert(pane.glyph_calls == 1, "margin-glyph-calls")
+    vt.feed(mut pane, "y".bytes())
+    assert(pane.cursor_row == 2 && pane.cursor_col == 2 && pane.primary.cells[20].base == 121, "margin-wrapped")
+}
+
+fn main() -> int {
+    test_a_text_row_takes_the_run_path()
+    test_the_margin_takes_the_per_glyph_path()
+    print("PASS vt-fast-path")
+    0
+}
