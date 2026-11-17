@@ -863,17 +863,19 @@ fn row_damage_in_rect(mut r: Rig) -> str {
 // pre-image. Raw frames and per-run byte/unchanged counts are printed only
 // after the focus measurements, so output does not pace the server.
 fn capture_focus(mut out: List[str], before: proto.Image, after: proto.Image, body: List[byte], label: str) {
-    if (env.get("WARREN_FOCUS_CAPTURE") else "") != "1" { return }
-    let wire = proto.encode(131, 0, body)
-    assert(wire.code == 0, "focus capture frame")
-    var hex = "WIRE {label} seq={after.seq} "
-    let digits = "0123456789abcdef"
-    for b in wire.bytes {
-        let n = b as int
-        hex = hex + digits[n / 16..n / 16 + 1] + digits[n % 16..n % 16 + 1]
+    let verbose = (env.get("WARREN_FOCUS_CAPTURE") else "") == "1"
+    if verbose {
+        let wire = proto.encode(131, 0, body)
+        assert(wire.code == 0, "focus capture frame")
+        var hex = "WIRE {label} seq={after.seq} "
+        let digits = "0123456789abcdef"
+        for b in wire.bytes {
+            let n = b as int
+            hex = hex + digits[n / 16..n / 16 + 1] + digits[n % 16..n % 16 + 1]
+        }
+        (mut out).push(hex)
+        (mut out).push("CURSOR {label} seq={after.seq} {before.cursor_row},{before.cursor_col},{before.shape},{before.visible}->{after.cursor_row},{after.cursor_col},{after.shape},{after.visible} fixed-wire=28")
     }
-    (mut out).push(hex)
-    (mut out).push("CURSOR {label} seq={after.seq} {before.cursor_row},{before.cursor_col},{before.shape},{before.visible}->{after.cursor_row},{after.cursor_col},{after.shape},{after.visible} fixed-wire=28")
     var at = 22
     var k = 0
     let count = le(body, 18, 4)
@@ -895,16 +897,34 @@ fn capture_focus(mut out: List[str], before: proto.Image, after: proto.Image, bo
                 before.flags[i] == after.flags[i] && before.fg[i] == after.fg[i] && before.bg[i] == after.bg[i] { unchanged += 1 }
             c += 1
         }
-        let part = if row == after.rows then "hints" else if row == after.rows - 1 then "bar" else "pane-border"
-        (mut out).push("RUN {label} seq={after.seq} part={part} row={row} col={col} columns={columns} wire={at - start} unchanged={unchanged}")
+        // These fixtures are ASCII: no unchanged wide-pair companion is
+        // needed. A needless repaint is red even if it fits the byte bound.
+        assert(unchanged == 0, "focus delta repaints unchanged cells")
+        if verbose {
+            let part = if row == after.rows then "hints" else if row == after.rows - 1 then "bar" else "pane-border"
+            (mut out).push("RUN {label} seq={after.seq} part={part} row={row} col={col} columns={columns} wire={at - start} unchanged={unchanged}")
+        }
         k += 1
     }
     assert(at == body.len, "focus capture consumes payload")
 }
 
-fn focus_before(p: client.Peer) -> proto.Image {
-    if (env.get("WARREN_FOCUS_CAPTURE") else "") == "1" { return copy p.image }
-    proto.image()
+fn focus_before(p: client.Peer) -> proto.Image { copy p.image }
+
+// One small socket write carries both complete KEY messages. The separate
+// schedule below deliberately waits for the prefix image before its action.
+fn coalesced_focus_prefix(p: client.Peer, code: int) -> bool {
+    var batch = List[byte]()
+    for mods in [4, 0] {
+        var key = List[byte]()
+        proto.put(mut key, mods, 1)
+        proto.put(mut key, 0, 1)
+        proto.put(mut key, if mods == 4 then 32 else code, 4)
+        let frame = proto.encode(2, 0, key)
+        if frame.code != 0 { return false }
+        for b in frame.bytes { (mut batch).push(b) }
+    }
+    client.send_raw(p, batch)
 }
 
 fn bytes_until_focus_mode(mut p: client.Peer, want: str, ms: int, mut captured: List[str], label: str) -> int {
@@ -968,7 +988,7 @@ fn row_focus_bytes(mut r: Rig, separate: bool) -> str {
         two_prefix = bytes_until_focus_mode(mut p, "PREFIX", 3000, mut captured, "two-prefix")
         if two_prefix < 0 { return "no prefix image before two-pane focus" }
         let _h = client.key(p, 0, 0, 104)
-    } else { let _h = prefix(p, 104) }
+    } else { let _h = coalesced_focus_prefix(p, 104) }
     let two_action = bytes_until_golden_two(mut p, true, 3000, mut captured)
     if two_action < 0 { return "no image completed the focus change" }
     let two_bytes = two_prefix + two_action
@@ -985,7 +1005,7 @@ fn row_focus_bytes(mut r: Rig, separate: bool) -> str {
         three_prefix = bytes_until_focus_mode(mut p, "PREFIX", 3000, mut captured, "three-prefix")
         if three_prefix < 0 { return "no prefix image before three-pane focus" }
         let _b = client.key(p, 0, 0, 104)
-    } else { let _b = prefix(p, 104) }
+    } else { let _b = coalesced_focus_prefix(p, 104) }
     let three_action = bytes_until_golden_three(mut p, 1, "default", 3000, mut captured)
     if three_action < 0 { return "no image completed the second focus change" }
     let three_bytes = three_prefix + three_action
@@ -995,9 +1015,15 @@ fn row_focus_bytes(mut r: Rig, separate: bool) -> str {
     client.hang_up(mut p)
     let st = stop_server(mut r)
     if st != 0 { return "server exit {st}" }
-    // The prefix's own image (its mode field) may come first: 94 bytes.
-    if two_bytes > 800 { return "a focus change between two panes took {two_bytes} bytes (predicted 600, or 94 + 666, bound 800)" }
-    if three_bytes > 500 { return "a focus change among three panes took {three_bytes} bytes (predicted 314, or 94 + 380, bound 500)" }
+    // Coalesced minima remain 600/314 (28 fixed + 572/286 border).
+    // Separated prefix reveal: 626 = 28 fixed + 66 mode + 532 hints.
+    // Action: 926/640 = 28 + 572/286 border + 66 mode + 260 hint erase.
+    // Necessary totals: 1552/1266; headroom: 168/134 (about 11%).
+    // Hard zero-unchanged-cell checks above apply in both schedules.
+    let two_bound = if separate then 1720 else 800
+    let three_bound = if separate then 1400 else 500
+    if two_bytes > two_bound { return "a focus change between two panes took {two_bytes} bytes (bound {two_bound}, separated={separate})" }
+    if three_bytes > three_bound { return "a focus change among three panes took {three_bytes} bytes (bound {three_bound}, separated={separate})" }
     ""
 }
 
