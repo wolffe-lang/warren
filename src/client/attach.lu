@@ -302,9 +302,7 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
     // and are changed in place; the turn hands back only a number.
     var why = GOES_ON
     while why == GOES_ON {
-        region turn {
-            why = one_turn(mut p, mut t, mut out, mut w, mut drawn, mut par, mut l, pol)
-        }
+        why = one_turn(mut p, mut t, mut out, mut w, mut drawn, mut par, mut l, pol)
     }
     ended(why, p, l)
 }
