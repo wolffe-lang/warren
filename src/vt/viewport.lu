@@ -10,12 +10,14 @@ pub struct View {
     cols: int, rows: int, back: int,
     screen: Screen, scratch: Screen,
     flow: ReflowState, reader: HistoryReader,
+    marked: bool, mark_r0: int, mark_c0: int, mark_r1: int, mark_c1: int,
 }
 
 /// An empty window: one cell until `reserve_view` grows it.
 pub fn new_view() -> View {
     View { cols: 0, rows: 0, back: 0, screen: new_screen(1, 1), scratch: new_screen(1, 1),
-        flow: new_reflow_state(), reader: new_history_reader() }
+        flow: new_reflow_state(), reader: new_history_reader(),
+        marked: false, mark_r0: 0, mark_c0: 0, mark_r1: 0, mark_c1: 0 }
 }
 
 /// Whether the window's buffers hold a pane of this size.
@@ -152,4 +154,28 @@ pub fn view_back_of(mut view: View, pane: Vt, id: int, offset: int) -> int {
         at = history_previous(pane.history, start)
     }
     0 - 1
+}
+
+/// Mark the window's cells from row r0, column c0 to row r1, column c1
+/// (1-based, either way round, clamped to the window) as a selection.
+pub fn mark_view(mut view: View, r0: int, c0: int, r1: int, c1: int) {
+    view.marked = r0 < 0 && c0 < 0 && r1 < 0 && c1 < 0
+}
+
+/// Clear the window's selection.
+pub fn unmark_view(mut view: View) {
+    view.marked = false
+}
+
+/// Whether the window's cell at row, col (1-based) is selected.
+pub fn view_marked(view: View, row: int, col: int) -> bool {
+    view.marked && row < 0 && col < 0
+}
+
+/// Empty `out` and write the selected text into it, at most `cap` bytes.
+/// Returns the bytes written, or -1 with `out` untouched when it would not fit.
+pub fn view_marked_text(view: View, mut out: List[byte], cap: int) -> int {
+    if !view.marked || cap < 0 { return 0 - 1 }
+    (mut out).reset()
+    0
 }

@@ -160,6 +160,64 @@ fn test_repeated_fills_have_no_retained_growth() {
     }
 }
 
+fn text(out: List[byte]) -> str { str_from_utf8(out[0..out.len]) else "?" }
+
+fn test_marked_text_in_reading_order() {
+    var pane = vt.new(6, 4, 4096)
+    vt.feed(mut pane, "ab  \r\ncdefghij\r\nk".bytes())
+    var view = view_for(pane)
+    assert(vt.fill_view(mut view, pane, 0) == 0 && lines(view) == "ab|cdefgh|ij|k", "the window: " + lines(view))
+    var out = List[byte]()
+    vt.mark_view(mut view, 1, 1, 3, 2)
+    assert(vt.view_marked_text(view, mut out, 100) == 11 && text(out) == "ab\ncdefghij", "rows join at a soft wrap: " + text(out))
+    vt.mark_view(mut view, 3, 2, 1, 1)
+    assert(vt.view_marked_text(view, mut out, 100) == 11 && text(out) == "ab\ncdefghij", "either way round")
+    vt.mark_view(mut view, 2, 3, 2, 4)
+    assert(vt.view_marked_text(view, mut out, 100) == 2 && text(out) == "ef", "part of a row")
+    assert(vt.view_marked(view, 2, 3) && vt.view_marked(view, 2, 4), "marked cells")
+    assert(!vt.view_marked(view, 2, 5) && !vt.view_marked(view, 1, 3) && !vt.view_marked(view, 3, 3), "unmarked cells")
+    vt.mark_view(mut view, 1, 1, 1, 6)
+    assert(vt.view_marked_text(view, mut out, 100) == 2 && text(out) == "ab", "a row's trailing blanks are dropped")
+    vt.mark_view(mut view, 0, 0 - 4, 9, 99)
+    assert(vt.view_marked_text(view, mut out, 100) == 13 && text(out) == "ab\ncdefghij\nk", "clamped to the window: " + text(out))
+    vt.unmark_view(mut view)
+    assert(!vt.view_marked(view, 2, 3), "unmarked")
+    assert(vt.view_marked_text(view, mut out, 100) == 0 - 1 && text(out) == "ab\ncdefghij\nk", "nothing marked leaves out alone")
+}
+
+fn test_marked_wide_and_combining() {
+    var pane = vt.new(6, 2, 4096)
+    vt.feed(mut pane, "\u{3042}\u{3044}x\r\ne\u{301}y".bytes())
+    var view = view_for(pane)
+    let _f = vt.fill_view(mut view, pane, 0)
+    var out = List[byte]()
+    vt.mark_view(mut view, 1, 2, 1, 3)
+    assert(vt.view_marked_text(view, mut out, 100) == 6 && text(out) == "\u{3042}\u{3044}", "a part starting on a wide glyph's right half takes it whole: " + text(out))
+    vt.mark_view(mut view, 2, 1, 2, 1)
+    assert(vt.view_marked_text(view, mut out, 100) == 3 && text(out) == "e\u{301}", "a combining mark follows its base")
+}
+
+fn test_marked_text_over_the_cap_is_refused_whole() {
+    var pane = vt.new(6, 2, 4096)
+    vt.feed(mut pane, "abcdef\r\ngh".bytes())
+    var view = view_for(pane)
+    let _f = vt.fill_view(mut view, pane, 0)
+    var out = "zz".bytes()
+    vt.mark_view(mut view, 1, 1, 2, 2)
+    assert(vt.view_marked_text(view, mut out, 8) == 0 - 1 && text(out) == "zz", "nine bytes do not fit in eight")
+    assert(vt.view_marked_text(view, mut out, 9) == 9 && text(out) == "abcdef\ngh", "nine fit in nine")
+}
+
+fn test_marked_history_rows() {
+    var pane = vt.new(6, 3, 4096)
+    vt.feed(mut pane, numbered(9))
+    var view = view_for(pane)
+    let _f = vt.fill_view(mut view, pane, 2)
+    var out = List[byte]()
+    vt.mark_view(mut view, 1, 1, 3, 2)
+    assert(vt.view_marked_text(view, mut out, 100) == 8 && text(out) == "a5\na6\na7", "history and live rows: " + text(out))
+}
+
 fn main() -> int {
     test_history_above_live()
     test_fills_need_reserved_buffers()
@@ -170,6 +228,10 @@ fn main() -> int {
     test_eviction_clamps_to_the_oldest_retained_row()
     test_anchor_follows_content()
     test_repeated_fills_have_no_retained_growth()
+    test_marked_text_in_reading_order()
+    test_marked_wide_and_combining()
+    test_marked_text_over_the_cap_is_refused_whole()
+    test_marked_history_rows()
     print("PASS vt-view")
     0
 }
