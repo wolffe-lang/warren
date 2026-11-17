@@ -462,9 +462,18 @@ inside a shown pane focuses it. The first gesture into an unfocused pane
 pane reach its program only when it asked for reports, relative to its rect.
 The consumed gesture is tracked per client, so it does not swallow another
 client's clicks. Clicking a painted tab label selects that tab, including a
-wide glyph's continuation cell. Border clicks, overflow markers, the session
-name, mode, clock and hint line stay inert; border dragging is planned. Mouse
-actions remain limited to normal and locked mode. When focus moves, a pane that asked for focus reports hears it lose
+wide glyph's continuation cell. Plain border clicks, overflow markers, the
+session name, mode, clock and hint line stay inert. Left-dragging a border
+moves the split originally hit along its own axis, with the same subtree
+minimum clamps as keyboard resize. The gesture remains consumed outside the
+pane area and through release; it cannot become input to a reporting child.
+A different client's layout change, a key or a client resize cancels capture.
+The gesture's own resizes preserve it. Chrome works in normal, locked,
+prefix, pane, tab, resize and session modes; prompts, help and confirmation
+own their input. Only normal and locked modes forward content mouse events.
+The outer client enables all-motion reports so a child asking for 1003 can
+receive hover; the server still filters 1000/1002/1003 and re-encodes 1006 or
+legacy reports according to the child. When focus moves, a pane that asked for focus reports hears it lose
 or take focus, and the clients take the new pane's title. A bell from the
 active tab reaches the clients; titles come from the focused pane only.
 
