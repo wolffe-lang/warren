@@ -2407,7 +2407,7 @@ fn row_scroll_keys(mut r: Rig) -> str {
     if at == 0 { return "no numbered output:\n" + client.screen_text(p) }
     let _enter = prefix(p, 91)
     if !until_mode(mut p, "SCROLL", 3000) { return "prefix [ did not enter scroll mode: '" + mode_of(p.image) + "'" }
-    if !until_hint(mut p, " jk row  PgUp PgDn page  ud half  gG oldest/live  q quit  Esc back", 1000) { return "scroll hints: '" + hint_of(p.image) + "'" }
+    if !until_hint(mut p, " jk row  PgUp PgDn page  ud half  gG oldest/live  /?nN search  q quit  Esc back", 1000) { return "scroll hints: '" + hint_of(p.image) + "'" }
     let _k = type_keys(p, "k")
     if !until_rect_line(mut p, "L79", 1, at, 80, 1, 3000) { return "k did not look back one row" }
     let _up = client.key(p, 0, 1, 1)
@@ -2793,6 +2793,184 @@ fn row_config_refused(mut r: Rig) -> str {
     finish(mut r, mut a)
 }
 
+// ---------------- search in scroll mode ----------------
+
+// Inverse cells in the pane area.
+fn inverse_count(img: proto.Image) -> int {
+    if !img.valid { return 0 }
+    var n = 0
+    var r = 1
+    while r <= AREA {
+        var c = 1
+        while c <= img.cols {
+            if inverse_at(img, c, r) { n += 1 }
+            c += 1
+        }
+        r += 1
+    }
+    n
+}
+
+// The row reading `text` whose first `n` cells, and no other pane cells, are
+// inverse, waited for; or 0.
+fn until_found(mut p: client.Peer, text: str, n: int, ms: int) -> int {
+    let until = now_ms() + ms
+    var more = true
+    while more {
+        let row = row_reading(p.image, text, 1, 80)
+        if row > 0 && inverse_count(p.image) == n {
+            var c = 1
+            while c <= n && inverse_at(p.image, c, row) { c += 1 }
+            if c > n { return row }
+        }
+        if now_ms() >= until { more = false }
+        else if client.step(mut p, until - now_ms()) < 0 { more = false }
+    }
+    0
+}
+
+// Open scroll mode on the shell's L1..L80 and type a search; returns the row
+// L80 is on, or 0.
+fn search_typed(mut p: client.Peer, way: str, text: str) -> int {
+    let at = numbered_output(mut p, 80, 1, 80)
+    if at == 0 { return 0 }
+    let _enter = prefix(p, 91)
+    if !until_mode(mut p, "SCROLL", 3000) { return 0 }
+    let _way = type_keys(p, way)
+    if !until_mode(mut p, "SEARCH", 3000) { return 0 }
+    let _text = type_keys(p, text)
+    if !until_hint(mut p, " " + way + text, 3000) { return 0 }
+    at
+}
+
+// Prefix [ then ? opens the search prompt toward older rows, typed on the hint
+// line; Enter finds the newest match above the window's bottom row, moves the
+// window to show it and draws it inverse for this client, in scroll mode.
+fn row_search_older(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let at = search_typed(mut p, "?", "L37")
+    if at == 0 { return "no search prompt: mode '" + mode_of(p.image) + "', hint '" + hint_of(p.image) + "'" }
+    let _run = enter(p)
+    if !until_mode(mut p, "SCROLL", 3000) { return "Enter did not return to scroll mode: '" + mode_of(p.image) + "'" }
+    if until_found(mut p, "L37", 3, 3000) == 0 { return "L37 was not shown marked:\n" + client.screen_text(p) }
+    if rect_has(p.image, "L80", 1, at, 80, 1) { return "the window did not move back to the match" }
+    finish(mut r, mut p)
+}
+
+// n searches again the same way from the last match, N the other way.
+fn row_search_repeat(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let at = search_typed(mut p, "?", "L1")
+    if at == 0 { return "no search prompt: mode '" + mode_of(p.image) + "', hint '" + hint_of(p.image) + "'" }
+    let _run = enter(p)
+    if until_found(mut p, "L19", 2, 3000) == 0 { return "the newest L1 is L19:\n" + client.screen_text(p) }
+    let _n = type_keys(p, "n")
+    if until_found(mut p, "L18", 2, 3000) == 0 { return "n did not find L18:\n" + client.screen_text(p) }
+    let _n2 = type_keys(p, "n")
+    if until_found(mut p, "L17", 2, 3000) == 0 { return "n did not find L17:\n" + client.screen_text(p) }
+    let _back = type_keys(p, "N")
+    if until_found(mut p, "L18", 2, 3000) == 0 { return "N did not come back to L18:\n" + client.screen_text(p) }
+    if mode_of(p.image) != "SCROLL" { return "n and N left scroll mode" }
+    finish(mut r, mut p)
+}
+
+// / searches toward newer rows from the window's top row; a match the window
+// already shows leaves it in place.
+fn row_search_newer(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let at = numbered_output(mut p, 80, 1, 80)
+    if at == 0 { return "no numbered output:\n" + client.screen_text(p) }
+    let _enter = prefix(p, 91)
+    if !until_mode(mut p, "SCROLL", 3000) { return "prefix [ did not enter scroll mode" }
+    let _top = type_keys(p, "g")
+    if !until_rect(mut p, "while", 1, 1, 80, 1, 3000) { return "g did not show the oldest row" }
+    let _slash = type_keys(p, "/L2")
+    if !until_hint(mut p, " /L2", 3000) { return "the prompt toward newer rows: '" + hint_of(p.image) + "'" }
+    let _run = enter(p)
+    if until_found(mut p, "L2", 2, 3000) == 0 { return "L2 was not marked:\n" + client.screen_text(p) }
+    if !rect_has(p.image, "while", 1, 1, 80, 1) { return "a match in the window moved it" }
+    let _n = type_keys(p, "n")
+    if until_found(mut p, "L20", 2, 3000) == 0 { return "n did not find L20:\n" + client.screen_text(p) }
+    finish(mut r, mut p)
+}
+
+// A match on the live rows is marked there; the window stays at them.
+fn row_search_live(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let at = search_typed(mut p, "?", "L79")
+    if at == 0 { return "no search prompt: mode '" + mode_of(p.image) + "', hint '" + hint_of(p.image) + "'" }
+    let _run = enter(p)
+    let row = until_found(mut p, "L79", 3, 3000)
+    if row == 0 { return "L79 was not marked:\n" + client.screen_text(p) }
+    if row != at - 1 || !rect_has(p.image, "L80", 1, at, 80, 1) { return "the window left the live rows" }
+    if mode_of(p.image) != "SCROLL" { return "the search left scroll mode" }
+    finish(mut r, mut p)
+}
+
+// A match runs across a soft wrap: the last cell of one row and the first of
+// the next.
+fn row_search_wrapped(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let _cmd = client.input(p, "printf '%078dQU%s\\n' 0 UX\r")
+    if !until_rect_line(mut p, "UX", 1, 1, 80, AREA, 5000) { return "no wrapped output:\n" + client.screen_text(p) }
+    let tail = row_reading(p.image, "UX", 1, 80)
+    let _enter = prefix(p, 91)
+    if !until_mode(mut p, "SCROLL", 3000) { return "prefix [ did not enter scroll mode" }
+    let _q = type_keys(p, "?QUUX")
+    if !until_hint(mut p, " ?QUUX", 3000) { return "the prompt: '" + hint_of(p.image) + "'" }
+    let _run = enter(p)
+    let until = now_ms() + 3000
+    while now_ms() < until && inverse_count(p.image) != 4 { let _k = client.step(mut p, until - now_ms()) }
+    if inverse_count(p.image) != 4 || !inverse_at(p.image, 79, tail - 1) || !inverse_at(p.image, 80, tail - 1) ||
+            !inverse_at(p.image, 1, tail) || !inverse_at(p.image, 2, tail) {
+        return "QUUX across the wrap was not marked ({inverse_count(p.image)} inverse cells):\n" + client.screen_text(p)
+    }
+    finish(mut r, mut p)
+}
+
+// No match: the hint line says so and the window stays where it was.
+fn row_search_not_found(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let at = search_typed(mut p, "?", "zzz")
+    if at == 0 { return "no search prompt: mode '" + mode_of(p.image) + "', hint '" + hint_of(p.image) + "'" }
+    let _run = enter(p)
+    if !until_hint(mut p, "no older match: zzz", 3000) { return "no message: '" + hint_of(p.image) + "'" }
+    if mode_of(p.image) != "SCROLL" || !rect_has(p.image, "L80", 1, at, 80, 1) || inverse_count(p.image) != 0 {
+        return "a search without a match moved or marked the window"
+    }
+    finish(mut r, mut p)
+}
+
+// Esc in the search prompt goes back to scroll mode, searching nothing.
+fn row_search_cancel(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let at = search_typed(mut p, "?", "L5")
+    if at == 0 { return "no search prompt: mode '" + mode_of(p.image) + "', hint '" + hint_of(p.image) + "'" }
+    let _cancel = esc(p)
+    if !until_mode(mut p, "SCROLL", 3000) { return "Esc did not return to scroll mode: '" + mode_of(p.image) + "'" }
+    let _n = type_keys(p, "n")
+    drain(mut p, 200)
+    if !rect_has(p.image, "L80", 1, at, 80, 1) || inverse_count(p.image) != 0 { return "a cancelled search moved or marked the window" }
+    if !until_hint(mut p, " jk row  PgUp PgDn page  ud half  gG oldest/live  /?nN search  q quit  Esc back", 1000) {
+        return "scroll hints after a cancel: '" + hint_of(p.image) + "'"
+    }
+    finish(mut r, mut p)
+}
+
 fn run_row(warren: str, name: str) -> str {
     var r = rig(warren, name)
     var why = "no such row"
@@ -2821,6 +2999,13 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "clip-program-default" { why = row_clip_program_default(mut r) }
     else if name == "clip-program-config" { why = row_clip_program_config(mut r) }
     else if name == "config-refused" { why = row_config_refused(mut r) }
+    else if name == "search-older" { why = row_search_older(mut r) }
+    else if name == "search-repeat" { why = row_search_repeat(mut r) }
+    else if name == "search-newer" { why = row_search_newer(mut r) }
+    else if name == "search-live" { why = row_search_live(mut r) }
+    else if name == "search-wrapped" { why = row_search_wrapped(mut r) }
+    else if name == "search-not-found" { why = row_search_not_found(mut r) }
+    else if name == "search-cancel" { why = row_search_cancel(mut r) }
     else if name == "mouse-sgr-off" { why = row_mouse_focus(mut r, false, 0) }
     else if name == "mouse-sgr-sgr" { why = row_mouse_focus(mut r, false, 1) }
     else if name == "mouse-sgr-legacy" { why = row_mouse_focus(mut r, false, 2) }
@@ -2872,7 +3057,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-reporting-child scroll-two-clients scroll-alternate select-drag-sgr select-drag-legacy select-reporting-child select-origin-clamp select-two-clients select-in-scroll paste-bracketed clip-copy clip-program-default clip-program-config config-refused mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
+    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-reporting-child scroll-two-clients scroll-alternate select-drag-sgr select-drag-legacy select-reporting-child select-origin-clamp select-two-clients select-in-scroll paste-bracketed clip-copy clip-program-default clip-program-config config-refused search-older search-repeat search-newer search-live search-wrapped search-not-found search-cancel mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
         (mut x).push(n)
     }
     x
