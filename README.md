@@ -7,8 +7,9 @@ their code.
 
 **Status: a working server and terminal client with sessions, panes, tabs,
 modes, the hint bar, mouse clicks to focus panes or switch tabs, border
-dragging, and scrollback by the wheel or scroll mode; configuration, copy
-and search are still to come.** The repository holds the pins,
+dragging, scrollback by the wheel or scroll mode, and selection that copies
+on mouse release; configuration, export to the desktop clipboard and search
+are still to come.** The repository holds the pins,
 tiered CI, a pinned reference emulator with a cell-for-cell harness, a survey,
 recorded corpus, and reference contracts for the emulator and protocol.
 `src/vt/parser.lu` decodes split UTF-8 and recognises bounded terminal
@@ -53,7 +54,10 @@ per-connection hit maps are fixed-size and reused. The wheel over a pane whose
 program asked for no mouse reports looks back through its history, three rows
 a notch; prefix `[` opens the same scroll mode from the keyboard (`j k`,
 PageUp/PageDown, `u d`, `g G`, `q` or Esc). Each client looks back on its own,
-while the pane's output goes on. `vt-dump` is a diagnostic command.
+while the pane's output goes on. Dragging over a pane whose program asked for
+no mouse reports (or with Shift, over one that did) selects text, and releasing
+copies it into the session's register; prefix `]` pastes the register into the
+focused pane. `vt-dump` is a diagnostic command.
 [MAP](docs/MAP.md) separates what is planned from what is measured.
 
 ## What is planned
@@ -86,7 +90,7 @@ while the pane's output goes on. `vt-dump` is a diagnostic command.
 | W1 | the emulator | pure core/history/reflow, diagnostic CLI and full-frame/property gates |
 | W2 | one pane; detach and attach | server, terminal client, new, attach, detach and a second client, with rows on Linux, macOS and PAX under QEMU; surviving a PAX console logout waits on PAX |
 | W3 | panes, tabs, the bar, keys | pure layout module; panes and tabs in the server, borders and the focus mark, the bar's lines (tabs with activity, bell and zoom marks, the mode, the clock); modes per client, the hint line and the key list from one key table, a minimal command line; configuration planned |
-| W4 | mouse, scrollback, copy | pane/tab clicks, minimum-clamped border dragging, wheel and key scrollback per client; copy and search planned |
+| W4 | mouse, scrollback, copy | pane/tab clicks, minimum-clamped border dragging, wheel and key scrollback per client, drag selection copied on release into the session's register and pasted with prefix `]`; OSC 52 and search planned |
 | W5 | layouts, commands, persistence | planned |
 | W6 | on the PAX image, on real hardware | planned |
 
