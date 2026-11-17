@@ -51,7 +51,7 @@ const INVERSE: int = 64
 const FIELD: int = 65
 /// Idle hints, and the prefix table revealed after Ctrl-Space.
 const NORMAL_HINTS: str = " C-Space prefix"
-const PREFIX_HINTS: str = " C-Space prefix  M-\\ M-| |- split  M-t c new tab  M-w x close  ? keys  +16"
+const PREFIX_HINTS: str = " C-Space prefix  M-\\ M-| |- split  M-t c new tab  M-w x close  ? keys  +17"
 const PANE_HINTS: str = " |- split  hjkl focus  x close  z zoom  o next pane  = equalize  Esc back"
 
 fn now_ms() -> int {
@@ -1327,7 +1327,7 @@ fn row_hint_line(mut r: Rig) -> str {
     let _z = client.resize(p, 40, 24)
     if !until_hint(mut p, NORMAL_HINTS, 3000) { return "idle at 40 columns: '" + hint_of(p.image) + "'" }
     let _narrow = ctrl_space(p)
-    if !until_hint(mut p, " C-Space prefix  M-\\ M-| |- split  +19", 3000) { return "prefix at 40 columns: '" + hint_of(p.image) + "'" }
+    if !until_hint(mut p, " C-Space prefix  M-\\ M-| |- split  +20", 3000) { return "prefix at 40 columns: '" + hint_of(p.image) + "'" }
     finish(mut r, mut p)
 }
 
