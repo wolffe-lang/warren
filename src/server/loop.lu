@@ -1383,6 +1383,10 @@ fn key_event(mut s: Server, index: int, mods: int, kind: int, code: int) {
         view_key(mut s, index, a, st.arg)
         return
     }
+    if a == config.A_PASTE {
+        paste_register(mut s, index)
+        return
+    }
     act(mut s, index, a, st.arg, 1)
 }
 
@@ -1400,6 +1404,10 @@ fn leave_view(mut s: Server, index: int) {
     s.conns[index].view_slot = 0 - 1
     s.conns[index].view_back = 0
     s.conns[index].view_retry = 0 - 1
+    s.conns[index].sel_state = 0
+    s.conns[index].sel_slot = 0 - 1
+    s.conns[index].sel_opened = false
+    vt.unmark_view(mut s.conns[index].view)
     frame_moved(mut s, index)
 }
 
@@ -1504,6 +1512,109 @@ fn wheel(mut s: Server, index: int, si: int, up: bool, mods: int, col: int, row:
     view_move(mut s, index, WHEEL_ROWS)
 }
 
+// ---- selection: a drag copies into the session's register on release ----
+
+// A left press that may begin a selection: in the pane this client is looking
+// back at, or in the focused pane in normal mode when its program asked for no
+// mouse reports (with Shift, even when it did). Alt and Ctrl are the program's.
+// The press is the UI's; nothing happens until the pointer moves.
+fn select_start(mut s: Server, index: int, hit: int, from: int, mods: int, col: int, row: int) -> bool {
+    if mods & 6 != 0 { return false }
+    let mode = s.conns[index].mode
+    let viewing = mode == config.MODE_SCROLL && s.conns[index].view_slot == hit && view_live(s, index)
+    if !viewing {
+        if hit != from || mode != config.MODE_NORMAL { return false }
+        let reports = s.panes[hit].screen.mode_values[8] == 1 || s.panes[hit].screen.mode_values[9] == 1 ||
+            s.panes[hit].screen.mode_values[10] == 1
+        if reports && mods & 1 == 0 { return false }
+    }
+    s.conns[index].sel_state = 1
+    s.conns[index].sel_slot = hit
+    s.conns[index].sel_row = row - s.panes[hit].at_row + 1
+    s.conns[index].sel_col = col - s.panes[hit].at_col + 1
+    s.conns[index].sel_opened = false
+    s.conns[index].mouse_consumed = s.conns[index].mouse_consumed | 1
+    // The window a drag needs grows between turns, before the pointer moves.
+    if !vt.view_fits(s.conns[index].view, s.panes[hit].screen.cols, s.panes[hit].screen.rows) {
+        s.conns[index].view_cols = s.panes[hit].screen.cols
+        s.conns[index].view_rows = s.panes[hit].screen.rows
+        s.need_view = true
+    }
+    true
+}
+
+// The selection ends: its highlight goes, and a window its drag opened closes.
+fn select_end(mut s: Server, index: int) {
+    let opened = s.conns[index].sel_opened
+    let was = s.conns[index].sel_state
+    s.conns[index].sel_state = 0
+    s.conns[index].sel_slot = 0 - 1
+    s.conns[index].sel_opened = false
+    vt.unmark_view(mut s.conns[index].view)
+    if opened && s.conns[index].mode == config.MODE_SCROLL { set_mode(mut s, index, config.MODE_NORMAL) }
+    else if was == 2 { frame_moved(mut s, index) }
+}
+
+// Motion and release of a selection's gesture. The first move opens a snapshot
+// window at the pane's live rows (unless the client is already looking back),
+// so output cannot shift the text under the drag; the far end is clamped to
+// the pane it started in. Release copies into the session's register and says
+// so; a press and release on one cell copies nothing. The wheel waits.
+fn select_gesture(mut s: Server, index: int, kind: int, button: int, col: int, row: int) -> bool {
+    let state = s.conns[index].sel_state
+    if state == 0 { return false }
+    let k = s.conns[index].sel_slot
+    if kind == 0 || k < 0 || k >= s.panes.len || !s.panes[k].live {
+        select_end(mut s, index)
+        return false
+    }
+    if kind == 3 || kind == 4 { return state == 2 }
+    if kind != 2 && !(kind == 1 && button == 1) { return true }
+    var pr = row - s.panes[k].at_row + 1
+    var pc = col - s.panes[k].at_col + 1
+    if pr < 1 { pr = 1 }
+    if pr > s.panes[k].screen.rows { pr = s.panes[k].screen.rows }
+    if pc < 1 { pc = 1 }
+    if pc > s.panes[k].screen.cols { pc = s.panes[k].screen.cols }
+    if kind == 2 {
+        if state == 1 {
+            if pr == s.conns[index].sel_row && pc == s.conns[index].sel_col { return true }
+            let viewing = s.conns[index].mode == config.MODE_SCROLL && s.conns[index].view_slot == k && view_live(s, index)
+            if !viewing {
+                enter_view(mut s, index, k, false)
+                s.conns[index].sel_opened = true
+                view_to(mut s, index, 0)
+            }
+            s.conns[index].sel_state = 2
+        }
+        vt.mark_view(mut s.conns[index].view, s.conns[index].sel_row, s.conns[index].sel_col, pr, pc)
+        frame_moved(mut s, index)
+        return true
+    }
+    s.conns[index].mouse_consumed = s.conns[index].mouse_consumed & 6
+    if state == 2 && s.conns[index].view.marked {
+        vt.mark_view(mut s.conns[index].view, s.conns[index].sel_row, s.conns[index].sel_col, pr, pc)
+        let si = s.conns[index].session
+        if si >= 0 {
+            let n = vt.view_marked_text(s.conns[index].view, mut s.sessions[si].register, REGISTER_BYTES)
+            if n < 0 { tell(mut s, index, "selection too large: {REGISTER_BYTES} bytes at most") }
+            else { tell(mut s, index, "copied {n} bytes") }
+        }
+    }
+    select_end(mut s, index)
+    true
+}
+
+// Prefix ]: the session's register into the focused pane, as one bracketed
+// paste when its program asked for that (PASTE's own rules).
+fn paste_register(mut s: Server, index: int) {
+    let si = s.conns[index].session
+    if si < 0 || !s.sessions[si].live || s.sessions[si].register.len == 0 { return }
+    let f = focused_slot(s, si)
+    if f < 0 { return }
+    queue_to(mut s, f, paste_bytes(s.panes[f].screen, s.sessions[si].register))
+}
+
 // Prompts/help/confirmation own their input; the other modes keep chrome usable.
 fn mouse_chrome(mode: int) -> bool {
     passing(mode) || mode == config.MODE_PREFIX || mode == config.MODE_PANE || mode == config.MODE_TAB ||
@@ -1544,6 +1655,7 @@ fn mouse_event(mut s: Server, index: int, body: List[byte]) {
     let row = u(body, 5, 2)
     let bit = if button == 1 then 1 else if button == 2 then 2 else 4
     if border_gesture(mut s, index, kind, button, col, row) { return }
+    if select_gesture(mut s, index, kind, button, col, row) { return }
     if kind == 1 && s.conns[index].mouse_consumed & bit != 0 {
         s.conns[index].mouse_consumed = s.conns[index].mouse_consumed & (7 - bit)
         return
@@ -1592,6 +1704,7 @@ fn mouse_event(mut s: Server, index: int, body: List[byte]) {
     let id = layout.pane_at(s.sessions[si].layout, tab, cols, area, col, row)
     let hit = slot_of(s, id)
     let from = focused_slot(s, si)
+    if kind == 0 && button == 1 && hit >= 0 && select_start(mut s, index, hit, from, mods, col, row) { return }
     if hit < 0 || hit != from {
         if kind == 0 {
             s.conns[index].mouse_consumed = s.conns[index].mouse_consumed | bit
@@ -1954,6 +2067,7 @@ fn make_session(mut s: Server, name: str, cols: int, rows: int, cwd: str, names:
     (mut s.sessions[slot].env_values).reset()
     (mut s.sessions[slot].mark_tab).reset()
     (mut s.sessions[slot].mark_bits).reset()
+    (mut s.sessions[slot].register).reset()
     i = 0
     while i < names.len {
         (mut s.sessions[slot].env_names).push(copy names[i])
@@ -2246,7 +2360,7 @@ fn compose_now(mut s: Server, index: int, now: int) {
             }
         }
     }
-    let vslot = if s.conns[index].view_back > 0 then s.conns[index].view_slot else 0 - 1
+    let vslot = if s.conns[index].view_back > 0 || s.conns[index].sel_state == 2 then s.conns[index].view_slot else 0 - 1
     let full = s.conns[index].force_full
     let gen = s.sessions[si].layout_gen
     let all = s.conns[index].seen_layout != gen
