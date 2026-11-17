@@ -61,32 +61,38 @@ fn frame_cell(panes: List[Pane], ses: Session, bar: List[vt.Cell], view: vt.View
     cell
 }
 
+// The frame's cell at column c (1-based) of `row` into `line[c]`, once a
+// row: `have[c]` says it is there; `sh.reads` counts each one computed.
+fn row_cell(mut line: List[vt.Cell], mut have: List[bool], mut sh: Shadow, panes: List[Pane], ses: Session,
+    bar: List[vt.Cell], view: vt.View, view_slot: int, row: int, c: int) {
+    if have[c] { return }
+    line[c] = frame_cell(panes, ses, bar, view, view_slot, (row - 1) * ses.cols + c - 1)
+    have[c] = true
+    sh.reads += 1
+}
+
 // Emit the runs covering columns a..b (1-based, inclusive) of one row of
-// the frame; as `emit_span` for one pane.
-fn emit_frame_span(mut body: List[byte], mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[vt.Cell],
-    view: vt.View, view_slot: int, row: int, a: int, b: int) -> int {
-    let cols = ses.cols
+// the frame from its cells in `line`; as `emit_span` for one pane.
+fn emit_line(mut body: List[byte], line: List[vt.Cell], cols: int, row: int, a: int, b: int) -> int {
     var runs = 0
     var col = a
     while col <= b {
-        let lead = frame_cell(panes, ses, bar, view, view_slot, (row - 1) * cols + col - 1)
-        sh.reads += 1
+        let lead = copy line[col]
         var records = List[byte]()
         var record_count = 0
         var covered = 0
         var c = col
         while c <= b {
-            let cell = frame_cell(panes, ses, bar, view, view_slot, (row - 1) * cols + c - 1)
-            sh.reads += 1
+            let cell = copy line[c]
             if !same_rendition(cell, lead) && c > col { break }
             let orphan = cell.width == 0
             let w = sent_width(cell, c, cols)
             var times = 1
             var next = c + w
             while next + w - 1 <= b && times < 65535 && !orphan {
-                let other = frame_cell(panes, ses, bar, view, view_slot, (row - 1) * cols + next - 1)
-                sh.reads += 1
-                if !same_glyph(other, cell) || !same_rendition(other, lead) || sent_width(other, next, cols) != w { break }
+                if !same_glyph(line[next], cell) || !same_rendition(line[next], lead) || sent_width(line[next], next, cols) != w {
+                    break
+                }
                 times += 1
                 next += w
             }
@@ -109,13 +115,27 @@ fn emit_frame_span(mut body: List[byte], mut sh: Shadow, panes: List[Pane], ses:
     runs
 }
 
-fn store_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[vt.Cell], view: vt.View, view_slot: int,
-    row: int, a: int, b: int) {
+fn store_line(mut sh: Shadow, line: List[vt.Cell], cols: int, row: int, a: int, b: int) {
     var c = a
     while c <= b {
-        let i = (row - 1) * ses.cols + c - 1
-        sh.cells[i] = frame_cell(panes, ses, bar, view, view_slot, i)
-        sh.reads += 1
+        sh.cells[(row - 1) * cols + c - 1] = line[c]
+        c += 1
+    }
+}
+
+// Within a pane's rect on frame row `row`, keep scanning only the columns
+// its emulator changed after tick `seen`.
+fn limit_row(mut scan: List[bool], pane: Pane, seen: int, row: int, cols: int) {
+    if !pane.live || !pane.shown { return }
+    let pr = row - pane.at_row + 1
+    if pr < 1 || pr > pane.screen.rows { return }
+    let (first, last) = vt.changed_span(pane.screen, pr, seen)
+    let pcols = pane.screen.cols
+    if first == 0 && last >= pcols - 1 { return }
+    var c = pane.at_col
+    while c < pane.at_col + pcols && c <= cols {
+        let pc = c - pane.at_col
+        if c >= 1 && (pc < first || pc > last) { scan[c] = false }
         c += 1
     }
 }
@@ -124,10 +144,12 @@ fn store_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[vt.Cel
 /// payload, updating its shadow. A full image (base 0) when `full` is set
 /// or the shadow is not of this size; otherwise a delta on seq - 1 over
 /// the scanned regions: every cell when `all`, else the rects in `scans`
-/// (col, row, cols, rows, four ints each). Empty when nothing changed.
-/// The cursor is the caller's (`cursor`: row, col, shape, visible). Pane
-/// slot `view_slot` (-1: none) shows the client's window `view` instead of
-/// its screen.
+/// (col, row, cols, rows, four ints each), and within a pane's rect only
+/// the rows and columns its emulator changed since this shadow's last
+/// image (the shadow keeps each pane slot's gen and tick). Each frame cell
+/// is computed once. Empty when nothing changed. The cursor is the
+/// caller's (`cursor`: row, col, shape, visible). Pane slot `view_slot`
+/// (-1: none) shows the client's window `view` instead of its screen.
 pub fn compose_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[vt.Cell], view: vt.View,
     view_slot: int, seq: int, full: bool, all: bool, scans: List[int], cursor: List[int]) -> List[byte] {
     let cols = ses.cols
@@ -135,24 +157,50 @@ pub fn compose_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[
     let whole = full || !sh.valid || sh.cols != cols || sh.rows != rows
     if whole { reshape(mut sh, cols, rows) }
     sh.reads = 0
+    // A pane's damage limits its scan when this shadow's last image was
+    // composed from the same pane (its gen), unless every cell is asked for.
+    while sh.seen_gen.len < panes.len {
+        (mut sh.seen_gen).push(0 - 1)
+        (mut sh.seen_tick).push(0)
+    }
+    var limit = List[bool]()
+    var p = 0
+    while p < panes.len {
+        (mut limit).push(!whole && !all && sh.seen_gen[p] == panes[p].gen)
+        p += 1
+    }
     var body = List[byte]()
     var runs = 0
     var changed = List[bool]()
     var scan = List[bool]()
+    var have = List[bool]()
+    var line = List[vt.Cell]()
     var k = 0
     while k <= cols + 1 {
         (mut changed).push(false)
         (mut scan).push(false)
+        (mut have).push(false)
+        (mut line).push(blank_cell())
         k += 1
     }
     var row = 1
     while row <= rows {
+        var c = 1
+        while c <= cols {
+            have[c] = false
+            c += 1
+        }
         if whole {
-            runs += emit_frame_span(mut body, mut sh, panes, ses, bar, view, view_slot, row, 1, cols)
-            store_frame(mut sh, panes, ses, bar, view, view_slot, row, 1, cols)
+            c = 1
+            while c <= cols {
+                row_cell(mut line, mut have, mut sh, panes, ses, bar, view, view_slot, row, c)
+                c += 1
+            }
+            runs += emit_line(mut body, line, cols, row, 1, cols)
+            store_line(mut sh, line, cols, row, 1, cols)
         } else {
             var any_scan = all
-            var c = 1
+            c = 1
             while c <= cols {
                 scan[c] = all
                 c += 1
@@ -173,14 +221,18 @@ pub fn compose_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[
                 }
             }
             if any_scan {
+                p = 0
+                while p < panes.len {
+                    if limit[p] { limit_row(mut scan, panes[p], sh.seen_tick[p], row, cols) }
+                    p += 1
+                }
                 var any = false
                 c = 1
                 while c <= cols {
                     changed[c] = false
                     if scan[c] {
-                        let i = (row - 1) * cols + c - 1
-                        changed[c] = !same(frame_cell(panes, ses, bar, view, view_slot, i), sh.cells[i])
-                        sh.reads += 1
+                        row_cell(mut line, mut have, mut sh, panes, ses, bar, view, view_slot, row, c)
+                        changed[c] = !same(line[c], sh.cells[(row - 1) * cols + c - 1])
                         if changed[c] { any = true }
                     }
                     c += 1
@@ -194,8 +246,8 @@ pub fn compose_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[
                         while c <= cols {
                             if changed[c] {
                                 let i = (row - 1) * cols + c - 1
-                                let live = frame_cell(panes, ses, bar, view, view_slot, i)
-                                sh.reads += 1
+                                row_cell(mut line, mut have, mut sh, panes, ses, bar, view, view_slot, row, c)
+                                let live = copy line[c]
                                 let old = copy sh.cells[i]
                                 if (live.width == 0 || old.width == 0) && c > 1 && !changed[c - 1] {
                                     changed[c - 1] = true
@@ -214,8 +266,13 @@ pub fn compose_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[
                         if changed[c] {
                             var e = c
                             while e + 1 <= cols && changed[e + 1] { e += 1 }
-                            runs += emit_frame_span(mut body, mut sh, panes, ses, bar, view, view_slot, row, c, e)
-                            store_frame(mut sh, panes, ses, bar, view, view_slot, row, c, e)
+                            var f = c
+                            while f <= e {
+                                row_cell(mut line, mut have, mut sh, panes, ses, bar, view, view_slot, row, f)
+                                f += 1
+                            }
+                            runs += emit_line(mut body, line, cols, row, c, e)
+                            store_line(mut sh, line, cols, row, c, e)
                             c = e + 1
                         } else {
                             c += 1
@@ -225,6 +282,13 @@ pub fn compose_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[
             }
         }
         row += 1
+    }
+    // Every pane slot as of this image: its gen and its emulator's tick.
+    p = 0
+    while p < panes.len {
+        sh.seen_gen[p] = panes[p].gen
+        sh.seen_tick[p] = vt.damage_tick(panes[p].screen)
+        p += 1
     }
     let cr = clamp(cursor[0], 1, rows)
     let cc = clamp(cursor[1], 1, cols)

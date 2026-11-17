@@ -9,7 +9,9 @@ use vt
 
 /// What one client holds: the cells and cursor of the last image it was
 /// sent, which it must apply before it may ACK. `reads` counts the frame
-/// cells the last session compose computed (a measure of its work).
+/// cells the last session compose computed (a measure of its work). For
+/// each pane slot, `seen_gen` and `seen_tick` are the pane's gen and its
+/// emulator's damage tick when the last image was composed.
 pub struct Shadow {
     valid: bool,
     cols: int,
@@ -20,12 +22,14 @@ pub struct Shadow {
     shape: int,
     visible: int,
     reads: int,
+    seen_gen: List[int],
+    seen_tick: List[int],
 }
 
 /// A shadow holding nothing: the next image is full.
 pub fn no_shadow() -> Shadow {
     Shadow { valid: false, cols: 0, rows: 0, cells: List[vt.Cell](), cursor_row: 0, cursor_col: 0,
-        shape: 0, visible: 0, reads: 0 }
+        shape: 0, visible: 0, reads: 0, seen_gen: List[int](), seen_tick: List[int]() }
 }
 
 /// The wire colour of an emulator colour: default, palette or RGB.
