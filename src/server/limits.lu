@@ -47,11 +47,16 @@ pub fn connection_bytes() -> int {
     1048582 + 65540 + EVENT_QUEUE + TAB_HIT_BYTES
 }
 
+/// The session's register: the text a selection copied, at most this many
+/// bytes (with a bracketed paste's twelve, one pane input queue).
+pub const REGISTER_BYTES: int = 65524
+
 /// Projected bytes of an attached connection at its session's size: the
-/// above, one image, the shadow of what its client holds, and its scroll
-/// window and that window's scratch (each at most the session's area).
+/// above, one image, the shadow of what its client holds, its scroll window
+/// and that window's scratch (each at most the session's area), and its
+/// session's register (counted for every attached client, an upper bound).
 pub fn attached_bytes(cols: int, rows: int) -> int {
-    connection_bytes() + image_bytes(cols, rows) + 3 * cols * rows * CELL_BYTES
+    connection_bytes() + image_bytes(cols, rows) + 3 * cols * rows * CELL_BYTES + REGISTER_BYTES
 }
 
 /// Bytes read from one handle in one turn.
