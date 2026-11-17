@@ -123,19 +123,24 @@ fn store_line(mut sh: Shadow, line: List[vt.Cell], cols: int, row: int, a: int, 
     }
 }
 
-// Within a pane's rect on frame row `row`, keep scanning only the columns
-// its emulator changed after tick `seen`.
-fn limit_row(mut scan: List[bool], pane: Pane, seen: int, row: int, cols: int) {
+// On frame row `row`, in the cells the owner map gives pane slot `p`,
+// keep scanning only the columns its emulator changed after tick `seen`.
+// A pane of another session may be shown at the same place in its own
+// frame: it owns no cell here and limits nothing.
+fn limit_row(mut scan: List[bool], ses: Session, p: int, pane: Pane, seen: int, row: int, cols: int) {
     if !pane.live || !pane.shown { return }
     let pr = row - pane.at_row + 1
     if pr < 1 || pr > pane.screen.rows { return }
-    let (first, last) = vt.changed_span(pane.screen, pr, seen)
     let pcols = pane.screen.cols
+    let start = (row - 1) * cols
+    if pane.at_col < 1 || pane.at_col > cols || start + pane.at_col - 1 >= ses.owner.len { return }
+    if ses.owner[start + pane.at_col - 1] != p { return }
+    let (first, last) = vt.changed_span(pane.screen, pr, seen)
     if first == 0 && last >= pcols - 1 { return }
     var c = pane.at_col
-    while c < pane.at_col + pcols && c <= cols {
+    while c < pane.at_col + pcols && c <= cols && start + c - 1 < ses.owner.len {
         let pc = c - pane.at_col
-        if c >= 1 && (pc < first || pc > last) { scan[c] = false }
+        if ses.owner[start + c - 1] == p && (pc < first || pc > last) { scan[c] = false }
         c += 1
     }
 }
@@ -223,7 +228,7 @@ pub fn compose_frame(mut sh: Shadow, panes: List[Pane], ses: Session, bar: List[
             if any_scan {
                 p = 0
                 while p < panes.len {
-                    if limit[p] { limit_row(mut scan, panes[p], sh.seen_tick[p], row, cols) }
+                    if limit[p] { limit_row(mut scan, ses, p, panes[p], sh.seen_tick[p], row, cols) }
                     p += 1
                 }
                 var any = false
