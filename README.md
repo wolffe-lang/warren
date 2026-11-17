@@ -6,8 +6,8 @@ pull request. It takes its ideas from tmux, zellij and herdr, and none of
 their code.
 
 **Status: a working server and terminal client with sessions, panes, tabs,
-modes, the hint bar and mouse clicks to focus panes or switch tabs;
-configuration, border dragging, scrollback controls and copy mode are still
+modes, the hint bar, mouse clicks to focus panes or switch tabs, and border
+dragging; configuration, scrollback controls and copy mode are still
 to come.** The repository holds the pins,
 tiered CI, a pinned reference emulator with a cell-for-cell harness, a survey,
 recorded corpus, and reference contracts for the emulator and protocol.
@@ -80,7 +80,7 @@ and Ctrl+w remain available to programs. `vt-dump` is a diagnostic command.
 | W1 | the emulator | pure core/history/reflow, diagnostic CLI and full-frame/property gates |
 | W2 | one pane; detach and attach | server, terminal client, new, attach, detach and a second client, with rows on Linux, macOS and PAX under QEMU; surviving a PAX console logout waits on PAX |
 | W3 | panes, tabs, the bar, keys | pure layout module; panes and tabs in the server, borders and the focus mark, the bar's lines (tabs with activity, bell and zoom marks, the mode, the clock); modes per client, the hint line and the key list from one key table, a minimal command line; configuration planned |
-| W4 | mouse, scrollback, copy | pane/tab clicks; border dragging, wheel scrollback and copy planned |
+| W4 | mouse, scrollback, copy | pane/tab clicks and minimum-clamped border dragging; wheel scrollback and copy planned |
 | W5 | layouts, commands, persistence | planned |
 | W6 | on the PAX image, on real hardware | planned |
 
