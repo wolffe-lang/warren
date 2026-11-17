@@ -1311,6 +1311,8 @@ fn prompt_erase(mut s: Server, index: int) {
 /// A KEY from a client, through the key table in the client's mode: passed
 /// to the focused pane, or an action and the next mode.
 fn key_event(mut s: Server, index: int, mods: int, kind: int, code: int) {
+    // A keyboard action cancels mouse capture, but its release stays consumed.
+    s.conns[index].drag = layout.no_border_hit()
     let si = s.conns[index].session
     let mode = s.conns[index].mode
     let st = config.step(s.keys, mode, mods, kind, code)
@@ -1376,6 +1378,36 @@ fn key_event(mut s: Server, index: int, mods: int, kind: int, code: int) {
     act(mut s, index, a, st.arg, 1)
 }
 
+// Prompts/help/confirmation own their input; the other modes keep chrome usable.
+fn mouse_chrome(mode: int) -> bool {
+    passing(mode) || mode == config.MODE_PREFIX || mode == config.MODE_PANE || mode == config.MODE_TAB ||
+        mode == config.MODE_RESIZE || mode == config.MODE_SESSION
+}
+
+// A captured border owns every motion and the matching release even outside
+// its original rect. Only this gesture's own resize advances its generation.
+fn border_gesture(mut s: Server, index: int, kind: int, button: int, col: int, row: int) -> bool {
+    if s.conns[index].drag.node < 0 { return false }
+    if kind == 0 { s.conns[index].drag = layout.no_border_hit(); return false }
+    if kind != 2 && !(kind == 1 && button == 1) { return false }
+    let si = s.conns[index].session
+    let hit = s.conns[index].drag
+    let valid = si >= 0 && s.sessions[si].live && s.sessions[si].layout.active == hit.tab &&
+        s.sessions[si].layout_gen == s.conns[index].drag_layout && mouse_chrome(s.conns[index].mode)
+    if valid && (kind == 1 || button == 1) {
+        let target = if hit.axis == layout.COLS then col else row
+        let moved = layout.drag_border(mut s.sessions[si].layout, hit, target, s.sessions[si].cols,
+            s.sessions[si].rows - BAR_LINES) else 0
+        if moved != 0 {
+            layout_changed(mut s, si)
+            s.conns[index].drag_layout = s.sessions[si].layout_gen
+        }
+    }
+    if !valid || kind == 1 { s.conns[index].drag = layout.no_border_hit() }
+    if kind == 1 { s.conns[index].mouse_consumed = s.conns[index].mouse_consumed & 6 }
+    true
+}
+
 /// A mouse gesture consumed by the UI never sends an orphan motion/release
 /// to a pane. This state belongs to the client, just like its key mode.
 fn mouse_event(mut s: Server, index: int, body: List[byte]) {
@@ -1385,6 +1417,7 @@ fn mouse_event(mut s: Server, index: int, body: List[byte]) {
     let col = u(body, 3, 2)
     let row = u(body, 5, 2)
     let bit = if button == 1 then 1 else if button == 2 then 2 else 4
+    if border_gesture(mut s, index, kind, button, col, row) { return }
     if kind == 1 && s.conns[index].mouse_consumed & bit != 0 {
         s.conns[index].mouse_consumed = s.conns[index].mouse_consumed & (7 - bit)
         return
@@ -1396,7 +1429,7 @@ fn mouse_event(mut s: Server, index: int, body: List[byte]) {
     let cols = s.sessions[si].cols
     let rows = s.sessions[si].rows
     let area = rows - BAR_LINES
-    if !passing(s.conns[index].mode) || col < 1 || col > cols || row < 1 || row > rows {
+    if !mouse_chrome(s.conns[index].mode) || col < 1 || col > cols || row < 1 || row > rows {
         if kind == 0 { s.conns[index].mouse_consumed = s.conns[index].mouse_consumed | bit }
         return
     }
@@ -1416,6 +1449,15 @@ fn mouse_event(mut s: Server, index: int, body: List[byte]) {
         return
     }
     let tab = s.sessions[si].layout.active
+    if kind == 0 && button == 1 && mods == 0 {
+        let border = layout.border_at(s.sessions[si].layout, tab, cols, area, col, row)
+        if border.node >= 0 {
+            s.conns[index].drag = border
+            s.conns[index].drag_layout = s.sessions[si].layout_gen
+            s.conns[index].mouse_consumed = s.conns[index].mouse_consumed | 1
+            return
+        }
+    }
     let id = layout.pane_at(s.sessions[si].layout, tab, cols, area, col, row)
     let hit = slot_of(s, id)
     let from = focused_slot(s, si)
@@ -1430,6 +1472,7 @@ fn mouse_event(mut s: Server, index: int, body: List[byte]) {
         }
         return
     }
+    if !passing(s.conns[index].mode) { return }
     let pc = col - s.panes[hit].at_col + 1
     let pr = row - s.panes[hit].at_row + 1
     queue_to(mut s, hit, mouse_bytes(s.panes[hit].screen, kind, button, mods, pc, pr))
@@ -1454,6 +1497,7 @@ fn attached_message(mut s: Server, index: int, kind: int, body: List[byte]) {
             if f >= 0 { queue_to(mut s, f, focus_bytes(s.panes[f].screen, u(body, 0, 1) == 1)) }
         }
     } else if kind == 6 {
+        s.conns[index].drag = layout.no_border_hit()
         let cols = u(body, 0, 2)
         let rows = u(body, 2, 2)
         if cols < MIN_COLS || rows < MIN_ROWS {

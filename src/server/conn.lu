@@ -5,6 +5,7 @@
 //! shadow of what its client holds. Buffers are kept across reuse of the
 //! slot and grow only to their caps.
 use proto
+use layout
 
 /// A connection slot. `gen` changes at every reuse, so a readiness event
 /// taken for an earlier occupant is discarded. `pending` is a key's action
@@ -59,6 +60,8 @@ pub struct Conn {
     confirm: int,
     help_top: int,
     mouse_consumed: int,
+    drag: layout.BorderHit,
+    drag_layout: int,
     hello: List[byte],
     hello_len: int,
     hello_ready: bool,
@@ -100,7 +103,8 @@ pub fn new_conn() -> Conn {
         tx: List[byte](), tx_off: 0, tx_len: 0, image_start: 0, image_end: 0 - 1, image_seq: 0,
         ack: proto.ack_state(), force_full: true, ending: false, ending_gen: 0, stale: false, stale_since: 0, last_frame: 0,
         shadow: no_shadow(), cols: 0, rows: 0, depth: 0, features: 0, write_on: false, read_on: false,
-        mode: 0, back: 0, prompt: List[byte](), confirm: 0, help_top: 0, mouse_consumed: 0, hello: List[byte](), hello_len: 0, hello_ready: false,
+        mode: 0, back: 0, prompt: List[byte](), confirm: 0, help_top: 0, mouse_consumed: 0,
+        drag: layout.no_border_hit(), drag_layout: 0 - 1, hello: List[byte](), hello_len: 0, hello_ready: false,
         resize_ready: false, resize_cols: 0, resize_rows: 0, command_ready: false, command: List[byte](),
         command_len: 0, stop_after: false, pending: 0, pending_arg: 0, message: List[byte](), message_until: 0,
         sent_kind: 0, sent_code: 0, seen_layout: 0 - 1, seen_bar: 0 - 1, seen_damage: List[int](),
@@ -147,6 +151,8 @@ pub fn reset_conn(mut c: Conn, fd: int, id: int, now: int) {
     c.confirm = 0
     c.help_top = 0
     c.mouse_consumed = 0
+    c.drag = layout.no_border_hit()
+    c.drag_layout = 0 - 1
     c.hello_len = 0
     c.hello_ready = false
     c.resize_ready = false
