@@ -1,0 +1,188 @@
+//! member: false
+//! Native-only corpus witness for compose's damage: one corpus stream in
+//! the corpus properties' WRP1 framing on stdin (size, output records,
+//! resizes), its output fed in seeded random chunks to a pane filling a
+//! session's tab area. One client composes after every chunk, another
+//! after every third; after each image its shadow must equal the frame a
+//! full rescan computes. A resize rebuilds the session at the new size.
+use std.fs
+use std.io
+use server
+use vt
+
+struct Input { data: List[byte], at: int }
+
+fn read_u32(mut input: Input) -> int {
+    if input.at > input.data.len - 4 { return 0 - 1 }
+    var value: int = 0
+    var weight: int = 1
+    var i = 0
+    while i < 4 {
+        value += input.data[input.at] as int * weight
+        input.at += 1
+        weight *= 256
+        i += 1
+    }
+    value
+}
+
+struct Rng { state: int }
+
+fn next(mut r: Rng, bound: int) -> int {
+    r.state = (r.state * 1103515245 + 12345) % 2147483648
+    (r.state / 65536) % bound
+}
+
+struct Client { sh: server.Shadow, seq: int }
+
+// A pane the emulator accepts, with the bar's two rows in the frame.
+fn fits(cols: int, rows: int) -> bool {
+    cols >= 1 && rows >= 1 && cols <= 262144 / (rows + 2)
+}
+
+fn pane(cols: int, rows: int) -> server.Pane {
+    server.Pane { live: true, id: 1, session: 0, session_gen: 0, gen: 1, master: 0 - 1, key: 0 - 1, child: 0 - 1,
+        pid: 0 - 1, child_live: false, status: 0 - 1, ended: false, screen: vt.new(cols, rows, 1048576),
+        input: List[byte](), in_off: 0, in_len: 0, write_on: false, last_output: 0, sync_since: 0, damage: 0,
+        shown: true, at_col: 1, at_row: 1 }
+}
+
+// The session's tab area at the pane's size, the bar's two rows below.
+fn shape(mut ses: server.Session, cols: int, rows: int) {
+    ses.cols = cols
+    ses.rows = rows + 2
+    ses.owner = List[int]()
+    var i = 0
+    while i < cols * rows {
+        (mut ses.owner).push(0)
+        i += 1
+    }
+}
+
+fn compose(mut c: Client, panes: List[server.Pane], ses: server.Session) {
+    let cols = ses.cols
+    let rows = ses.rows - 2
+    let scans: List[int] = [1, 1, cols, rows]
+    let cursor: List[int] = [1, 1, 0, 1]
+    let image = server.compose_frame(mut c.sh, panes, ses, List[vt.Cell](), c.seq + 1, c.seq == 0, false, scans,
+        cursor)
+    if image.len > 0 { c.seq += 1 }
+}
+
+fn same_cell(a: server.Shadow, i: int, b: server.Shadow) -> bool {
+    a.cells[i].base == b.cells[i].base && a.cells[i].mark1 == b.cells[i].mark1 && a.cells[i].mark2 == b.cells[i].mark2 &&
+        a.cells[i].width == b.cells[i].width && a.cells[i].flags == b.cells[i].flags &&
+        a.cells[i].foreground == b.cells[i].foreground && a.cells[i].background == b.cells[i].background
+}
+
+fn differs(panes: List[server.Pane], ses: server.Session, sh: server.Shadow) -> int {
+    var fresh = server.no_shadow()
+    let cursor: List[int] = [1, 1, 0, 1]
+    let _image = server.compose_frame(mut fresh, panes, ses, List[vt.Cell](), 1, true, false, List[int](), cursor)
+    var i = 0
+    while i < ses.cols * ses.rows {
+        if !same_cell(sh, i, fresh) { return i }
+        i += 1
+    }
+    0 - 1
+}
+
+fn main() -> int {
+    var file = fs.stdin()
+    var buffer = List[byte]()
+    (mut buffer).reserve(4096)
+    var data = List[byte]()
+    (mut data).reserve(65536)
+    while true {
+        let count = fs.read_into(mut file, mut buffer, 4096) else |error| match error {
+            eof => 0,
+            io => { return 1 },
+        }
+        if count == 0 { break }
+        for raw in buffer {
+            if data.len == 65536 { return 2 }
+            (mut data).push(raw)
+        }
+    }
+    if data.len < 13 || data[0] != 87 as byte || data[1] != 82 as byte || data[2] != 80 as byte || data[3] != 49 as byte {
+        return 2
+    }
+    var input = Input { data: data, at: 4 }
+    let cols = read_u32(mut input)
+    let rows = read_u32(mut input)
+    if !fits(cols, rows) { return 2 }
+    var panes = List[server.Pane]()
+    (mut panes).push(pane(cols, rows))
+    var ses = server.idle_session()
+    ses.live = true
+    shape(mut ses, cols, rows)
+    var one = Client { sh: server.no_shadow(), seq: 0 }
+    var two = Client { sh: server.no_shadow(), seq: 0 }
+    compose(mut one, panes, ses)
+    compose(mut two, panes, ses)
+    var g = Rng { state: 20261117 }
+    var fed: int = 0
+    var resizes = 0
+    var images = 0
+    var chunks = 0
+    var ended = false
+    while input.at < input.data.len {
+        let kind = input.data[input.at] as int
+        input.at += 1
+        if kind == 0 {
+            ended = true
+            break
+        }
+        if kind == 1 {
+            let length = read_u32(mut input)
+            if length < 0 || length > input.data.len - input.at { return 2 }
+            var at = input.at
+            let end = input.at + length
+            while at < end {
+                var stop = at + 1 + next(mut g, 64)
+                if stop > end { stop = end }
+                vt.feed(mut panes[0].screen, input.data[at..stop])
+                panes[0].damage += 1
+                compose(mut one, panes, ses)
+                let a = differs(panes, ses, one.sh)
+                if a >= 0 {
+                    io.write_line("FAIL compose-damage-corpus client 1 chunk {chunks} ending at byte {stop - input.at} of {length} cell {a}")
+                    return 1
+                }
+                images += 1
+                chunks += 1
+                if chunks % 3 == 0 {
+                    compose(mut two, panes, ses)
+                    let b = differs(panes, ses, two.sh)
+                    if b >= 0 {
+                        io.write_line("FAIL compose-damage-corpus client 2 chunk {chunks} ending at byte {stop - input.at} of {length} cell {b}")
+                        return 1
+                    }
+                    images += 1
+                }
+                at = stop
+            }
+            input.at = end
+            fed += length
+        } else if kind == 2 {
+            let width = read_u32(mut input)
+            let height = read_u32(mut input)
+            if !fits(width, height) { return 2 }
+            if vt.resize(mut panes[0].screen, width, height) != "" { return 2 }
+            panes[0].damage += 1
+            shape(mut ses, width, height)
+            resizes += 1
+        } else {
+            return 2
+        }
+    }
+    if !ended || input.at != input.data.len { return 2 }
+    compose(mut two, panes, ses)
+    let last = differs(panes, ses, two.sh)
+    if last >= 0 {
+        io.write_line("FAIL compose-damage-corpus client 2 at the end cell {last}")
+        return 1
+    }
+    io.write_line("COMPOSE-DAMAGE-CORPUS bytes={fed} resizes={resizes} images={images}")
+    0
+}
