@@ -92,9 +92,7 @@ pub fn dial_or_start(create: bool) -> Peer ! DialErrors {
     var why = ""
     var first = dial(sock) else |e| {
         why = "{e}"
-        Peer { fd: 0 - 1, rx: List[byte](), rx_off: 0, rx_len: 0, image: proto.image(), frames: 0,
-            full_frames: 0, last_base: 0, title: "", bells: 0, ended: false, end_kind: 0, end_code: 0,
-            end_text: "", welcome_session: "", auto_ack: true, pongs: 0 }
+        no_peer(0 - 1)
     }
     if why.len == 0 { return first }
     if why == "denied" { return denied }
@@ -296,7 +294,7 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
     }
     var drawn = proto.image()
     var par = parser()
-    var session = if p.welcome_session.len > 0 then p.welcome_session else "the session"
+    var session = if p.welcome_session.len > 0 then kept_text(p.welcome_session) else "the session"
     var last_cols = cols
     var last_rows = rows
     var in_file = copy t.file
@@ -368,7 +366,7 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
                         return End { code: 1, line: "warren: the server sent an image that does not apply", gone: false }
                     }
                     if k == 0 - 1 { return End { code: 1, line: "warren: the server closed the connection", gone: false } }
-                    if k == 129 && p.welcome_session.len > 0 { session = p.welcome_session }
+                    if k == 129 && p.welcome_session.len > 0 { session = kept_text(p.welcome_session) }
                     if k == 131 {
                         let bytes = render(mut drawn, p.image, pol)
                         fs.write_chunk(mut out, bytes) else |_| {
@@ -378,11 +376,11 @@ fn run(mut p: Peer, mut t: Tty, mut out: fs.File, cols: int, rows: int, pol: Pol
                     } else if k == 132 {
                         fs.write_chunk(mut out, "\u{7}".bytes()) else |_| {}
                     } else if k == 134 && !pol.explicit_wide {
-                        fs.write_chunk(mut out, "\u{1b}]2;{sanitize(p.title)}\u{7}".bytes()) else |_| {}
+                        fs.write_chunk(mut out, "\u{1b}]2;{sanitize(kept_text(p.title))}\u{7}".bytes()) else |_| {}
                     } else if k == 135 {
-                        return bye_end(p.end_code, p.end_text, session)
+                        return bye_end(p.end_code, kept_text(p.end_text), session)
                     } else if k == 130 {
-                        return End { code: 1, line: "warren: refused: {p.end_text}", gone: false }
+                        return End { code: 1, line: "warren: refused: {kept_text(p.end_text)}", gone: false }
                     }
                 }
                 if pulled == 1 { return End { code: 1, line: "warren: the server closed the connection", gone: false } }
