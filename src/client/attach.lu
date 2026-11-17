@@ -94,7 +94,7 @@ pub fn dial_or_start(create: bool) -> Peer ! DialErrors {
         why = "{e}"
         Peer { fd: 0 - 1, rx: List[byte](), rx_off: 0, rx_len: 0, image: proto.image(), frames: 0,
             full_frames: 0, last_base: 0, title: "", bells: 0, ended: false, end_kind: 0, end_code: 0,
-            end_text: "", welcome_session: "", auto_ack: true, pongs: 0 }
+            end_text: "", welcome_session: "", auto_ack: true, pongs: 0, clipboard: List[byte](), clips: 0 }
     }
     if why.len == 0 { return first }
     if why == "denied" { return denied }
