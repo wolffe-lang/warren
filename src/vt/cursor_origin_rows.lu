@@ -1,0 +1,60 @@
+//! member: false
+//! Origin bounds after a saved cursor is restored above a later region.
+
+fn above_region() -> Vt {
+    var pane = new(12, 8, 0)
+    feed(mut pane, "\u{1b}[?6h\u{1b}[1;1H\u{1b}7\u{1b}[4;7r\u{1b}8".bytes())
+    assert(pane.modes.origin && pane.cursor_row == 1 && pane.cursor_col == 1)
+    pane
+}
+
+fn test_origin_horizontal_addressing_reenters_region() {
+    let suffixes: List[str] = ["7G", "9`", "5a", "G", "0G", "999G", "`", "0`", "999`", "a", "0a", "999a"]
+    let columns: List[int] = [7, 9, 6, 1, 1, 12, 1, 1, 12, 2, 2, 12]
+    var index = 0
+    for suffix in suffixes {
+        var pane = above_region()
+        feed(mut pane, "\u{1b}[{suffix}".bytes())
+        assert(pane.cursor_row == 4 && pane.cursor_col == columns[index], "origin-horizontal-reenters-region")
+        assert(pane.region_top == 4 && pane.region_bottom == 7 && !pane.pending_wrap)
+        index += 1
+    }
+}
+
+fn test_relative_cuf_cub_and_print_stay_above_region() {
+    var pane = above_region()
+    feed(mut pane, "\u{1b}[5C".bytes())
+    assert(pane.cursor_row == 1 && pane.cursor_col == 6)
+    feed(mut pane, "\u{1b}[2Dxyz".bytes())
+    assert(pane.cursor_row == 1 && pane.cursor_col == 7, "relative-motion-print-keeps-restored-row")
+}
+
+fn test_horizontal_without_origin_keeps_absolute_row() {
+    let suffixes: List[str] = ["7G", "9`", "5a"]
+    let columns: List[int] = [7, 9, 6]
+    var index = 0
+    for suffix in suffixes {
+        var pane = new(12, 8, 0)
+        feed(mut pane, "\u{1b}7\u{1b}[4;7r\u{1b}8\u{1b}[{suffix}".bytes())
+        assert(!pane.modes.origin && pane.cursor_row == 1 && pane.cursor_col == columns[index])
+        index += 1
+    }
+}
+
+fn test_1049_restored_origin_and_in_region_row() {
+    var pane = new(12, 8, 0)
+    feed(mut pane, "\u{1b}[?6h\u{1b}[?1049h\u{1b}[4;7r\u{1b}[?1049l".bytes())
+    assert(pane.modes.origin && pane.cursor_row == 1 && !pane.active_alternate)
+    feed(mut pane, "\u{1b}[9`".bytes())
+    assert(pane.cursor_row == 4 && pane.cursor_col == 9, "1049-restored-horizontal-reenters-region")
+    feed(mut pane, "\u{1b}[2;2H\u{1b}[3a".bytes())
+    assert(pane.cursor_row == 5 && pane.cursor_col == 5, "horizontal-keeps-existing-in-region-row")
+}
+
+fn main() -> int {
+    test_origin_horizontal_addressing_reenters_region()
+    test_relative_cuf_cub_and_print_stay_above_region()
+    test_horizontal_without_origin_keeps_absolute_row()
+    test_1049_restored_origin_and_in_region_row()
+    0
+}

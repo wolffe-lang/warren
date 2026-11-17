@@ -32,6 +32,14 @@ def main():
         except (AssertionError,ValueError,oracle.OracleError): pass
         else: raise AssertionError('D12 accepted a different trigger or changed report')
     print('PASS D12 exact-origin-above-top unsigned-wrap absolute-DECCIR no-mutation strict-original-rejection nontrigger-refusal')
+    sys.path.insert(0, str(ROOT/'tools/vt'))
+    from erase_extent_fixture import trace
+    setup=b'\x1b[?6h\x1b[1;1H\x1b7\x1b[4;7r\x1b8'
+    for suffix,row,col in ((b'',1,1),(b'xyz',1,4),(b'\x1b[5C',1,6),
+                           (b'\x1b[5a',4,6),(b'\x1b[7G',4,7),(b'\x1b[9`',4,9)):
+        got=trace(setup+suffix,12,8)['cursor']
+        assert got==[row,col], ('origin-horizontal-source-trace',suffix,got,[row,col])
+    print('PASS origin-horizontal-source-trace restored print CUF HPR CHA HPA')
 
 
 if __name__=='__main__': main()
