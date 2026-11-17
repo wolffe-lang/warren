@@ -2068,8 +2068,8 @@ fn row_mouse_focus(mut r: Rig, legacy: bool, encoding: int) -> str {
     if !mouse_click(a, legacy, 5, 3) { return "focused outer click" }
     if !until_mouse_bytes(left, expected + expected) { return "focused click did not reach its program" }
     let _border = outer_mouse(a, legacy, 0, 40, 3)
-    let _motion = outer_mouse(a, legacy, 2, 5, 3)
-    let _up = outer_mouse(a, legacy, 1, 5, 3)
+    let _motion = outer_mouse(a, legacy, 2, 40, 3)
+    let _up = outer_mouse(a, legacy, 1, 40, 3)
     let _hint = mouse_click(a, legacy, 5, 24)
     let _outside = mouse_click(a, legacy, 81, 25)
     drain(mut a, 100)
@@ -2358,7 +2358,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
+    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
         (mut x).push(n)
     }
     x
