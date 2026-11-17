@@ -269,9 +269,11 @@ class Trace:
             if final in 'EF':
                 self.col = 1
             self.pending = False
-        elif final in 'CDG`':
+        elif final in 'CDG`a':
             self.clear_mark_uncertainty()
-            self.col = min(self.cols, max(1, value if final in 'G`' else self.col + (value if final == 'C' else -value)))
+            self.col = min(self.cols, max(1, value if final in 'G`' else self.col + (value if final in 'Ca' else -value)))
+            if self.origin and final in 'G`a':
+                self.row = min(self.bottom, max(self.top, self.row))
             self.pending = False
         elif final == 'r':
             bottom = min(self.rows, (parts[1] or self.rows) if len(parts) > 1 else self.rows)
