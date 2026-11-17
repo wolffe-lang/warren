@@ -24,7 +24,9 @@ use layout
 /// line `view_id` at cell `view_offset`; a window the wheel opened
 /// (`view_wheel`) closes when it reaches the live rows. A window too small
 /// for its pane asks to grow to `view_cols` by `view_rows` between turns and
-/// is filled `view_retry` rows back on the next.
+/// is filled `view_retry` rows back on the next. A selection (`sel_state` 1
+/// pressed, 2 dragging) started at window row `sel_row`, column `sel_col` in
+/// pane slot `sel_slot`; `sel_opened` says its drag opened the window.
 pub struct Conn {
     live: bool,
     fd: int,
@@ -80,6 +82,11 @@ pub struct Conn {
     view_cols: int,
     view_rows: int,
     view_retry: int,
+    sel_state: int,
+    sel_slot: int,
+    sel_row: int,
+    sel_col: int,
+    sel_opened: bool,
     hello: List[byte],
     hello_len: int,
     hello_ready: bool,
@@ -125,6 +132,7 @@ pub fn new_conn() -> Conn {
         drag: layout.no_border_hit(), drag_layout: 0 - 1,
         view: vt.new_view(), view_slot: 0 - 1, view_pane: 0 - 1, view_back: 0, view_wheel: false, view_id: 0 - 1, view_offset: 0,
         view_cols: 0, view_rows: 0, view_retry: 0 - 1,
+        sel_state: 0, sel_slot: 0 - 1, sel_row: 0, sel_col: 0, sel_opened: false,
         hello: List[byte](), hello_len: 0, hello_ready: false,
         resize_ready: false, resize_cols: 0, resize_rows: 0, command_ready: false, command: List[byte](),
         command_len: 0, stop_after: false, pending: 0, pending_arg: 0, message: List[byte](), message_until: 0,
@@ -184,6 +192,10 @@ pub fn reset_conn(mut c: Conn, fd: int, id: int, now: int) {
     c.view_cols = 0
     c.view_rows = 0
     c.view_retry = 0 - 1
+    c.sel_state = 0
+    c.sel_slot = 0 - 1
+    c.sel_opened = false
+    vt.unmark_view(mut c.view)
     c.hello_len = 0
     c.hello_ready = false
     c.resize_ready = false
