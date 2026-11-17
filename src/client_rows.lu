@@ -946,18 +946,23 @@ fn clock_shape(text: str) -> bool {
     b[0] == 32 as byte && b[3] == 58 as byte && b[6] == 32 as byte
 }
 
-fn terminal_mouse(mut r: Run, legacy: bool, col: int, row: int) {
-    for release in [false, true] {
-        var data = List[byte]()
-        if legacy {
-            data = "\u{1b}[M".bytes()
-            for n in [if release then 35 else 32, col + 32, row + 32] { (mut data).push(n as byte) }
-        } else {
-            let end = if release then "m" else "M"
-            data = "\u{1b}[<0;{col};{row}{end}".bytes()
-        }
-        fs.write_chunk(mut r.master, data) else |_| {}
+fn terminal_pointer(mut r: Run, legacy: bool, kind: int, col: int, row: int) {
+    var data = List[byte]()
+    if legacy {
+        data = "\u{1b}[M".bytes()
+        let b = if kind == 1 then 35 else if kind == 2 then 64 else 32
+        for n in [b, col + 32, row + 32] { (mut data).push(n as byte) }
+    } else {
+        let b = if kind == 2 then 32 else 0
+        let end = if kind == 1 then "m" else "M"
+        data = "\u{1b}[<{b};{col};{row}{end}".bytes()
     }
+    fs.write_chunk(mut r.master, data) else |_| {}
+}
+
+fn terminal_mouse(mut r: Run, legacy: bool, col: int, row: int) {
+    terminal_pointer(mut r, legacy, 0, col, row)
+    terminal_pointer(mut r, legacy, 1, col, row)
 }
 
 fn row_mouse_e2e(warren: str, legacy: bool) -> str {
@@ -983,6 +988,13 @@ fn row_mouse_e2e(warren: str, legacy: bool) -> str {
     let end2 = now_ms() + 5000
     while !region_has(r.screen, "B-6", 1, 1, 39, 22) && now_ms() < end2 { pump(mut r, 50) }
     if !region_has(r.screen, "B-6", 1, 1, 39, 22) { close_run(r); return "border click changed focus" }
+    if r.screen.mode_values[10] != 1 { close_run(r); return "outer all-motion not enabled" }
+    terminal_pointer(mut r, legacy, 0, 40, 3)
+    terminal_pointer(mut r, legacy, 2, 46, 3)
+    if !until_border(mut r, 46, 22, 22, 3000) { close_run(r); return "real-client border drag did not resize" }
+    terminal_pointer(mut r, legacy, 1, 46, 24)
+    pump(mut r, 100)
+    if !until_border(mut r, 46, 22, 22, 1000) { close_run(r); return "release outside pane lost origin split" }
     type_text(mut r, "\u{0}d")
     let why = ends_with(mut r, 0, "[detached")
     close_run(r)
