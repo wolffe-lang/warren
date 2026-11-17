@@ -1,8 +1,12 @@
 //! member: false
 //! Compose's damage rows: a session compose computes each frame cell once,
 //! and in a pane it reads only the rows and spans the emulator changed
-//! since this client's last image.
-//! Pure: native, the checked machine and lupin.
+//! since this client's last image; and over seeded streams in random
+//! chunks, two clients composing at different times each hold exactly the
+//! frame a full rescan computes. Native and the checked machine. The
+//! program's argument is the streams per size (one by default); the gate
+//! runs twelve.
+use std.env
 use server
 use vt
 
@@ -130,11 +134,178 @@ fn test_no_new_damage_reads_nothing() {
     assert(reads == 0, "no-new-damage-reads-nothing")
 }
 
+// ---- the damage-limited image equals a full rescan ----
+
+struct Rng { state: int }
+
+fn next(mut r: Rng, bound: int) -> int {
+    r.state = (r.state * 1103515245 + 12345) % 2147483648
+    (r.state / 65536) % bound
+}
+
+// One stream: text among everything else that writes or moves cells
+// (wraps, scrolls in and out of a region, inserted and deleted lines and
+// characters, erases of every kind, wide glyphs, marks, REP, insert mode,
+// the alternate screen, alignment, resets).
+fn stream(mut g: Rng, rows: int, cols: int) -> List[byte] {
+    var out = List[byte]()
+    let alphabet = "abcdefghijklmnopqrstuvwxyz ABCXYZ0123456789.,;:!?-_=+*/()[]<>|~`'#$%&@^".bytes()
+    var pieces = 0
+    while pieces < 40 {
+        let kind = next(mut g, 30)
+        if kind < 9 {
+            var n = 1 + next(mut g, cols * 2)
+            while n > 0 {
+                let pick = next(mut g, alphabet.len)
+                (mut out).push(alphabet[pick])
+                n -= 1
+            }
+        } else if kind == 9 { push_text(mut out, "\r\n") }
+        else if kind == 10 {
+            let row = 1 + next(mut g, rows)
+            let col = 1 + next(mut g, cols)
+            push_text(mut out, "\u{1b}[{row};{col}H")
+        } else if kind == 11 {
+            let bold = next(mut g, 2)
+            let colour = next(mut g, 8)
+            push_text(mut out, "\u{1b}[{bold};4{colour}m")
+        } else if kind == 12 {
+            let part = next(mut g, 3)
+            push_text(mut out, "\u{1b}[{part}K")
+        } else if kind == 13 {
+            let part = next(mut g, 3)
+            push_text(mut out, "\u{1b}[{part}J")
+        }
+        else if kind == 14 { push_text(mut out, "中") }
+        else if kind == 15 { push_text(mut out, "e\u{301}") }
+        else if kind == 16 {
+            let times = 1 + next(mut g, 3)
+            push_text(mut out, "\u{1b}[{times}b")
+        } else if kind == 17 {
+            let n = 1 + next(mut g, 3)
+            push_text(mut out, "\u{1b}[{n}L")
+        } else if kind == 18 {
+            let n = 1 + next(mut g, 3)
+            push_text(mut out, "\u{1b}[{n}M")
+        } else if kind == 19 {
+            let n = 1 + next(mut g, 3)
+            push_text(mut out, "\u{1b}[{n}@")
+        } else if kind == 20 {
+            let n = 1 + next(mut g, 3)
+            push_text(mut out, "\u{1b}[{n}P")
+        } else if kind == 21 {
+            let n = 1 + next(mut g, 3)
+            push_text(mut out, "\u{1b}[{n}X")
+        }
+        else if kind == 22 { push_text(mut out, if next(mut g, 2) == 0 then "\u{1b}[4h" else "\u{1b}[4l") }
+        else if kind == 23 { push_text(mut out, if next(mut g, 2) == 0 then "\u{1b}[?1049h" else "\u{1b}[?1049l") }
+        else if kind == 24 { push_text(mut out, if next(mut g, 2) == 0 then "\u{1b}D" else "\u{1b}M") }
+        else if kind == 25 {
+            let top = 1 + next(mut g, rows)
+            push_text(mut out, "\u{1b}[{top};{rows}r")
+        }
+        else if kind == 26 { push_text(mut out, "\n\n\n") }
+        else if kind == 27 { push_text(mut out, "\u{1b}#8") }
+        else if kind == 28 { push_text(mut out, if next(mut g, 2) == 0 then "\u{1b}(0q" else "\u{1b}(B") }
+        else { push_text(mut out, if next(mut g, 6) == 0 then "\u{1b}c" else "\u{8}\t") }
+        pieces += 1
+    }
+    out
+}
+
+fn same_cell(a: server.Shadow, i: int, b: server.Shadow) -> bool {
+    a.cells[i].base == b.cells[i].base && a.cells[i].mark1 == b.cells[i].mark1 && a.cells[i].mark2 == b.cells[i].mark2 &&
+        a.cells[i].width == b.cells[i].width && a.cells[i].flags == b.cells[i].flags &&
+        a.cells[i].foreground == b.cells[i].foreground && a.cells[i].background == b.cells[i].background
+}
+
+// The first frame cell where a client's shadow and a full rescan differ,
+// or -1.
+fn differs(panes: List[server.Pane], ses: server.Session, sh: server.Shadow) -> int {
+    var fresh = server.no_shadow()
+    let cursor: List[int] = [1, 1, 0, 1]
+    let _image = server.compose_frame(mut fresh, panes, ses, List[vt.Cell](), vt.new_view(), 0 - 1, 1, true, false, List[int](), cursor)
+    var i = 0
+    while i < ses.cols * ses.rows {
+        if !same_cell(sh, i, fresh) { return i }
+        i += 1
+    }
+    0 - 1
+}
+
+// Seeded streams at sizes that meet the edges often (the first `count`
+// of them), fed in random chunks. One client composes after every chunk,
+// another after every third; after each image, its shadow must equal the
+// full rescan. A difference is printed as `FAIL damage-equals-rescan` and
+// ends the comparison.
+fn damage_agrees(rounds: int, count: int) -> bool {
+    var g = Rng { state: 20261117 }
+    let sizes = [1, 1, 2, 3, 7, 4, 13, 5, 20, 6, 40, 12]
+    var streams = 0
+    var images = 0
+    var k = 0
+    while k < sizes.len && k < count * 2 {
+        let cols = sizes[k]
+        let rows = sizes[k + 1]
+        var round = 0
+        while round < rounds {
+            let data = stream(mut g, rows, cols)
+            var r = rig(cols, rows)
+            var other = server.no_shadow()
+            var other_seq = 0
+            let _first = compose(mut r, true)
+            var at = 0
+            var chunk = 0
+            while at < data.len {
+                var end = at + 1 + next(mut g, 24)
+                if end > data.len { end = data.len }
+                feed(mut r, data[at..end])
+                let _reads = compose(mut r, false)
+                let one = differs(r.panes, r.ses, r.sh)
+                if one >= 0 {
+                    print("FAIL damage-equals-rescan size {cols}x{rows} round {round} client 1 chunk ending at byte {end} of {data.len} cell {one}")
+                    return false
+                }
+                chunk += 1
+                images += 1
+                if chunk % 3 == 0 || end == data.len {
+                    let cursor: List[int] = [1, 1, 0, 1]
+                    let scans: List[int] = [1, 1, cols, rows]
+                    let image = server.compose_frame(mut other, r.panes, r.ses, List[vt.Cell](), vt.new_view(), 0 - 1, other_seq + 1,
+                        other_seq == 0, false, scans, cursor)
+                    if image.len > 0 { other_seq += 1 }
+                    let two = differs(r.panes, r.ses, other)
+                    if two >= 0 {
+                        print("FAIL damage-equals-rescan size {cols}x{rows} round {round} client 2 chunk ending at byte {end} of {data.len} cell {two}")
+                        return false
+                    }
+                    images += 1
+                }
+                at = end
+            }
+            streams += 1
+            round += 1
+        }
+        k += 2
+    }
+    print("MEASURE compose-damage streams={streams} images={images}")
+    true
+}
+
+// The checked machine's step budget holds the three smallest sizes.
+fn test_damage_equals_a_full_rescan() {
+    assert(damage_agrees(1, 3), "damage-equals-rescan")
+}
+
 fn main() -> int {
     test_a_whole_image_reads_each_cell_once()
     test_one_cell_reads_one()
     test_a_redraw_reads_its_rows()
     test_no_new_damage_reads_nothing()
+    let args = env.args()
+    var rounds = 1
+    if args.len > 0 { rounds = args[0].to_int() else 1 }
+    if !damage_agrees(rounds, 6) { return 1 }
     print("PASS compose-damage")
     0
 }
