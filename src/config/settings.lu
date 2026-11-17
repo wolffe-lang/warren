@@ -11,8 +11,51 @@ pub fn default_settings() -> Settings {
     Settings { ok: true, why: "", line: 0, clipboard_programs: false }
 }
 
-/// Parse a configuration file's text.
+fn refuse(line: int, why: str) -> Settings {
+    Settings { ok: false, why: why, line: line, clipboard_programs: false }
+}
+
+// A line without its comment (`#` to the end: values are bare words) and the
+// blanks around it.
+fn settings_line(raw: str) -> str {
+    let at = raw.find("#") else raw.len
+    raw[0..at].trim()
+}
+
+/// Parse a configuration file's text: blank lines, `#` comments, the table
+/// `[clipboard]` and in it `programs = true` or `false`. Anything else, a
+/// table or key given twice included, refuses the whole file by line and
+/// reason, with every setting at its default.
 pub fn parse_settings(text: str) -> Settings {
-    if text.len < 0 { return default_settings() }
-    default_settings()
+    var s = default_settings()
+    var table = ""
+    var clipboard_seen = false
+    var programs_seen = false
+    var n = 0
+    for raw in text.lines() {
+        n += 1
+        let line = settings_line(raw)
+        if line.len == 0 { continue }
+        if line.starts_with("[") {
+            if !line.ends_with("]") { return refuse(n, "a table header needs ]") }
+            let name = line[1..line.len - 1].trim()
+            if name != "clipboard" { return refuse(n, "unknown table [{name}]") }
+            if clipboard_seen { return refuse(n, "[clipboard] appears twice") }
+            clipboard_seen = true
+            table = name
+            continue
+        }
+        let eq = line.find("=") else 0 - 1
+        if eq < 0 { return refuse(n, "expected key = value") }
+        if table.len == 0 { return refuse(n, "a key outside a table") }
+        let key = line[0..eq].trim()
+        let value = line[eq + 1..line.len].trim()
+        if key != "programs" { return refuse(n, "unknown key {key} in [{table}]") }
+        if programs_seen { return refuse(n, "programs is set twice") }
+        if value == "true" { s.clipboard_programs = true }
+        else if value == "false" { s.clipboard_programs = false }
+        else { return refuse(n, "programs takes true or false") }
+        programs_seen = true
+    }
+    s
 }
