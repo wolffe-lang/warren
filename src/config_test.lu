@@ -1,0 +1,46 @@
+//! member: false
+//! warren.toml's settings: the strict subset the parser takes, each refusal
+//! by line and reason, and the defaults. Pure: native, checked and lupin.
+use config
+
+fn test_defaults() {
+    let d = config.default_settings()
+    assert(d.ok && !d.clipboard_programs, "programs cannot write the clipboard by default")
+    let empty = config.parse_settings("")
+    assert(empty.ok && !empty.clipboard_programs, "an empty file is the defaults")
+    let comments = config.parse_settings("# warren\n\n   # indented comment\n")
+    assert(comments.ok && !comments.clipboard_programs, "comments and blank lines")
+}
+
+fn test_clipboard_programs() {
+    let on = config.parse_settings("[clipboard]\nprograms = true\n")
+    assert(on.ok && on.clipboard_programs, "programs = true")
+    let off = config.parse_settings("# on purpose\n[clipboard]\nprograms = false # the default\n")
+    assert(off.ok && !off.clipboard_programs, "programs = false with a trailing comment")
+    let spaced = config.parse_settings("  [ clipboard ]  \n  programs=true")
+    assert(spaced.ok && spaced.clipboard_programs, "spaces around names and no final newline")
+}
+
+fn refused(text: str, line: int, why: str) -> bool {
+    let s = config.parse_settings(text)
+    !s.ok && s.line == line && s.why == why && !s.clipboard_programs
+}
+
+fn test_refusals() {
+    assert(refused("programs = true\n", 1, "a key outside a table"), "key before a table")
+    assert(refused("[clipboard]\nprograms = yes\n", 2, "programs takes true or false"), "bad value")
+    assert(refused("[clipboard]\nprograms = true\nprograms = false\n", 3, "programs is set twice"), "duplicate key")
+    assert(refused("[clipboard]\ncolour = 1\n", 2, "unknown key colour in [clipboard]"), "unknown key")
+    assert(refused("[keys]\n", 1, "unknown table [keys]"), "unknown table")
+    assert(refused("[clipboard\n", 1, "a table header needs ]"), "open header")
+    assert(refused("[clipboard]\nprograms\n", 2, "expected key = value"), "no equals")
+    assert(refused("[clipboard]\nprograms = true\n[clipboard]\n", 3, "[clipboard] appears twice"), "table twice")
+}
+
+fn main() -> int {
+    test_defaults()
+    test_clipboard_programs()
+    test_refusals()
+    print("PASS config-settings")
+    0
+}
