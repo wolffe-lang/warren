@@ -1024,9 +1024,11 @@ fn number_in(line: str, word: str) -> int {
     rest[0..end].to_int() else 0 - 1
 }
 
-// The prompt-frame rows' client width.
+// The prompt-frame rows' client width: a column short of the clock's, so
+// line one has no clock, the minute's redraw changes no cell, and no frame
+// the rows did not cause stands between a key and its echo.
 fn prompt_cols() -> int {
-    80
+    server.CLOCK_MIN_COLS - 1
 }
 
 // The frames a trace holds so far.

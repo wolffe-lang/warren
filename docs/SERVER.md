@@ -335,7 +335,8 @@ flat resident size over 10,000 keystrokes, the trace's closes (below),
 20 echoes each composed in the turn that read it (`prompt-frame`), and an echo
 just after the minute, from a client that still owes the ACK for whatever the
 minute sent, composed in the turn that read it (`prompt-frame-minute`, which
-waits for the next minute).
+waits for the next minute). Both attach a column narrower than the clock's
+width, so the minute's redraw of line one sends them nothing.
 `src/compose_rows.lu` holds every
 composed image, applied by the client's applier, to the emulator's stored
 cells, and holds the event queue's cap to the bytes a client has yet to take
