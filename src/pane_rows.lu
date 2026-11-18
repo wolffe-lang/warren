@@ -2116,8 +2116,15 @@ fn row_mouse_tabs(mut r: Rig, legacy: bool) -> str {
     let _name = prefix(p, 44)
     let _long = type_keys(p, "a-very-long-label")
     let _done = enter(p)
+    // Each new tab is shown until its shell's prompt is drawn: output in a tab
+    // that is not shown marks it, and a mark widens its label on the bar.
     var n = 2
-    while n < 9 { let _c = prefix(p, 99); n += 1 }
+    while n < 9 {
+        let _c = prefix(p, 99)
+        n += 1
+        if !until_active(mut p, "b", "{n}", 3000) { return "tab {n}" }
+        if !client.until_line(mut p, "$", 3000) { return "no prompt in tab {n}" }
+    }
     // Every late shell has written its prompt before line one is read.
     drain(mut p, 1000)
     let _size = client.resize(p, 40, 24)
