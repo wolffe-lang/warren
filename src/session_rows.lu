@@ -6,9 +6,10 @@
 //!
 //!   session_rows WARREN [ROW...]
 //!
-//! `close-causes` and `prompt-frame` read the server's trace (WARREN_TRACE,
-//! its standard error kept in a file): every close names its cause, and
-//! every echo is composed in the turn that read it.
+//! `close-causes`, `prompt-frame` and `prompt-frame-minute` read the
+//! server's trace (WARREN_TRACE, its standard error kept in a file): every
+//! close names its cause, and every echo is composed in the turn that read
+//! it, the minute's redraw of line one included.
 //!
 //! Prints `PASS <row>` or `FAIL <row> <why>` per row, then
 //! `SESSION-ROWS rows=N failed=M`; exits 1 when any row is red.
@@ -1023,6 +1024,20 @@ fn number_in(line: str, word: str) -> int {
     rest[0..end].to_int() else 0 - 1
 }
 
+// The prompt-frame rows' client width.
+fn prompt_cols() -> int {
+    80
+}
+
+// The frames a trace holds so far.
+fn frames_in(text: str) -> int {
+    var n = 0
+    for line in text.lines() {
+        if line.starts_with("warren-server: frame conn ") { n += 1 }
+    }
+    n
+}
+
 // Each echo is composed in the turn that read it. A key's echo is a short
 // read that leaves the master empty, so no timer stands between it and
 // its frame. The server's trace gives each frame's turn and the turn that
@@ -1033,15 +1048,12 @@ fn row_prompt_frame(mut r: Rig) -> str {
     fs.remove(path) else |_| {}
     let why = start_traced(mut r, "/bin/cat", 60000, path)
     if why.len > 0 { return why }
-    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    var p = attach(r, prompt_cols(), 24, "", 1) else |e| { return "dial-{e}" }
     if !client.until_kind(mut p, 131, 5000) { return "no first image" }
     var quiet = 0
     while quiet < 1000 && client.step(mut p, 300) > 0 { quiet += 1 }
     let warm = fs.read_text(path) else |e| { return "the trace: {e}" }
-    var before = 0
-    for line in warm.lines() {
-        if line.starts_with("warren-server: frame conn ") { before += 1 }
-    }
+    let before = frames_in(warm)
     var typed = ""
     var n = 0
     while n < 20 {
@@ -1073,6 +1085,76 @@ fn row_prompt_frame(mut r: Rig) -> str {
     }
     print("MEASURE prompt-frame echoes={n} frames={frames} in-read-turn={prompt}")
     if prompt < n { return "{prompt} of {n} echoes composed in the turn that read them; the first other frame: {late}" }
+    ""
+}
+
+/// How long past the minute the minute row waits before its key: room for
+/// the server's timer to have drawn line one again.
+const MINUTE_MARGIN_MS: int = 1000
+
+/// How long the minute row's client keeps its ACK after its key: long
+/// enough for the server to read the echo first.
+const MINUTE_HOLD_MS: int = 200
+
+// The echo after the minute is composed in the turn that read it. At each
+// minute the server draws line one again (the clock). This client takes
+// what the minute sent but owes its ACK when its key's echo is read, as a
+// client busy elsewhere would; a frame the minute sent then holds the
+// echo's frame for that ACK. The row waits for the next minute: up to a
+// minute and a second.
+fn row_prompt_frame_minute(mut r: Rig) -> str {
+    let path = (env.cwd() else ".") + "/" + r.dir + "-trace"
+    fs.remove(path) else |_| {}
+    let why = start_traced(mut r, "/bin/cat", 120000, path)
+    if why.len > 0 { return why }
+    var p = attach(r, prompt_cols(), 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut p, 131, 5000) { return "no first image" }
+    var quiet = 0
+    while quiet < 1000 && client.step(mut p, 300) > 0 { quiet += 1 }
+    p.auto_ack = false
+    let now = time.unix_ms()
+    let minute = (now / 60000 + 1) * 60000
+    time.sleep(time.millis(minute + MINUTE_MARGIN_MS - now))
+    var held = 0 - 1
+    var sent = 0
+    var k = client.step(mut p, 200)
+    while k > 0 {
+        if k == 131 {
+            held = p.image.seq
+            sent += 1
+        }
+        k = client.step(mut p, 200)
+    }
+    if k < 0 { return "the connection ended across the minute" }
+    let mid = fs.read_text(path) else |e| { return "the trace: {e}" }
+    let before = frames_in(mid)
+    let _q = client.input(p, "q")
+    time.sleep(time.millis(MINUTE_HOLD_MS))
+    if held >= 0 {
+        var a = List[byte]()
+        proto.put(mut a, held, 4)
+        let _a = client.send(p, 8, a)
+    }
+    p.auto_ack = true
+    if !client.until_line(mut p, "q", 3000) { return "echo not shown: " + client.screen_text(p) }
+    client.hang_up(mut p)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    let text = fs.read_text(path) else |e| { return "the trace: {e}" }
+    var seen = 0
+    var turn = 0 - 1
+    var read = 0 - 1
+    for line in text.lines() {
+        if !line.starts_with("warren-server: frame conn ") { continue }
+        seen += 1
+        if seen == before + 1 {
+            turn = number_in(line, " turn ")
+            read = number_in(line, " read-turn ")
+        }
+    }
+    print("MEASURE prompt-frame-minute cols={prompt_cols()} minute-frames={sent} echo-turn={turn} read-turn={read}")
+    if turn < 0 { return "no frame after the minute" }
+    if turn != read { return "the echo after the minute was composed in turn {turn}, read in turn {read}; the minute sent {sent} frame(s)" }
     ""
 }
 
@@ -1109,13 +1191,14 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "too-slow" { why = row_too_slow(mut r) }
     else if name == "close-causes" { why = row_close_causes(mut r) }
     else if name == "prompt-frame" { why = row_prompt_frame(mut r) }
+    else if name == "prompt-frame-minute" { why = row_prompt_frame_minute(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute".split(" ") {
         (mut x).push(n)
     }
     x

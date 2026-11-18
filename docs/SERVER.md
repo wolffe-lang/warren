@@ -331,8 +331,11 @@ pre-HELLO, connection, session and memory limits (the memory row lowers the
 budget through `WARREN_MEMORY_BUDGET`, which the server takes only below its
 own), a resize while an image is outstanding, a client too slow for its events
 beside one that keeps up, a keystroke's delay beside a flooding pane, a
-flat resident size over 10,000 keystrokes, the trace's closes (below), and
-20 echoes each composed in the turn that read it (`prompt-frame`).
+flat resident size over 10,000 keystrokes, the trace's closes (below),
+20 echoes each composed in the turn that read it (`prompt-frame`), and an echo
+just after the minute, from a client that still owes the ACK for whatever the
+minute sent, composed in the turn that read it (`prompt-frame-minute`, which
+waits for the next minute).
 `src/compose_rows.lu` holds every
 composed image, applied by the client's applier, to the emulator's stored
 cells, and holds the event queue's cap to the bytes a client has yet to take
