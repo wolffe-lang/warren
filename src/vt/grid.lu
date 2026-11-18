@@ -43,6 +43,8 @@ pub struct Modes {
 /// One pane's pure terminal state. Cursor and region coordinates are 1-based;
 /// tab and row arrays are 0-based. History uses fixed encoded-byte storage;
 /// row addresses survive ordinary fragment boundaries and cursor movement.
+/// `glyph_calls` counts the scalars written through the per-glyph path
+/// (`print_scalar`), for rows that hold how much of a feed takes it.
 pub struct Vt {
     cols: int, rows: int,
     primary: Screen, alternate: Screen, active_alternate: bool,
@@ -60,6 +62,7 @@ pub struct Vt {
     combine_row: int, combine_col: int,
     history: History, line_coordinate: LineCoordinate,
     resize_state: ResizeState,
+    glyph_calls: int,
 }
 
 fn new_screen(cols: int, rows: int) -> Screen {
@@ -127,5 +130,6 @@ pub fn new(cols: int, rows: int, scrollback_cap_bytes: int) -> Vt {
         history: new_history(scrollback_cap_bytes),
         line_coordinate: LineCoordinate { id: 0, offset: 0, next_id: rows },
         resize_state: new_resize_state(cols),
+        glyph_calls: 0,
     }
 }

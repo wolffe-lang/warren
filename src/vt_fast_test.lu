@@ -1,0 +1,210 @@
+//! member: false
+//! The feed's printable fast path: a run of printable ASCII in ground state
+//! is written to the row without the per-byte parser and per-glyph calls,
+//! and every feed agrees, cell for cell, with the per-byte reference.
+//! Pure: native, the checked machine and lupin. The program's argument is
+//! the equivalence row's rounds per size (one by default, the checked
+//! machine's and lupin's bound); the gate runs twelve natively.
+use std.env
+use vt
+
+fn repeat(text: str, n: int) -> str {
+    var out = ""
+    var i = 0
+    while i < n {
+        out = out + text
+        i += 1
+    }
+    out
+}
+
+// A redraw's row as a full-screen editor writes it: the cursor placed, a
+// rendition, a line of text, the rendition reset.
+fn test_a_text_row_takes_the_run_path() {
+    var pane = vt.new(320, 90, 0)
+    let text = repeat("lorem ipsum dolor sit amet, ", 10) + "consectetur adipiscing elit, "
+    assert(text.len == 309, "fast-row-length")
+    vt.feed(mut pane, ("\u{1b}[5;1H\u{1b}[1;31m" + text + "\u{1b}[0m").bytes())
+    assert(pane.primary.cells[4 * 320].base == 108 && pane.primary.cells[4 * 320 + 308].base == 32, "fast-row-cells")
+    assert(pane.primary.cells[4 * 320].flags == 1 && pane.primary.cells[4 * 320].foreground == 1, "fast-row-pen")
+    assert(pane.cursor_row == 5 && pane.cursor_col == 310 && !pane.pending_wrap, "fast-row-cursor")
+    assert(pane.primary.extents[4] == 309, "fast-row-extent")
+    // Every printable byte of the row took the run path: no per-glyph call.
+    assert(pane.glyph_calls == 0, "fast-row-glyph-calls")
+}
+
+// A row that reaches the right margin: only the margin's cell takes the
+// per-glyph path (it sets the pending wrap), and the next byte wraps.
+fn test_the_margin_takes_the_per_glyph_path() {
+    var pane = vt.new(20, 3, 0)
+    vt.feed(mut pane, repeat("x", 20).bytes())
+    assert(pane.cursor_col == 20 && pane.pending_wrap, "margin-pending-wrap")
+    assert(pane.glyph_calls == 1, "margin-glyph-calls")
+    vt.feed(mut pane, "y".bytes())
+    assert(pane.cursor_row == 2 && pane.cursor_col == 2 && pane.primary.cells[20].base == 121, "margin-wrapped")
+}
+
+// ---- the fast path equals the per-byte reference ----
+
+struct Rng { state: int }
+
+fn next(mut r: Rng, bound: int) -> int {
+    r.state = (r.state * 1103515245 + 12345) % 2147483648
+    (r.state / 65536) % bound
+}
+
+fn push_text(mut out: List[byte], text: str) {
+    for b in text.bytes() { (mut out).push(b) }
+}
+
+// One stream: printable runs among the controls, sequences and scalars that
+// border them (margins, wraps, wide glyphs, combining marks, REP, insert
+// mode, DEC graphics, shifts, the alternate screen, scroll regions, resets).
+fn stream(mut r: Rng, rows: int, cols: int) -> List[byte] {
+    var out = List[byte]()
+    let alphabet = "abcdefghijklmnopqrstuvwxyz ABCXYZ0123456789.,;:!?-_=+*/()[]{{}}<>|~`'#$%&@^"
+    var pieces = 0
+    while pieces < 40 {
+        let kind = next(mut r, 24)
+        if kind < 9 {
+            var n = 1 + next(mut r, cols * 2)
+            while n > 0 {
+                let at = next(mut r, alphabet.len)
+                (mut out).push(alphabet.bytes()[at])
+                n -= 1
+            }
+        } else if kind == 9 { push_text(mut out, "\r\n") }
+        else if kind == 10 {
+            let row = 1 + next(mut r, rows)
+            let col = 1 + next(mut r, cols)
+            push_text(mut out, "\u{1b}[{row};{col}H")
+        } else if kind == 11 {
+            let bold = next(mut r, 2)
+            let colour = next(mut r, 8)
+            push_text(mut out, "\u{1b}[{bold};3{colour}m")
+        } else if kind == 12 {
+            let part = next(mut r, 3)
+            push_text(mut out, "\u{1b}[{part}K")
+        }
+        else if kind == 13 { push_text(mut out, "中") }
+        else if kind == 14 { push_text(mut out, "e\u{301}") }
+        else if kind == 15 { push_text(mut out, "\u{301}") }
+        else if kind == 16 {
+            let times = 1 + next(mut r, 3)
+            push_text(mut out, "\u{1b}[{times}b")
+        }
+        else if kind == 17 { push_text(mut out, if next(mut r, 2) == 0 then "\u{1b}[4h" else "\u{1b}[4l") }
+        else if kind == 18 { push_text(mut out, if next(mut r, 2) == 0 then "\u{1b}(0" else "\u{1b}(B") }
+        else if kind == 19 { push_text(mut out, if next(mut r, 2) == 0 then "\u{e}" else "\u{f}") }
+        else if kind == 20 { push_text(mut out, if next(mut r, 2) == 0 then "\u{1b}[?1049h" else "\u{1b}[?1049l") }
+        else if kind == 21 { push_text(mut out, if next(mut r, 2) == 0 then "\u{1b}[?7l" else "\u{1b}[?7h") }
+        else if kind == 22 {
+            let top = 1 + next(mut r, rows)
+            push_text(mut out, "\u{1b}[{top};{rows}r")
+        }
+        else { push_text(mut out, if next(mut r, 4) == 0 then "\u{1b}c" else "\u{8}\t") }
+        pieces += 1
+    }
+    out
+}
+
+fn same_screen(a: vt.Screen, b: vt.Screen) -> bool {
+    if a.cells.len != b.cells.len || a.extents.len != b.extents.len { return false }
+    var i = 0
+    while i < a.cells.len {
+        if a.cells[i].base != b.cells[i].base || a.cells[i].mark1 != b.cells[i].mark1 ||
+            a.cells[i].mark2 != b.cells[i].mark2 || a.cells[i].width != b.cells[i].width ||
+            a.cells[i].flags != b.cells[i].flags || a.cells[i].foreground != b.cells[i].foreground ||
+            a.cells[i].background != b.cells[i].background || a.cells[i].written != b.cells[i].written { return false }
+        i += 1
+    }
+    i = 0
+    while i < a.extents.len {
+        if a.extents[i] != b.extents[i] || a.wrapped[i] != b.wrapped[i] || a.line_ids[i] != b.line_ids[i] ||
+            a.line_offsets[i] != b.line_offsets[i] { return false }
+        i += 1
+    }
+    true
+}
+
+// Everything a later byte can read, field by field (no allocation): the
+// cursor, wrap, region, modes, tabs and charsets; both screens whole (cells,
+// extents, wraps, line lineage); the combining anchor, the last printed
+// scalar; the history's records and the line coordinate.
+fn same_state(a: vt.Vt, b: vt.Vt) -> bool {
+    if a.cursor_row != b.cursor_row || a.cursor_col != b.cursor_col || a.pending_wrap != b.pending_wrap { return false }
+    if a.region_top != b.region_top || a.region_bottom != b.region_bottom || a.active_alternate != b.active_alternate { return false }
+    if a.modes.autowrap != b.modes.autowrap || a.modes.insert != b.modes.insert || a.modes.origin != b.modes.origin { return false }
+    if a.g0 != b.g0 || a.g1 != b.g1 || a.shifted != b.shifted { return false }
+    if a.pen.flags != b.pen.flags || a.pen.foreground != b.pen.foreground || a.pen.background != b.pen.background { return false }
+    if a.combine_row != b.combine_row || a.combine_col != b.combine_col { return false }
+    if a.last_printed != b.last_printed || a.last_mark1 != b.last_mark1 || a.last_mark2 != b.last_mark2 { return false }
+    if a.history.records != b.history.records || a.history.head != b.history.head { return false }
+    if a.line_coordinate.id != b.line_coordinate.id || a.line_coordinate.offset != b.line_coordinate.offset { return false }
+    var i = 0
+    while i < a.tabs.len {
+        if a.tabs[i] != b.tabs[i] { return false }
+        i += 1
+    }
+    i = 0
+    while i < a.mode_values.len {
+        if a.mode_values[i] != b.mode_values[i] { return false }
+        i += 1
+    }
+    same_screen(a.primary, b.primary) && same_screen(a.alternate, b.alternate)
+}
+
+// Seeded streams at sizes that meet the margin often, each fed to `feed` in
+// random chunks and to `feed_reference` in the same chunks: equal after
+// every chunk. A difference is printed as `FAIL fast-equals-reference` and
+// ends the comparison. `rounds` streams at each size.
+fn runs_agree(rounds: int) -> bool {
+    var r = Rng { state: 20261117 }
+    let sizes = [1, 1, 2, 3, 7, 4, 13, 5, 20, 6]
+    var streams = 0
+    var chunks = 0
+    var k = 0
+    while k < sizes.len {
+        let cols = sizes[k]
+        let rows = sizes[k + 1]
+        var round = 0
+        while round < rounds {
+            let data = stream(mut r, rows, cols)
+            var fast = vt.new(cols, rows, 4096)
+            var slow = vt.new(cols, rows, 4096)
+            var at = 0
+            while at < data.len {
+                var end = at + 1 + next(mut r, 24)
+                if end > data.len { end = data.len }
+                vt.feed(mut fast, data[at..end])
+                vt.feed_reference(mut slow, data[at..end])
+                if !same_state(fast, slow) {
+                    print("FAIL fast-equals-reference size {cols}x{rows} round {round} chunk ending at byte {end} of {data.len}")
+                    return false
+                }
+                chunks += 1
+                at = end
+            }
+            streams += 1
+            round += 1
+        }
+        k += 2
+    }
+    print("MEASURE vt-fast-path streams={streams} chunks={chunks}")
+    true
+}
+
+fn test_runs_agree_with_the_reference() {
+    assert(runs_agree(1), "fast-equals-reference")
+}
+
+fn main() -> int {
+    test_a_text_row_takes_the_run_path()
+    test_the_margin_takes_the_per_glyph_path()
+    let args = env.args()
+    var rounds = 1
+    if args.len > 0 { rounds = args[0].to_int() else 1 }
+    if !runs_agree(rounds) { return 1 }
+    print("PASS vt-fast-path")
+    0
+}

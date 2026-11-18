@@ -51,7 +51,7 @@ width/resource/platform evidence remain separate pending measurements.
 
 | Module | Pure | Milestone | Measured today |
 |---|---|---|---|
-| `src/vt` | yes | W1 | pure screen/history/reflow, bounded events/answers, native/lupin operation rows and complete frozen corpus comparisons with named policies |
+| `src/vt` | yes | W1 | pure screen/history/reflow, bounded events/answers, native/lupin operation rows and complete frozen corpus comparisons with named policies; printable ASCII runs written without the per-byte parser, held equal to it over seeded streams in random chunks (`vt_fast_test` native, checked and lupin) |
 | `src/proto` | yes | W2 | bounded framing, payload validation, encode, assembly and ACK model (`protocol_rows`, `protocol_fuzz`) |
 | `src/layout` | yes | W3 | tabs and split trees, geometry (`rects`, `borders`, `pane_at`), every operation with named refusals, the canonical dump ([LAYOUT](LAYOUT.md)); 59 hand-written goldens and seeded properties at five sizes (`layout_native`, `layout_slice` on the checked machine and lupin, `layout_test`) |
 | `src/server` | no | W2, W3 | server: runtime directory, start lock, one wait a turn, admission limits; panes and tabs, the compositor, frame pacing (`session_rows`, `pane_rows`, `compose_rows`, `pacing_test` native, checked and lupin; docs/SERVER.md) |

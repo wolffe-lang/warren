@@ -103,6 +103,8 @@ step width-vector-build "$WOLF" build --deny-warnings src/vt_width_vector.lu -o 
 step width-vector-native python3 -I tests/vt/width_vector_rows.py --out "$root/target/vt/native-widths.bin" "$root/target/native/vt-width-vector"
 step resource-smoke-build "$WOLF" build --deny-warnings src/vt_resource_test.lu -o "$root/target/native/resource-smoke"
 step resource-smoke-native "$root/target/native/measure-child" "$root/target/native/resource-smoke"
+step vt-fast-build "$WOLF" build --deny-warnings src/vt_fast_test.lu -o "$root/target/native/vt-fast"
+step vt-fast-native "$root/target/native/vt-fast" 12
 step checked-vt python3 -I tests/vt/checked_rows.py "$WOLF"
 step checked-keys python3 -I tests/vt/checked_rows.py --out "$root/target/checked-keys" --label checked-keys "$WOLF" keys_test
 step checked-pacing python3 -I tests/vt/checked_rows.py --out "$root/target/checked-pacing" --label checked-pacing "$WOLF" pacing_test
@@ -146,7 +148,7 @@ step version-answer-lupin python3 -I tests/vt/version_answer.py "$LUPIN" run src
 # Framing/capacity rows live beside the pure members to exercise private
 # storage policy. The native default ring and smaller interpreter ledger
 # are deliberately separate entries; the interpreter cap is not increased.
-for entry in vt_grid_test vt_unicode_test vt_annotation_test vt_combining_anchor_test vt_ops_test vt_screen_state_test vt_graphics_test vt_events_test vt_dump_test vt_width_test vt_history_test vt_resize_test vt_interaction_test vt_resource_test vt_scalar_test; do
+for entry in vt_grid_test vt_unicode_test vt_annotation_test vt_combining_anchor_test vt_ops_test vt_screen_state_test vt_graphics_test vt_events_test vt_dump_test vt_width_test vt_history_test vt_resize_test vt_interaction_test vt_resource_test vt_scalar_test vt_fast_test; do
   step "$entry-lupin" "$LUPIN" run "src/$entry.lu"
 done
 for entry in cell_capacity_rows copy_rows capacity_rows history_rows history_codec_rows history_fragment_rows line_coordinate_rows history_deque_rows history_prefix_rows reflow_rows resize_properties_rows history_capacity_rows pane_capacity_rows; do
