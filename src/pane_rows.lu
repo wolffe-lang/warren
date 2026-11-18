@@ -2091,9 +2091,11 @@ fn row_mouse_focus(mut r: Rig, legacy: bool, encoding: int) -> str {
 
 fn row_mouse_tabs(mut r: Rig, legacy: bool) -> str {
     // Each pane's shell starts 300 ms late, as on a slow host, so its first
-    // prompt can come after the row has made the next tab.
+    // prompt can come after the row has made the next tab. Its prompt is not
+    // `$ `: a script's non-interactive shell drops PS1 on some hosts (macOS's
+    // /bin/sh), and the shell it starts then draws its own default.
     let late = out_file(r, "late-sh")
-    fs.write_text(late, "sleep 0.3\nexec /bin/sh\n") else |e| { return "late shell: {e}" }
+    fs.write_text(late, "sleep 0.3\nPS1='sh-3.2$ '\nexport PS1\nexec /bin/sh\n") else |e| { return "late shell: {e}" }
     let why = start_server(mut r, "/bin/sh " + late)
     if why.len > 0 { return why }
     var p = session(r, 80, 24, "b") else |e| { return "dial-{e}" }
