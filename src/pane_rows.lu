@@ -2124,8 +2124,22 @@ fn row_mouse_tabs(mut r: Rig, legacy: bool) -> str {
     while n < 9 {
         let _c = prefix(p, 99)
         n += 1
-        if !until_active(mut p, "b", "{n}", 3000) { return "tab {n}" }
-        if !client.until_line(mut p, "$", 3000) { return "no prompt in tab {n}" }
+        if !until_active(mut p, "b", "{n}", 10000) { return "tab {n}" }
+        // The prompt's arrival, not its text, which differs between hosts:
+        // any text in the tab's pane.
+        let until = now_ms() + 10000
+        var drawn = false
+        while !drawn {
+            var row = 1
+            while row <= p.image.rows - 2 {
+                if proto.row_text(p.image, row).len > 0 { drawn = true }
+                row += 1
+            }
+            if !drawn {
+                if now_ms() >= until { return "no prompt in tab {n}" }
+                if client.step(mut p, 100) < 0 { return "the connection ended in tab {n}" }
+            }
+        }
     }
     // Every late shell has written its prompt before line one is read.
     drain(mut p, 1000)
