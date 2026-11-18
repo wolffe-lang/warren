@@ -180,14 +180,15 @@ step session-rows session_rows
 # zoom and closes through key events; the frame's borders and bar are held
 # cell for cell.
 pane_rows() (
-  rows=(split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs
-    resize-all-tabs zoom too-small pane-memory pane-limit frame-golden damage-in-rect focus-bytes
-    keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode
-    session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay
-    bar-line-one zoom-mark activity-marks clock clock-tick)
-  if [ "$mode" = linux ]; then rows+=(split-close-cycles pane-cost); fi
+  # Every row in the pane rows' own default list, then the pane-count refusal
+  # (32 panes, not in that list) and, on Linux, the rows that read /proc.
   rm -rf target/prows && mkdir -p target/prows && cd target/prows
-  "$root/target/native/pane-rows" "$root/target/native/warren" "${rows[@]}"
+  rc=0
+  "$root/target/native/pane-rows" "$root/target/native/warren" || rc=1
+  rows=(pane-limit)
+  if [ "$mode" = linux ]; then rows+=(split-close-cycles pane-cost); fi
+  "$root/target/native/pane-rows" "$root/target/native/warren" "${rows[@]}" || rc=1
+  exit "$rc"
 )
 step pane-build "$WOLF" build --deny-warnings src/pane_rows.lu -o "$root/target/native/pane-rows"
 step pane-rows pane_rows

@@ -575,7 +575,9 @@ command prompts, modes held per client, INPUT and PASTE dropped outside normal
 and locked mode, and the key list drawn for one client and closed back to the
 exact frame; line one at 20, 80 and 200 columns and with nine tabs at 40, the
 zoom mark, the activity and bell marks, the clock and its minute, and (with
-/proc) the threads and resident size a pane. The client rows drive the same
+/proc) the threads and resident size a pane. The gate runs every row in the
+pane rows' default list, the mouse rows among them, then the pane-count refusal
+and, on Linux, the rows that read /proc. The client rows drive the same
 split end to end through the real client. The key table itself is held by `src/keys_test.lu` (every binding's
 step, the hint lines at 80 and 40 columns, the key list, the command line),
 natively, on the checked machine and under lupin. Differences from tmux, by ruling:
