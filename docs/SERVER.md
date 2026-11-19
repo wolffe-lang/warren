@@ -621,6 +621,11 @@ row). The emulator stamps each row's last change, its columns and the change
 before it with the pane's tick, which moves once a feed and once a resize; the
 client's shadow keeps each pane slot's gen and the tick it was composed
 through, so a reused slot, a full image or a layout change reads every cell.
+A client's window and selection change without the emulator, so opening,
+moving or closing a window, and a selection or search mark, read every cell
+too (`scroll-live-edit` in the pane rows: a line the pane wrote while the
+window looked back is drawn when the window closes, and none of its rows
+stays).
 Each frame cell is computed once an image (`src/compose_damage_test.lu`; the
 damage-limited image equals a full rescan for two clients over seeded streams
 and over every corpus stream, `src/compose_corpus_rows.lu`).

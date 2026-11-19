@@ -2463,6 +2463,31 @@ fn row_scroll_keys(mut r: Rig) -> str {
     finish(mut r, mut p)
 }
 
+// The live rows after a window: a line the pane wrote while a client looked
+// back is drawn when the client leaves scroll mode, and no row of the window
+// stays. The compositor reads a pane's cells by what its emulator changed;
+// the window changes without the emulator, so leaving it reads every cell.
+fn row_scroll_live_edit(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let at = numbered_output(mut p, 80, 1, 80)
+    if at == 0 { return "no numbered output:\n" + client.screen_text(p) }
+    let _later = client.input(p, "(sleep 2; echo live-$((40+2))) &\r")
+    let _enter = prefix(p, 91)
+    if !until_mode(mut p, "SCROLL", 3000) { return "prefix [ did not enter scroll mode: '" + mode_of(p.image) + "'" }
+    let _page = client.key(p, 0, 1, 7)
+    if !until_rect(mut p, "L45", 1, 1, 80, AREA, 3000) { return "PageUp did not look back a window" }
+    // The line is written while the window looks back.
+    drain(mut p, 2500)
+    let _q = type_keys(p, "q")
+    if !until_mode(mut p, "NORMAL", 3000) { return "q did not leave scroll mode" }
+    if !until_rect(mut p, "live-42", 1, 1, 80, AREA, 3000) { return "the line written under the window was not drawn after it:\n" + client.screen_text(p) }
+    drain(mut p, 100)
+    if client.screen_text(p).contains("L45") { return "a row of the window stayed after it closed:\n" + client.screen_text(p) }
+    finish(mut r, mut p)
+}
+
 // A program that asked for mouse reports gets the wheel as it did before.
 fn row_scroll_reporting_child(mut r: Rig) -> str {
     let why = start_server(mut r, "/bin/sh")
@@ -3014,6 +3039,7 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "scroll-wheel-sgr" { why = row_scroll_wheel(mut r, false) }
     else if name == "scroll-wheel-legacy" { why = row_scroll_wheel(mut r, true) }
     else if name == "scroll-keys" { why = row_scroll_keys(mut r) }
+    else if name == "scroll-live-edit" { why = row_scroll_live_edit(mut r) }
     else if name == "scroll-reporting-child" { why = row_scroll_reporting_child(mut r) }
     else if name == "scroll-two-clients" { why = row_scroll_two_clients(mut r) }
     else if name == "scroll-alternate" { why = row_scroll_alternate(mut r) }
@@ -3086,7 +3112,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-reporting-child scroll-two-clients scroll-alternate select-drag-sgr select-drag-legacy select-reporting-child select-origin-clamp select-two-clients select-in-scroll paste-bracketed clip-copy clip-program-default clip-program-config config-refused search-older search-repeat search-newer search-live search-wrapped search-not-found search-cancel mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
+    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-live-edit scroll-reporting-child scroll-two-clients scroll-alternate select-drag-sgr select-drag-legacy select-reporting-child select-origin-clamp select-two-clients select-in-scroll paste-bracketed clip-copy clip-program-default clip-program-config config-refused search-older search-repeat search-newer search-live search-wrapped search-not-found search-cancel mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
         (mut x).push(n)
     }
     x
