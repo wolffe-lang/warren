@@ -81,6 +81,14 @@ RETRY_PAUSE_SECONDS = 1.0
 # it is what the bound is for. A job makes six checks (cases, mutations, the
 # census, fuzz and recording digests, the fresh drive), so at p = 2.5% a run is
 # falsely red at most 6 in 10,000 times; most runners retry nothing at all.
+#
+# Those counts were taken while the X server reset between terminals (see
+# Display): every one of those retries was on a dump's second pass, launched
+# the moment the first pass's terminal left, and a runner's rate was its
+# timing, none on most and one launch in twenty on some (82 of 1,624, over the
+# bound, on a display that was not failing). With the server kept, the same
+# launches retry nothing, and the bound stands as headroom for a display that
+# does fail.
 RETRY_P = 0.025
 RETRY_TAIL = 1e-4
 RETRY_FLOOR = 2
