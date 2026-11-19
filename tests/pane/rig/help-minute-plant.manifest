@@ -1,0 +1,7 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# compares the frame after the key list with the frame before in every cell,
+# the clock's included.
+floor 15
+rig help-minute-plant-step.sh sha256=d0cf1654e4bd465eaafa5c74dac94ff550750e4ea69007f7a44ee944c3fa8a68
+step help-minute-plant-build tools=python3,cc script=help-minute-plant-step.sh -- build
+step help-overlay-minute needs=help-minute-plant-build tools=python3 script=help-minute-plant-step.sh -- rows

@@ -21,6 +21,7 @@ def main():
         (PANE_RIG, 'w3-plant.manifest', ['w3-plant-build', 'keys-reach-focused']),
         (PANE_RIG, 'w3-modes-plant.manifest', ['w3-modes-plant-build', 'hint-line']),
         (PANE_RIG, 'w3-bar-plant.manifest', ['w3-bar-plant-build', 'activity-marks']),
+        (PANE_RIG, 'help-minute-plant.manifest', ['help-minute-plant-build', 'help-overlay-minute']),
         (CLIENT_RIG, 'w6-window-plant.manifest', ['w6-window-plant-build', 'zero-window']),
         (RIG, 'oracle-harness.manifest', ['oracle-harness-unit', 'oracle-harness-reference']),
         (RIG, 'oracle-retry-plant.manifest', ['signal-retry']),
@@ -51,6 +52,8 @@ def main():
     assert 'pane-rows" "$root/target/native/warren" hint-line confirm-close' in modes_plant
     bar_plant = (PANE_RIG / 'w3-bar-plant-step.sh').read_text()
     assert 'pane-rows" "$root/target/native/warren" activity-marks zoom-mark' in bar_plant
+    minute_plant = (PANE_RIG / 'help-minute-plant-step.sh').read_text()
+    assert 'pane-rows" "$root/target/native/warren" help-overlay-minute help-overlay' in minute_plant
     window_plant = (CLIENT_RIG / 'w6-window-plant-step.sh').read_text()
     assert 'client-rows" "$root/target/native/warren" zero-window window-too-large' in window_plant
     harness = (RIG / 'oracle-harness-step.sh').read_text()
