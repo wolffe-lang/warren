@@ -128,8 +128,11 @@ class Display:
             self.proc, self.name = None, os.environ['WARREN_ORACLE_DISPLAY']
             return self
         read_fd, write_fd = os.pipe()
+        # -noreset: each terminal is this server's only client, and a server
+        # that resets when its last client leaves refuses a client that
+        # connects meanwhile ("Can't open display"), as the next pass does.
         self.proc = subprocess.Popen(
-            ['Xvfb', '-displayfd', str(write_fd), '-screen', '0', '2560x1600x24', '-nolisten', 'tcp'],
+            ['Xvfb', '-displayfd', str(write_fd), '-screen', '0', '2560x1600x24', '-nolisten', 'tcp', '-noreset'],
             pass_fds=[write_fd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         os.close(write_fd)
         with os.fdopen(read_fd) as stream:
