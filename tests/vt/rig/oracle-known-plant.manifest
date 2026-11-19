@@ -1,5 +1,5 @@
 # Use the recorder's --base and --plant mode on a plant branch whose one hunk
 # lets a known seed that passes go quiet instead of failing until it leaves the list.
 floor 15
-rig oracle-harness-step.sh sha256=d9317f32171099e35027392bc11797ce1a660cb5fe95fbcfad66789f9329acea
+rig oracle-harness-step.sh sha256=77e28671e662dc36dcf42e7d6d68750f3f22349b3b5eead62ab611891b513860
 step known-fixed tools=python3 script=oracle-harness-step.sh -- known-plant

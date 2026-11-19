@@ -28,7 +28,8 @@ def main():
         (RIG, 'oracle-bound-plant.manifest', ['retry-bound']),
         (RIG, 'oracle-nightly-plant.manifest', ['nightly-limit']),
         (RIG, 'oracle-known-plant.manifest', ['known-fixed']),
-        (RIG, 'oracle-jump-plant.manifest', ['jump-scroll-off'])):
+        (RIG, 'oracle-jump-plant.manifest', ['jump-scroll-off']),
+        (RIG, 'oracle-reset-plant.manifest', ['display-noreset'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
@@ -61,6 +62,7 @@ def main():
     assert "printf 'FAIL retry-bound " in harness and 'rate-bound-ordinary-runner' in harness
     assert "printf 'FAIL nightly-limit " in harness and 'test_nightly_fits_its_limit' in harness
     assert "printf 'FAIL known-fixed " in harness and 'fresh-known known-passes' in harness
+    assert "printf 'FAIL display-noreset " in harness and 'display-reset server-keeps-its-state' in harness
     assert "printf 'FAIL jump-scroll-off " in harness and 'jump_scroll_rows.py' in harness
     assert '--case fresh-0901 --case fresh-2265 --case fresh-2536' in harness
     assert 'tests/vt/fresh_fuzz.py --profile pull-request' in harness and 'exec bash tools/gate unit' in harness
