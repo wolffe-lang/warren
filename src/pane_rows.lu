@@ -1655,7 +1655,9 @@ fn row_input_in_modes(mut r: Rig) -> str {
 
 // The key list is drawn for one client only, over the tab area, scrolls
 // with j and k, and closes back to the exact frame it covered.
-fn row_help_overlay(mut r: Rig) -> str {
+// `across_minute` keeps the key list open until the bar's clock has moved, so
+// the frame after Esc is compared with one taken in the minute before.
+fn row_help_overlay(mut r: Rig, across_minute: bool) -> str {
     let why = start_server(mut r, "/bin/cat")
     if why.len > 0 { return why }
     var a = attach(r, 80, 24, "h", 1) else |e| { return "dial-{e}" }
@@ -1677,6 +1679,16 @@ fn row_help_overlay(mut r: Rig) -> str {
     if !until_rect_line(mut a, "  NORMAL   M-\\        split-right", 1, 1, 80, 1, 3000) { return "j: '" + cells(a.image, 1, 1, 80) + "'" }
     let _k = client.key(a, 0, 0, 107)
     if !until_rect_line(mut a, first, 1, 1, 80, 1, 3000) { return "k: '" + cells(a.image, 1, 1, 80) + "'" }
+    if across_minute {
+        let was = clock_of(before)
+        let until = now_ms() + 61500
+        while clock_of(a.image) == was && now_ms() < until {
+            let k = client.step(mut a, 100)
+            if k < 0 { return "the connection ended under the key list" }
+        }
+        if clock_of(a.image) == was { return "the clock still reads '{was}' after a minute" }
+        print("MEASURE help-overlay-minute clock-before={was} clock-after=" + clock_of(a.image))
+    }
     let _e = esc(a)
     if !until_mode(mut a, "NORMAL", 3000) { return "Esc did not close" }
     drain(mut a, 300)
@@ -3099,7 +3111,8 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "command-mode" { why = row_command_mode(mut r) }
     else if name == "modes-per-client" { why = row_modes_per_client(mut r) }
     else if name == "input-in-modes" { why = row_input_in_modes(mut r) }
-    else if name == "help-overlay" { why = row_help_overlay(mut r) }
+    else if name == "help-overlay" { why = row_help_overlay(mut r, false) }
+    else if name == "help-overlay-minute" { why = row_help_overlay(mut r, true) }
     else if name == "bar-line-one" { why = row_bar_line_one(mut r) }
     else if name == "zoom-mark" { why = row_zoom_mark(mut r) }
     else if name == "activity-marks" { why = row_activity_marks(mut r) }
@@ -3112,7 +3125,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-live-edit scroll-reporting-child scroll-two-clients scroll-alternate select-drag-sgr select-drag-legacy select-reporting-child select-origin-clamp select-two-clients select-in-scroll paste-bracketed clip-copy clip-program-default clip-program-config config-refused search-older search-repeat search-newer search-live search-wrapped search-not-found search-cancel mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
+    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-live-edit scroll-reporting-child scroll-two-clients scroll-alternate select-drag-sgr select-drag-legacy select-reporting-child select-origin-clamp select-two-clients select-in-scroll paste-bracketed clip-copy clip-program-default clip-program-config config-refused search-older search-repeat search-newer search-live search-wrapped search-not-found search-cancel mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay help-overlay-minute bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
         (mut x).push(n)
     }
     x
