@@ -6,8 +6,9 @@
 # every gate step that launches the pinned reference terminal, through the
 # harness's launch and retry; `plant` and `bound-plant` run the display retry
 # rows, `nightly-plant` the tier tests, `known-plant` the fresh drive's
-# known-failure rows and `jump-plant` the jump-scroll rows (which launch the
-# pinned reference terminal), on a plant and name the row it must turn red.
+# known-failure rows, `jump-plant` the jump-scroll rows and `reset-plant` the
+# display-reset rows (both launch the pinned reference terminal), on a plant
+# and name the row it must turn red.
 set -euo pipefail
 root=$PWD
 export HOME="$root/target/home" TMPDIR="$root/target/tmp" SHELL=/bin/sh
@@ -33,6 +34,7 @@ case "${1:-}" in
     printf 'END %s exit=%s secs=%s\n' "$name" "$one" "$((SECONDS-start))"
     [ "$one" -eq 0 ] || rc=1
   }
+  run display-reset-rows python3 -I tests/vt/display_reset_rows.py
   run case-streams python3 -I tests/vt/cases.py "$work/cases"
   run oracle-cases python3 -I tools/oracle/run.py cases "$work/cases" --expected tests/vt/expected --out "$work/cases-out"
   run jump-scroll-rows python3 -I tests/vt/jump_scroll_rows.py
@@ -89,6 +91,16 @@ case "${1:-}" in
   sed 's/^/  /' target/gate/plant-jump-rows.out
   if grep -q '^FAIL jump-scroll erase-on-a-scroll-made-row-counts-written' target/gate/plant-jump-rows.out; then
     printf 'FAIL jump-scroll-off an erase on a scroll-made row did not count its cells as written\n'
+  fi
+  exit "$rc"
+  ;;
+ reset-plant)
+  rc=0
+  export LC_ALL=C.UTF-8
+  python3 -I tests/vt/display_reset_rows.py > target/gate/plant-reset-rows.out 2>&1 || rc=$?
+  sed 's/^/  /' target/gate/plant-reset-rows.out
+  if grep -q '^FAIL display-reset server-keeps-its-state' target/gate/plant-reset-rows.out; then
+    printf 'FAIL display-noreset the oracle started its X server without -noreset\n'
   fi
   exit "$rc"
   ;;
