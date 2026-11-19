@@ -1655,6 +1655,20 @@ fn row_input_in_modes(mut r: Rig) -> str {
 
 // The key list is drawn for one client only, over the tab area, scrolls
 // with j and k, and closes back to the exact frame it covered.
+/// The cells that differ between two frames, the clock's five digits and
+/// colon (HH:MM on line one) left out.
+fn differing_but_clock(before: proto.Image, after: proto.Image) -> int {
+    if before.cols != after.cols || before.rows != after.rows || after.cols < 40 { return proto.differing(before, after) }
+    var same = copy after
+    let at = (after.rows - 2) * after.cols + after.cols - 6
+    var k = 0
+    while k < 5 {
+        same.base[at + k] = before.base[at + k]
+        k += 1
+    }
+    proto.differing(before, same)
+}
+
 // `across_minute` keeps the key list open until the bar's clock has moved, so
 // the frame after Esc is compared with one taken in the minute before.
 fn row_help_overlay(mut r: Rig, across_minute: bool) -> str {
@@ -1692,8 +1706,18 @@ fn row_help_overlay(mut r: Rig, across_minute: bool) -> str {
     let _e = esc(a)
     if !until_mode(mut a, "NORMAL", 3000) { return "Esc did not close" }
     drain(mut a, 300)
-    let d = proto.differing(before, a.image)
+    // The clock belongs to the minute, not to the key list: a take that
+    // crosses a minute sees it move. Every other cell is held to the frame
+    // before, and the clock's own cells to the host's time.
+    let d = differing_but_clock(before, a.image)
     if d != 0 { return "{d} cells differ from the frame before the key list" }
+    let cw = clock_cells_are(a.image)
+    if cw.len > 0 { return "clock " + cw }
+    let s = time.unix_ms() / 1000
+    let shown = clock_of(a.image)
+    if shown != local_hhmm(s) && shown != local_hhmm(s - 60) {
+        return "the clock reads '{shown}' after the key list, the host " + local_hhmm(s)
+    }
     client.hang_up(mut b)
     finish(mut r, mut a)
 }
