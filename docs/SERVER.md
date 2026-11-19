@@ -669,7 +669,8 @@ bytes, the hint lines, the prefix sent twice and locked mode reaching the pane
 (`--read-bytes`), the four sticky modes, a close that asks, the rename and
 command prompts, modes held per client, INPUT and PASTE dropped outside normal
 and locked mode, and the key list drawn for one client and closed back to the
-exact frame; line one at 20, 80 and 200 columns and with nine tabs at 40, the
+exact frame, across a minute too (every cell but the clock's, which reads the
+host's time); line one at 20, 80 and 200 columns and with nine tabs at 40, the
 zoom mark, the activity and bell marks, the clock and its minute, and (with
 /proc) the threads and resident size a pane. The gate runs every row in the
 pane rows' default list, the mouse rows among them, then the pane-count refusal
