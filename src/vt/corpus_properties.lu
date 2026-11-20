@@ -73,8 +73,15 @@ fn logical_content(pane: Vt) -> List[int] {
     // Lines after the last content are not text. Background paint alone marks
     // such a row used above, and a resize lays paint only on the row it sits
     // on, clipped at the new width (paint is not content), so R1 compares the
-    // lines up to the last content scalar, never the separators after it.
-    while out.len > 0 && out[out.len - 1] == 0 - 1 {
+    // lines up to the last content scalar, never the separators after it. The
+    // list is walked by its shape: a separator is one -1, a scalar five values
+    // starting with 0 (its colours may be -1 too).
+    var last = 0
+    var i = 0
+    while i < out.len {
+        if out[i] == 0 - 1 { i += 1 } else { i += 5; last = i }
+    }
+    while out.len > last {
         let _gone = (mut out).pop() else { break }
     }
     out
