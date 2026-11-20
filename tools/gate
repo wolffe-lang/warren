@@ -129,6 +129,7 @@ step corpus-chunking-native python3 -I tests/vt/chunking_suite.py "$root/target/
 step corpus-properties-build "$WOLF" build --deny-warnings src/vt/corpus_properties.lu -o "$root/target/native/corpus-properties"
 step corpus-properties-framing python3 -I tests/vt/corpus_property_rows.py "$root/target/native/corpus-properties" "$root/target/native/warren"
 step corpus-properties-native python3 -I tests/vt/corpus_properties.py "$root/target/native/corpus-properties" "$root/target/native/warren"
+step paint-properties-rows python3 -I tests/vt/paint_properties_rows.py "$root/target/native/corpus-properties"
 step modules-run modules_run "$root/target/native/warren"
 step wolf-test "$WOLF" test --deny-warnings src
 step lupin-pure "$LUPIN" run src/pure_test.lu
