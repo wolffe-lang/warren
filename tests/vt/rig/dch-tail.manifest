@@ -1,0 +1,8 @@
+# A take for D15, the reference's DCH second-half blank: run the recorder
+# inside the pinned oracle image from a clean committed checkout, with
+# --preflight running tests/layout/rig/preflight-inside.sh. The whole Linux
+# gate, then the two seeds the known list gave up, under the nightly profile.
+floor 35
+rig dch-tail-step.sh sha256=b088e3e2b9327cd5d872a42b0a613afc9261aea7d1b7a528fb98e5a93944d86b
+step gate-linux tools=bash,python3,cc,git,xterm,Xvfb,tmux script=dch-tail-step.sh -- gate-linux
+step dch-tail-seeds tools=python3,xterm,Xvfb script=dch-tail-step.sh -- seeds

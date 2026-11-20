@@ -1,0 +1,6 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# stops splitting the triggering DCH in the reference's input.
+floor 15
+rig dch-tail-step.sh sha256=b088e3e2b9327cd5d872a42b0a613afc9261aea7d1b7a528fb98e5a93944d86b
+step dch-tail-plant-build tools=python3 script=dch-tail-step.sh -- build
+step dch-tail-seeds-pass needs=dch-tail-plant-build tools=python3,xterm,Xvfb script=dch-tail-step.sh -- plant

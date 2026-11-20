@@ -35,7 +35,9 @@ def main():
         (RIG, 'paint-properties.manifest', ['gate-linux', 'paint-known-cases']),
         (RIG, 'paint-properties-plant.manifest', ['paint-properties-plant-build', 'painted-row-below-cursor-4397']),
         (RIG, 'history-ring.manifest', ['gate-linux']),
-        (RIG, 'history-ring-plant.manifest', ['history-ring-plant-build', 'pane-first-resize-keeps-the-ring'])):
+        (RIG, 'history-ring-plant.manifest', ['history-ring-plant-build', 'pane-first-resize-keeps-the-ring']),
+        (RIG, 'dch-tail.manifest', ['gate-linux', 'dch-tail-seeds']),
+        (RIG, 'dch-tail-plant.manifest', ['dch-tail-plant-build', 'dch-tail-seeds-pass'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
@@ -80,6 +82,9 @@ def main():
     assert 'tests/vt/paint_properties_rows.py' in paint and 'fresh_fuzz.py --profile nightly' in paint
     ring = (RIG / 'history-ring-step.sh').read_text()
     assert 'exec bash tools/gate linux' in ring and "FAIL pane-first-resize-keeps-the-ring " in ring
+    dch = (RIG / 'dch-tail-step.sh').read_text()
+    assert 'exec bash tools/gate linux' in dch and 'dch-tail-seeds.json' in dch
+    assert "print('FAIL dch-tail-seeds-pass " in dch and 'fresh_fuzz.py --profile nightly' in dch
     linux = (RIG / 'w1-step.sh').read_text()
     assert 'tools/gate linux' in linux and 'vt_resource_bench.lu' in linux
     assert 'width_sweep.py' in linux and '--suite recordings' in linux
