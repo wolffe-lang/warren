@@ -1,9 +1,4 @@
 {
-  "fresh-1164": {"issue": 31, "failures": ["R1-R3-R8"]},
-  "fresh-1726": {"issue": 31, "failures": ["R1-R3-R8"]},
-  "fresh-2645": {"issue": 31, "failures": ["R1-R3-R8"]},
   "fresh-2851": {"issue": 33, "failures": ["unclassified-complete-frame"]},
-  "fresh-4397": {"issue": 31, "failures": ["R1-R3-R8"]},
-  "fresh-4908": {"issue": 31, "failures": ["R1-R3-R8"]},
   "fresh-4971": {"issue": 33, "failures": ["unclassified-complete-frame"]}
 }
