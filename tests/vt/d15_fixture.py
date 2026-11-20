@@ -38,7 +38,9 @@ def written(cols, cells, extent, vacated, pen='-', cursor=1, alternate=False):
     frame['extents'][0] = extent
     frame['cursor']['col'] = cursor
     if alternate:
-        frame['modes']['alternate-screen-1049'] = 1
+        # Modes 47, 1047 and 1049 report the one alternate screen.
+        for mode in ('alternate-screen-47', 'alternate-screen-1047', 'alternate-screen-1049'):
+            frame['modes'][mode] = 1
     return frame
 
 
