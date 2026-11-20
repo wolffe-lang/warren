@@ -150,8 +150,8 @@ measure a one-row region. Those parser projections are not whole-screen
 comparisons. Current whole-frame comparisons cover eight cases, 151 census
 streams and five recordings, plus the frozen 32-seed baseline. Named divergences
 and source-triggered report limits have complete-frame fixtures; repaired D9/D13
-reference inputs and D10's failed raw reports never become candidate-derived
-goldens. The Linux drive records 200 requested-4KiB streams with bytewise/random
+and split D15 reference inputs and D10's failed raw reports never become
+candidate-derived goldens. The Linux drive records 200 requested-4KiB streams with bytewise/random
 P2 and primary content/rendition/resize-path checks; the nightly profile uses
 5000 seeds. Both profiles' step limits and drive deadlines are sized from the
 measured pace (`ci/tiers.py`). A seed whose failure is a known defect is listed
