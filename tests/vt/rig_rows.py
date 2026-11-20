@@ -31,7 +31,9 @@ def main():
         (RIG, 'oracle-jump-plant.manifest', ['jump-scroll-off']),
         (RIG, 'oracle-reset-plant.manifest', ['display-noreset']),
         (RIG, 'wide-pending.manifest', ['gate-linux', 'wide-known-cases']),
-        (RIG, 'wide-pending-plant.manifest', ['wide-pending-plant-build', 'wide-pending-off-wide-pending-wide'])):
+        (RIG, 'wide-pending-plant.manifest', ['wide-pending-plant-build', 'wide-pending-off-wide-pending-wide']),
+        (RIG, 'paint-properties.manifest', ['gate-linux', 'paint-known-cases']),
+        (RIG, 'paint-properties-plant.manifest', ['paint-properties-plant-build', 'painted-row-below-cursor-4397'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
@@ -71,6 +73,9 @@ def main():
     wide = (RIG / 'wide-pending-step.sh').read_text()
     assert 'exec bash tools/gate linux' in wide and 'wide-pending-seeds.json' in wide
     assert 'tests/vt/wide_pending_rows.py --out' in wide and 'fresh_fuzz.py --profile nightly' in wide
+    paint = (RIG / 'paint-properties-step.sh').read_text()
+    assert 'exec bash tools/gate linux' in paint and 'paint-properties-seeds.json' in paint
+    assert 'tests/vt/paint_properties_rows.py' in paint and 'fresh_fuzz.py --profile nightly' in paint
     linux = (RIG / 'w1-step.sh').read_text()
     assert 'tools/gate linux' in linux and 'vt_resource_bench.lu' in linux
     assert 'width_sweep.py' in linux and '--suite recordings' in linux

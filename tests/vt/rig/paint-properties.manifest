@@ -1,0 +1,8 @@
+# A take for background paint below the cursor and the resize properties: run
+# the recorder inside the pinned oracle image from a clean committed checkout,
+# with --preflight running tests/layout/rig/preflight-inside.sh. The whole
+# Linux gate, then the nightly known list's seeds and the five it gave up.
+floor 35
+rig paint-properties-step.sh sha256=62051785f2a9a20fa6879d0f402c6c1995347443a260089f2cbbb5039797baab
+step gate-linux tools=bash,python3,cc,git,xterm,Xvfb,tmux script=paint-properties-step.sh -- gate-linux
+step paint-known-cases tools=python3,xterm,Xvfb script=paint-properties-step.sh -- known

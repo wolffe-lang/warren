@@ -1,0 +1,6 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# compares the trailing lines after the last content again.
+floor 15
+rig paint-properties-step.sh sha256=62051785f2a9a20fa6879d0f402c6c1995347443a260089f2cbbb5039797baab
+step paint-properties-plant-build tools=python3 script=paint-properties-step.sh -- build
+step painted-row-below-cursor-4397 needs=paint-properties-plant-build tools=python3 script=paint-properties-step.sh -- plant
