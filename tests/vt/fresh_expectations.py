@@ -12,6 +12,8 @@ from repair_background_fixture import repair as repair_background
 from legacy_black_fixture import repair as repair_legacy
 from report_fixture import controls, tab_operations, column_one
 from report_expectations import parts, foreground, replace_foreground, with_tab_one
+from erase_extent_fixture import trace
+from dch_tail_fixture import repair as split_dch
 
 
 def d9_triggers(data):
@@ -93,6 +95,37 @@ def legacy_pair(data, original, repaired):
     differences = screen.compare(expected, repaired)
     assert not differences, ('D13 paired reference changed another field', differences[:20])
     return expected, {'source_edits': edits, 'cells': cells}
+
+
+def dch_pair(data, original, repaired):
+    """D15: where the reference on the split input keeps a cell that the
+    reference on the original input blanked. Each such cell needs an observable
+    source trigger, at most one cell a trigger; the blank is narrow and so is
+    the kept cell; a row's extent may grow only to a kept cell's column."""
+    cols, rows = original['size']
+    _, edits = split_dch(data, cols, rows)
+    found = [item for item in trace(data, cols, rows)['dch_tail'] if item['observable']]
+    expected = copy.deepcopy(original)
+    cells = []
+    assert original['size'] == repaired['size']
+    for r, row in enumerate(original['rows']):
+        for c, cell in enumerate(row):
+            old, new = screen.normalise(cell), screen.normalise(repaired['rows'][r][c])
+            if old != new:
+                assert edits and found, 'D15 change without its source DCH trigger'
+                assert old[0] == 1 and old[1] == 'U+0020', 'D15 reference cell is not a narrow blank'
+                assert new[0] == 1, 'D15 kept cell is not narrow'
+                cells.append([r + 1, c + 1, cell, repaired['rows'][r][c]])
+                expected['rows'][r][c] = copy.deepcopy(repaired['rows'][r][c])
+    assert len(cells) <= len(found), 'D15 changed more cells than it has triggers'
+    for r, (old, new) in enumerate(zip(original['extents'], repaired['extents']), 1):
+        if old != new:
+            kept = [col for row, col, _, _ in cells if row == r]
+            assert old < new and new in kept, 'D15 extent change outside a kept cell'
+            expected['extents'][r - 1] = new
+    differences = screen.compare(expected, repaired)
+    assert not differences, ('D15 paired reference changed another field', differences[:20])
+    return expected, {'triggers': found, 'edits': edits, 'cells': cells}
 
 
 def measured_tabs(data, reference, record):
