@@ -119,6 +119,7 @@ step census-native python3 -I tests/vt/compare_suite.py --suite census "$root/ta
 step recordings-native python3 -I tests/vt/compare_suite.py --suite recordings "$root/target/native/warren"
 step fuzz-baseline-native python3 -I tests/vt/compare_suite.py --suite fuzz-baseline "$root/target/native/warren"
 step d9-original-repaired-native python3 -I tests/vt/compare_d9.py "$root/target/native/warren"
+step d15-frames-native python3 -I tests/vt/compare_d15.py "$root/target/native/warren"
 step combining-extent-native python3 -I tests/vt/combining_extent_rows.py "$root/target/native/warren"
 step combining-frames-native python3 -I tests/vt/compare_combining.py "$root/target/native/warren"
 step combine-anchor-frames-native python3 -I tests/vt/compare_combine_anchor.py "$root/target/native/warren"
@@ -146,6 +147,7 @@ step combine-anchor-frames-lupin python3 -I tests/vt/compare_combine_anchor.py "
 step erase-reflow-contract-lupin python3 -I tests/vt/compare_erase_reflow.py "$LUPIN" run src/warren.lu
 step annotation-frames-lupin python3 -I tests/vt/compare_annotations.py "$LUPIN" run src/warren.lu
 step erase-extent-frames-lupin python3 -I tests/vt/compare_erase_extents.py "$LUPIN" run src/warren.lu
+step d15-frames-lupin python3 -I tests/vt/compare_d15.py "$LUPIN" run src/warren.lu
 step census-lupin python3 -I tests/vt/compare_suite.py --suite census --observer-timeout 600 "$LUPIN" run src/warren.lu
 step answer-build "$WOLF" build --deny-warnings src/vt_answers_test.lu -o "$root/target/native/vt-answers"
 step version-answer-native python3 -I tests/vt/version_answer.py "$root/target/native/vt-answers"
