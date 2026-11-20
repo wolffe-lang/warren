@@ -142,7 +142,7 @@ class Display:
         # resets when its last client leaves. The next pass connects just
         # then; the hosted retries ("Can't open display") were all on it.
         self.proc = subprocess.Popen(
-            ['Xvfb', '-displayfd', str(write_fd), '-screen', '0', '2560x1600x24', '-nolisten', 'tcp', '-noreset'],
+            ['Xvfb', '-displayfd', str(write_fd), '-screen', '0', '2560x1600x24', '-nolisten', 'tcp'],
             pass_fds=[write_fd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         os.close(write_fd)
         with os.fdopen(read_fd) as stream:
