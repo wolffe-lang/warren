@@ -407,7 +407,9 @@ history header or wire encoding.
 
 - **R1 content is kept.** On the primary screen, a resize changes no line's
   content, except that whole oldest fragments may leave scrollback to stay
-  under the cap. Nothing is cut at the right edge.
+  under the cap. Nothing is cut at the right edge. Background-only paint is
+  not content: it stays on the row it sits on and is clipped at the new
+  width, so lines after the last content are not compared (warren#31).
 - **R2 the cursor keeps its place.** The cursor stays on the same cell of
   the same line, or, when it sat past the content, the same distance past it,
   clamped to the new width. If that logical cell lies outside the visible
