@@ -83,12 +83,14 @@ RETRY_PAUSE_SECONDS = 1.0
 # falsely red at most 6 in 10,000 times; most runners retry nothing at all.
 #
 # Those counts were taken while the X server reset between terminals (see
-# Display): every one of those retries was on a dump's second pass, launched
-# the moment the first pass's terminal left, and a runner's rate was its
-# timing, none on most and one launch in twenty on some (82 of 1,624, over the
-# bound, on a display that was not failing). With the server kept, the same
-# launches retry nothing, and the bound stands as headroom for a display that
-# does fail.
+# Display). Every retry in the hosted logs read (264, over 20 jobs) was on a
+# dump's second pass, launched the moment the first pass's terminal left, and
+# a runner's rate was its own: none on most, one launch in twenty on some (82
+# of 1,624, over the bound). That points at the reset, which is now off; it
+# was not reproduced off the hosted runners, where back-to-back launches
+# retried nothing with the reset or without it. Whether the hosted counts
+# fall to none is to be read from the runs after this change, and the rate
+# measured again then. Until then the bound stands as it was.
 RETRY_P = 0.025
 RETRY_TAIL = 1e-4
 RETRY_FLOOR = 2
@@ -137,8 +139,8 @@ class Display:
             return self
         read_fd, write_fd = os.pipe()
         # -noreset: each terminal is this server's only client, and a server
-        # that resets when its last client leaves refuses a client that
-        # connects meanwhile ("Can't open display"), as the next pass does.
+        # resets when its last client leaves. The next pass connects just
+        # then; the hosted retries ("Can't open display") were all on it.
         self.proc = subprocess.Popen(
             ['Xvfb', '-displayfd', str(write_fd), '-screen', '0', '2560x1600x24', '-nolisten', 'tcp', '-noreset'],
             pass_fds=[write_fd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
