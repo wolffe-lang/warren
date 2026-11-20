@@ -83,6 +83,7 @@ step observer-deadline-rows python3 -I tests/vt/observer_rows.py
 step display-retry-rows python3 -I tests/vt/display_retry_rows.py
 step display-reset-unit python3 -I tests/vt/display_reset_rows.py --unit
 step print-parse-rows python3 -I tests/vt/print_parse_rows.py
+step wide-pending-trace-rows python3 -I tests/vt/wide_pending_trace_rows.py
 step tier-planner python3 -I ci/tiers-test.py
 step harness-mutations python3 -I tools/oracle/run.py selftest tests/vt/expected/*.screen
 step fuzz-generator fuzz_generator
@@ -149,7 +150,7 @@ step version-answer-lupin python3 -I tests/vt/version_answer.py "$LUPIN" run src
 # Framing/capacity rows live beside the pure members to exercise private
 # storage policy. The native default ring and smaller interpreter ledger
 # are deliberately separate entries; the interpreter cap is not increased.
-for entry in vt_grid_test vt_unicode_test vt_annotation_test vt_combining_anchor_test vt_ops_test vt_screen_state_test vt_graphics_test vt_events_test vt_dump_test vt_width_test vt_history_test vt_resize_test vt_interaction_test vt_resource_test vt_scalar_test vt_fast_test; do
+for entry in vt_grid_test vt_unicode_test vt_annotation_test vt_combining_anchor_test vt_ops_test vt_screen_state_test vt_graphics_test vt_events_test vt_dump_test vt_width_test vt_history_test vt_resize_test vt_interaction_test vt_resource_test vt_scalar_test vt_fast_test vt_wide_pending_test; do
   step "$entry-lupin" "$LUPIN" run "src/$entry.lu"
 done
 for entry in cell_capacity_rows copy_rows capacity_rows history_rows history_codec_rows history_fragment_rows line_coordinate_rows history_deque_rows history_prefix_rows reflow_rows resize_properties_rows history_capacity_rows pane_capacity_rows; do
@@ -230,6 +231,10 @@ step fuzz-streams python3 -I tools/corpus/fuzz.py --digests 32 2048 --dir "$work
 step oracle-fuzz python3 -I tools/oracle/run.py digests "$work/fuzz" --out "$work/fuzz-out" --manifest tests/corpus/fuzz-screens.sha256
 step oracle-corpus python3 -I tools/oracle/run.py digests tests/corpus --out "$work/corpus-out" --manifest tests/corpus/recording-screens.sha256
 step tmux-rows python3 -I tools/session/tmux_rows.py --cases "$work/cases" --expected tests/vt/expected --out "$root/target/tmux"
+# A wide scalar that cannot fit in the last column with autowrap off, against
+# the reference live (warren#28), natively and under lupin.
+step wide-pending-rows-native python3 -I tests/vt/wide_pending_rows.py "$root/target/native/warren"
+step wide-pending-rows-lupin python3 -I tests/vt/wide_pending_rows.py "$LUPIN" run src/warren.lu
 step fresh-fuzz-native python3 -I tests/vt/fresh_fuzz.py --profile "${WARREN_FUZZ_PROFILE:-pull-request}" --out "$work/fresh-fuzz" "$root/target/native/warren" "$root/target/native/corpus-properties"
 # Three nightly seeds whose wide-character break blanks the reference rendered
 # differently with jump scroll on (warren#30): pinned so it stays proven.
