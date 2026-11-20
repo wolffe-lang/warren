@@ -1,0 +1,8 @@
+# A take for a wide scalar that cannot fit with autowrap off: run the recorder
+# inside the pinned oracle image from a clean committed checkout, with
+# --preflight running tests/layout/rig/preflight-inside.sh. The whole Linux
+# gate, then the nightly known list's seeds and the twenty-one it gave up.
+floor 35
+rig wide-pending-step.sh sha256=f776a817af465829ce8fb1dc61eb961413cfe00da67fd16bc4bf09f3506b3807
+step gate-linux tools=bash,python3,cc,git,xterm,Xvfb,tmux script=wide-pending-step.sh -- gate-linux
+step wide-known-cases tools=python3,xterm,Xvfb script=wide-pending-step.sh -- known

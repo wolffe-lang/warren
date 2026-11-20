@@ -29,7 +29,9 @@ def main():
         (RIG, 'oracle-nightly-plant.manifest', ['nightly-limit']),
         (RIG, 'oracle-known-plant.manifest', ['known-fixed']),
         (RIG, 'oracle-jump-plant.manifest', ['jump-scroll-off']),
-        (RIG, 'oracle-reset-plant.manifest', ['display-noreset'])):
+        (RIG, 'oracle-reset-plant.manifest', ['display-noreset']),
+        (RIG, 'wide-pending.manifest', ['gate-linux', 'wide-known-cases']),
+        (RIG, 'wide-pending-plant.manifest', ['wide-pending-plant-build', 'wide-pending-off-wide-pending-wide'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
@@ -66,6 +68,9 @@ def main():
     assert "printf 'FAIL jump-scroll-off " in harness and 'jump_scroll_rows.py' in harness
     assert '--case fresh-0901 --case fresh-2265 --case fresh-2536' in harness
     assert 'tests/vt/fresh_fuzz.py --profile pull-request' in harness and 'exec bash tools/gate unit' in harness
+    wide = (RIG / 'wide-pending-step.sh').read_text()
+    assert 'exec bash tools/gate linux' in wide and 'wide-pending-seeds.json' in wide
+    assert 'tests/vt/wide_pending_rows.py --out' in wide and 'fresh_fuzz.py --profile nightly' in wide
     linux = (RIG / 'w1-step.sh').read_text()
     assert 'tools/gate linux' in linux and 'vt_resource_bench.lu' in linux
     assert 'width_sweep.py' in linux and '--suite recordings' in linux
