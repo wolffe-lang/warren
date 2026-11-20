@@ -42,5 +42,17 @@ fn main() -> int {
         assert(pane.history.bytes.len == 8388608 && retained == 12108528, "pane-native-large-default-history-budget")
         io.write_line("MEASURE pane-default cols=320 rows=90 history-cap=8388608 retained={retained}")
     }
+    // A first resize sizes its canonical window from the history the ring
+    // holds, not from the ring's length: two lines of history in an 8 MiB
+    // ring cost the screens' workspace and a small window (warren#7).
+    region first_resize(cap: 67108864) {
+        var pane = new(80, 24, 8388608)
+        feed(mut pane, "a\r\nb\r\n".bytes())
+        let before = budget.charged(first_resize)
+        assert(resize(mut pane, 81, 24) == "")
+        let grown = budget.charged(first_resize) - before
+        io.write_line("MEASURE pane-first-resize cols=81 rows=24 history-cap=8388608 history-used={pane.history.used} grown={grown}")
+        assert(grown < 2097152, "pane-first-resize-keeps-the-ring")
+    }
     0
 }
