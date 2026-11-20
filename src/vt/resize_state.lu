@@ -82,7 +82,10 @@ fn prepare_resize_storage(mut pane: Vt, cols: int, rows: int) {
     ensure_screen_capacity(mut pane.resize_state.output, peak, row_capacity)
     // Rounded screen storage may have grown further in the workspace.
     let cache_peak = pane.resize_state.output.cells.len
-    ensure_history_capacity(mut pane.resize_state.canonical, pane.history.bytes.len + 48 * cache_peak)
+    // The window holds the original screen's encoding (at most 48 bytes a
+    // cell) and records pulled from history: at most what the ring holds
+    // when an epoch's first resize sizes it, not the ring's length.
+    ensure_history_capacity(mut pane.resize_state.canonical, pane.history.used + 48 * cache_peak)
     ensure_tab_capacity(mut pane, cols)
     if row_capacity > pane.resize_state.row_records.len {
         let capacity = grown_capacity(pane.resize_state.row_records.len, row_capacity)

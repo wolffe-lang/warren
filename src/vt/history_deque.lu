@@ -67,7 +67,8 @@ fn ensure_history_capacity(mut history: History, needed: int) {
     // cache. Geometric growth retains old arena buffers and counts them.
     assert(needed >= 0, "reflow-cache-bound")
     if needed <= history.bytes.len { return }
-    var capacity: int = if history.bytes.len < 1 { 1 } else { history.bytes.len }
+    // The first allocation is exact; later growth doubles.
+    var capacity: int = if history.bytes.len < 1 { needed } else { history.bytes.len }
     while capacity < needed {
         if capacity > 4611686018427387903 { capacity = needed }
         else { capacity *= 2 }
