@@ -57,6 +57,7 @@ step frozen-references python3 -I tools/vt/check_references.py
 step frozen-checkpoints python3 -I tools/vt/check_checkpoints.py
 step inverse-reference python3 -I tools/vt/check_inverse.py
 step d9-reference python3 -I tools/vt/check_d9.py
+step d15-reference python3 -I tools/vt/check_d15.py
 step combining-reference python3 -I tools/vt/check_combining.py
 step combine-anchor-reference python3 -I tools/vt/check_combine_anchor.py
 step zero-width-reference python3 -I tools/vt/check_zero_width.py
