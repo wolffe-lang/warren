@@ -333,8 +333,9 @@ The list, with the document's section for each, is in the prediction
 | D12 | origin-mode CPR wraps a negative relative row after restoring an absolute cursor above the current region; a one-above-top row reports zero | keep the measured absolute placement but report relative CPR row 1 above the region | exact-trigger reference-report inconsistency; DECCIR remains the absolute witness |
 | D13 | legacy SGR30 with bold promotes the stored black foreground to index8 | store index0 plus bold, exactly as indexed38;5;0 | painter brightening does not change stored colour; 31–37, indexed0 and explicit90 remain strict controls |
 | D14 | withdrawn; with jump scroll off the reference counts a partial erase's cells as written, as warren does | a partial erase marks its requested cells written, independent of row history | the measured exception was the reference's jump scroll: with it on, the same bytes gave different extents from run to run (warren#25) |
+| D15 | deleting characters while cells move left, when the vacated span starts on a wide character's second half, blanks the cell that moved in from the last column, with the pen's background (`tests/vt/reference/d15`) | keep that cell: only a broken half is blanked | G2: the blanked cell is no half of a broken pair; the reference repairs the pair at the vacated span's start but blanks the column after the shift (warren#33) |
 
-Rows for the live divergences D1 to D14 compare with written expectations, never with the
+Rows for the live divergences D1 to D15 compare with written expectations, never with the
 reference, and a corpus stream that exercises one is compared under that
 divergence's name or not at all. D9 is scoped to the first SGR sequence after
 a restore that contains 7 or 27 with no separate background setter/reset
@@ -359,6 +360,23 @@ it is warren's contract. The oracle runs the reference with jump scroll off,
 and nothing corrects its extents. `tests/vt/reference/erase-extents` keeps 32
 complete boundary frames, captured that way and uncorrected; the three resized
 frames use independent full R1/R5 contracts under D6.
+
+D15's trigger is exact. DCH n at column c with c+n at most cols moves columns c+n to cols
+left by n and blanks columns cols-n+1 to cols. If column cols-n+1 held a wide
+character's second half before the move, the reference also blanks column
+cols-n after it, the cell that came from the last column, with the pen's
+background and unwritten. warren keeps that cell. When nothing moves (c+n is
+cols+1), that blank is the first half of the cut pair, and the two agree. When
+the cell coming from the last column is itself a second half, which a
+deletion of one always moves, the reference is left with a first half alone
+that its own two readings of the screen disagree on; that case is not
+observable and is not covered by D15. The fresh drive finds the trigger from
+the source alone, gives the reference a split input (`CSI n-1 P` then `CSI P`,
+which never meets it) and permits, per trigger, one narrow blank in the
+original frame where the split frame keeps a narrow cell, and the row's extent
+growing to that cell. `tests/vt/reference/d15` keeps five trigger cases and
+three controls, both inputs and both observations; warren's frames for them
+are written in `tests/vt/d15_fixture.py`.
 
 ### 3.2 SGR details (measured)
 
