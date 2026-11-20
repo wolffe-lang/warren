@@ -56,7 +56,7 @@ Z11 = C + b'1;1Habc' + WIDE + b'efgQR' + C + b'1;1H' + C + b'6P'
 MOVED = b'abcdef' + WIDE + C + b'1;12HQ' + C + b'44m' + C + b'1;1H' + C + b'5P'      # 12 columns
 NOTHING_MOVES = C + b'1;3H' + WIDE + C + b'1;4H' + C + b'7P'
 ICH = C + b'1;3H' + WIDE + C + b'1;10HQ' + C + b'1;1H' + C + b'3@'
-LAST_PAIR = C + b'1;9H' + WIDE + C + b'1;1H' + C + b'P'
+LAST_PAIR = C + b'1;9H' + WIDE + C + b'1;1H' + C + b'1P'
 Z1 = C + b'1;45H' + WIDE + C + b'1;79H' + 'あ'.encode() + C + b'1;1H' + C + b'35P'  # 80 columns
 
 
