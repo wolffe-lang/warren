@@ -116,6 +116,8 @@ pub fn resize(mut pane: Vt, cols: int, rows: int) -> str {
     pane.region_top = 1
     pane.region_bottom = rows
     pane.pending_wrap = false
+    // The reference resizes only between reads, so a resize ends a wide run.
+    pane.wide_run = false
     if pane.resize_state.lost { pane.resize_state.active = false }
     // Every row of both screens is new at the new size.
     begin_tick(mut pane)
