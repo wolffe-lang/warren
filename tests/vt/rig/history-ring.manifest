@@ -1,0 +1,6 @@
+# A take for the size of a resize's canonical window: run the recorder inside
+# the pinned oracle image from a clean committed checkout, with --preflight
+# running tests/layout/rig/preflight-inside.sh. The whole Linux gate.
+floor 35
+rig history-ring-step.sh sha256=92cd492971c5eab389d6156d73e581514cdda27ce6ed59f3c23ea8eb5b28dea1
+step gate-linux tools=bash,python3,cc,git,xterm,Xvfb,tmux script=history-ring-step.sh -- gate-linux
