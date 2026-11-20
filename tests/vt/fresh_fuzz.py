@@ -159,18 +159,20 @@ def main():
     from legacy_black_fixture import repair as legacy_input
     from report_fixture import without_bold, tab_operations
     from report_expectations import recompose_no_bold
-    from fresh_expectations import background_pair, legacy_pair, measured_tabs
+    from fresh_expectations import background_pair, legacy_pair, measured_tabs, dch_pair
+    from dch_tail_fixture import repair as dch_input
     from fresh_reports import status_pass
     from erase_extent_fixture import trace
     args.out.mkdir(parents=True, exist_ok=False)
-    rules = ('D7', 'D9', 'D12', 'D13', 'RPT-BRIGHT-BOLD-COLOUR', 'RPT-TABS-COLUMN-ONE')
+    rules = ('D7', 'D9', 'D12', 'D13', 'D15', 'RPT-BRIGHT-BOLD-COLOUR', 'RPT-TABS-COLUMN-ONE')
     manifest = {'schema': 2, 'seeds': args.seeds, 'requested_bytes': args.bytes,
         'selected_case_count': len(selected), 'diagnostic_selection': args.case,
         'pins_sha256': hashlib.sha256((ROOT / 'warren-oracle.toml').read_bytes()).hexdigest(),
         'fixture_sha256': {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in
             ('tests/vt/fresh_expectations.py', 'tests/vt/report_expectations.py',
              'tools/vt/repair_background_fixture.py', 'tools/vt/legacy_black_fixture.py',
-             'tools/vt/report_fixture.py', 'tools/vt/erase_extent_fixture.py', 'tests/vt/fresh-known.json')},
+             'tools/vt/report_fixture.py', 'tools/vt/erase_extent_fixture.py', 'tools/vt/dch_tail_fixture.py',
+             'tests/vt/fresh-known.json')},
         'rule_counts': {rule: {'source_cases': 0, 'cases_with_permitted_delta': 0,
                                'fully_resolved_at_stage': 0} for rule in rules},
         'cases': {}, 'failed': 0, 'known': {}, 'fixed': {}, 'display_retries': []}
@@ -248,6 +250,15 @@ def main():
                         current, detail = legacy_pair(current_input, current, paired)
                         current_input = legacy_fixed
                         stage('D13', current, detail, True, bool(detail['cells']))
+                    # D15: a DCH whose vacated span starts on a second half. The
+                    # reference blanks the cell that moved in from the last column;
+                    # its split input keeps it, and the bound allows that cell only.
+                    split_input, edits = dch_input(current_input)
+                    if edits:
+                        paired = dump_input('dch-split-reference', split_input)
+                        current, detail = dch_pair(current_input, current, paired)
+                        current_input = split_input
+                        stage('D15', current, detail, True, bool(detail['cells']))
                     plain_input, edits = without_bold(current_input)
                     # Stream32's opposite promotion stays explicitly outside
                     # no-bold. Its separate D13 input supplies its complete frame.
