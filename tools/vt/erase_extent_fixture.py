@@ -48,6 +48,7 @@ class Trace:
         self.cols, self.rows = cols, rows
         self.events = []
         self.reference_exclusions = []
+        self.dch_tail = []
         self.reset()
 
     def reset(self):
@@ -122,10 +123,21 @@ class Trace:
             else:
                 self.blank(row, index - 1, preserve=True)
 
-    def shift(self, count, insert):
+    def shift(self, count, insert, offset=None, end=None):
         row = self.screen[self.row - 1]
         first = self.col - 1
         count = min(count, self.cols - first)
+        boundary = self.cols - count
+        if not insert and first + count < self.cols and row.cells[boundary].width == 0 \
+                and row.cells[boundary - 1].width == 2:
+            # D15 (warren#33): cells move left and the vacated span starts on a
+            # second half. The reference then blanks column cols-n with the pen,
+            # the cell that moved there from the last column; warren keeps it.
+            # A second half moving there leaves the reference a lone first half
+            # its own two passes read differently: not observable.
+            self.dch_tail.append({'offset': offset, 'end': end, 'count': count, 'screen': self.alternate,
+                                  'row': self.row, 'col': boundary,
+                                  'observable': row.cells[self.cols - 1].width != 0})
         blanks = [Cell(self.background, contract=insert, reference=insert, changed=True) for _ in range(count)]
         if insert:
             row.cells[first:] = blanks + row.cells[first:self.cols - count]
@@ -315,7 +327,7 @@ class Trace:
         elif final in ('@', 'P'):
             self.clear_mark_uncertainty()
             self.pending = False
-            self.shift(value, final == '@')
+            self.shift(value, final == '@', offset, offset + 3 + len(body))
         elif final in ('L', 'M'):
             if self.top <= self.row <= self.bottom:
                 self.clear_mark_uncertainty()
@@ -412,5 +424,5 @@ def trace(data, cols=80, rows=24):
         if reference != contract:
             changed.append({'row': index + 1, 'reference_extent': reference, 'contract_extent': contract})
     return {'schema': 1, 'events': state.events, 'rows': changed,
-            'reference_exclusions': state.reference_exclusions,
+            'reference_exclusions': state.reference_exclusions, 'dch_tail': state.dch_tail,
             'cursor': [state.row, state.col], 'active_alternate': bool(state.alternate)}
