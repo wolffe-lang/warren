@@ -520,8 +520,10 @@ lookback up to the configured history cap. The allocation budget counts the
 fixed-capacity encoded history ring, peak screen/workspace capacities and
 all retained arena growth buffers; replaced arena buffers are not claimed
 freed. The canonical resize deque has
-an explicit additional bound of the configured history cap plus 48 bytes per
-peak cell before geometric rounding; it is not treated as free duplication
+an explicit additional bound of the history the ring holds at an epoch's
+first resize plus 48 bytes per peak cell; its first allocation is exact and
+later growth doubles (warren#7: sized from the ring's length, it doubled to
+twice the cap whatever the pane held). It is not treated as free duplication
 of history. Backing capacity is reused on shrink and on regrowth within the
 previous peak, with no further charge.
 Growth is bounded by the protocol's 262144-cell area ceiling. Tests repeat
