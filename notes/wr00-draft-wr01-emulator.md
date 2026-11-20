@@ -165,7 +165,8 @@ see it broken.
 - **G3 cursor.** 1 <= row <= rows and 1 <= col <= cols. `pending_wrap`
   implies col = cols. The flag is set by printing into the last column
   whether or not autowrap is on (measured), and is consulted only when
-  autowrap is on.
+  autowrap is on; with autowrap off, a wide character that cannot fit
+  clears it (section 2.3, step 3).
 - **G4 region.** 1 <= top <= bottom <= rows, with top < bottom required
   only when rows > 1. A one-row pane has top = bottom = 1 (ruled and
   measured: `one-row-plain`, `one-row-region` in `tests/vt/parser-reference/`).
@@ -200,8 +201,18 @@ For a code point with width w (section 5):
    of the next row (scrolling the region if on its bottom row), clear the flag.
 3. Except for G2a at one column, if w = 2 and col = cols: with autowrap,
    wrap as in 2 first, leaving the
-   last column as it was and outside the extent (`wide-last-column-wrap`);
-   without autowrap, the character is not stored.
+   last column as it was and outside the extent (`wide-last-column-wrap`).
+   Without autowrap (measured, warren#28): the character clears the pending
+   wrap. Right after a wide graphic written in the same run of printing, it
+   replaces that graphic where the graphic starts (the combine anchor), the
+   cursor stays on the last column with no wrap pending, and insert mode does
+   not shift for it. After anything else (a narrow graphic, a mark, any
+   control, escape or string, DEL, an encoded C1, a wide character that was
+   itself dropped, a resize) it is not stored and the anchor stays, but it is
+   the last printed character, so REP repeats it. The reference also ends the
+   run where its reads split the input; no feed boundary does here (P2), so
+   warren keeps the outcome of input read whole, as the oracle drives it
+   (`tests/vt/wide_pending_rows.py`).
 4. In insert mode, shift the row right by w from the cursor first; cells
    pushed past the last column are lost (`insert-mode`, `wide-insert-mode`).
 5. Write the cell or pair with the pen's rendition, through the charset
@@ -232,7 +243,7 @@ still runs native chunking and resize-property checks on those streams.
 |---|---|
 | CR, BS, LF, IND, RI, NEL | HT (the cursor is already on the last column) |
 | CUU, CUD, CUF, CUB, CUP, HVP, CHA, VPA and the other cursor moves, even to the same cell | SGR |
-| EL, ED, ECH, ICH, DCH | DECSC (and DECRC restores the flag it saved) |
+| EL, ED, ECH, ICH, DCH; with autowrap off, a wide character that cannot fit (2.3) | DECSC (and DECRC restores the flag it saved) |
 | IL, DL (which also move to column 1) | DECSCUSR, DECTCEM, IRM, HTS |
 | DECSTBM and DECOM set or reset (which home the cursor) | OSC, DA, DSR |
 | | DECAWM reset then set |
