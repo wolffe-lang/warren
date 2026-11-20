@@ -220,7 +220,7 @@ fn print_scalar(mut pane: Vt, cp: int) {
     pane.last_printed = cp
     pane.last_mark1 = 0
     pane.last_mark2 = 0
-    pane.wide_run = width == 2
+    pane.wide_run = false
     if replaces {
         pane.cursor_col = pane.cols
         pane.pending_wrap = false
