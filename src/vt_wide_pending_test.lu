@@ -6,12 +6,17 @@
 //! same run of printing it replaces that glyph where the glyph starts;
 //! after anything else it is dropped. Pure: native, the checked machine and
 //! lupin.
+
 use vt
 use std.io
 
 fn at(pane: vt.Vt, row: int, col: int) -> int { (row - 1) * pane.cols + col - 1 }
+
 fn cell_base(pane: vt.Vt, row: int, col: int) -> int { pane.primary.cells[at(pane, row, col)].base }
-fn cell_width(pane: vt.Vt, row: int, col: int) -> int { pane.primary.cells[at(pane, row, col)].width }
+
+fn cell_width(pane: vt.Vt, row: int, col: int) -> int {
+    pane.primary.cells[at(pane, row, col)].width
+}
 
 // Eight columns by three rows, autowrap off, then the text.
 fn fed(text: str) -> vt.Vt {
@@ -22,48 +27,113 @@ fn fed(text: str) -> vt.Vt {
 
 fn test_narrow_pending_drops_the_wide_scalar_and_clears_the_wrap() {
     var pane = fed("\u{1b}[1;8Hx中")
-    assert(pane.cursor_row == 1 && pane.cursor_col == 8 && !pane.pending_wrap, "narrow-pending-wide-clears")
-    assert(cell_base(pane, 1, 8) == 120 && cell_width(pane, 1, 8) == 1 && cell_base(pane, 1, 7) == 32, "narrow-pending-wide-dropped")
+    assert(
+        pane.cursor_row == 1 && pane.cursor_col == 8 && !pane.pending_wrap,
+        "narrow-pending-wide-clears",
+    )
+    assert(
+        cell_base(pane, 1, 8) == 120 && cell_width(pane, 1, 8) == 1 && cell_base(pane, 1, 7) == 32,
+        "narrow-pending-wide-dropped",
+    )
     vt.feed(mut pane, "\u{1b}[?7hA".bytes())
-    assert(pane.cursor_row == 1 && pane.cursor_col == 8 && pane.pending_wrap && cell_base(pane, 1, 8) == 65,
-        "reenabled-print-overwrites-last-column")
+    assert(
+        pane.cursor_row == 1 &&
+            pane.cursor_col == 8 &&
+            pane.pending_wrap &&
+            cell_base(pane, 1, 8) == 65,
+        "reenabled-print-overwrites-last-column",
+    )
 }
 
 fn test_a_wide_scalar_in_one_run_replaces_the_wide_glyph() {
     var pane = fed("\u{1b}[1;7H文あ")
-    assert(cell_base(pane, 1, 7) == 0x3042 && cell_width(pane, 1, 7) == 2 && cell_width(pane, 1, 8) == 0, "pending-wide-replaced")
+    assert(
+        cell_base(pane, 1, 7) == 0x3042 &&
+            cell_width(pane, 1, 7) == 2 &&
+            cell_width(pane, 1, 8) == 0,
+        "pending-wide-replaced",
+    )
     assert(pane.cursor_col == 8 && !pane.pending_wrap, "replacement-clears-wrap")
     pane = fed("\u{1b}[1;7H文あ中い")
     assert(cell_base(pane, 1, 7) == 0x3044 && !pane.pending_wrap, "run-of-four-keeps-last")
     pane = fed("\u{1b}[1;6H中あ")
-    assert(cell_base(pane, 1, 6) == 0x3042 && cell_width(pane, 1, 8) == 1 && cell_base(pane, 1, 8) == 32, "before-last-column-replaced-in-place")
+    assert(
+        cell_base(pane, 1, 6) == 0x3042 &&
+            cell_width(pane, 1, 8) == 1 &&
+            cell_base(pane, 1, 8) == 32,
+        "before-last-column-replaced-in-place",
+    )
     assert(pane.cursor_col == 8 && !pane.pending_wrap, "before-last-column-cursor")
     pane = fed("\u{1b}[1;5H中あい")
-    assert(cell_base(pane, 1, 5) == 0x4E2D && cell_base(pane, 1, 7) == 0x3044 && !pane.pending_wrap, "third-wide-replaces-second")
+    assert(
+        cell_base(pane, 1, 5) == 0x4E2D && cell_base(pane, 1, 7) == 0x3044 && !pane.pending_wrap,
+        "third-wide-replaces-second",
+    )
     pane = fed("\u{1b}[1;7H文あ\u{301}")
-    assert(cell_base(pane, 1, 7) == 0x3042 && pane.primary.cells[at(pane, 1, 7)].mark1 == 0x301, "mark-after-replacement")
+    assert(
+        cell_base(pane, 1, 7) == 0x3042 && pane.primary.cells[at(pane, 1, 7)].mark1 == 0x301,
+        "mark-after-replacement",
+    )
 }
 
 fn test_anything_between_makes_the_wide_scalar_dropped() {
-    let breaks: List[str] = ["\u{1b}[m", "\u{1b}]2;t\u{1b}\\", "\u{1b}]2;t\u{7}", "\u{7}", "\u{0}", "\u{18}", "\u{1a}",
-        "\u{7f}", "\u{85}", "\t", "\u{1b}[?25h", "\u{1b}[?999h", "\u{1b}[;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;m",
-        "\u{1b}(B", "\u{1b}中", "\u{1b}[1中", "\u{1b}_x\u{1b}\\", "\u{1b}Pq\u{1b}\\", "\u{1b}7\u{1b}8", "\u{301}",
-        "\u{fe0f}", "\u{200d}", "\u{fff9}"]
+    let breaks: List[str] = [
+        "\u{1b}[m",
+        "\u{1b}]2;t\u{1b}\\",
+        "\u{1b}]2;t\u{7}",
+        "\u{7}",
+        "\u{0}",
+        "\u{18}",
+        "\u{1a}",
+        "\u{7f}",
+        "\u{85}",
+        "\t",
+        "\u{1b}[?25h",
+        "\u{1b}[?999h",
+        "\u{1b}[;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;m",
+        "\u{1b}(B",
+        "\u{1b}中",
+        "\u{1b}[1中",
+        "\u{1b}_x\u{1b}\\",
+        "\u{1b}Pq\u{1b}\\",
+        "\u{1b}7\u{1b}8",
+        "\u{301}",
+        "\u{fe0f}",
+        "\u{200d}",
+        "\u{fff9}",
+    ]
     for item in breaks {
         let pane = fed("\u{1b}[1;7H文{item}あ")
-        assert(cell_base(pane, 1, 7) == 0x6587 && cell_width(pane, 1, 7) == 2, "break-keeps-first-wide")
-        assert(pane.cursor_col == 8 && !pane.pending_wrap, "break-drops-second-wide-and-clears-wrap")
+        assert(
+            cell_base(pane, 1, 7) == 0x6587 && cell_width(pane, 1, 7) == 2,
+            "break-keeps-first-wide",
+        )
+        assert(
+            pane.cursor_col == 8 && !pane.pending_wrap,
+            "break-drops-second-wide-and-clears-wrap",
+        )
     }
 }
 
 fn test_a_narrow_scalar_before_is_never_replaced() {
     var pane = fed("\u{1b}[1;7Hab中")
-    assert(cell_base(pane, 1, 7) == 97 && cell_base(pane, 1, 8) == 98 && !pane.pending_wrap, "narrow-before-wide-keeps-both")
+    assert(
+        cell_base(pane, 1, 7) == 97 && cell_base(pane, 1, 8) == 98 && !pane.pending_wrap,
+        "narrow-before-wide-keeps-both",
+    )
     pane = fed("\u{1b}[1;7H文あx中")
-    assert(cell_base(pane, 1, 8) == 120 && cell_base(pane, 1, 7) == 32 && !pane.pending_wrap, "narrow-between-drops")
+    assert(
+        cell_base(pane, 1, 8) == 120 && cell_base(pane, 1, 7) == 32 && !pane.pending_wrap,
+        "narrow-between-drops",
+    )
     // A printable ASCII run (the run path) ends a wide run as a narrow scalar does.
     pane = fed("\u{1b}[1;1H中abcde中")
-    assert(cell_base(pane, 1, 1) == 0x4E2D && cell_base(pane, 1, 7) == 101 && cell_base(pane, 1, 8) == 32, "ascii-run-then-wide-dropped")
+    assert(
+        cell_base(pane, 1, 1) == 0x4E2D &&
+            cell_base(pane, 1, 7) == 101 &&
+            cell_base(pane, 1, 8) == 32,
+        "ascii-run-then-wide-dropped",
+    )
     assert(pane.cursor_col == 8 && !pane.pending_wrap, "ascii-run-then-wide-cursor")
     pane = fed("\u{1b}[1;3Habcde中あ")
     assert(cell_base(pane, 1, 8) == 32 && !pane.pending_wrap, "dropped-wide-ends-the-run")
@@ -71,27 +141,48 @@ fn test_a_narrow_scalar_before_is_never_replaced() {
 
 fn test_a_dropped_wide_scalar_leaves_the_anchor_and_is_repeated() {
     var pane = fed("\u{1b}[1;8Hx中\u{301}")
-    assert(cell_base(pane, 1, 8) == 120 && pane.primary.cells[at(pane, 1, 8)].mark1 == 0x301, "dropped-wide-keeps-anchor")
+    assert(
+        cell_base(pane, 1, 8) == 120 && pane.primary.cells[at(pane, 1, 8)].mark1 == 0x301,
+        "dropped-wide-keeps-anchor",
+    )
     pane = fed("\u{1b}[1;3Habcde中\u{1b}[b")
-    assert(cell_base(pane, 1, 7) == 101 && cell_base(pane, 1, 8) == 32 && pane.cursor_col == 8 && !pane.pending_wrap,
-        "rep-repeats-the-dropped-wide")
+    assert(
+        cell_base(pane, 1, 7) == 101 &&
+            cell_base(pane, 1, 8) == 32 &&
+            pane.cursor_col == 8 &&
+            !pane.pending_wrap,
+        "rep-repeats-the-dropped-wide",
+    )
 }
 
 fn test_insert_mode_does_not_shift_for_a_replacement() {
     let pane = fed("\u{1b}[1;6Hxyz\u{1b}[1;6H\u{1b}[4h中あ")
-    assert(cell_base(pane, 1, 6) == 0x3042 && cell_base(pane, 1, 8) == 120, "insert-replacement-no-shift")
+    assert(
+        cell_base(pane, 1, 6) == 0x3042 && cell_base(pane, 1, 8) == 120,
+        "insert-replacement-no-shift",
+    )
 }
 
 fn test_the_alternate_screen_replaces_too() {
     let pane = fed("\u{1b}[?1049h\u{1b}[?7l\u{1b}[1;7H文あ")
-    assert(pane.alternate.cells[6].base == 0x3042 && pane.alternate.cells[6].width == 2 && !pane.pending_wrap,
-        "alternate-pending-wide-replaced")
+    assert(
+        pane.alternate.cells[6].base == 0x3042 &&
+            pane.alternate.cells[6].width == 2 &&
+            !pane.pending_wrap,
+        "alternate-pending-wide-replaced",
+    )
 }
 
 fn test_autowrap_on_still_wraps_the_wide_scalar() {
     var pane = vt.new(8, 3, 0)
     vt.feed(mut pane, "\u{1b}[1;8Hx中".bytes())
-    assert(pane.cursor_row == 2 && pane.cursor_col == 3 && !pane.pending_wrap && cell_base(pane, 2, 1) == 0x4E2D, "autowrap-on-wraps")
+    assert(
+        pane.cursor_row == 2 &&
+            pane.cursor_col == 3 &&
+            !pane.pending_wrap &&
+            cell_base(pane, 2, 1) == 0x4E2D,
+        "autowrap-on-wraps",
+    )
 }
 
 // The reference's run also ends where its reads split the input; warren's
@@ -113,12 +204,20 @@ fn test_a_resize_ends_the_run() {
     vt.feed(mut pane, "\u{1b}[?7l\u{1b}[1;7H文".bytes())
     assert(vt.resize(mut pane, 8, 4) == "", "resize-accepted")
     vt.feed(mut pane, "あ".bytes())
-    assert(cell_base(pane, 1, 7) == 0x6587 && pane.cursor_col == 8 && !pane.pending_wrap, "resize-ends-the-run")
+    assert(
+        cell_base(pane, 1, 7) == 0x6587 && pane.cursor_col == 8 && !pane.pending_wrap,
+        "resize-ends-the-run",
+    )
 }
 
 // The run path and the per-byte path agree on every stream here.
 fn test_the_run_path_agrees() {
-    let streams: List[str] = ["\u{1b}[1;1H中abcde中", "\u{1b}[1;7H文あx中", "\u{1b}[1;3Habcde中あ", "\u{1b}[1;7H文ab\u{1b}[?7h中"]
+    let streams: List[str] = [
+        "\u{1b}[1;1H中abcde中",
+        "\u{1b}[1;7H文あx中",
+        "\u{1b}[1;3Habcde中あ",
+        "\u{1b}[1;7H文ab\u{1b}[?7h中",
+    ]
     for text in streams {
         var fast = vt.new(8, 3, 0)
         var slow = vt.new(8, 3, 0)
@@ -140,6 +239,8 @@ fn main() -> int {
     test_a_feed_boundary_is_not_a_break()
     test_a_resize_ends_the_run()
     test_the_run_path_agrees()
-    io.write_line("PASS vt-wide-pending narrow-pending replaced breaks narrow dropped insert alternate autowrap boundary resize run-path")
+    io.write_line(
+        "PASS vt-wide-pending narrow-pending replaced breaks narrow dropped insert alternate autowrap boundary resize run-path",
+    )
     0
 }
