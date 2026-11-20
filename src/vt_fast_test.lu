@@ -129,15 +129,15 @@ fn same_screen(a: vt.Screen, b: vt.Screen) -> bool {
 
 // Everything a later byte can read, field by field (no allocation): the
 // cursor, wrap, region, modes, tabs and charsets; both screens whole (cells,
-// extents, wraps, line lineage); the combining anchor, the last printed
-// scalar; the history's records and the line coordinate.
+// extents, wraps, line lineage); the combining anchor and the wide run, the
+// last printed scalar; the history's records and the line coordinate.
 fn same_state(a: vt.Vt, b: vt.Vt) -> bool {
     if a.cursor_row != b.cursor_row || a.cursor_col != b.cursor_col || a.pending_wrap != b.pending_wrap { return false }
     if a.region_top != b.region_top || a.region_bottom != b.region_bottom || a.active_alternate != b.active_alternate { return false }
     if a.modes.autowrap != b.modes.autowrap || a.modes.insert != b.modes.insert || a.modes.origin != b.modes.origin { return false }
     if a.g0 != b.g0 || a.g1 != b.g1 || a.shifted != b.shifted { return false }
     if a.pen.flags != b.pen.flags || a.pen.foreground != b.pen.foreground || a.pen.background != b.pen.background { return false }
-    if a.combine_row != b.combine_row || a.combine_col != b.combine_col { return false }
+    if a.combine_row != b.combine_row || a.combine_col != b.combine_col || a.wide_run != b.wide_run { return false }
     if a.last_printed != b.last_printed || a.last_mark1 != b.last_mark1 || a.last_mark2 != b.last_mark2 { return false }
     if a.history.records != b.history.records || a.history.head != b.history.head { return false }
     if a.line_coordinate.id != b.line_coordinate.id || a.line_coordinate.offset != b.line_coordinate.offset { return false }
