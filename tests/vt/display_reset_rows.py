@@ -3,17 +3,20 @@
 
 The oracle runs one reference terminal at a time, so each is its display's
 only client, and a dump's second pass starts the moment its first pass's
-terminal exits. An X server resets itself when its last client leaves, and a
-client that connects while it resets is refused: the terminal's "Can't open
-display". Whether the next terminal met the reset was the machine's timing,
-so the same commit retried nothing on one runner and one launch in twenty on
-another. The oracle's display must not reset between clients.
+terminal exits. An X server resets itself when its last client leaves unless
+it is started with -noreset. On hosted runners every retried launch ("Can't
+open display") was a second pass, and the same commit retried nothing on one
+runner and one launch in twenty on another: the next terminal meeting the
+reset, by the machine's timing, is the likely cause. The oracle's display
+does not reset between clients.
 
 Two rows. `server-keeps-its-state` reads the arguments the oracle starts its
-X server with, from a stand-in on PATH: needs python3 only. `back-to-back`
-launches the pinned terminal on the oracle's own display, through the
-oracle's own launch, with no pause, and holds the retries to none: needs the
-pinned image. `--unit` runs the first row alone.
+X server with, from a stand-in on PATH: needs python3 only; it is the row
+that is red without -noreset. `back-to-back` launches the pinned terminal on
+the oracle's own display, through the oracle's own launch, with no pause,
+and holds the retries to none: needs the pinned image. It holds the
+behaviour wanted; on the machines tried off the hosted runners it retried
+nothing with the reset either. `--unit` runs the first row alone.
 """
 import os
 from pathlib import Path
