@@ -59,6 +59,8 @@ class Trace:
         self.background = DEFAULT
         self.origin = self.insert = self.pending = self.newline = False
         self.autowrap = True
+        # True only right after a wide glyph was written (warren#28).
+        self.wide_run, self.run_col = False, 1
         self.tabs = set(range(9, self.cols + 1, 8))
         self.saved = [(1, 1, DEFAULT, False, False)] * 2
 
@@ -137,9 +139,11 @@ class Trace:
 
     def print(self, cp, offset=0):
         if 0xFFF9 <= cp <= 0xFFFB:
+            self.wide_run = False
             return
         size = width(cp)
         if size == 0:
+            self.wide_run = False
             if cp != 0x200D and self.ri_offset >= 0 and self.ri_tab_offset >= 0:
                 self.reference_exclusions.append({'name': 'RI-HT-combining-open',
                     'ri_offset': self.ri_offset, 'ht_offset': self.ri_tab_offset,
@@ -158,12 +162,20 @@ class Trace:
             self.linefeed()
         if size == 2 and self.cols == 1:
             size = 1
+        replaces = False
         if size == 2 and self.col == self.cols:
-            if not self.autowrap:
+            if self.autowrap:
+                self.col = 1
+                self.linefeed()
+            elif not self.wide_run:
+                # Autowrap off: the wide scalar clears a pending wrap and is dropped,
+                self.pending = False
                 return
-            self.col = 1
-            self.linefeed()
-        if self.insert:
+            else:
+                # unless it follows a wide glyph of the same run, which it replaces.
+                self.col = self.run_col
+                replaces = True
+        if self.insert and not replaces:
             self.shift(size, True)
         row = self.screen[self.row - 1]
         first = self.col - 1
@@ -174,8 +186,12 @@ class Trace:
             old = row.cells[index]
             row.cells[index] = Cell(self.background, size if index == first else 0, True, True,
                 old.changed or (row.fill is not None and self.background != row.fill))
-        self.pending = self.col + size > self.cols
-        self.col = min(self.cols, self.col + size)
+        self.wide_run, self.run_col = size == 2, self.col
+        if replaces:
+            self.pending, self.col = False, self.cols
+        else:
+            self.pending = self.col + size > self.cols
+            self.col = min(self.cols, self.col + size)
 
     def erase(self, row_number, first, last, kind, offset):
         row = self.screen[row_number - 1]
@@ -330,6 +346,8 @@ def trace(data, cols=80, rows=24):
     while at < len(data):
         start, code = at, data[at]
         at += 1
+        if code < 32 or code == 127:
+            state.wide_run = False
         if code == 27:
             if at == len(data):
                 raise ValueError('truncated escape')
