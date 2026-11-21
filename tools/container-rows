@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# A container's own limits, under the flags the gate runs with
+# (tools/container-run.sh). tools/in-container runs these before the gate, so
+# a local engine is held to what the hosted runner enforces.
+#   container-memory-cap   touching the memory limit and 1 GiB more, one byte a
+#                          page in 256 MiB steps, is ended by the kernel (137)
+#                          before it passes the limit; the hosted runner has no
+#                          swap, so a local engine whose swap is unbounded would
+#                          let a step pass there that the runner kills
+#   tools/container-rows ENGINE MEMORY IMAGE
+# MEMORY is the limit as the engine takes it, a whole number of g or m. The
+# image needs python3. Each row prints PASS or FAIL by name; the exit status is
+# 0 only when every row passed.
+set -uo pipefail
+root=$(cd "$(dirname "$0")/.." && pwd)
+. "$root/tools/container-run.sh"
+[ "$#" -eq 3 ] || { echo 'usage: tools/container-rows ENGINE MEMORY IMAGE' >&2; exit 2; }
+engine=$1 memory=$2 image=$3
+case $memory in
+  *[0-9][gG]) limit=$(( ${memory%[gG]} * 1024 )) ;;
+  *[0-9][mM]) limit=${memory%[mM]} ;;
+  *) echo "FAIL container-rows: memory $memory is not a whole number of g or m"; exit 2 ;;
+esac
+out=$(mktemp -d "${TMPDIR:-/tmp}/container-rows.XXXXXX")
+trap 'rm -rf "$out"' EXIT
+fail=0
+
+memory_cap() {
+  local want=$((limit + 1024)) rc=0 touched
+  container_run "$engine" "$memory" "$image" --network=none -- python3 -I -c '
+import sys
+total, step = int(sys.argv[1]), 256
+held, done = [], 0
+while done < total:
+    block = bytearray(step << 20)
+    block[::4096] = b"\x01" * ((step << 20) // 4096)
+    held.append(block)
+    done += step
+    print("TOUCHED %d" % done, flush=True)
+' "$want" > "$out/memory-cap.out" 2>&1 || rc=$?
+  touched=$(awk '/^TOUCHED / {n = $2} END {print n + 0}' "$out/memory-cap.out")
+  if [ "$rc" -eq 137 ] && [ "$touched" -lt "$limit" ]; then
+    echo "PASS container-memory-cap limit=${limit}MiB exit=137 touched=${touched}MiB"
+  else
+    sed 's/^/  /' "$out/memory-cap.out" | tail -n 5
+    echo "FAIL container-memory-cap limit=${limit}MiB exit=$rc touched=${touched}MiB of ${want}MiB: expected the kernel's kill (137) before the limit"
+    fail=1
+  fi
+}
+
+memory_cap
+exit "$fail"

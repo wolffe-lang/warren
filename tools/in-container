@@ -35,6 +35,13 @@ if [ "$rc" -eq 0 ]; then sed 's/^/  /' "$root/target/gate/oracle-image.log"; els
 echo "END oracle-image exit=$rc secs=$((SECONDS-start))"
 [ "$rc" -eq 0 ] || exit "$rc"
 if [ "${WARREN_PREPARE_ONLY:-0}" = 1 ]; then exit 0; fi
+# The container held to its own limits under the gate's flags, before the gate.
+start=$SECONDS rc=0
+echo 'START container-limits'
+bash "$root/tools/container-rows" "$engine" "$memory" "$image" > "$root/target/gate/container-limits.log" 2>&1 || rc=$?
+awk '/^FAIL / {print; next} {print "  " $0}' "$root/target/gate/container-limits.log"
+echo "END container-limits exit=$rc secs=$((SECONDS-start))"
+[ "$rc" -eq 0 ] || exit "$rc"
 if [ "$#" -eq 0 ]; then set -- bash tools/gate linux; fi
 . "$root/tools/container-run.sh"
 container_run "$engine" "$memory" "$image" \
