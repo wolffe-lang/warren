@@ -73,10 +73,10 @@ def main():
         and re.search(r'^FAIL peak-bound own-exit exit=7 ', got.stdout, re.M) is not None,
         'exit %d, peak %r: %s' % (got.returncode, peak, got.stdout[-400:]))
 
-    got = run('killed', 512 * MIB, *child(measure, 64, 'kill'))
-    peak = peak_of(got.stdout, 'killed')
+    got = run('grows', 512 * MIB, *child(measure, 64, 'kill'))
+    peak = peak_of(got.stdout, 'grows')
     row('kill-names-its-peak', got.returncode == 137 and peak is not None and peak[0] >= 64 * MIB
-        and re.search(r'^FAIL peak-bound killed signal=9 peak-rss-bytes=\d+ bound=', got.stdout, re.M) is not None,
+        and re.search(r'^FAIL peak-bound grows killed signal=9 peak-rss-bytes=\d+ bound=', got.stdout, re.M) is not None,
         'exit %d, peak %r: %s' % (got.returncode, peak, got.stdout[-400:]))
 
     got = run('unmeasured', 512 * MIB, sys.executable, '-I', '-c', 'print("no measure")')
