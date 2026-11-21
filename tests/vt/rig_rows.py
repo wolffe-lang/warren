@@ -37,7 +37,9 @@ def main():
         (RIG, 'history-ring.manifest', ['gate-linux']),
         (RIG, 'history-ring-plant.manifest', ['history-ring-plant-build', 'pane-first-resize-keeps-the-ring']),
         (RIG, 'dch-tail.manifest', ['gate-linux', 'dch-tail-seeds']),
-        (RIG, 'dch-tail-plant.manifest', ['dch-tail-plant-build', 'dch-tail-seeds-pass'])):
+        (RIG, 'dch-tail-plant.manifest', ['dch-tail-plant-build', 'dch-tail-seeds-pass']),
+        (RIG, 'container-limits.manifest', ['gate-linux', 'container-limits']),
+        (RIG, 'container-limits-plant.manifest', ['container-memory-cap'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
@@ -46,6 +48,9 @@ def main():
         for relative, digest in scripts:
             assert hashlib.sha256((rig / relative).read_bytes()).hexdigest() == digest
         assert 'floor ' in raw
+    limits = (RIG / 'container-limits-step.sh').read_text()
+    assert '. tools/container-run.sh' in limits and 'container_run "$engine" "$memory" "$image"' in limits
+    assert 'exec bash tools/container-rows "$engine" "$limits" "$image"' in limits
     plant = (RIG / 'w1-plant-step.sh').read_text()
     assert 'FAIL vt-scalar-value ' in plant and 'exit "$rc"' in plant
     assert '[ "$rc" -eq 134 ]' in plant

@@ -1,0 +1,5 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# drops the swap bound from tools/container-run.sh, so the memory row goes red.
+floor 15
+rig container-limits-step.sh sha256=d94ac5812fabd1b20cc85105acf6a91949b949ea6ae1d8db2132fd940ad879c3
+step container-memory-cap tools=bash,python3 script=container-limits-step.sh -- plant

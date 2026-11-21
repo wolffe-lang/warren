@@ -1,0 +1,10 @@
+# A take for the container's own limits and the gate's time and peak bounds.
+# The recorder runs on the host beside the engine (container-limits-step.sh
+# names the environment it reads), with --preflight
+# 'bash tests/vt/rig/container-limits-step.sh preflight': the whole Linux gate
+# in the pinned image under tools/container-run.sh's flags, then the container
+# rows under the same flags.
+floor 35
+rig container-limits-step.sh sha256=d94ac5812fabd1b20cc85105acf6a91949b949ea6ae1d8db2132fd940ad879c3
+step gate-linux tools=bash,python3 script=container-limits-step.sh -- gate-linux
+step container-limits tools=bash,python3 script=container-limits-step.sh -- limits
