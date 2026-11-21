@@ -182,9 +182,13 @@ session_rows() (
 )
 step deps-rows python3 -I tests/deps/run.py --wolf "$WOLF" --lupin "$LUPIN" --std "$WOLF_STD"
 step compose-build "$WOLF" build --deny-warnings src/compose_rows.lu -o "$root/target/native/compose-rows"
-step compose-native "$root/target/native/compose-rows"
+# Peaks measured 2026-11-21 under measure-child, three takes each: Linux x86-64 in the pinned oracle image and macOS arm64.
+# Each bound is four times the larger, rounded up to a whole MiB; peak_bound.py names a peak past it.
+#   compose-native: Linux 183,504,896, macOS 183,631,872 bytes -> 701 MiB
+step compose-native python3 -I tools/vt/peak_bound.py --name compose-native --bound 735051776 -- "$root/target/native/measure-child" "$root/target/native/compose-rows"
 step compose-damage-build "$WOLF" build --deny-warnings src/compose_damage_test.lu -o "$root/target/native/compose-damage"
-step compose-damage-native "$root/target/native/compose-damage" 12
+#   compose-damage-native: Linux 918,937,600, macOS 954,269,696 bytes -> 3,641 MiB
+step compose-damage-native python3 -I tools/vt/peak_bound.py --name compose-damage-native --bound 3817865216 -- "$root/target/native/measure-child" "$root/target/native/compose-damage" 12
 step compose-damage-corpus-build "$WOLF" build --deny-warnings src/compose_corpus_rows.lu -o "$root/target/native/compose-corpus"
 step compose-damage-corpus python3 -I tests/vt/compose_damage_corpus.py "$root/target/native/compose-corpus"
 step session-build "$WOLF" build --deny-warnings src/session_rows.lu -o "$root/target/native/session-rows"
@@ -212,7 +216,8 @@ client_rows() (
   "$root/target/native/client-rows" "$root/target/native/warren"
 )
 step client-spans-build "$WOLF" build --deny-warnings src/client_spans_test.lu -o "$root/target/native/client-spans"
-step client-spans-native "$root/target/native/client-spans"
+#   client-spans-native: Linux 4,440,064, macOS 2,572,288 bytes -> 17 MiB
+step client-spans-native python3 -I tools/vt/peak_bound.py --name client-spans-native --bound 17825792 -- "$root/target/native/measure-child" "$root/target/native/client-spans"
 step client-build "$WOLF" build --deny-warnings src/client_rows.lu -o "$root/target/native/client-rows"
 step client-rows client_rows
 [ "$mode" = linux ] || exit 0
