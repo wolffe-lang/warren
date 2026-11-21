@@ -86,7 +86,7 @@ class Tiers(unittest.TestCase):
                  'plan-test': {'result': 'success'}}
         p = self.verdict(needs)
         self.assertNotEqual(p.returncode, 0)
-        self.assertIn('selected job hit its time limit: macos (gate step 40 minutes)', p.stderr)
+        self.assertIn('selected job hit its time limit: macos (gate step %d minutes)' % tiers_module().LIMITS['macos'], p.stderr)
         needs['macos'] = {'result': 'cancelled', 'outputs': {}}
         p = self.verdict(needs)
         self.assertNotEqual(p.returncode, 0)
@@ -112,12 +112,13 @@ class Tiers(unittest.TestCase):
     def test_limit_step(self):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
-            line, out = self.limit(tmp, 'failure', 2400)
+            macos = tiers_module().LIMITS['macos'] * 60
+            line, out = self.limit(tmp, 'failure', macos)
             self.assertEqual(out, 'limit=hit\n')
-            self.assertTrue(line.startswith('TIME-LIMIT macos: the gate step ran 2400 s'), line)
-            self.assertEqual(self.limit(tmp, 'cancelled', 2380)[1], 'limit=hit\n')
+            self.assertTrue(line.startswith('TIME-LIMIT macos: the gate step ran %d s' % macos), line)
+            self.assertEqual(self.limit(tmp, 'cancelled', macos - 20)[1], 'limit=hit\n')
             self.assertEqual(self.limit(tmp, 'failure', 600)[1], 'limit=held\n')
-            self.assertEqual(self.limit(tmp, 'success', 2399)[1], 'limit=held\n')
+            self.assertEqual(self.limit(tmp, 'success', macos - 1)[1], 'limit=held\n')
             linux = tiers_module().LIMITS['linux'] * 60
             self.assertEqual(self.limit(tmp, 'failure', linux, 'linux')[1], 'limit=hit\n')
             self.assertEqual(self.limit(tmp, 'failure', linux - 60, 'linux')[1], 'limit=held\n')

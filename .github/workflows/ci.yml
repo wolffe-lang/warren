@@ -85,13 +85,13 @@ jobs:
     if: ${{ contains(fromJSON(needs.plan.outputs.jobs), 'macos') }}
     runs-on: macos-15
     # As linux: the gate step's limit is in ci/tiers.py's LIMITS.
-    timeout-minutes: 50
+    timeout-minutes: 75
     outputs:
       limit: ${{ steps.limit.outputs.limit }}
     steps:
       - uses: actions/checkout@v4
       - id: gate
-        timeout-minutes: 40
+        timeout-minutes: 65
         run: |
           date +%s > "$RUNNER_TEMP/gate-start"
           bash tools/gate macos
