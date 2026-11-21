@@ -128,6 +128,12 @@ bash tools/in-container    # Linux: builds the oracle image, holds it to its pin
                            # `tools/gate linux` inside (WARREN_ENGINE=podman also works)
 ```
 
+`tools/in-container` starts every container with swap bounded by the memory
+limit, as on the hosted runner, which has no swap, and starts the command with
+no signal blocked or ignored. Before the gate it shows both: a container that
+touches past its limit is ended by the kernel, and a command reads an empty
+signal mask (`tools/container-rows`).
+
 The parser's additional entries can be run after staging the tools:
 
 ```sh
@@ -154,7 +160,8 @@ and split D15 reference inputs and D10's failed raw reports never become
 candidate-derived goldens. The Linux drive records 200 requested-4KiB streams with bytewise/random
 P2 and primary content/rendition/resize-path checks; the nightly profile uses
 5000 seeds. Both profiles' step limits and drive deadlines are sized from the
-measured pace (`ci/tiers.py`). A seed whose failure is a known defect is listed
+measured pace, and each limit is held to at least twice the slowest green gate
+step measured on hosted runs (`ci/tiers.py`). A seed whose failure is a known defect is listed
 in `tests/vt/fresh-known.json` with the issue that tracks it and the failures it
 shows: it prints `KNOWN` and does not fail the drive while it fails exactly so,
 and it fails the drive as `FIXED` once it passes, until its fix removes it from
@@ -167,7 +174,9 @@ rate separately from process startup. The [emulator contract](notes/wr00-draft-w
 defines the invariants and named reference divergences.
 
 The gate prints one `START`/`END name exit=N` pair per step. No step skips:
-a missing oracle is red.
+a missing oracle is red. Row programs that build large screens run under a
+peak bound stated beside their step (`tools/vt/peak_bound.py`): one that grows
+past it is a red row naming its peak, not a job the kernel ends with no name.
 
 What the Linux gate measures today is the harness, not a multiplexer:
 
