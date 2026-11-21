@@ -7,6 +7,11 @@
 #                          before it passes the limit; the hosted runner has no
 #                          swap, so a local engine whose swap is unbounded would
 #                          let a step pass there that the runner kills
+#   container-signal-mask  the command starts with no signal blocked and none
+#                          ignored, read from its own /proc/self/status with no
+#                          shell between (an engine's init may hand its child a
+#                          blocked set, which every pty and job-control row
+#                          would inherit)
 #   tools/container-rows ENGINE MEMORY IMAGE
 # MEMORY is the limit as the engine takes it, a whole number of g or m. The
 # image needs python3. Each row prints PASS or FAIL by name; the exit status is
@@ -48,5 +53,19 @@ while done < total:
   fi
 }
 
+signal_mask() {
+  local rc=0 blocked ignored
+  container_run "$engine" "$memory" "$image" --network=none -- cat /proc/self/status > "$out/signal-mask.out" 2>&1 || rc=$?
+  blocked=$(awk '$1 == "SigBlk:" {print $2}' "$out/signal-mask.out")
+  ignored=$(awk '$1 == "SigIgn:" {print $2}' "$out/signal-mask.out")
+  if [ "$rc" -eq 0 ] && [ "$blocked" = 0000000000000000 ] && [ "$ignored" = 0000000000000000 ]; then
+    echo "PASS container-signal-mask SigBlk=$blocked SigIgn=$ignored"
+  else
+    echo "FAIL container-signal-mask exit=$rc SigBlk=${blocked:-none} SigIgn=${ignored:-none}: expected nothing blocked or ignored"
+    fail=1
+  fi
+}
+
 memory_cap
+signal_mask
 exit "$fail"
