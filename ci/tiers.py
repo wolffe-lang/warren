@@ -39,6 +39,15 @@ GATE_SECONDS_BESIDE_FRESH = 2843
 # slow drive by name before the step limit would: 2,843 + 15,000 = 17,843 s
 # against 20,700. A workflow dispatch may ask for the nightly profile.
 NIGHTLY_LIMITS = {'linux': 345}
+# The slowest green gate step each limit has met since, read from the jobs of
+# the 40 runs from 2026-11-18 22:45Z to 2026-11-21 13:36Z (the gate step's
+# start and end): macOS 30 green jobs, 1,173 to 1,825 s (nightly 44545067049);
+# Linux on the pull-request profile 28 green jobs, 1,733 to 3,293 s (trunk push
+# 44477665367); the Linux nightly 3 green jobs, 7,084 to 8,495 s (nightly
+# 44751135693). The gate has grown since the estimates above: each limit must
+# stay at least twice the slowest of these.
+SLOWEST_GREEN_GATE_SECONDS = {'linux': 3293, 'macos': 1825}
+SLOWEST_GREEN_NIGHTLY_SECONDS = {'linux': 8495}
 PROFILES = ('pull-request', 'nightly')
 # A gate step that ended this close to its limit, red or cancelled, ran
 # into it.

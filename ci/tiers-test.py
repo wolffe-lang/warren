@@ -146,6 +146,23 @@ class Tiers(unittest.TestCase):
         deadline = fresh_fuzz.profile_deadline('pull-request') if hasattr(fresh_fuzz, 'profile_deadline') else 3600
         self.assertGreaterEqual(deadline, 2 * seeds * tiers.FRESH_SECONDS_PER_SEED)
 
+    def test_limits_hold_twice_the_slowest_measured(self):
+        # Each gate step's limit against the slowest green gate step it has
+        # actually met (tiers.py names the runs): at least twice it, the rule
+        # LIMITS states, so a runner 1.5 times slower still finishes.
+        tiers = tiers_module()
+        for job, slowest in sorted(tiers.SLOWEST_GREEN_GATE_SECONDS.items()):
+            with self.subTest(job=job, profile='pull-request'):
+                limit = tiers.LIMITS[job] * 60
+                self.assertGreaterEqual(limit, 2 * slowest, '%s limit %d s, slowest green gate step %d s' % (
+                    job, limit, slowest))
+        for job, slowest in sorted(tiers.SLOWEST_GREEN_NIGHTLY_SECONDS.items()):
+            with self.subTest(job=job, profile='nightly'):
+                limit = tiers.NIGHTLY_LIMITS[job] * 60
+                self.assertGreaterEqual(limit, 2 * slowest, '%s nightly limit %d s, slowest green gate step %d s' % (
+                    job, limit, slowest))
+        self.assertEqual(sorted(tiers.SLOWEST_GREEN_GATE_SECONDS), sorted(tiers.LIMITS))
+
     def test_pull_request_fits_its_limit(self):
         # The pull-request profile's Linux gate at the slowest measured pace: the
         # rest of the gate and its 200 seeds. Its step limit holds twice that, the
