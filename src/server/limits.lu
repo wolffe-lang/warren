@@ -74,6 +74,9 @@ pub const ACCEPT_BATCH: int = 8
 
 /// HELLO must be complete this long after accept.
 pub const HELLO_MS: int = 5000
+/// A REPLY that needs the server-wide reply buffer while another holds it
+/// waits at most this long; then it is refused by name.
+pub const REPLY_WAIT_MS: int = 5000
 /// A draining connection is closed after this long.
 pub const DRAIN_MS: int = 2000
 /// A closing pane's child is given this long before its pane is removed.

@@ -63,6 +63,8 @@ pub struct Server {
     reply_gen: int,
     reply_waiters: List[int],
     reply_waiter_gens: List[int],
+    // How long a reply waits for the buffer (REPLY_WAIT_MS, or lower).
+    reply_wait_ms: int,
     // While a command's action runs, the end of the last session owes the
     // stop instead of starting it, so the command's REPLY is queued first.
     hold_stop: bool,
@@ -180,11 +182,47 @@ fn release_reply(mut s: Server) {
         let g = s.reply_waiter_gens[0]
         drop_waiter(mut s, 0)
         if w >= 0 && w < s.conns.len && s.conns[w].live && s.conns[w].gen == g && s.conns[w].command_len > 0 {
+            // Its turn: the buffer is kept for it (no reply in it yet), so a
+            // COMMAND that comes meanwhile waits behind it.
+            s.reply_conn = w
+            s.reply_gen = g
             s.conns[w].command_ready = true
             s.again = true
             return
         }
     }
+}
+
+// Whether connection `index` waits for the reply buffer.
+fn waits_for_reply(s: Server, index: int) -> bool {
+    var k = 0
+    while k < s.reply_waiters.len {
+        if s.reply_waiters[k] == index && s.reply_waiter_gens[k] == s.conns[index].gen { return true }
+        k += 1
+    }
+    false
+}
+
+// A reply waited for the buffer as long as it may: it leaves the queue and
+// its COMMAND is refused by name (status 1).
+fn refuse_waiter(mut s: Server, index: int) {
+    var k = 0
+    while k < s.reply_waiters.len {
+        if s.reply_waiters[k] == index && s.reply_waiter_gens[k] == s.conns[index].gen { drop_waiter(mut s, k) } else { k += 1 }
+    }
+    let body = s.conns[index].command[0..s.conns[index].command_len]
+    let id = u(body, 0, 4)
+    let argv = argv_of(body)
+    let verb = if argv.len > 0 then argv[0] else ""
+    s.conns[index].command_len = 0
+    let ok = send(mut s.conns[index], 136, reply_payload(id, cmd.EXIT_REFUSED, "",
+        "warren: {verb}: waited {s.reply_wait_ms} ms for the server's reply buffer, which another reply held\n"))
+    trace(s, "conn {index} gave up waiting for the reply buffer")
+    s.conns[index].sent_kind = 136
+    s.conns[index].sent_code = cmd.EXIT_REFUSED
+    s.conns[index].phase = DRAINING
+    s.conns[index].deadline = now_ns() + DRAIN_MS * 1000000
+    if !ok { close_conn(mut s, index, "the REPLY to {verb} could not be queued") }
 }
 
 // Remove waiter `k` of the reply buffer, keeping the others' order.
@@ -2300,15 +2338,19 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
             "warren: {verb}: its reply of {payload.len} bytes is past the protocol's 8 MiB\n"))
         trace(s, "conn {index} REPLY of {payload.len} bytes refused: past the protocol's cap")
     } else if fits_queue(s.conns[index], wire) {
+        // A turn kept for this connection that its reply no longer needs.
+        if s.reply_conn == index && s.reply_gen == s.conns[index].gen { release_reply(mut s) }
         ok = enqueue(mut s.conns[index], wire, false)
         trace(s, "conn {index} REPLY {wire.len} bytes, in its queue")
-    } else if s.reply_conn >= 0 {
+    } else if s.reply_conn >= 0 && !(s.reply_conn == index && s.reply_gen == s.conns[index].gen) {
         // Another reply holds the buffer: this one is asked again when it is
-        // free (the COMMAND is kept as one waiting for a slot is).
+        // free (the COMMAND is kept as one waiting for a slot is), for at
+        // most the reply wait, counted from its first wait.
         command_later(mut s, index, body)
         s.conns[index].command_ready = false
         (mut s.reply_waiters).push(index)
         (mut s.reply_waiter_gens).push(s.conns[index].gen)
+        if s.conns[index].deadline == 0 { s.conns[index].deadline = now_ns() + s.reply_wait_ms * 1000000 }
         trace(s, "conn {index} waits for the reply buffer")
         return
     } else {
@@ -3104,6 +3146,8 @@ fn timers(mut s: Server, now: int) {
                 s.conns[i].ending = false
                 s.conns[i].deadline = 0
                 terminal(mut s, i, 135, 2, "session ended")
+            } else if waits_for_reply(s, i) {
+                refuse_waiter(mut s, i)
             } else {
                 close_conn(mut s, i, "its deadline passed while {phase_name(s.conns[i].phase)}")
             }
@@ -3307,6 +3351,9 @@ pub fn serve() -> int {
     // the memory; MEMORY_BUDGET is the server's rule and is never raised.
     var budget = (env.get("WARREN_MEMORY_BUDGET") else "0").to_int() else 0
     if budget <= 0 || budget > MEMORY_BUDGET { budget = MEMORY_BUDGET }
+    // A row may shorten the reply buffer's wait, never lengthen it.
+    var reply_wait = (env.get("WARREN_REPLY_WAIT_MS") else "0").to_int() else 0
+    if reply_wait <= 0 || reply_wait > REPLY_WAIT_MS { reply_wait = REPLY_WAIT_MS }
     var conns = List[Conn]()
     var i = 0
     while i < MAX_CONNECTIONS {
@@ -3325,7 +3372,7 @@ pub fn serve() -> int {
         place: place, w: waiter, listen_key: 0 - 1, listening: false,
         conns: conns, sessions: List[Session](), panes: List[Pane](), orphans: List[int](), key_kind: List[int](),
         key_owner: List[int](), key_gen: List[int](), next_id: 0, next_pane: 1, next_session: 1, next_tab: 1, told: List[byte](), reply: List[byte](), reply_len: 0, reply_off: 0, reply_conn: 0 - 1, reply_gen: 0,
-        reply_waiters: List[int](), reply_waiter_gens: List[int](), hold_stop: false, stop_owed: false, stopping: false, stop_deadline: 0,
+        reply_waiters: List[int](), reply_waiter_gens: List[int](), reply_wait_ms: reply_wait, hold_stop: false, stop_owed: false, stopping: false, stop_deadline: 0,
         started: now_ns(), idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
         version: vt.package_version(), again: false, need_slot: false, need_pane: false, need_view: false, settings: load_settings(), want_cols: 0,
         want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, frames: 0, prompt_frames: 0,
