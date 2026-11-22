@@ -449,6 +449,14 @@ pub fn reply_payload(id: int, status: int, out: str, err: str) -> List[byte] {
     b
 }
 
+/// A REPLY's wire bytes. Stub: one physical frame, as `send` encodes
+/// every message; empty past the physical frame's 1 MiB.
+pub fn reply_wire(payload: List[byte]) -> List[byte] {
+    let r = proto.encode(136, 0, payload)
+    if r.code != 0 { return List[byte]() }
+    r.bytes
+}
+
 /// A HELLO, read after the codec validated it.
 pub struct Hello {
     role: int,
