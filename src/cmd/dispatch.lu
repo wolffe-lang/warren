@@ -14,6 +14,16 @@ pub const VERB_LIST_SESSIONS: int = 3
 pub const VERB_NEW_SESSION: int = 4
 /// `list --json`.
 pub const VERB_LIST_JSON: int = 5
+/// `send-keys [-t TARGET] [-l] [--] KEY...`.
+pub const VERB_SEND_KEYS: int = 6
+/// `capture-pane [-t TARGET] [-p] [-e] [-J] [-S LINE] [-E LINE]`.
+pub const VERB_CAPTURE: int = 7
+/// A capture's line given as `-`: history's first line for `-S`, the last
+/// visible row for `-E`.
+pub const LINE_EDGE: int = 1125899906842624
+/// A capture's line not given: the first visible row for `-S`, the last
+/// visible row for `-E`.
+pub const LINE_UNSET: int = 1125899906842625
 
 /// A verb read from a COMMAND's arguments: `ok`, its kind, its target (empty
 /// for none), the command line's reading for an action, a new session's
@@ -21,23 +31,30 @@ pub const VERB_LIST_JSON: int = 5
 /// the server refuses), the directory a new pane starts in (`-c DIR`) and
 /// the program it runs (`-- CMD [ARG...]`, empty for the shell); or a
 /// refusal, its exit status (2 for usage) and why.
+/// For `send-keys`: its words (`keys`) and whether they are all text
+/// (`literal`). For `capture-pane`: whether it prints (`print`), writes
+/// renditions (`escapes`) and joins wrapped rows (`join`), and its first and
+/// last lines (`start`, `end`: a line number, LINE_EDGE or LINE_UNSET).
 pub struct Verb { ok: bool, kind: int, target: str, command: config.Command, name: str, named: bool, dir: str, has_dir: bool,
-    argv: List[str], status: int, why: str }
+    argv: List[str], status: int, why: str, keys: List[str], literal: bool, print: bool, escapes: bool, join: bool,
+    start: int, end: int }
 
 // The server's own verbs, besides the command line's (a function: the
 // reference interpreter does not resolve a method on a module constant).
 fn server_verbs() -> str {
-    "kill-server list-sessions ls new-session list"
+    "kill-server list-sessions ls new-session list send-keys capture-pane"
 }
 
 fn usage_error(why: str) -> Verb {
     Verb { ok: false, kind: 0, target: "", command: config.command(""), name: "", named: false, dir: "", has_dir: false,
-        argv: List[str](), status: EXIT_USAGE, why: why }
+        argv: List[str](), status: EXIT_USAGE, why: why, keys: List[str](), literal: false, print: false, escapes: false,
+        join: false, start: LINE_UNSET, end: LINE_UNSET }
 }
 
 fn verb_of(kind: int, target: str, name: str) -> Verb {
     Verb { ok: true, kind: kind, target: target, command: config.command(""), name: name, named: false, dir: "",
-        has_dir: false, argv: List[str](), status: EXIT_DONE, why: "" }
+        has_dir: false, argv: List[str](), status: EXIT_DONE, why: "", keys: List[str](), literal: false, print: false,
+        escapes: false, join: false, start: LINE_UNSET, end: LINE_UNSET }
 }
 
 fn is_server_verb(v: str) -> bool {
@@ -65,6 +82,8 @@ pub fn parse_verb(argv: List[str]) -> Verb {
     let v = argv[0]
     let server_verb = is_server_verb(v)
     if !server_verb && !is_command_verb(v) { return usage_error("unknown command: " + v) }
+    if v == "send-keys" { return parse_send_keys(argv) }
+    if v == "capture-pane" { return parse_capture(argv) }
     var target = ""
     var targeted = false
     var dir = ""
@@ -131,7 +150,18 @@ pub fn parse_verb(argv: List[str]) -> Verb {
     let c = config.command(line)
     if !c.ok { return usage_error(c.why) }
     Verb { ok: true, kind: VERB_ACTION, target: target, command: c, name: "", named: false, dir: dir, has_dir: has_dir,
-        argv: program, status: EXIT_DONE, why: "" }
+        argv: program, status: EXIT_DONE, why: "", keys: List[str](), literal: false, print: false, escapes: false,
+        join: false, start: LINE_UNSET, end: LINE_UNSET }
+}
+
+// `send-keys`'s arguments. Stub: not in this version.
+fn parse_send_keys(argv: List[str]) -> Verb {
+    usage_error("usage: send-keys: not in this version ({argv.len - 1} arguments)")
+}
+
+// `capture-pane`'s arguments. Stub: not in this version.
+fn parse_capture(argv: List[str]) -> Verb {
+    usage_error("usage: capture-pane: not in this version ({argv.len - 1} arguments)")
 }
 
 // The verbs that make a pane, and so take `-c DIR` (and, but for
