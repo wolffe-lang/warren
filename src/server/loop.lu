@@ -2186,6 +2186,8 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
                 } else if missing.len > 0 {
                     err = "warren: {verb}: the program did not start: {missing}\n"
                 } else {
+                    // The id the pane a creating verb makes will take.
+                    let made = s.next_pane
                     if command_action(mut s, si, r.tab, r.pane, v.command, dir, v.argv) == LATER {
                         command_later(mut s, index, body)
                         return
@@ -2195,6 +2197,9 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
                     } else {
                         status = 0
                         err = ""
+                        if (a == config.A_SPLIT || a == config.A_NEW_TAB) && slot_of(s, made) >= 0 {
+                            out = cmd.format_id(cmd.ID_PANE, made) + "\n"
+                        }
                     }
                 }
             }
