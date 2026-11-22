@@ -83,7 +83,8 @@ in panes may write the clipboard too; by default they may not. `vt-dump` is a di
 - **Scrollback and copy:** per-pane scrollback under a byte cap, search, a
   keyboard copy mode, an internal buffer and OSC 52 outward.
 - **One TOML file** for configuration, and a command socket so that scripts
-  can drive it (`warren split`, `warren send-keys`, `warren list --json`).
+  can drive it: every command line verb with a target (`warren split-right -t
+  work`) and `warren list --json` today ([CLI](docs/CLI.md)); `send-keys` later.
 - **Layouts and working directories are saved and restored.** Running programs
   are not resurrected.
 
@@ -94,7 +95,7 @@ in panes may write the clipboard too; by default they may not. `vt-dump` is a di
 | W2 | one pane; detach and attach | server, terminal client, new, attach, detach and a second client, with rows on Linux, macOS and PAX under QEMU; surviving a PAX console logout waits on PAX |
 | W3 | panes, tabs, the bar, keys | pure layout module; panes and tabs in the server, borders and the focus mark, the bar's lines (tabs with activity, bell and zoom marks, the mode, the clock); modes per client, the hint line and the key list from one key table, a minimal command line; configuration planned |
 | W4 | mouse, scrollback, copy | pane/tab clicks, minimum-clamped border dragging, wheel and key scrollback per client, drag selection copied on release into the session's register and the terminal's clipboard (OSC 52), pasted with prefix `]`; programs' OSC 52 writes off unless `warren.toml` allows them; search in scroll mode |
-| W5 | layouts, commands, persistence | planned |
+| W5 | layouts, commands, persistence | in progress: ids, targets, every command line verb, `list --json` |
 | W6 | on the PAX image, on real hardware | planned |
 
 ## Machines and pins
