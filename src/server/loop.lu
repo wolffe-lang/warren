@@ -2282,6 +2282,32 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
                 err = ""
             }
         }
+    } else if v.ok && v.kind == cmd.VERB_SEND_KEYS {
+        status = cmd.EXIT_REFUSED
+        let from = cmd.parse_id(pane_field_of(body))
+        let caller = if from.kind == cmd.ID_PANE then from.n else 0
+        let r = cmd.resolve(snapshot(s), v.target, caller)
+        let k = if r.ok then slot_of(s, r.pane) else 0 - 1
+        if !r.ok {
+            err = if v.target.len > 0 then "warren: {verb}: {r.why}: {v.target}\n" else "warren: {verb}: {r.why}\n"
+        } else if k < 0 || !s.panes[k].live || s.panes[k].ended {
+            err = "warren: {verb}: the pane's program has ended\n"
+        } else {
+            // Each key as a typed key reaches the pane: in the pane's own
+            // mode, past the key table (no prefix, no bindings).
+            var data = List[byte]()
+            for e in cmd.events_of(v.keys, v.literal) {
+                for b in key_bytes(s.panes[k].screen, e.mods, e.kind, e.code) { (mut data).push(b) }
+            }
+            let room = INPUT_QUEUE - (s.panes[k].in_len - s.panes[k].in_off)
+            if data.len > room {
+                err = "warren: {verb}: {data.len} bytes do not fit the pane's input queue ({room} of {INPUT_QUEUE} bytes free); nothing was sent\n"
+            } else {
+                queue_to(mut s, k, data)
+                status = 0
+                err = ""
+            }
+        }
     } else if v.ok {
         status = cmd.EXIT_REFUSED
         let a = v.command.action
