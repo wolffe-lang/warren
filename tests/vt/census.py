@@ -134,6 +134,13 @@ case('osc-unknown', E + b']777;hello\x07X')
 case('osc-icon-only', E + b']1;icon\x07X')
 case('osc-0', E + b']0;both\x07X')
 case('osc-utf8', E + b']2;\xe4\xb8\xad\x07X')
+# OSC 7, the directory a program reports, changes nothing on the screen: each
+# stream is cell-equal to `ab` printed alone.
+case('osc7-bel', b'a' + E + b']7;file:///tmp/osc7-x\x07b')
+case('osc7-st', b'a' + E + b']7;file:///tmp/osc7-x' + E + b'\\b')
+case('osc7-long', b'a' + E + b']7;file:///tmp/' + b'x' * 4200 + b'\x07b')
+case('osc7-malformed', b'a' + E + b']7;file:///tmp/%G1\x07b')
+case('osc7-empty', b'a' + E + b']7;\x07b')
 case('dcs', E + b'Pqqq' + E + b'\\X')
 case('apc', E + b'_app' + E + b'\\X')
 case('pm', E + b'^pm' + E + b'\\X')

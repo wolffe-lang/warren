@@ -354,6 +354,31 @@
         "screen_sha256": "1d95fddaa3a823494c25a6474f6988562fa5269f11ab0c36341016c050d3e142",
         "replay": false
       },
+      "osc7-bel": {
+        "input_sha256": "0a0313cd4a98e2cf7109f22fb3d66c2aef4d80bfb093361e817476c42e4bbc67",
+        "screen_sha256": "1aa91992573d627837da2bb95f48cc661cf6337f66d74648870b804004e4b0b9",
+        "replay": false
+      },
+      "osc7-empty": {
+        "input_sha256": "c712d1a04fc6b298c986f6501f870e320ced0b4d63644d2b5987acd32bc8c123",
+        "screen_sha256": "1aa91992573d627837da2bb95f48cc661cf6337f66d74648870b804004e4b0b9",
+        "replay": false
+      },
+      "osc7-long": {
+        "input_sha256": "749e9ebc8e5999c25e04a406ee4984ceedb739a394a8172aa041ced28ee8add8",
+        "screen_sha256": "1aa91992573d627837da2bb95f48cc661cf6337f66d74648870b804004e4b0b9",
+        "replay": false
+      },
+      "osc7-malformed": {
+        "input_sha256": "6438c71a2b362a919abdb00db6921bc9d86f9ea5d145e5a25c0c526e7e7aef49",
+        "screen_sha256": "1aa91992573d627837da2bb95f48cc661cf6337f66d74648870b804004e4b0b9",
+        "replay": false
+      },
+      "osc7-st": {
+        "input_sha256": "66dcde7322c2f09d0db80a3539d938e658a2f3d4ed05404d6940346f6e426227",
+        "screen_sha256": "1aa91992573d627837da2bb95f48cc661cf6337f66d74648870b804004e4b0b9",
+        "replay": false
+      },
       "pm": {
         "input_sha256": "c7b2a2275ea2d33ffdb1754395b288fed50548799c1c6e47497dcc9ed2ad7632",
         "screen_sha256": "26701c18868dcead378f83d7f6ecf36b07d470f157698f265940747705aae828",
