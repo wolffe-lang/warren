@@ -48,6 +48,10 @@ pub struct Server {
     // a command and there was no client to tell (bytes the server keeps:
     // a turn's region may not leave a str in it).
     told: List[byte],
+    // While a command's action runs, the end of the last session owes the
+    // stop instead of starting it, so the command's REPLY is queued first.
+    hold_stop: bool,
+    stop_owed: bool,
     stopping: bool,
     stop_deadline: int,
     started: int,
@@ -383,7 +387,11 @@ fn end_session(mut s: Server, si: int) {
     }
     s.sessions[si].live = false
     s.sessions[si].members = 0
-    if live_sessions(s) == 0 { begin_stop(mut s, "the last session ended") }
+    if live_sessions(s) == 0 {
+        // A command that ended the last session has its REPLY queued before
+        // the stop, as kill-server's is.
+        if s.hold_stop { s.stop_owed = true } else { begin_stop(mut s, "the last session ended") }
+    }
 }
 
 // ---- panes ----
@@ -2188,7 +2196,10 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
                 } else {
                     // The id the pane a creating verb makes will take.
                     let made = s.next_pane
-                    if command_action(mut s, si, r.tab, r.pane, v.command, dir, v.argv) == LATER {
+                    s.hold_stop = true
+                    let done = command_action(mut s, si, r.tab, r.pane, v.command, dir, v.argv)
+                    s.hold_stop = false
+                    if done == LATER {
                         command_later(mut s, index, body)
                         return
                     }
@@ -2212,6 +2223,10 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
     s.conns[index].deadline = now_ns() + DRAIN_MS * 1000000
     if !ok { close_conn(mut s, index, "the REPLY to {verb} could not be queued") }
     if s.conns[index].stop_after || (!ok && v.kind == cmd.VERB_KILL_SERVER) { begin_stop(mut s, "kill-server") }
+    if s.stop_owed {
+        s.stop_owed = false
+        begin_stop(mut s, "the last session ended")
+    }
 }
 /// One complete logical message from a connection.
 fn message(mut s: Server, index: int, kind: int, body: List[byte]) {
@@ -3202,7 +3217,7 @@ pub fn serve() -> int {
     var s = Server {
         place: place, w: waiter, listen_key: 0 - 1, listening: false,
         conns: conns, sessions: List[Session](), panes: List[Pane](), orphans: List[int](), key_kind: List[int](),
-        key_owner: List[int](), key_gen: List[int](), next_id: 0, next_pane: 1, next_session: 1, next_tab: 1, told: List[byte](), stopping: false, stop_deadline: 0,
+        key_owner: List[int](), key_gen: List[int](), next_id: 0, next_pane: 1, next_session: 1, next_tab: 1, told: List[byte](), hold_stop: false, stop_owed: false, stopping: false, stop_deadline: 0,
         started: now_ns(), idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
         version: vt.package_version(), again: false, need_slot: false, need_pane: false, need_view: false, settings: load_settings(), want_cols: 0,
         want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, frames: 0, prompt_frames: 0,
