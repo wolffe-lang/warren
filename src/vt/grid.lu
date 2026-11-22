@@ -52,6 +52,9 @@ pub struct Modes {
 /// (`print_scalar`), for rows that hold how much of a feed takes it.
 /// `wide_run` is true only right after a wide glyph was written: any other
 /// byte, a narrow or dropped scalar, a mark and a resize end the run.
+/// `cwd_storage` holds the directory the program last reported with OSC 7
+/// (`cwd_length` 0: none), and `local_host` the name this machine answers
+/// to in that report (osc7.lu).
 pub struct Vt {
     cols: int, rows: int,
     primary: Screen, alternate: Screen, active_alternate: bool,
@@ -60,6 +63,8 @@ pub struct Vt {
     tabs: List[bool], default_tabs: bool,
     pen: Pen, modes: Modes, parser: Parser,
     title_storage: List[byte], title_length: int,
+    cwd_storage: List[byte], cwd_length: int,
+    local_host: List[byte], local_host_length: int,
     mode_values: List[int], events: EventState,
     scrollback_cap_bytes: int,
     answer_storage: List[byte], answer_length: int,
@@ -141,6 +146,8 @@ pub fn new(cols: int, rows: int, scrollback_cap_bytes: int) -> Vt {
         modes: Modes { autowrap: true, origin: false, insert: false,
             newline: false, cursor_visible: true },
         parser: new_parser(), title_storage: new_byte_buffer(), title_length: 0,
+        cwd_storage: new_byte_buffer(), cwd_length: 0,
+        local_host: new_host_buffer(), local_host_length: 0,
         mode_values: new_mode_values(), events: new_events(),
         scrollback_cap_bytes: scrollback_cap_bytes,
         answer_storage: new_byte_buffer(), answer_length: 0,

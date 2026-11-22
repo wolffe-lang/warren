@@ -1,0 +1,39 @@
+//! member: true
+//! OSC 7, the directory a pane's program reports: `ESC ] 7 ; file://HOST/PATH`
+//! ended by BEL or ST. The pane keeps the last path it accepted in fixed
+//! storage, beside the window title; it has no screen effect and raises no
+//! event, and a reset (RIS) keeps it, as it keeps the title.
+
+/// The longest host name a pane is given: 255 bytes, as POSIX allows.
+pub const HOST_BYTES: int = 256
+
+fn new_host_buffer() -> List[byte] {
+    var data = List[byte]()
+    (mut data).reserve(HOST_BYTES)
+    var i = 0
+    while i < HOST_BYTES { (mut data).push(0 as byte); i += 1 }
+    data
+}
+
+/// Give the pane the name this machine answers to, which an OSC 7 host may
+/// name besides the empty host and `localhost`. False, and no name kept,
+/// when `name` is empty or longer than 255 bytes.
+pub fn set_local_host(mut pane: Vt, name: str) -> bool {
+    let bytes = name.bytes()
+    if bytes.len == 0 || bytes.len >= HOST_BYTES {
+        pane.local_host_length = 0
+        return false
+    }
+    var i = 0
+    while i < bytes.len {
+        pane.local_host[i] = bytes[i]
+        i += 1
+    }
+    pane.local_host_length = bytes.len
+    true
+}
+
+/// The directory the pane's program last reported, "" when none.
+pub fn reported_dir(pane: Vt) -> str {
+    str_from_utf8(pane.cwd_storage[0..pane.cwd_length]) else ""
+}
