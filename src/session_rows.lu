@@ -720,6 +720,80 @@ fn row_list_json_over_queue(mut r: Rig) -> str {
     ""
 }
 
+// The physical frames in `got`, from the first: the REPLY's payload once
+// its last fragment is in, else empty.
+fn reply_in(got: List[byte]) -> List[byte] {
+    var at = 0
+    var chain = List[byte]()
+    while at + 6 <= got.len {
+        let n = le4(got, at)
+        let kind = got[at + 4] as int
+        let more = got[at + 5] as int
+        if at + 6 + n > got.len { break }
+        if kind == 136 {
+            for b in got[at + 6..at + 6 + n] { (mut chain).push(b) }
+            if more == 0 { return chain }
+        }
+        at = at + 6 + n
+    }
+    List[byte]()
+}
+
+// One `list --json` read by hand: `pause_ms` before the first read, then
+// `chunk` bytes every `every_ms`, or one chunk and then a stall of
+// `stall_ms`. Returns the REPLY's payload, or empty when the connection
+// ended first.
+fn read_slowly(r: Rig, pause_ms: int, chunk: int, every_ms: int, stall_ms: int) -> List[byte] {
+    var p = client.dial(socket(r)) else |_| { return List[byte]() }
+    var none = List[str]()
+    let _h = client.send(p, 1, client.hello_payload(2, 0, 0, "", 0, "", none, none))
+    var b = List[byte]()
+    proto.put(mut b, 9, 4)
+    proto.put(mut b, 2, 2)
+    proto.put_text(mut b, "list")
+    proto.put_text(mut b, "--json")
+    proto.put_text(mut b, "/")
+    proto.put_text(mut b, "")
+    let _c = client.send(p, 11, b)
+    var s = net.Socket { fd: p.fd }
+    time.sleep(time.millis(pause_ms))
+    var got = List[byte]()
+    var reads = 0
+    let until = now_ms() + 30000
+    var payload = List[byte]()
+    while now_ms() < until {
+        let part = net.read_bytes(mut s, chunk) else |_| { break }
+        if part.len == 0 { break }
+        for x in part { (mut got).push(x) }
+        payload = reply_in(got)
+        if payload.len > 0 { break }
+        reads += 1
+        if stall_ms > 0 && reads == 1 { time.sleep(time.millis(stall_ms)) } else { time.sleep(time.millis(every_ms)) }
+    }
+    client.hang_up(mut p)
+    payload
+}
+
+// A command client that reads a large REPLY slowly but steadily receives
+// all of it: the two seconds a draining connection is given count from
+// its last write that made progress. It waits 1.2 s, then reads 8 KiB
+// every 250 ms. The control: a client that reads 8 KiB and then stalls for
+// 3 s is closed before the REPLY ends, unless its socket took the whole
+// REPLY at once (said in a NOTE).
+fn row_reply_slow_reader(mut r: Rig) -> str {
+    let why = quoted_session(mut r)
+    if why.len > 0 { return why }
+    let l = quoted_listing(r)
+    if l.status != 0 { return "the listing of 32 titled panes: {l.err}" }
+    let slow = read_slowly(r, 1200, 8192, 250, 0)
+    if slow.len == 0 { return "the slow reader's connection ended before its REPLY did" }
+    let out_len = le4(slow, 5)
+    if out_len != l.out.len { return "the slow reader's REPLY held {out_len} bytes of output, not {l.out.len}" }
+    let stalled = read_slowly(r, 0, 8192, 0, 3000)
+    if stalled.len > 0 { print("NOTE reply-slow-reader: the stalled reader's socket took the whole REPLY") }
+    ""
+}
+
 // Ids are never handed out again: a closed pane's, an ended session's and
 // its tab's.
 fn row_ids_never_reused(mut r: Rig) -> str {
@@ -1810,13 +1884,14 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "title-flood-survives" { why = row_title_flood_survives(mut r) }
     else if name == "title-on-focus" { why = row_title_on_focus(mut r) }
     else if name == "list-json-over-queue" { why = row_list_json_over_queue(mut r) }
+    else if name == "reply-slow-reader" { why = row_reply_slow_reader(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader".split(" ") {
         (mut x).push(n)
     }
     x
