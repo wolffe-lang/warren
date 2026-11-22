@@ -41,7 +41,8 @@ def main():
         (RIG, 'container-limits.manifest', ['gate-linux', 'container-limits']),
         (RIG, 'container-limits-plant.manifest', ['container-memory-cap']),
         (RIG, 'verbs.manifest', ['gate-linux']),
-        (RIG, 'verbs-plant.manifest', ['ids-never-reused'])):
+        (RIG, 'verbs-plant.manifest', ['ids-never-reused']),
+        (RIG, 'verbs-create-plant.manifest', ['split-prints-new-id'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
@@ -62,7 +63,7 @@ def main():
     assert inner_path.exists(), 'verbs-plant-toolchain: no verbs-inner.sh setting root before the toolchain'
     inner = inner_path.read_text()
     assert inner.index('root=$PWD') < inner.index('. tools/toolchain-env.sh'), 'verbs-plant-toolchain: root'
-    assert 'exec ../native/session-rows ../native/warren ids-never-reused' in inner
+    assert 'exec ../native/session-rows ../native/warren "$row"' in inner
     for mode in ('plant', 'toolchain'):
         assert f'inside bash tests/vt/rig/verbs-inner.sh {mode}' in verbs, ('verbs-plant-toolchain', mode)
     plant = (RIG / 'w1-plant-step.sh').read_text()

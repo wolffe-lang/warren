@@ -1,0 +1,6 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# has a split print the old pane's id, so the printed-id row goes red by name.
+floor 15
+rig verbs-step.sh sha256=1459beaf6782447b2a9722f99a436867464e883cf85b502d4e6bb4dca56bf4e8
+rig verbs-inner.sh sha256=33948c6f39ebec8b3b05473d503a8fc475a2ba5ddc1fc0084f1553632c413b28
+step split-prints-new-id tools=bash,python3 script=verbs-step.sh -- plant split-prints-new-id

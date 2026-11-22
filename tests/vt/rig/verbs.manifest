@@ -4,6 +4,6 @@
 # 'bash tests/vt/rig/verbs-step.sh preflight': the whole Linux gate in the
 # pinned image, which runs the pure rows, the session rows and the CLI rows.
 floor 35
-rig verbs-step.sh sha256=2fc9babb0cf78fcae8afa85dfafa0c6939159f37bac69a0826f72278cca1b3d2
-rig verbs-inner.sh sha256=4aab0aa61ed3beda181bd29d26682acc894a71d31010c18b239623d63b7f7bf9
+rig verbs-step.sh sha256=1459beaf6782447b2a9722f99a436867464e883cf85b502d4e6bb4dca56bf4e8
+rig verbs-inner.sh sha256=33948c6f39ebec8b3b05473d503a8fc475a2ba5ddc1fc0084f1553632c413b28
 step gate-linux tools=bash,python3 script=verbs-step.sh -- gate-linux
