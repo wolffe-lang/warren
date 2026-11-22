@@ -224,8 +224,8 @@ pub fn attach(target: str, create: bool) -> int {
         eprint("warren: {large}")
         return 1
     }
-    let console = (env.get("WARREN_RENDER") else "") == "console"
     let termname = env.get("TERM") else ""
+    let console = console_chosen(termname, env.get("WARREN_RENDER") else "")
     let pol = policy_for(termname, env.get("COLORTERM") else "", console)
     // Bit 3: the outer terminal takes OSC 52 clipboard writes; never the console.
     let features = if console then 0 else 15
