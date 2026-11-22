@@ -202,6 +202,17 @@ fn console_feed(mut c: Console, bytes: List[byte]) {
     }
 }
 
+// The console policy is PAX's console's and a Linux virtual console's: it is
+// picked when TERM is linux and WARREN_RENDER is unset (or empty), and the
+// variable decides whenever it is set, either way.
+fn test_console_chosen() {
+    assert(client.console_chosen("linux", ""), "console-term-linux-unset")
+    assert(client.console_chosen("linux", "console"), "console-term-linux-variable")
+    assert(!client.console_chosen("linux", "terminal"), "console-term-linux-overridden")
+    assert(!client.console_chosen("xterm-256color", ""), "console-term-other")
+    assert(client.console_chosen("xterm-256color", "console"), "console-variable-elsewhere")
+}
+
 fn test_console_policy() {
     let pol = client.policy_for("", "", true)
     var p = pair(30, 8)
