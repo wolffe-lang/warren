@@ -142,6 +142,9 @@ step keys-lupin "$LUPIN" run src/keys_test.lu
 step pacing-lupin "$LUPIN" run src/pacing_test.lu
 step client-input-lupin "$LUPIN" run src/client_input_test.lu
 step client-keyboard-lupin "$LUPIN" run src/client_keyboard_test.lu
+step cmd-rows-build "$WOLF" build --deny-warnings src/cmd_rows_test.lu -o "$root/target/native/cmd-rows"
+step cmd-rows-native "$root/target/native/cmd-rows"
+step cmd-rows-lupin "$LUPIN" run src/cmd_rows_test.lu
 step cli-lupin python3 -I tests/vt/cli_rows.py "$LUPIN" run src/warren.lu
 step cases-lupin python3 -I tests/vt/compare_cases.py "$LUPIN" run src/warren.lu
 step combining-frames-lupin python3 -I tests/vt/compare_combining.py "$LUPIN" run src/warren.lu

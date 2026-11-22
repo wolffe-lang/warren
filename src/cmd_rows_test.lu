@@ -1,0 +1,302 @@
+//! member: false
+//! The command client's pure rules, held by expectations written before the
+//! code: ids and their one spelling, targets resolved over a snapshot of the
+//! server's sessions, the verb table read exactly as the command line (`:`)
+//! reads it, and `warren list --json` schema 1. Each row prints `PASS <row>`
+//! or `FAIL <row> <why>`, then `CMD-ROWS rows=N failed=M`; the program exits 1
+//! when any row is red. Native, under lupin, and as one test of `wolf test`.
+use cmd
+use config
+
+struct Tally { rows: int, failed: int }
+
+fn row(mut t: Tally, name: str, why: str) {
+    t.rows += 1
+    if why.len == 0 {
+        print("PASS {name}")
+    } else {
+        print("FAIL {name} {why}")
+        t.failed += 1
+    }
+}
+
+// ---- snapshots, written by hand ----
+
+fn pane(id: int, col: int, cols: int, rows: int, pid: int, title: str) -> cmd.PaneView {
+    cmd.PaneView { id: id, col: col, row: 1, cols: cols, rows: rows, pid: pid, title: title }
+}
+
+// Session s1 `work` (tabs t1 `main` with p1 and p2, focus p2; t2 `logs`
+// with p3, zoomed), session s2 `1` (t3 `main` with p4), session s4 `a:b`
+// (t5 `x.y` with p6). Ids 3 and 5 of sessions and tabs, 5 of panes, are gone.
+fn world() -> cmd.Snapshot {
+    var t1 = List[cmd.PaneView]()
+    (mut t1).push(pane(1, 1, 40, 22, 4201, "sh"))
+    (mut t1).push(pane(2, 42, 39, 22, 4202, "top"))
+    var t2 = List[cmd.PaneView]()
+    (mut t2).push(pane(3, 1, 80, 22, 4203, "tail"))
+    var work = List[cmd.TabView]()
+    (mut work).push(cmd.TabView { id: 1, name: "main", focus: 2, zoomed: false, panes: t1 })
+    (mut work).push(cmd.TabView { id: 2, name: "logs", focus: 3, zoomed: true, panes: t2 })
+    var t3 = List[cmd.PaneView]()
+    (mut t3).push(pane(4, 1, 120, 38, 4204, ""))
+    var one = List[cmd.TabView]()
+    (mut one).push(cmd.TabView { id: 3, name: "main", focus: 4, zoomed: false, panes: t3 })
+    var t5 = List[cmd.PaneView]()
+    (mut t5).push(pane(6, 1, 80, 22, 4206, ""))
+    var colon = List[cmd.TabView]()
+    (mut colon).push(cmd.TabView { id: 5, name: "x.y", focus: 6, zoomed: false, panes: t5 })
+    var sessions = List[cmd.SessionView]()
+    (mut sessions).push(cmd.SessionView { id: 1, name: "work", cols: 80, rows: 24, clients: 1, active: 1, tabs: work })
+    (mut sessions).push(cmd.SessionView { id: 2, name: "1", cols: 120, rows: 40, clients: 0, active: 3, tabs: one })
+    (mut sessions).push(cmd.SessionView { id: 4, name: "a:b", cols: 80, rows: 24, clients: 0, active: 5, tabs: colon })
+    cmd.Snapshot { sessions: sessions }
+}
+
+// One session `solo` (s7, tab t9 with p11).
+fn solo() -> cmd.Snapshot {
+    var ps = List[cmd.PaneView]()
+    (mut ps).push(pane(11, 1, 80, 22, 0 - 1, ""))
+    var tabs = List[cmd.TabView]()
+    (mut tabs).push(cmd.TabView { id: 9, name: "main", focus: 11, zoomed: false, panes: ps })
+    var sessions = List[cmd.SessionView]()
+    (mut sessions).push(cmd.SessionView { id: 7, name: "solo", cols: 80, rows: 24, clients: 2, active: 9, tabs: tabs })
+    cmd.Snapshot { sessions: sessions }
+}
+
+// ---- ids ----
+
+fn id_reads(text: str, kind: int, n: int) -> str {
+    let got = cmd.parse_id(text)
+    if got.kind != kind || got.n != n { return "'{text}' read as {got.kind}/{got.n}, not {kind}/{n}" }
+    ""
+}
+
+fn ids(mut t: Tally) {
+    var why = ""
+    if cmd.format_id(cmd.ID_SESSION, 1) != "s1" { why = "session 1 is '{cmd.format_id(cmd.ID_SESSION, 1)}'" }
+    if cmd.format_id(cmd.ID_TAB, 12) != "t12" { why = "tab 12 is '{cmd.format_id(cmd.ID_TAB, 12)}'" }
+    if cmd.format_id(cmd.ID_PANE, 3) != "p3" { why = "pane 3 is '{cmd.format_id(cmd.ID_PANE, 3)}'" }
+    row(mut t, "ids-format", why)
+    why = ""
+    for c in "s1 1 1|t12 2 12|p3 3 3|%7 3 7|p123456 3 123456".split("|") {
+        let f = c.split(" ")
+        let one = id_reads(f[0], f[1].to_int() else (0 - 1), f[2].to_int() else (0 - 1))
+        if one.len > 0 { why = one }
+    }
+    row(mut t, "ids-parse", why)
+    // The refusals beside a control that must be read: a reader that
+    // refuses everything does not pass this row.
+    why = id_reads("p3", cmd.ID_PANE, 3)
+    for bad in "p0|p007|p|x1|p-1|p1x||%|%0|s 1|P1|t|s01|p+1".split("|") {
+        let one = id_reads(bad, cmd.ID_NONE, 0)
+        if one.len > 0 { why = one }
+    }
+    if cmd.format_id(cmd.ID_NONE, 1) != "" || cmd.format_id(cmd.ID_PANE, 0) != "" { why = "an id of no kind or of 0 has text" }
+    row(mut t, "ids-refuse", why)
+    why = ""
+    let kinds: List[int] = [cmd.ID_SESSION, cmd.ID_TAB, cmd.ID_PANE]
+    let numbers: List[int] = [1, 9, 10, 99, 123456]
+    for kind in kinds {
+        for n in numbers {
+            let text = cmd.format_id(kind, n)
+            let back = cmd.parse_id(text)
+            if back.kind != kind || back.n != n { why = "{kind}/{n} as '{text}' came back {back.kind}/{back.n}" }
+        }
+    }
+    row(mut t, "ids-round-trip", why)
+}
+
+// ---- targets ----
+
+fn leads(snap: cmd.Snapshot, target: str, caller: int, session: int, tab: int, pane: int) -> str {
+    let r = cmd.resolve(snap, target, caller)
+    if !r.ok { return "'{target}' refused {r.why}" }
+    if r.session != session || r.tab != tab || r.pane != pane {
+        return "'{target}' led to {r.session}/{r.tab}/{r.pane}, not {session}/{tab}/{pane}"
+    }
+    ""
+}
+
+fn refuses(snap: cmd.Snapshot, target: str, caller: int, why: str) -> str {
+    let r = cmd.resolve(snap, target, caller)
+    if r.ok { return "'{target}' led to {r.session}/{r.tab}/{r.pane}" }
+    if r.why != why { return "'{target}' refused {r.why}, not {why}" }
+    ""
+}
+
+fn either(a: str, b: str) -> str {
+    if a.len > 0 { return a }
+    b
+}
+
+fn targets(mut t: Tally) {
+    let w = world()
+    // An id names its own pane; a tab's or a session's id, its focused pane.
+    var why = either(leads(w, "p2", 0, 1, 1, 2), leads(w, "%2", 0, 1, 1, 2))
+    why = either(why, either(leads(w, "p1", 0, 1, 1, 1), leads(w, "t2", 0, 1, 2, 3)))
+    why = either(why, either(leads(w, "s2", 0, 2, 3, 4), leads(w, "s1", 0, 1, 1, 2)))
+    row(mut t, "target-ids", why)
+    // A session by its name: its active tab's focused pane. A session's
+    // name is never an index (sessions are named `1`, `2` ... by default).
+    why = either(leads(w, "work", 0, 1, 1, 2), leads(w, "1", 0, 2, 3, 4))
+    row(mut t, "target-session-name", why)
+    why = either(leads(w, "work:2", 0, 1, 2, 3), leads(w, "work:logs", 0, 1, 2, 3))
+    why = either(why, either(leads(w, "work:1.1", 0, 1, 1, 1), leads(w, "work:main.2", 0, 1, 1, 2)))
+    why = either(why, leads(w, "1:1.1", 0, 2, 3, 4))
+    row(mut t, "target-tab-and-pane", why)
+    // A name that holds ':' or '.': the whole text names a session first;
+    // else the last ':' parts the session from the tab, and a last '.' parts
+    // a pane only when what follows is a number.
+    why = either(leads(w, "a:b", 0, 4, 5, 6), leads(w, "a:b:x.y", 0, 4, 5, 6))
+    why = either(why, either(leads(w, "a:b:1.1", 0, 4, 5, 6), leads(w, "a:b:x.y.1", 0, 4, 5, 6)))
+    row(mut t, "target-names-with-separators", why)
+    why = either(refuses(w, "nosuch", 0, "no-such-session"), refuses(w, "s99", 0, "no-such-session"))
+    why = either(why, either(refuses(w, "p0", 0, "no-such-session"), refuses(w, "nosuch:1", 0, "no-such-session")))
+    why = either(why, either(refuses(w, "work:9", 0, "no-such-tab"), refuses(w, "work:nosuch", 0, "no-such-tab")))
+    why = either(why, either(refuses(w, "t99", 0, "no-such-tab"), refuses(w, "work:1.x", 0, "no-such-tab")))
+    why = either(why, either(refuses(w, "work:1.3", 0, "no-such-pane"), refuses(w, "p99", 0, "no-such-pane")))
+    why = either(why, either(refuses(w, "p5", 0, "no-such-pane"), refuses(w, "work:0", 0, "no-such-tab")))
+    why = either(why, either(refuses(w, "work:", 0, "malformed"), refuses(w, ":1", 0, "malformed")))
+    why = either(why, refuses(w, "work:1.", 0, "malformed"))
+    row(mut t, "target-refusals", why)
+    // No target: the caller's own pane; with no caller (or a gone one) the
+    // only session's focused pane; with several sessions, a refusal.
+    why = either(leads(w, "", 3, 1, 2, 3), leads(w, "", 6, 4, 5, 6))
+    why = either(why, either(refuses(w, "", 0, "ambiguous"), refuses(w, "", 99, "ambiguous")))
+    why = either(why, either(leads(solo(), "", 0, 7, 9, 11), leads(solo(), "", 42, 7, 9, 11)))
+    why = either(why, refuses(cmd.Snapshot { sessions: List[cmd.SessionView]() }, "", 0, "no-such-session"))
+    row(mut t, "target-default", why)
+}
+
+// ---- the verb table ----
+
+fn argv_of(line: str) -> List[str] {
+    var out = List[str]()
+    for w in line.split(" ") {
+        if w.len > 0 { (mut out).push(w) }
+    }
+    out
+}
+
+fn same(line: str) -> str {
+    let a = config.command(line)
+    let v = cmd.parse_verb(argv_of(line))
+    if a.ok {
+        if !v.ok { return "'{line}' refused: {v.why}" }
+        if v.kind != cmd.VERB_ACTION { return "'{line}' read as kind {v.kind}" }
+        if !v.command.ok || v.command.action != a.action || v.command.arg != a.arg || v.command.count != a.count ||
+                v.command.text != a.text {
+            return "'{line}' read as {v.command.action}/{v.command.arg}/{v.command.count}/'{v.command.text}', the command line {a.action}/{a.arg}/{a.count}/'{a.text}'"
+        }
+        if v.target != "" { return "'{line}' has target '{v.target}'" }
+        return ""
+    }
+    if v.ok { return "'{line}' accepted where the command line refuses: {a.why}" }
+    if v.status != cmd.EXIT_USAGE || v.why != a.why { return "'{line}' refused {v.status} '{v.why}', the command line '{a.why}'" }
+    ""
+}
+
+fn verb(argv: str) -> cmd.Verb {
+    cmd.parse_verb(argv_of(argv))
+}
+
+fn usage(argv: str, why: str) -> str {
+    let v = verb(argv)
+    if v.ok { return "'{argv}' accepted" }
+    if v.status != cmd.EXIT_USAGE || v.why != why { return "'{argv}' refused {v.status} '{v.why}', not '{why}'" }
+    ""
+}
+
+fn verbs(mut t: Tally) {
+    var why = ""
+    let lines = "split-right|split-down|focus left|focus right|focus up|focus down|resize up|resize down 3|resize left 12|select-tab 3|  select-tab 3 |rename-tab work notes|close-pane|lock|focus-next|zoom|equalize|new-tab|next-tab|previous-tab|close-tab|detach|bogus|focus sideways|select-tab x|zoom now|select-tab 0|resize up 0|rename-tab|resize up 3 4|focus"
+    for line in lines.split("|") {
+        why = either(why, same(line))
+    }
+    row(mut t, "verbs-parity", why)
+    why = ""
+    let a = verb("split-right -t work")
+    if !a.ok || a.kind != cmd.VERB_ACTION || a.target != "work" || a.command.action != config.A_SPLIT || a.command.arg != 0 {
+        why = "split-right -t work: {a.ok} {a.kind} '{a.target}' {a.command.action}/{a.command.arg} {a.why}"
+    }
+    let b = verb("resize -t p3 up 3")
+    if !b.ok || b.target != "p3" || b.command.action != config.A_RESIZE || b.command.arg != 2 || b.command.count != 3 {
+        why = "resize -t p3 up 3: {b.ok} '{b.target}' {b.command.action}/{b.command.arg}/{b.command.count} {b.why}"
+    }
+    let c = verb("rename-tab -t work:2 old logs")
+    if !c.ok || c.target != "work:2" || c.command.action != config.A_RENAME_TAB || c.command.text != "old logs" {
+        why = "rename-tab -t work:2 old logs: {c.ok} '{c.target}' '{c.command.text}' {c.why}"
+    }
+    row(mut t, "verbs-target-flag", why)
+    why = ""
+    let k = verb("kill-server")
+    if !k.ok || k.kind != cmd.VERB_KILL_SERVER { why = "kill-server: {k.ok} {k.kind} {k.why}" }
+    let l = verb("list-sessions")
+    let ls = verb("ls")
+    if !l.ok || l.kind != cmd.VERB_LIST_SESSIONS || !ls.ok || ls.kind != cmd.VERB_LIST_SESSIONS { why = "list-sessions or ls: {l.why} {ls.why}" }
+    let n0 = verb("new-session")
+    let n1 = verb("new-session work")
+    if !n0.ok || n0.kind != cmd.VERB_NEW_SESSION || n0.name != "" || !n1.ok || n1.name != "work" {
+        why = "new-session: '{n0.name}' '{n1.name}' {n0.why} {n1.why}"
+    }
+    let j = verb("list --json")
+    if !j.ok || j.kind != cmd.VERB_LIST_JSON { why = "list --json: {j.ok} {j.kind} {j.why}" }
+    row(mut t, "verbs-server", why)
+    why = either(usage("", "usage: warren <verb> [-t TARGET] [ARGUMENT...]"), usage("split-right -t", "usage: -t needs a target"))
+    why = either(why, usage("split-right -t a -t b", "usage: -t given twice"))
+    why = either(why, either(usage("kill-server -t work", "usage: kill-server takes no target"), usage("kill-server now", "usage: kill-server")))
+    why = either(why, either(usage("ls -t work", "usage: ls takes no target"), usage("list", "usage: list --json")))
+    why = either(why, either(usage("list --yaml", "usage: list --json"), usage("new-session a b", "usage: new-session [NAME]")))
+    why = either(why, usage("bogus -t work", "unknown command: bogus"))
+    row(mut t, "verbs-usage", why)
+    why = ""
+    let names = cmd.verb_names()
+    for want in "kill-server list-sessions ls new-session list split-right split-down focus focus-next resize zoom equalize close-pane new-tab close-tab next-tab previous-tab select-tab rename-tab detach lock".split(" ") {
+        var found = false
+        for n in names {
+            if n == want { found = true }
+        }
+        if !found { why = "{want} is not in the table" }
+    }
+    row(mut t, "verbs-table-names", why)
+}
+
+// ---- list --json ----
+
+// JSON as written in a row: `<` and `>` for braces, `'` for a quote.
+fn json_text(text: str) -> str {
+    text.replace("<", "{{").replace(">", "}}").replace("'", "\"")
+}
+
+fn json_is(snap: cmd.Snapshot, want: str) -> str {
+    let got = cmd.list_json(snap)
+    if got != want { return "got '{got}'" }
+    ""
+}
+
+fn listing(mut t: Tally) {
+    row(mut t, "json-empty", json_is(cmd.Snapshot { sessions: List[cmd.SessionView]() }, json_text("<'schema':1,'sessions':[]>")))
+    var two = world()
+    let _gone = (mut two.sessions).pop() else { return }
+    let want = json_text("<'schema':1,'sessions':[<'id':'s1','name':'work','cols':80,'rows':24,'clients':1,'active_tab':'t1','tabs':[<'id':'t1','name':'main','index':1,'focus':'p2','zoomed':false,'panes':[<'id':'p1','index':1,'col':1,'row':1,'cols':40,'rows':22,'pid':4201,'title':'sh'>,<'id':'p2','index':2,'col':42,'row':1,'cols':39,'rows':22,'pid':4202,'title':'top'>]>,<'id':'t2','name':'logs','index':2,'focus':'p3','zoomed':true,'panes':[<'id':'p3','index':1,'col':1,'row':1,'cols':80,'rows':22,'pid':4203,'title':'tail'>]>]>,<'id':'s2','name':'1','cols':120,'rows':40,'clients':0,'active_tab':'t3','tabs':[<'id':'t3','name':'main','index':1,'focus':'p4','zoomed':false,'panes':[<'id':'p4','index':1,'col':1,'row':1,'cols':120,'rows':38,'pid':4204,'title':''>]>]>]>")
+    row(mut t, "json-two-sessions", json_is(two, want))
+    // Escapes: a quote, a backslash, a control byte (as \u00XX, DEL too),
+    // and UTF-8 as it is; a pane with no program has a null pid.
+    var odd = solo()
+    odd.sessions[0].name = "q\"b\\s\u{1}é"
+    odd.sessions[0].tabs[0].panes[0].title = "a\nb\u{7f}"
+    let esc = json_text("<'schema':1,'sessions':[<'id':'s7','name':'q\\'b\\\\s\\u0001é','cols':80,'rows':24,'clients':2,'active_tab':'t9','tabs':[<'id':'t9','name':'main','index':1,'focus':'p11','zoomed':false,'panes':[<'id':'p11','index':1,'col':1,'row':1,'cols':80,'rows':22,'pid':null,'title':'a\\u000ab\\u007f'>]>]>]>")
+    row(mut t, "json-escapes-and-null-pid", json_is(odd, esc))
+}
+
+fn main() -> int {
+    var t = Tally { rows: 0, failed: 0 }
+    ids(mut t)
+    targets(mut t)
+    verbs(mut t)
+    listing(mut t)
+    print("CMD-ROWS rows={t.rows} failed={t.failed}")
+    if t.failed > 0 { return 1 }
+    0
+}
