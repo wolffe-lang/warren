@@ -368,16 +368,18 @@ it, where Linux ends the session at once and the server a second
 later. Either way the server does not end before the program does.
 
 A command connection's COMMAND is read through the verb table in
-[CLI](CLI.md): `kill-server`, `list-sessions`, `new-session [NAME]`,
+[CLI](CLI.md): `kill-server`, `list-sessions`, `new-session [-c DIR] [NAME]`,
 `list --json` and every command the `:` line takes. A verb the table does
 not hold (tmux's `split-window`, for one) replies status 2 with the command
 line's own `unknown command: NAME`. `new-session` makes a detached session at
-the command HELLO's size (80x24 when both are zero), working directory and
-environment, and replies status 0 with the name on standard output. Without a
+the command HELLO's size (80x24 when both are zero), working directory (or
+`-c DIR`) and environment, and replies status 0 with the name on standard output. Without a
 NAME it takes the lowest positive number no live session is named; an empty
 NAME is a name, and is refused. A name already in use, a size below 20x6 and a
 name that is not allowed reply status 1 with the reason;
 a slot made between turns delays the reply by a turn, as it does a HELLO. A
+`kill-session` that ends the last session has its REPLY queued before the
+server stops, as `kill-server`'s is. A
 pane whose program does not start is refused (REFUSE invalid-request, with the
 reason) rather than shown as an error pane.
 
@@ -461,7 +463,8 @@ they came from. The command line takes the table's action names and their
 arguments: `split-right`, `split-down`, `focus left|right|up|down`,
 `focus-next`, `resize DIRECTION [N]`, `zoom`, `equalize`, `close-pane`,
 `new-tab`, `close-tab`, `next-tab`, `previous-tab`, `select-tab N`,
-`rename-tab NAME`, `detach`, `lock`; an unknown verb or a bad argument is
+`rename-tab NAME`, `kill-session`, `rename-session NAME`, `detach`, `lock`; an
+unknown verb or a bad argument is
 answered on the hint line. INPUT, PASTE and mouse events reach the pane only in
 normal and locked mode, and are dropped in the others.
 
