@@ -22,6 +22,11 @@ Rows:
   tmux-missing-target  a split aimed at a session that does not exist is
                        refused with a non-zero exit and a reason, and no pane
                        is made or changed (warren: verb-refused-target)
+  tmux-session-verbs   kill-session ends only its session, and a split with
+                       -c DIR starts its program in DIR (warren:
+                       kill-session-ends, split-in-dir; tmux prints a new
+                       pane's id only with -P and runs a command through
+                       sh -c, warren always prints it and runs argv as given)
 
 Each client is a pty of the suite's own. Nothing is signalled: clients are
 detached by tmux's own command and the server is ended with kill-server.
@@ -322,6 +327,28 @@ def row_missing_target(out):
     return 0
 
 
+
+def row_session_verbs(out):
+    place = out / 'tmux-place'
+    place.mkdir(parents=True, exist_ok=True)
+    want_path = os.path.realpath(str(place))
+    tmux = Tmux(out, 'sessions')
+    try:
+        tmux.run('new-session', '-d', '-s', 'a', '-x', '80', '-y', '24', 'sleep 60')
+        tmux.run('new-session', '-d', '-s', 'b', '-x', '80', '-y', '24', 'sleep 60')
+        tmux.run('kill-session', '-t', 'b')
+        names = tmux.run('list-sessions', '-F', '#{session_name}').split()
+        tmux.run('split-window', '-h', '-t', 'a:', '-c', str(place), 'sleep 60')
+        paths = [line for line in tmux.run('list-panes', '-t', 'a:', '-F', '#{pane_current_path}').splitlines() if line]
+    finally:
+        tmux.close()
+    print('  measured: sessions %s, pane paths %s' % (names, paths))
+    if names != ['a'] or len(paths) != 2 or paths[1] != want_path:
+        print('FAIL tmux-session-verbs: sessions %s, paths %s, expected [a] and the split in %s' % (names, paths, want_path))
+        return 1
+    print('PASS tmux-session-verbs (warren: kill-session-ends, split-in-dir)')
+    return 0
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cases', type=Path, required=True)
@@ -345,6 +372,7 @@ def main():
     failed += row_focus_ring(args.out)
     failed += row_kill_pane(args.out)
     failed += row_missing_target(args.out)
+    failed += row_session_verbs(args.out)
     return 1 if failed else 0
 
 
