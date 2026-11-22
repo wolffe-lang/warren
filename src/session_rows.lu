@@ -1952,36 +1952,27 @@ fn row_pane_cwd_from_proc(mut r: Rig) -> str {
     w
 }
 
-// With no report, a pane is listed at its session's start directory,
-// learnt from `start`. On a host with no /proc: a live program that moved.
-// On Linux: a pane whose program has ended (its pid null), though it moved
-// first; it leaves a child that ignores hangup holding the terminal open
-// (where the host revokes a terminal when its session leader ends, as BSDs
-// do, the pane ends with its program and there is no such pane to list).
+// With no report and no /proc to read, a pane is listed at its session's
+// start directory, learnt from `start`: a shell that moved into a directory
+// that was then removed. On Linux /proc names it, as `... (deleted)`, which
+// is no directory; elsewhere there is no /proc at all. (A pane ends with its
+// program, so no pane of an ended program is left to list.)
 fn row_pane_cwd_start(mut r: Rig) -> str {
     let moved = beside(r, "moved")
     fs.create_dir_all(moved) else |e| { return "mkdir: {e}" }
     let here = env.cwd() else "/"
     let script = beside(r, "move.sh")
-    fs.write_text(script, "cd \"" + moved + "\" || exit 1; if [ \"$WARREN_PANE\" = %1 ]; then printf 'MOVED\\n'; exec sleep 60; fi; " +
-        "(trap '' HUP; exec sleep 60) & printf 'ENDING\\n'; exit 0\n") else |e| { return "the script: {e}" }
+    fs.write_text(script, "cd \"" + moved + "\" || exit 1; printf 'MOVED\\n'; exec /bin/sh\n") else |e| { return "the script: {e}" }
     let why = start_server(mut r, "/bin/sh " + script)
     if why.len > 0 { return why }
     var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
     if !client.until_text(mut a, "MOVED", 5000) { return "the pane printed nothing: " + client.screen_text(a) }
-    if os.name() != "linux" {
-        let live = until_cwd(r, "p1", here + "|start")
-        client.hang_up(mut a)
-        if live.len > 0 { return "a live pane on a host with no /proc: " + live }
-        return ""
-    }
-    let s = ask(r, "split-right -t work", "")
-    if s.status != 0 { return "split-right: {s.status} '{s.err.trim()}'" }
-    if !client.until_text(mut a, "ENDING", 5000) { return "the second pane printed nothing: " + client.screen_text(a) }
-    if !until_pid_null(r, "p2") { return "the second pane's program did not end with its terminal held open" }
-    let w = until_cwd(r, "p2", here + "|start")
+    let before = until_cwd(r, "p1", moved_listing(moved))
+    if before.len > 0 { return "before the removal: " + before }
+    fs.remove_dir(moved) else |e| { return "rmdir: {e}" }
+    let w = until_cwd(r, "p1", here + "|start")
     client.hang_up(mut a)
-    if w.len > 0 { return "an ended program: " + w }
+    if w.len > 0 { return "after the removal: " + w }
     ""
 }
 
