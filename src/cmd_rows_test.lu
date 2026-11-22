@@ -271,6 +271,77 @@ fn verbs(mut t: Tally) {
     row(mut t, "verbs-table-names", why)
 }
 
+// ---- the creating verbs and the session verbs ----
+
+fn options_are(argv: List[str], label: str, target: str, action: int, arg: int, dir: str, has_dir: bool, program: str) -> str {
+    let v = cmd.parse_verb(argv)
+    if !v.ok { return "'{label}' refused {v.status} '{v.why}'" }
+    if v.kind != cmd.VERB_ACTION || v.command.action != action || v.command.arg != arg {
+        return "'{label}' read as kind {v.kind} action {v.command.action}/{v.command.arg}"
+    }
+    var got = ""
+    for a in v.argv { got = got + "[" + a + "]" }
+    if v.target != target || v.dir != dir || v.has_dir != has_dir || got != program {
+        return "'{label}': target '{v.target}' dir '{v.dir}' has_dir={v.has_dir} argv {got}"
+    }
+    ""
+}
+
+fn creating(mut t: Tally) {
+    var why = options_are(argv_of("split-right -c /tmp"), "split-right -c /tmp", "", config.A_SPLIT, 0, "/tmp", true, "")
+    why = either(why, options_are(argv_of("split-down -t p2 -c /x -- vim a b"), "split-down -t p2 -c /x -- vim a b", "p2",
+        config.A_SPLIT, 1, "/x", true, "[vim][a][b]"))
+    // After `--` every word is the program's, `-t` and `-c` among them.
+    why = either(why, options_are(argv_of("split-right -- grep -t -c x"), "split-right -- grep -t -c x", "", config.A_SPLIT, 0,
+        "", false, "[grep][-t][-c][x]"))
+    why = either(why, options_are(argv_of("new-tab -c rel -- top"), "new-tab -c rel -- top", "", config.A_NEW_TAB, 0, "rel",
+        true, "[top]"))
+    var spaced = argv_of("split-right -- sh -c")
+    (mut spaced).push("echo a  b")
+    why = either(why, options_are(spaced, "split-right -- sh -c 'echo a  b'", "", config.A_SPLIT, 0, "", false,
+        "[sh][-c][echo a  b]"))
+    let n = verb("new-session -c /tmp work")
+    if !n.ok || n.kind != cmd.VERB_NEW_SESSION || !n.named || n.name != "work" || !n.has_dir || n.dir != "/tmp" {
+        why = either(why, "new-session -c /tmp work: {n.ok} {n.kind} '{n.name}' named={n.named} '{n.dir}' has_dir={n.has_dir} {n.why}")
+    }
+    let m = verb("new-session -c /tmp")
+    if !m.ok || m.named || !m.has_dir || m.dir != "/tmp" {
+        why = either(why, "new-session -c /tmp: {m.ok} named={m.named} '{m.dir}' has_dir={m.has_dir} {m.why}")
+    }
+    row(mut t, "verbs-create-options", why)
+    let other = "makes no pane: -c and -- go with split-right, split-down, new-tab and new-session"
+    why = either(usage("split-right -c", "usage: -c needs a directory"), usage("split-right -c a -c b", "usage: -c given twice"))
+    why = either(why, usage("split-right --", "usage: -- needs a command"))
+    why = either(why, either(usage("focus-next -c /tmp", "usage: focus-next " + other), usage("zoom -- top", "usage: zoom " + other)))
+    why = either(why, either(usage("kill-server -c /tmp", "usage: kill-server " + other), usage("new-session -- top", "usage: new-session takes no command")))
+    // The command line has no shell quoting and keeps refusing them.
+    let typed = config.command("split-right -c /tmp")
+    if typed.ok || typed.why != "split-right takes no arguments" { why = either(why, "the command line read 'split-right -c /tmp': {typed.ok} '{typed.why}'") }
+    row(mut t, "verbs-create-refusals", why)
+}
+
+fn session_verbs(mut t: Tally) {
+    var why = ""
+    let k = verb("kill-session")
+    if !k.ok || k.kind != cmd.VERB_ACTION || k.command.action != config.A_KILL_SESSION { why = "kill-session: {k.ok} {k.kind} {k.command.action} {k.why}" }
+    let kt = verb("kill-session -t work")
+    if !kt.ok || kt.target != "work" || kt.command.action != config.A_KILL_SESSION { why = either(why, "kill-session -t work: {kt.ok} '{kt.target}' {kt.why}") }
+    let r = verb("rename-session -t work notes")
+    if !r.ok || r.target != "work" || r.command.action != config.A_RENAME_SESSION || r.command.text != "notes" {
+        why = either(why, "rename-session -t work notes: {r.ok} '{r.target}' {r.command.action} '{r.command.text}' {r.why}")
+    }
+    why = either(why, either(usage("rename-session", "usage: rename-session NAME"), usage("kill-session now", "kill-session takes no arguments")))
+    why = either(why, either(same("kill-session"), same("rename-session two words")))
+    let d = verb("detach -t work")
+    if !d.ok || d.target != "work" || d.command.action != config.A_DETACH { why = either(why, "detach -t work: {d.ok} '{d.target}' {d.why}") }
+    var found = 0
+    for name in cmd.verb_names() {
+        if name == "kill-session" || name == "rename-session" { found += 1 }
+    }
+    if found != 2 { why = either(why, "kill-session and rename-session are not both in the table") }
+    row(mut t, "verbs-session-verbs", why)
+}
+
 // ---- list --json ----
 
 // JSON as written in a row: `<` and `>` for braces, `'` for a quote.
@@ -304,6 +375,8 @@ fn main() -> int {
     ids(mut t)
     targets(mut t)
     verbs(mut t)
+    creating(mut t)
+    session_verbs(mut t)
     listing(mut t)
     print("CMD-ROWS rows={t.rows} failed={t.failed}")
     if t.failed > 0 { return 1 }
