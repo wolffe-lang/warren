@@ -178,7 +178,8 @@ session_rows() (
     fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte
     inherited-ignore-reset session-end last-output last-output-after-ack late-child-reaped command start-lock max-pending
     max-sessions max-connections memory-budget resize-crossing-image too-slow flood-beside-quiet close-causes
-    prompt-frame prompt-frame-minute)
+    prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json
+    ids-never-reused)
   if [ "$mode" = linux ]; then rows+=(pane-signals-and-handles threads rss-flat); fi
   rm -rf target/rows && mkdir -p target/rows && cd target/rows
   "$root/target/native/session-rows" "$root/target/native/warren" "${rows[@]}"

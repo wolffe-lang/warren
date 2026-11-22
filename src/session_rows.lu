@@ -484,6 +484,185 @@ fn row_command(mut r: Rig) -> str {
     ""
 }
 
+// ---- the command client's verbs: ids, targets, the shared table, list --json ----
+
+// A command's answer: its status (0 - 1 when none came), standard output, standard error.
+struct Answer { status: int, out: str, err: str }
+
+fn le4(body: List[byte], at: int) -> int {
+    (body[at] as int) + (body[at + 1] as int) * 256 + (body[at + 2] as int) * 65536 + (body[at + 3] as int) * 16777216
+}
+
+// One COMMAND on the row's server: `argv` (words), sent from pane `pane`
+// ("" when it comes from no pane), as `warren <verb>` sends it.
+fn ask(r: Rig, argv: str, pane: str) -> Answer {
+    var p = client.dial(socket(r)) else |e| { return Answer { status: 0 - 1, out: "", err: "dial-{e}" } }
+    var none = List[str]()
+    let _h = client.send(p, 1, client.hello_payload(2, 0, 0, "", 0, "", none, none))
+    if !client.until_kind(mut p, 129, 2000) {
+        client.hang_up(mut p)
+        return Answer { status: 0 - 1, out: "", err: "no WELCOME" }
+    }
+    var words = List[str]()
+    for w in argv.split(" ") {
+        if w.len > 0 { (mut words).push(w) }
+    }
+    var b = List[byte]()
+    proto.put(mut b, 9, 4)
+    proto.put(mut b, words.len, 2)
+    for w in words { proto.put_text(mut b, w) }
+    proto.put_text(mut b, "/")
+    proto.put_text(mut b, pane)
+    let _c = client.send(p, 11, b)
+    let m = client.next(mut p, 3000)
+    client.hang_up(mut p)
+    if m.kind != 136 { return Answer { status: 0 - 1, out: "", err: "no REPLY ({m.kind})" } }
+    let out_len = le4(m.body, 5)
+    let err_len = le4(m.body, 9 + out_len)
+    Answer { status: m.body[4] as int, out: str_from_utf8(m.body[9..9 + out_len]) else "",
+        err: str_from_utf8(m.body[13 + out_len..13 + out_len + err_len]) else "" }
+}
+
+// `list --json`'s line, or a reason it is not there.
+fn listed(r: Rig) -> Answer {
+    let a = ask(r, "list --json", "")
+    if a.status != 0 { return Answer { status: a.status, out: "", err: "list --json status {a.status}: {a.err.trim()}" } }
+    a
+}
+
+// A listing with every pane's pid written as N (pids differ run to run).
+fn without_pids(json: str) -> str {
+    var out = ""
+    var rest = json.trim()
+    while rest.len > 0 {
+        let at = rest.find("\"pid\":") else {
+            out = out + rest
+            break
+        }
+        out = out + rest[0..at + 6] + "N"
+        var k = at + 6
+        while k < rest.len && rest.bytes()[k] != 44 && rest.bytes()[k] != 125 { k += 1 }
+        rest = rest[k..]
+    }
+    out
+}
+
+// How many panes a listing holds.
+fn panes_in(json: str) -> int {
+    json.split("\"id\":\"p").len - 1
+}
+
+// A split from outside, named by the session: the session's focused pane
+// is split, and the focus stays where it was.
+fn row_verb_split_target(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let before = listed(r)
+    if before.status != 0 { return before.err }
+    if panes_in(before.out) != 1 { return "panes before: {before.out}" }
+    let s = ask(r, "split-right -t work", "")
+    if s.status != 0 { return "split-right -t work status {s.status}: {s.err.trim()}" }
+    let after = listed(r)
+    if after.status != 0 { return after.err }
+    if panes_in(after.out) != 2 { return "panes after: {after.out}" }
+    if !after.out.contains("\"focus\":\"p1\"") { return "the focus moved: {after.out}" }
+    client.hang_up(mut a)
+    ""
+}
+
+// A target that names nothing is refused by name, exit status 1, and
+// nothing changes.
+fn row_verb_refused_target(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let s = ask(r, "split-right -t nosuch", "")
+    if s.status != 1 || !s.err.contains("no-such-session") { return "split-right -t nosuch: {s.status} '{s.err.trim()}'" }
+    let t = ask(r, "split-right -t work:9", "")
+    if t.status != 1 || !t.err.contains("no-such-tab") { return "split-right -t work:9: {t.status} '{t.err.trim()}'" }
+    let after = listed(r)
+    if after.status != 0 { return after.err }
+    if panes_in(after.out) != 1 { return "a refused verb changed the session: {after.out}" }
+    client.hang_up(mut a)
+    ""
+}
+
+// A verb with no -t acts on the pane it was sent from: the server-side
+// field, then the real command client typed into the pane's shell, which
+// sends its WARREN_PANE.
+fn row_verb_inside_pane(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let s = ask(r, "split-down", "%1")
+    if s.status != 0 { return "split-down from %1: {s.status} '{s.err.trim()}'" }
+    let two = listed(r)
+    if two.status != 0 { return two.err }
+    if panes_in(two.out) != 2 { return "panes after a split from %1: {two.out}" }
+    let here = env.cwd() else "."
+    let _i = client.input(a, "WARREN_RUNTIME_DIR={here}/{r.dir} {r.warren} split-right; echo rc=$?\r")
+    if !client.until_text(mut a, "rc=", 8000) { return "the client in the pane said nothing: " + client.screen_text(a) }
+    if !client.until_text(mut a, "rc=0", 3000) { return "the client in the pane: " + client.screen_text(a) }
+    let three = listed(r)
+    if three.status != 0 { return three.err }
+    if panes_in(three.out) != 3 { return "panes after a split from inside: {three.out}" }
+    client.hang_up(mut a)
+    ""
+}
+
+// list --json, schema 1, on a live server: two sessions in id order, each
+// pane's place and size inside the tab area (the bar takes two lines).
+fn row_list_json(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "one", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    var b = attach(r, 100, 30, "two", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut b, "$", 5000) { return "no prompt in two" }
+    let l = listed(r)
+    if l.status != 0 { return l.err }
+    let want = "{{\"schema\":1,\"sessions\":[{{\"id\":\"s1\",\"name\":\"one\",\"cols\":80,\"rows\":24,\"clients\":1,\"active_tab\":\"t1\",\"tabs\":[{{\"id\":\"t1\",\"name\":\"\",\"index\":1,\"focus\":\"p1\",\"zoomed\":false,\"panes\":[{{\"id\":\"p1\",\"index\":1,\"col\":1,\"row\":1,\"cols\":80,\"rows\":22,\"pid\":N,\"title\":\"\"}}]}}]}},{{\"id\":\"s2\",\"name\":\"two\",\"cols\":100,\"rows\":30,\"clients\":1,\"active_tab\":\"t2\",\"tabs\":[{{\"id\":\"t2\",\"name\":\"\",\"index\":1,\"focus\":\"p2\",\"zoomed\":false,\"panes\":[{{\"id\":\"p2\",\"index\":1,\"col\":1,\"row\":1,\"cols\":100,\"rows\":28,\"pid\":N,\"title\":\"\"}}]}}]}}]}}"
+    let got = without_pids(l.out)
+    if got != want { return "listing: {got}" }
+    if !l.out.ends_with("\n") { return "the listing does not end its line" }
+    client.hang_up(mut a)
+    client.hang_up(mut b)
+    ""
+}
+
+// Ids are never handed out again: a closed pane's, an ended session's and
+// its tab's.
+fn row_ids_never_reused(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "a", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let s1 = ask(r, "split-right -t a", "")
+    let c1 = ask(r, "close-pane -t p2", "")
+    let s2 = ask(r, "split-right -t a", "")
+    if s1.status != 0 || c1.status != 0 || s2.status != 0 { return "split, close, split: {s1.status} {c1.status} {s2.status} {s2.err.trim()}" }
+    let one = listed(r)
+    if one.status != 0 { return one.err }
+    if one.out.contains("\"id\":\"p2\"") || !one.out.contains("\"id\":\"p3\"") { return "pane 2 came back: {one.out}" }
+    let nb = ask(r, "new-session b", "")
+    if nb.status != 0 { return "new-session b: {nb.status} {nb.err.trim()}" }
+    let cb = ask(r, "close-pane -t b", "")
+    if cb.status != 0 { return "close-pane -t b: {cb.status} {cb.err.trim()}" }
+    let nc = ask(r, "new-session c", "")
+    if nc.status != 0 { return "new-session c: {nc.status} {nc.err.trim()}" }
+    let two = listed(r)
+    if two.status != 0 { return two.err }
+    if two.out.contains("\"name\":\"b\"") { return "session b is still listed: {two.out}" }
+    if !two.out.contains("\"id\":\"s3\",\"name\":\"c\"") { return "session c is not s3: {two.out}" }
+    if !two.out.contains("\"active_tab\":\"t3\"") || !two.out.contains("\"id\":\"p5\"") { return "session c's tab or pane reused an id: {two.out}" }
+    client.hang_up(mut a)
+    ""
+}
+
 // Every close names its cause in the server's trace, the ordinary ones
 // too: a command's REPLY sent, a first message that is not a HELLO, a
 // client gone before its WELCOME was written, a client's end of input, a
@@ -1194,13 +1373,18 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "close-causes" { why = row_close_causes(mut r) }
     else if name == "prompt-frame" { why = row_prompt_frame(mut r) }
     else if name == "prompt-frame-minute" { why = row_prompt_frame_minute(mut r) }
+    else if name == "verb-split-target" { why = row_verb_split_target(mut r) }
+    else if name == "verb-refused-target" { why = row_verb_refused_target(mut r) }
+    else if name == "verb-inside-pane" { why = row_verb_inside_pane(mut r) }
+    else if name == "list-json" { why = row_list_json(mut r) }
+    else if name == "ids-never-reused" { why = row_ids_never_reused(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused".split(" ") {
         (mut x).push(n)
     }
     x
