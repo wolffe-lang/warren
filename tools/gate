@@ -151,6 +151,7 @@ step capture-lupin "$LUPIN" run src/vt_capture_test.lu
 step send-keys-table python3 -I tests/session/send_keys_table.py
 step send-keys-table-build "$WOLF" build --deny-warnings src/send_keys_table_test.lu -o "$root/target/native/send-keys-table"
 step send-keys-table-native "$root/target/native/send-keys-table"
+step osc7-table python3 -I tests/session/osc7_table.py
 step pacing-lupin "$LUPIN" run src/pacing_test.lu
 step client-input-lupin "$LUPIN" run src/client_input_test.lu
 step client-keyboard-lupin "$LUPIN" run src/client_keyboard_test.lu
