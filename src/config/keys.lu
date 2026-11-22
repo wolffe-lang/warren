@@ -540,6 +540,8 @@ fn verb(action: int, arg: int) -> str {
     if action == A_DETACH { return "detach" }
     if action == A_CLOSE_TAB { return "close-tab" }
     if action == A_RENAME_TAB { return "rename-tab" }
+    if action == A_RENAME_SESSION { return "rename-session" }
+    if action == A_KILL_SESSION { return "kill-session" }
     if action == A_LOCK { return "lock" }
     if action == A_SEND_PREFIX { return "send the prefix" }
     if action == A_CONFIRM { return verb(arg, 0) + " (asks)" }
@@ -692,11 +694,11 @@ fn rest_after_verb(line: str) -> str {
 // Functions, not module constants: the reference interpreter does not
 // resolve a method called on a module constant.
 fn plain_verbs() -> str {
-    "split-right split-down focus-next zoom equalize close-pane new-tab close-tab next-tab previous-tab detach lock"
+    "split-right split-down focus-next zoom equalize close-pane new-tab close-tab next-tab previous-tab detach lock kill-session"
 }
 
 fn argument_verbs() -> str {
-    "focus resize select-tab rename-tab"
+    "focus resize select-tab rename-tab rename-session"
 }
 
 /// Every verb of the command line, the ones without arguments first.
@@ -717,7 +719,7 @@ pub fn command(line: str) -> Command {
     let v = w[0]
     let plain = plain_verbs().split(" ")
     let acts = [A_SPLIT, A_SPLIT, A_FOCUS_NEXT, A_ZOOM, A_EQUALIZE, A_CLOSE, A_NEW_TAB, A_CLOSE_TAB, A_NEXT_TAB,
-        A_PREVIOUS_TAB, A_DETACH, A_LOCK]
+        A_PREVIOUS_TAB, A_DETACH, A_LOCK, A_KILL_SESSION]
     var i = 0
     while i < plain.len {
         if plain[i] == v {
@@ -754,6 +756,12 @@ pub fn command(line: str) -> Command {
     if v == "rename-tab" {
         if w.len < 2 { return refused("usage: rename-tab NAME") }
         var c = command_of(A_RENAME_TAB, 0)
+        c.text = rest_after_verb(line)
+        return c
+    }
+    if v == "rename-session" {
+        if w.len < 2 { return refused("usage: rename-session NAME") }
+        var c = command_of(A_RENAME_SESSION, 0)
         c.text = rest_after_verb(line)
         return c
     }
