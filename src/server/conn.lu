@@ -151,6 +151,34 @@ pub fn new_conn() -> Conn {
     }
 }
 
+/// The bytes a slot's buffers retain, live or closed: its queues, its
+/// receive buffer, paste assembly and smaller texts, and its shadow and
+/// scroll window at CELL_BYTES a cell. wolf frees memory only a whole region
+/// at a time, so a slot's buffers are emptied at close and kept for its
+/// next connection, never given back; the projection counts them.
+pub fn retained_bytes(c: Conn) -> int {
+    c.tx.len + c.rx.len + c.paste.len + c.prompt.len + c.search.len + c.hello.len + c.command.len + c.message.len +
+        8 * c.seen_damage.len + CELL_BYTES * (c.shadow.cells.len + c.view.screen.cells.len + c.view.scratch.cells.len)
+}
+
+/// Empty a closed slot's queues in place; their storage stays for the
+/// slot's next connection.
+pub fn empty_conn(mut c: Conn) {
+    c.tx_off = 0
+    c.tx_len = 0
+    c.rx_off = 0
+    c.rx_len = 0
+    c.paste_len = 0
+    c.paste_active = false
+    c.image_end = 0 - 1
+    c.title_end = 0 - 1
+    c.title_dirty = false
+    c.command_len = 0
+    c.command_ready = false
+    c.hello_len = 0
+    c.hello_ready = false
+}
+
 /// Make a slot ready for a newly accepted socket, keeping its buffers.
 pub fn reset_conn(mut c: Conn, fd: int, id: int, now: int) {
     c.live = true
