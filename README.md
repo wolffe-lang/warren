@@ -90,6 +90,13 @@ in panes may write the clipboard too; by default they may not. `vt-dump` is a di
   sent as xterm types them (`ESC [ H`, `ESC [ F`), keypad Enter outside keypad
   mode as CR, and Ctrl with a key that has no control byte (C-1, C-Enter,
   C-BSpace and the like) as the key types it, where tmux sends nothing.
+  `list --json` names each pane's working directory and where it was learnt:
+  the directory its program last reported with OSC 7, the one `/proc` names,
+  or the session's start ([CLI](docs/CLI.md), [TERM](docs/TERM.md)). A split
+  starts in the working directory of the pane it splits, and a new tab in the
+  session's start directory. This differs from tmux 3.4, which starts a split
+  or a new window in the directory of the command's caller, or, from a key,
+  the session's, and never where the pane reported.
   A script that reads a long answer slowly is never cut off while it reads at
   least 8 KiB in every two seconds on Linux, or 2 KiB on macOS, and is closed
   two seconds after it stops reading ([PROTOCOL](docs/PROTOCOL.md)). Those
