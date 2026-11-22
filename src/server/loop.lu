@@ -39,6 +39,10 @@ pub struct Server {
     key_gen: List[int],
     next_id: int,
     next_pane: int,
+    // The next session's and the next tab's ids: like pane ids, from one
+    // counter each that never goes back.
+    next_session: int,
+    next_tab: int,
     stopping: bool,
     stop_deadline: int,
     started: int,
@@ -1001,7 +1005,11 @@ fn act_new_tab(mut s: Server, index: int, si: int) -> int {
     let from = focused_slot(s, si)
     let id = s.next_pane
     s.next_pane = s.next_pane + 1
+    // The layout hands out the server's next tab id, and the server takes
+    // back the count it reached.
+    s.sessions[si].layout.next_id = s.next_tab
     let _t = layout.new_tab(mut s.sessions[si].layout, id, "") else |_| { 0 }
+    s.next_tab = s.sessions[si].layout.next_id
     let why = spawn_pane(mut s, si, k, id, cols, area)
     if why.len > 0 {
         layout.close(mut s.sessions[si].layout, id) else |_| {}
@@ -2117,8 +2125,13 @@ fn make_session(mut s: Server, name: str, cols: int, rows: int, cwd: str, names:
     s.sessions[slot].rows = rows
     s.sessions[slot].members = 0
     s.sessions[slot].layout.tabs = copy fresh.tabs
-    s.sessions[slot].layout.active = fresh.active
-    s.sessions[slot].layout.next_id = fresh.next_id
+    s.sessions[slot].id = s.next_session
+    s.next_session = s.next_session + 1
+    // The first tab takes the server's next tab id, not the layout's own 1.
+    s.sessions[slot].layout.tabs[0].id = s.next_tab
+    s.sessions[slot].layout.active = s.next_tab
+    s.sessions[slot].layout.next_id = s.next_tab + 1
+    s.next_tab = s.next_tab + 1
     (mut s.sessions[slot].cwd).reset()
     for b in cwd.bytes() { (mut s.sessions[slot].cwd).push(b) }
     (mut s.sessions[slot].env_names).reset()
@@ -2893,7 +2906,7 @@ pub fn serve() -> int {
     var s = Server {
         place: place, w: waiter, listen_key: 0 - 1, listening: false,
         conns: conns, sessions: List[Session](), panes: List[Pane](), orphans: List[int](), key_kind: List[int](),
-        key_owner: List[int](), key_gen: List[int](), next_id: 0, next_pane: 1, stopping: false, stop_deadline: 0,
+        key_owner: List[int](), key_gen: List[int](), next_id: 0, next_pane: 1, next_session: 1, next_tab: 1, stopping: false, stop_deadline: 0,
         started: now_ns(), idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
         version: vt.package_version(), again: false, need_slot: false, need_pane: false, need_view: false, settings: load_settings(), want_cols: 0,
         want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, frames: 0, prompt_frames: 0,

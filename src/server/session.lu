@@ -63,6 +63,8 @@ pub struct Pane {
 /// the session's clients last copied, at most REGISTER_BYTES.
 pub struct Session {
     live: bool,
+    /// The session's id, from the server's counter: never handed out again.
+    id: int,
     name: List[byte],
     name_len: int,
     cols: int,
@@ -141,7 +143,7 @@ pub fn set_name(mut s: Session, name: str) {
 
 /// A free session slot.
 pub fn idle_session() -> Session {
-    Session { live: false, name: List[byte](), name_len: 0, cols: 0, rows: 0, members: 0, changed: false,
+    Session { live: false, id: 0, name: List[byte](), name_len: 0, cols: 0, rows: 0, members: 0, changed: false,
         generation: 0, layout: layout.Layout { tabs: List[layout.Tab](), active: 0, next_id: 1 },
         cwd: List[byte](), env_names: List[str](), env_values: List[str](), layout_gen: 0, bar_gen: 0,
         chrome_gen: 0 - 1, owner: List[int](), border: List[vt.Cell](), last_output: 0, mark_tab: List[int](),
