@@ -298,6 +298,34 @@ fn test_event_queue() {
     assert(server.events_queued(mixed) == (taken - 1) * 4000, "event-queue-past-image")
 }
 
+// A title is state, not an event: at most one TITLE waits in a client's
+// queue. A newer title while it waits only marks the client; once it is
+// written the newest title is queued, and a compaction keeps its bounds.
+fn test_title_queue() {
+    let a = bytes_of(4000)
+    var b = bytes_of(3000)
+    b[0] = 66 as byte
+    var c = server.new_conn()
+    assert(server.queue_title(mut c, a), "title-one-queued-first")
+    assert(server.queue_title(mut c, b), "title-one-queued-second-taken")
+    assert(server.queued(c) == 4000 && c.title_dirty, "title-one-queued")
+    server.wrote(mut c, 4000)
+    assert(server.title_owed(c), "title-latest-after-write-owed")
+    assert(server.queue_title(mut c, b), "title-latest-after-write-queued")
+    assert(server.queued(c) == 3000 && !c.title_dirty && !server.title_owed(c), "title-latest-after-write")
+    assert((c.tx[c.title_start] as int) == 66 && c.title_end - c.title_start == 3000, "title-latest-after-write-bytes")
+    var d = server.new_conn()
+    assert(server.enqueue(mut d, bytes_of(10), false), "title-offsets-event")
+    var t = bytes_of(20)
+    t[0] = 84 as byte
+    assert(server.queue_title(mut d, t), "title-offsets-title")
+    server.wrote(mut d, 10)
+    assert(server.enqueue(mut d, bytes_of(5), false), "title-offsets-compacting")
+    assert(d.tx_off == 0 && d.title_start == 0 && d.title_end == 20 && (d.tx[d.title_start] as int) == 84, "title-offsets-on-compaction")
+    server.wrote(mut d, 20)
+    assert(d.title_end < 0, "title-offsets-written")
+}
+
 // ---- the client renderer under a seeded soak (native: the step budget of
 // `wolf test` is too small for it) ----
 
@@ -419,6 +447,7 @@ fn main() -> int {
     test_applier_refusals()
     test_seeded_soak()
     test_event_queue()
+    test_title_queue()
     test_render_soak()
     measure(80, 24)
     measure(320, 90)
