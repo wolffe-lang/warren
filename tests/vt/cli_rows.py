@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the real dump CLI over stdin/files and explicit recordings."""
 import argparse
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -83,6 +84,13 @@ def main():
             run(['--replay'], data, code=2)
     unknown = subprocess.run(args.command + ['unknown'], cwd=ROOT, capture_output=True, timeout=180)
     assert unknown.returncode == 2 and not unknown.stdout
+    # No server: every verb that asks one exits 3, saying so (EXIT_NO_SERVER).
+    with tempfile.TemporaryDirectory(dir=root) as temporary:
+        env = dict(os.environ, WARREN_RUNTIME_DIR=str(Path(temporary) / 'rt'))
+        for verb in (['list-sessions'], ['kill-server'], ['list', '--json'], ['split-right']):
+            got = subprocess.run(args.command + verb, cwd=ROOT, capture_output=True, timeout=180, env=env)
+            assert got.returncode == 3 and got.stderr == b'warren: no server is running\n' and not got.stdout, (
+                'cli-no-server-exit-3', verb, got.returncode, got.stdout[:200], got.stderr[:200])
     # With no arguments warren attaches, which needs a terminal: here there is none.
     bare = subprocess.run(args.command, cwd=ROOT, capture_output=True, timeout=180, stdin=subprocess.DEVNULL)
     assert bare.returncode != 0 and not bare.stdout, bare
