@@ -1,14 +1,253 @@
 //! member: true
 //! `warren capture-pane`'s text: a pane's rows from retained history and the
-//! live screen as lines, read in one pass over the history ring. Pure.
+//! live screen as lines, laid at the pane's width and read in one pass over
+//! the history ring (a second pass counts its rows first). Pure.
+
+/// The rendition a capture last wrote: flags, foreground, background
+/// (the cell encoding: -1 default, 0..255 indexed, 16777216 and up RGB).
+struct CapturePen { flags: int, fg: int, bg: int }
+
+fn capture_put(mut out: List[byte], text: str) {
+    for b in text.bytes() { (mut out).push(b) }
+}
+
+fn capture_decimal(mut out: List[byte], n: int) {
+    if n >= 10 { capture_decimal(mut out, n / 10) }
+    (mut out).push((48 + n % 10) as byte)
+}
+
+// `;` then a colour's SGR parameters, foreground or background.
+fn capture_colour(mut out: List[byte], c: int, background: bool) {
+    var base = 30
+    if background { base = 40 }
+    (mut out).push(59 as byte)
+    if c >= 16777216 {
+        let rgb = c - 16777216
+        capture_decimal(mut out, base + 8)
+        capture_put(mut out, ";2;")
+        capture_decimal(mut out, rgb / 65536)
+        (mut out).push(59 as byte)
+        capture_decimal(mut out, rgb / 256 % 256)
+        (mut out).push(59 as byte)
+        capture_decimal(mut out, rgb % 256)
+    } else if c < 8 {
+        capture_decimal(mut out, base + c)
+    } else if c < 16 {
+        capture_decimal(mut out, base + 60 + c - 8)
+    } else {
+        capture_decimal(mut out, base + 8)
+        capture_put(mut out, ";5;")
+        capture_decimal(mut out, c)
+    }
+}
+
+// The SGR code of rendition flag bit k (bold, faint, italic, underline,
+// double underline, blink, inverse, invisible, crossed out).
+fn capture_flag_code(k: int) -> int {
+    if k == 0 { return 1 }
+    if k == 1 { return 2 }
+    if k == 2 { return 3 }
+    if k == 3 { return 4 }
+    if k == 4 { return 21 }
+    if k == 5 { return 5 }
+    if k == 6 { return 7 }
+    if k == 7 { return 8 }
+    9
+}
+
+// The whole pen from a reset, as one SGR.
+fn capture_pen(mut out: List[byte], flags: int, fg: int, bg: int) {
+    capture_put(mut out, "\u{1b}[0")
+    var bit = 1
+    var k = 0
+    while k < 9 {
+        if flags & bit != 0 {
+            (mut out).push(59 as byte)
+            capture_decimal(mut out, capture_flag_code(k))
+        }
+        bit = bit * 2
+        k += 1
+    }
+    if fg >= 0 { capture_colour(mut out, fg, false) }
+    if bg >= 0 { capture_colour(mut out, bg, true) }
+    (mut out).push(109 as byte)
+}
+
+fn capture_blank(c: Cell) -> bool {
+    c.width != 0 && (c.base == 32 || c.base == 0) && c.mark1 == 0 && c.mark2 == 0
+}
+
+// Whether a trailing cell is dropped: with `join`, a cell never written (a
+// written space stays, as the column a wide glyph could not use does not);
+// with `escapes`, one never written or a blank in the default pen; else any
+// blank.
+fn capture_trailing(c: Cell, escapes: bool, join: bool) -> bool {
+    if c.width == 0 { return true }
+    if join { return !c.written || c.base == 0 }
+    if escapes { return !c.written || (capture_blank(c) && c.flags == 0 && c.background < 0) }
+    capture_blank(c)
+}
+
+// One row of `screen` (1-based `row`, `cols` wide) into `out`. `joined`: the
+// row goes on into the next one captured, so no newline ends it.
+fn capture_row(screen: Screen, cols: int, row: int, escapes: bool, join: bool, joined: bool,
+        mut pen: CapturePen, mut out: List[byte]) {
+    let base = (row - 1) * cols
+    var end = cols
+    while end >= 1 && capture_trailing(screen.cells[base + end - 1], escapes, join) { end -= 1 }
+    var col = 1
+    while col <= end {
+        let c = copy screen.cells[base + col - 1]
+        if c.width != 0 {
+            if escapes && (c.flags != pen.flags || c.foreground != pen.fg || c.background != pen.bg) {
+                capture_pen(mut out, c.flags, c.foreground, c.background)
+                pen.flags = c.flags
+                pen.fg = c.foreground
+                pen.bg = c.background
+            }
+            var cp = c.base
+            if cp == 0 { cp = 32 }
+            let _a = marked_scalar(mut out, cp, true)
+            if c.mark1 != 0 { let _b = marked_scalar(mut out, c.mark1, true) }
+            if c.mark2 != 0 { let _c = marked_scalar(mut out, c.mark2, true) }
+        }
+        col += 1
+    }
+    if joined { return }
+    if escapes && (pen.flags != 0 || pen.fg >= 0 || pen.bg >= 0) {
+        capture_put(mut out, "\u{1b}[0m")
+        pen.flags = 0
+        pen.fg = 0 - 1
+        pen.bg = 0 - 1
+    }
+    (mut out).push(10 as byte)
+}
+
+// The last record of the logical line whose first record is `at`.
+fn capture_line_last(history: History, at: int, left: int) -> int {
+    let id = history_get_word(history, at, 8, 8)
+    var last = at
+    var next = (at + history_get_word(history, at, 0, 4)) % history.bytes.len
+    var k = 1
+    while k < left && history_get_word(history, next, 8, 8) == id {
+        last = next
+        next = (next + history_get_word(history, next, 0, 4)) % history.bytes.len
+        k += 1
+    }
+    last
+}
+
+// How many records from `at` to `last` (one logical line).
+fn capture_line_records(history: History, at: int, last: int) -> int {
+    var n = 1
+    var r = at
+    while r != last {
+        r = (r + history_get_word(history, r, 0, 4)) % history.bytes.len
+        n += 1
+    }
+    n
+}
 
 /// Write lines `first` to `last` of the pane into `out` (emptied first): 0
-/// is the first live row, -1 history's newest line. With `escapes`, each
-/// change of rendition as SGR; with `join`, rows joined at a soft wrap.
-/// Returns the bytes written, or -1 with `out` empty when they would pass
-/// `cap`. Stub: writes nothing.
+/// is the first live row, -1 history's newest row; a line before history's
+/// first or after the last live row is clamped to it, and the two are
+/// swapped when `last` is before `first`. On the alternate screen there is
+/// no history. With `escapes`, each change of rendition as the whole pen
+/// from a reset, and a reset at a line's end; with `join`, rows joined at a
+/// soft wrap. Returns the bytes written, or -1 with `out` empty when they
+/// would pass `cap`.
 pub fn capture_text(pane: Vt, first: int, last: int, escapes: bool, join: bool, mut out: List[byte], cap: int) -> int {
     (mut out).reset()
-    if pane.cols < 0 || first > last || escapes && join || cap < 0 { return 0 }
-    0
+    let cols = pane.cols
+    let rows = pane.rows
+    var view = new_view()
+    reserve_view(mut view, cols, rows)
+    let with_history = !pane.active_alternate && pane.history.records > 0 && pane.history.bytes.len > 0
+    // How many rows history holds at this width.
+    var held = 0
+    if with_history {
+        var at = pane.history.head
+        var k = 0
+        while k < pane.history.records {
+            let line_last = capture_line_last(pane.history, at, pane.history.records - k)
+            held += view_lay_line(mut view, pane.history, at, line_last, cols, 1, 1, false)
+            k += capture_line_records(pane.history, at, line_last)
+            at = (line_last + history_get_word(pane.history, line_last, 0, 4)) % pane.history.bytes.len
+        }
+    }
+    let total = held + rows
+    var a = held + first
+    var b = held + last
+    if a < 0 { a = 0 }
+    if a > total - 1 { a = total - 1 }
+    if b < 0 { b = 0 }
+    if b > total - 1 { b = total - 1 }
+    if b < a {
+        let t = a
+        a = b
+        b = t
+    }
+    var pen = CapturePen { flags: 0, fg: 0 - 1, bg: 0 - 1 }
+    // History's rows among a..b, a logical line at a time.
+    if with_history && a < held {
+        var at = pane.history.head
+        var k = 0
+        var index = 0
+        while k < pane.history.records && index <= b {
+            let line_last = capture_line_last(pane.history, at, pane.history.records - k)
+            let id = history_get_word(pane.history, at, 8, 8)
+            let n = view_lay_line(mut view, pane.history, at, line_last, cols, 1, 1, false)
+            k += capture_line_records(pane.history, at, line_last)
+            if index + n - 1 >= a {
+                var r1 = a - index + 1
+                if r1 < 1 { r1 = 1 }
+                var r2 = b - index + 1
+                if r2 > n { r2 = n }
+                // The newest line may go on into the live screen's first row.
+                let into_live = k == pane.history.records && pane.primary.line_ids[0] == id
+                var c1 = r1
+                while c1 <= r2 {
+                    var c2 = c1 + rows - 1
+                    if c2 > r2 { c2 = r2 }
+                    var row = 1
+                    while row <= c2 - c1 + 1 {
+                        blank_row(mut view.scratch, cols, row, 0 - 1)
+                        row += 1
+                    }
+                    let _laid = view_lay_line(mut view, pane.history, at, line_last, cols, c1, c2, true)
+                    row = 1
+                    while row <= c2 - c1 + 1 {
+                        let absolute = index + c1 + row - 2
+                        let wraps = view.scratch.wrapped[row - 1] || (c1 + row - 1 == n && into_live)
+                        capture_row(view.scratch, cols, row, escapes, join, join && wraps && absolute < b, mut pen, mut out)
+                        row += 1
+                    }
+                    if out.len > cap {
+                        (mut out).reset()
+                        return 0 - 1
+                    }
+                    c1 = c2 + 1
+                }
+            }
+            index += n
+            at = (line_last + history_get_word(pane.history, line_last, 0, 4)) % pane.history.bytes.len
+        }
+    }
+    // The live rows among a..b.
+    var absolute = a
+    if absolute < held { absolute = held }
+    while absolute <= b {
+        let row = absolute - held + 1
+        if pane.active_alternate {
+            capture_row(pane.alternate, cols, row, escapes, join, join && pane.alternate.wrapped[row - 1] && absolute < b, mut pen, mut out)
+        } else {
+            capture_row(pane.primary, cols, row, escapes, join, join && pane.primary.wrapped[row - 1] && absolute < b, mut pen, mut out)
+        }
+        if out.len > cap {
+            (mut out).reset()
+            return 0 - 1
+        }
+        absolute += 1
+    }
+    out.len
 }
