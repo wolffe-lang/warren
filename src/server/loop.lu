@@ -2063,6 +2063,25 @@ fn command_field(body: List[byte], which: int) -> str {
     str_from_utf8(body[at + 2..at + 2 + n]) else ""
 }
 
+/// A pane's working directory and where it was learnt.
+struct PaneDir { path: str, source: str }
+
+// A pane's working directory: the directory its program last reported by
+// OSC 7 (`osc7`), else the one /proc names for its live program (`proc`,
+// where the host has it), else its session's start directory (`start`). A
+// reported or read path is taken only while it names a directory that
+// exists; a program reports what it likes.
+fn pane_dir(s: Server, k: int) -> PaneDir {
+    let reported = vt.reported_dir(s.panes[k].screen)
+    if reported.len > 0 && is_directory(reported) { return PaneDir { path: reported, source: "osc7" } }
+    if s.panes[k].child_live && s.panes[k].pid > 0 {
+        let link = fs.read_link("/proc/{s.panes[k].pid}/cwd") else List[byte]()
+        let named = str_from_utf8(link) else ""
+        if named.starts_with("/") && is_directory(named) { return PaneDir { path: named, source: "proc" } }
+    }
+    PaneDir { path: cwd_of(s.sessions[s.panes[k].session]), source: "start" }
+}
+
 // One session as the command client's rules see it: its tabs in order,
 // each tab's panes in tree order with their rects in the tab area (a hidden
 // pane's rect is zero), the pid of a pane whose program is alive.
@@ -2076,12 +2095,14 @@ fn session_view(s: Server, si: int) -> cmd.SessionView {
             let k = slot_of(s, r.pane)
             var pid = 0 - 1
             var title = ""
+            var dir = PaneDir { path: cwd_of(s.sessions[si]), source: "start" }
             if k >= 0 {
                 if s.panes[k].child_live { pid = s.panes[k].pid }
                 title = str_from_utf8(s.panes[k].screen.title_storage[0..s.panes[k].screen.title_length]) else ""
+                dir = pane_dir(s, k)
             }
             (mut panes).push(cmd.PaneView { id: r.pane, col: r.col, row: r.row, cols: r.cols, rows: r.rows, pid: pid, title: title,
-                cwd: "", cwd_source: "" })
+                cwd: dir.path, cwd_source: dir.source })
         }
         (mut tabs).push(cmd.TabView { id: t.id, name: str_from_utf8(t.name) else "", focus: t.focus, zoomed: t.zoomed, panes: panes })
     }
