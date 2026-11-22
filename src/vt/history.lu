@@ -18,6 +18,10 @@ fn new_history(cap: int) -> History {
         let zeroes = "\u{0}".repeat(cap)
         zeroes.bytes()
     }
+    let _second = copy region {
+        let more = "\u{0}".repeat(cap)
+        more.bytes()
+    }
     History { bytes: data, head: 0, tail: 0, used: 0, records: 0, newest_length: 0, evicted: 0 }
 }
 
