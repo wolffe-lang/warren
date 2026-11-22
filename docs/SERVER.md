@@ -78,10 +78,14 @@ the projection, six times the cap and the screens and 1 MiB (13.2 MiB at
 80x24), is deliberately above that by 1.76 times; the `ring-resident-rows`
 step measures each stage on each host, holds it to the takes recorded in
 `tests/vt/ring-resident-takes.json` and holds the projection at or above it.
-On macOS (arm64, whose peaks are whole 16 KiB pages and the same to the byte
-from run to run) the first pane at the 2 MiB cap peaks at 6.75 MB, three times
-the cap and 0.44 MB of first-use cost, and the projection is above that by
-2.06 times; at an 8 MiB cap one run in four peaks a whole cap higher. The same
+Each row holds the least of its takes on both sides of its subtraction: a host
+may peak a few pages higher in one take (hosted macOS runners did, by 8 to 11
+pages, in one take of three now and then), and that is not the pane's cost.
+On macOS (arm64, whose peaks are whole 16 KiB pages and, in all but such a
+take, the same to the byte from run to run) the first pane at the 2 MiB cap
+peaks at 6.75 MB, three times the cap and 0.44 MB of first-use cost, and the
+projection is above that by 2.06 times; at an 8 MiB cap one run in four peaks
+a whole cap higher. The same
 program allocates in the same order every run, so that difference is the
 system's, not the program's, and the macOS rows measure that cap and do not
 hold it. So the cap is 2 MiB a pane in this version; a ring that grows as
