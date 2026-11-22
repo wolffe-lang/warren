@@ -1,0 +1,294 @@
+//! member: false
+//! OSC 7 read into the pane (vt/osc7.lu): the forms taken, the decoding,
+//! each refusal leaving the stored path as it was, an empty report clearing
+//! it, the 4096-byte bound, both endings, no screen effect and no event, and
+//! a reset keeping the path. Each row is one test, red by its own name.
+//! tests/session/osc7.table holds the same reader beside tmux 3.4.
+use vt
+
+fn osc7(body: str) -> str {
+    "\u{1b}]7;" + body + "\u{7}"
+}
+
+fn base() -> str {
+    osc7("file:///tmp/base")
+}
+
+// A pane whose machine is `box.example.com`, fed `data`.
+fn fed_bytes(data: List[byte]) -> vt.Vt {
+    var pane = vt.new(20, 4, 0)
+    let _named = vt.set_local_host(mut pane, "box.example.com")
+    vt.feed(mut pane, data)
+    pane
+}
+
+// The stored path once the pane reported /tmp/base and then printed `text`.
+fn after_base(text: str) -> str {
+    let pane = fed_bytes((base() + text).bytes())
+    vt.reported_dir(pane)
+}
+
+// The stored path once the pane reported /tmp/base and then OSC 7 whose
+// body is `head`, the raw byte `raw`, and `tail`.
+fn after_base_raw(head: str, raw: int, tail: str) -> str {
+    var data = List[byte]()
+    for b in (base() + "\u{1b}]7;" + head).bytes() { (mut data).push(b) }
+    (mut data).push(raw as byte)
+    for b in (tail + "\u{7}").bytes() { (mut data).push(b) }
+    let pane = fed_bytes(data)
+    vt.reported_dir(pane)
+}
+
+// The stored path for a pane named `local` that printed OSC 7 for `body`.
+fn named_after(local: str, body: str) -> str {
+    var pane = vt.new(20, 4, 0)
+    let _named = vt.set_local_host(mut pane, local)
+    vt.feed(mut pane, (base() + osc7(body)).bytes())
+    vt.reported_dir(pane)
+}
+
+fn test_empty_host() {
+    assert(after_base(osc7("file:///tmp/osc7-a")) == "/tmp/osc7-a", "osc7-empty-host")
+}
+
+fn test_st_ending() {
+    assert(after_base("\u{1b}]7;file:///tmp/osc7-a\u{1b}\\") == "/tmp/osc7-a", "osc7-st-ending")
+}
+
+fn test_localhost() {
+    assert(after_base(osc7("file://localhost/tmp/osc7-b")) == "/tmp/osc7-b", "osc7-localhost")
+}
+
+fn test_this_host() {
+    assert(after_base(osc7("file://box.example.com/tmp/osc7-c")) == "/tmp/osc7-c", "osc7-this-host")
+}
+
+fn test_host_case() {
+    assert(after_base(osc7("file://LOCALHOST/tmp/osc7-e")) == "/tmp/osc7-e", "osc7-host-case")
+    assert(after_base(osc7("file://Box.Example.COM/tmp/osc7-e")) == "/tmp/osc7-e", "osc7-host-case")
+}
+
+fn test_scheme_case() {
+    assert(after_base(osc7("FILE:///tmp/osc7-q")) == "/tmp/osc7-q", "osc7-scheme-case")
+}
+
+// The system reports the long name and the shell sends the short one.
+fn test_short_name_for_long() {
+    assert(named_after("box.example.com", "file://box/tmp/s") == "/tmp/s", "osc7-host-short-for-long")
+    assert(named_after("box.example.com", "file://BOX/tmp/s") == "/tmp/s", "osc7-host-short-for-long")
+}
+
+// The system reports the short name and the shell sends a long one.
+fn test_long_name_for_short() {
+    assert(named_after("box", "file://box.lan/tmp/l") == "/tmp/l", "osc7-host-long-for-short")
+    assert(named_after("box", "file://box.example.com/tmp/l") == "/tmp/l", "osc7-host-long-for-short")
+}
+
+// Only the first label of a name stands for the whole: two long names that
+// differ past it, a name that only begins like this one, and a part of the
+// first label are other hosts.
+fn test_other_names_kept() {
+    assert(named_after("box.example.com", "file://box.other.org/tmp/x") == "/tmp/base", "osc7-host-other-name-kept")
+    assert(named_after("box.example.com", "file://boxer/tmp/x") == "/tmp/base", "osc7-host-other-name-kept")
+    assert(named_after("box.example.com", "file://bo/tmp/x") == "/tmp/base", "osc7-host-other-name-kept")
+    assert(named_after("box", "file://boxer.lan/tmp/x") == "/tmp/base", "osc7-host-other-name-kept")
+    assert(named_after("box", "file://example.com/tmp/x") == "/tmp/base", "osc7-host-other-name-kept")
+}
+
+fn test_other_host() {
+    assert(after_base(osc7("file://elsewhere.example/tmp/osc7-d")) == "/tmp/base", "osc7-other-host-kept")
+}
+
+fn test_host_port() {
+    assert(after_base(osc7("file://localhost:22/tmp/osc7-p")) == "/tmp/base", "osc7-host-port-kept")
+}
+
+// A pane given no name takes the empty host and localhost only.
+fn test_no_local_name() {
+    var pane = vt.new(20, 4, 0)
+    vt.feed(mut pane, (osc7("file:///tmp/osc7-a") + osc7("file://box.example.com/tmp/osc7-c")).bytes())
+    assert(vt.reported_dir(pane) == "/tmp/osc7-a", "osc7-no-local-name")
+    vt.feed(mut pane, osc7("file://localhost/tmp/osc7-b").bytes())
+    assert(vt.reported_dir(pane) == "/tmp/osc7-b", "osc7-no-local-name")
+}
+
+// An empty name and one past 255 bytes are refused, and the refusal leaves
+// the pane with no name.
+fn test_local_host_bounds() {
+    var pane = vt.new(20, 4, 0)
+    assert(!vt.set_local_host(mut pane, ""), "osc7-local-host-bounds")
+    assert(vt.set_local_host(mut pane, "b".repeat(255)), "osc7-local-host-bounds")
+    vt.feed(mut pane, osc7("file://" + "b".repeat(255) + "/tmp/long-name").bytes())
+    assert(vt.reported_dir(pane) == "/tmp/long-name", "osc7-local-host-bounds")
+    assert(!vt.set_local_host(mut pane, "b".repeat(256)), "osc7-local-host-bounds")
+    vt.feed(mut pane, osc7("file://" + "b".repeat(255) + "/tmp/after").bytes())
+    assert(vt.reported_dir(pane) == "/tmp/long-name", "osc7-local-host-bounds")
+}
+
+fn test_percent_decoded() {
+    assert(after_base(osc7("file:///tmp/a%20b%4a%4B%2Fc%25%C3%A9")) == "/tmp/a bJK/c%\u{e9}", "osc7-percent-decoded")
+}
+
+fn test_bad_escape() {
+    assert(after_base(osc7("file:///tmp/%G1")) == "/tmp/base", "osc7-bad-escape-kept")
+}
+
+fn test_truncated_escape() {
+    assert(after_base(osc7("file:///tmp/a%2")) == "/tmp/base", "osc7-truncated-escape-kept")
+}
+
+fn test_lone_percent() {
+    assert(after_base(osc7("file:///tmp/a%")) == "/tmp/base", "osc7-lone-percent-kept")
+}
+
+fn test_escaped_nul() {
+    assert(after_base(osc7("file:///tmp/a%00b")) == "/tmp/base", "osc7-nul-kept")
+}
+
+fn test_raw_nul() {
+    assert(after_base_raw("file:///tmp/a", 0, "b") == "/tmp/base", "osc7-raw-nul-kept")
+}
+
+fn test_raw_control() {
+    assert(after_base(osc7("file:///tmp/a\tb")) == "/tmp/base", "osc7-raw-control-kept")
+    assert(after_base(osc7("file:///tmp/a\nb")) == "/tmp/base", "osc7-raw-control-kept")
+}
+
+// A decoded path that is not UTF-8 is refused: the earlier path stays.
+fn test_escaped_non_utf8() {
+    assert(after_base(osc7("file:///tmp/a%FFb")) == "/tmp/base", "osc7-non-utf8-kept")
+    assert(after_base(osc7("file:///tmp/a%C0%AFb")) == "/tmp/base", "osc7-non-utf8-kept")
+    assert(after_base(osc7("file:///tmp/a%C3")) == "/tmp/base", "osc7-non-utf8-kept")
+    assert(after_base(osc7("file:///tmp/a%ED%A0%80")) == "/tmp/base", "osc7-non-utf8-kept")
+}
+
+// A raw byte that is not UTF-8 reaches the reader as U+FFFD (the parser's
+// replacement), and a path holding U+FFFD is refused: the earlier path stays.
+fn test_raw_non_utf8() {
+    assert(after_base_raw("file:///tmp/a", 255, "b") == "/tmp/base", "osc7-raw-non-utf8-kept")
+}
+
+fn test_replacement_character() {
+    assert(after_base(osc7("file:///tmp/a%EF%BF%BDb")) == "/tmp/base", "osc7-fffd-kept")
+    assert(after_base(osc7("file:///tmp/a\u{fffd}b")) == "/tmp/base", "osc7-fffd-kept")
+}
+
+fn test_no_path() {
+    assert(after_base(osc7("file://localhost")) == "/tmp/base", "osc7-no-path-kept")
+}
+
+fn test_relative() {
+    assert(after_base(osc7("file:tmp/osc7-h")) == "/tmp/base", "osc7-relative-kept")
+}
+
+fn test_other_scheme() {
+    assert(after_base(osc7("http://localhost/tmp/osc7-i")) == "/tmp/base", "osc7-other-scheme-kept")
+}
+
+fn test_no_scheme() {
+    assert(after_base(osc7("/tmp/osc7-j")) == "/tmp/base", "osc7-no-scheme-kept")
+}
+
+// An empty report withdraws the path: the pane has none again.
+fn test_empty_clears() {
+    let before = after_base("")
+    let pane = fed_bytes((base() + osc7("")).bytes())
+    assert(before == "/tmp/base" && pane.cwd_length == 0 && vt.reported_dir(pane) == "", "osc7-empty-clears")
+}
+
+// The OSC string holds 4096 bytes: `7;file://` and a path of 4087 bytes
+// fill it and are taken.
+fn test_payload_bound_taken() {
+    let path = "/tmp/" + "x".repeat(4082)
+    assert(after_base(osc7("file://" + path)) == path, "osc7-4096-taken")
+}
+
+// One byte more and the string is dropped: the earlier path stays.
+fn test_over_long() {
+    assert(after_base(osc7("file:///tmp/" + "x".repeat(4083))) == "/tmp/base", "osc7-over-long-kept")
+    assert(after_base(osc7("file:///tmp/" + "x".repeat(8192))) == "/tmp/base", "osc7-over-long-kept")
+}
+
+fn test_query_literal() {
+    assert(after_base(osc7("file:///tmp/k?x=1#f")) == "/tmp/k?x=1#f", "osc7-query-literal")
+}
+
+fn test_last_wins() {
+    assert(after_base(osc7("file:///tmp/osc7-m") + osc7("file:///tmp/osc7-n")) == "/tmp/osc7-n", "osc7-last-wins")
+}
+
+fn test_valid_then_invalid() {
+    assert(after_base(osc7("file:///tmp/osc7-o") + osc7("http://x/y")) == "/tmp/osc7-o", "osc7-valid-then-invalid")
+}
+
+// The report changes nothing on the screen and raises no event.
+fn test_no_screen_effect() {
+    var plain = vt.new(20, 4, 0)
+    vt.feed(mut plain, "ab".bytes())
+    var told = vt.new(20, 4, 0)
+    vt.feed(mut told, ("a" + osc7("file:///tmp/osc7-a") + "b").bytes())
+    assert(vt.reported_dir(told) == "/tmp/osc7-a", "osc7-no-screen-effect")
+    assert(vt.dump(told) == vt.dump(plain), "osc7-no-screen-effect")
+    assert(vt.take_events(mut told).len == 0, "osc7-no-event")
+}
+
+fn test_reset_keeps() {
+    assert(after_base("ab\u{1b}c") == "/tmp/base", "osc7-ris-keeps")
+}
+
+fn test_title_apart() {
+    let pane = fed_bytes(("\u{1b}]2;t\u{7}" + osc7("file:///tmp/osc7-a")).bytes())
+    assert(pane.title_length == 1 && vt.reported_dir(pane) == "/tmp/osc7-a", "osc7-title-apart")
+}
+
+// The report fed one byte at a time is read as fed whole.
+fn test_split_feed() {
+    var pane = vt.new(20, 4, 0)
+    for b in osc7("file://localhost/tmp/a%20b").bytes() {
+        var one = List[byte]()
+        (mut one).push(b)
+        vt.feed(mut pane, one)
+    }
+    assert(vt.reported_dir(pane) == "/tmp/a b", "osc7-split-feed")
+}
+
+fn main() -> int {
+    test_empty_host()
+    test_st_ending()
+    test_localhost()
+    test_this_host()
+    test_host_case()
+    test_scheme_case()
+    test_short_name_for_long()
+    test_long_name_for_short()
+    test_other_names_kept()
+    test_other_host()
+    test_host_port()
+    test_no_local_name()
+    test_local_host_bounds()
+    test_percent_decoded()
+    test_bad_escape()
+    test_truncated_escape()
+    test_lone_percent()
+    test_escaped_nul()
+    test_raw_nul()
+    test_raw_control()
+    test_escaped_non_utf8()
+    test_raw_non_utf8()
+    test_replacement_character()
+    test_no_path()
+    test_relative()
+    test_other_scheme()
+    test_no_scheme()
+    test_empty_clears()
+    test_payload_bound_taken()
+    test_over_long()
+    test_query_literal()
+    test_last_wins()
+    test_valid_then_invalid()
+    test_no_screen_effect()
+    test_reset_keeps()
+    test_title_apart()
+    test_split_feed()
+    0
+}

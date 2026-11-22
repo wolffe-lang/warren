@@ -14,7 +14,8 @@ ENTRIES = ('vt_grid_test', 'vt_unicode_test', 'vt_annotation_test', 'vt_combinin
            'vt_ops_test', 'vt_screen_state_test',
            'vt_graphics_test', 'vt_events_test', 'vt_dump_test', 'vt_width_test',
            'vt_history_checked_semantics', 'vt_history_checked_allocation', 'vt_history_checked_chunking',
-           'vt_resize_test', 'vt_interaction_test', 'vt_scalar_test', 'vt_fast_test', 'vt_wide_pending_test')
+           'vt_resize_test', 'vt_interaction_test', 'vt_scalar_test', 'vt_fast_test', 'vt_wide_pending_test',
+           'vt_osc7_test')
 
 
 def validate(record, pin):
