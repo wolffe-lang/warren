@@ -4,6 +4,15 @@
 //! The bounded vt-dump raw/replay diagnostic is implemented. Command-client
 //! operations for a live server remain for W5.
 
+/// `warren <verb>`'s exit status when the verb was done.
+pub const EXIT_DONE: int = 0
+/// The server refused the verb; its reason is on standard error.
+pub const EXIT_REFUSED: int = 1
+/// A usage error: an unknown verb, a missing or extra argument.
+pub const EXIT_USAGE: int = 2
+/// No server answered.
+pub const EXIT_NO_SERVER: int = 3
+
 /// The milestone that fills this module in.
 pub fn milestone() -> str {
     "W5"
