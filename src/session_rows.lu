@@ -15,6 +15,7 @@
 //! `SESSION-ROWS rows=N failed=M`; exits 1 when any row is red.
 use std.env
 use std.fs
+use std.json
 use std.net
 use std.net.unix
 use std.process
@@ -1032,6 +1033,493 @@ fn waits_in(path: str) -> int {
         if line.ends_with(" waits for the reply buffer") { n += 1 }
     }
     n
+}
+
+// ---- send-keys and capture-pane ----
+
+// The repository's root, from this program's own path (target/native/...).
+fn repo_root() -> str {
+    let me = self_path()
+    let at = me.find("/target/native/") else { return "." }
+    me[0..at]
+}
+
+// One COMMAND as words, waiting at most `ms` for its REPLY.
+fn ask_long(r: Rig, words: List[str], ms: int) -> Answer {
+    var p = client.dial(socket(r)) else |e| { return Answer { status: 0 - 1, out: "", err: "dial-{e}" } }
+    var none = List[str]()
+    let _h = client.send(p, 1, client.hello_payload(2, 0, 0, "", 0, "", none, none))
+    var b = List[byte]()
+    proto.put(mut b, 9, 4)
+    proto.put(mut b, words.len, 2)
+    for w in words { proto.put_text(mut b, w) }
+    proto.put_text(mut b, "/")
+    proto.put_text(mut b, "")
+    let _c = client.send(p, 11, b)
+    let m = client.next(mut p, ms)
+    client.hang_up(mut p)
+    if m.kind != 136 { return Answer { status: 0 - 1, out: "", err: "no REPLY ({m.kind})" } }
+    let out_len = le4(m.body, 5)
+    let err_len = le4(m.body, 9 + out_len)
+    Answer { status: m.body[4] as int, out: str_from_utf8(m.body[9..9 + out_len]) else "",
+        err: str_from_utf8(m.body[13 + out_len..13 + out_len + err_len]) else "" }
+}
+
+// Words split at single spaces.
+fn split_words(text: str) -> List[str] {
+    var out = List[str]()
+    for w in text.split(" ") {
+        if w.len > 0 { (mut out).push(w) }
+    }
+    out
+}
+
+// The bytes a `--key-reader` logged so far.
+fn reader_bytes(path: str) -> List[byte] {
+    var out = List[byte]()
+    let log = fs.read_text(path) else ""
+    for line in log.lines() {
+        if line.starts_with("b ") { (mut out).push((line[2..line.len].to_int() else 0) as byte) }
+    }
+    out
+}
+
+// Wait until a reader has logged at least `n` bytes (or `ms` passed); its bytes.
+fn until_read(path: str, n: int, ms: int) -> List[byte] {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        let got = reader_bytes(path)
+        if got.len >= n { return got }
+        time.sleep(time.millis(5))
+    }
+    reader_bytes(path)
+}
+
+fn hex_of(b: List[byte]) -> str {
+    let digits = "0123456789abcdef"
+    var out = List[byte]()
+    for x in b {
+        let v = x as int
+        (mut out).push(digits.bytes()[v / 16])
+        (mut out).push(digits.bytes()[v % 16])
+    }
+    str_from_utf8(out) else ""
+}
+
+// A pane running `--key-reader FILE MODE` in a new tab of session `a`; its
+// id, or "" (and the reason in the trace of the caller).
+fn reader_tab(r: Rig, file: str, mode: str) -> str {
+    var w = split_words("new-tab -t a --")
+    (mut w).push(self_path())
+    (mut w).push("--key-reader")
+    (mut w).push(file)
+    (mut w).push(mode)
+    let a = ask_words(r, w, "")
+    if a.status != 0 { return "" }
+    if !until_file(file + ".ready", 5000) { return "" }
+    // The mode's sequences reach the emulator before the first key.
+    time.sleep(time.millis(100))
+    a.out.trim()
+}
+
+fn until_file(path: str, ms: int) -> bool {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        if fs.exists(path) { return true }
+        time.sleep(time.millis(10))
+    }
+    fs.exists(path)
+}
+
+// A session `a` at 80x26 (its panes 80x24) whose first pane runs `program`.
+fn pane_session(mut r: Rig, program: str) -> str {
+    let why = start_server(mut r, program)
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 26, "a", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut a, 131, 5000) { return "no first image" }
+    client.hang_up(mut a)
+    ""
+}
+
+// Every row of tests/session/send-keys.table, sent by `warren send-keys` to
+// a reader pane in the row's mode, reaches it as the table's warren column:
+// names, modifiers, text and -l, in normal, cursor and keypad modes. The
+// plant's row.
+fn row_send_keys_bytes(mut r: Rig) -> str {
+    let why = pane_session(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var panes = List[str]()
+    var files = List[str]()
+    for mode in split_words("normal cursor keypad") {
+        let f = beside(r, "keys-" + mode)
+        fs.remove(f) else |_| {}
+        let id = reader_tab(r, f, mode)
+        if id.len == 0 { return "no reader pane in {mode} mode" }
+        (mut panes).push(id)
+        (mut files).push(f)
+    }
+    let text = fs.read_text(repo_root() + "/tests/session/send-keys.table") else { return "no table" }
+    var seen = List[int]()
+    var z = 0
+    while z < 3 {
+        (mut seen).push(0)
+        z += 1
+    }
+    var rows = 0
+    for line in text.lines() {
+        if line.len == 0 || line.starts_with("#") { continue }
+        let f = line.split("\t")
+        if f.len != 5 { return "a table line of {f.len} columns" }
+        var k = 2
+        if f[0] == "normal" { k = 0 } else if f[0] == "cursor" { k = 1 }
+        var w = List[str]()
+        (mut w).push("send-keys")
+        (mut w).push("-t")
+        (mut w).push(panes[k])
+        for a in json_words(f[1]) { (mut w).push(a) }
+        let s = ask_words(r, w, "")
+        if s.status != 0 { return "send-keys -t {panes[k]} {f[1]}: status {s.status} '{s.err.trim()}'" }
+        let want = f[3].len / 2
+        let got = until_read(files[k], seen[k] + want, 2000)
+        var end = seen[k] + want
+        if got.len < end { end = got.len }
+        let mine = hex_of(got[seen[k]..end])
+        if mine != f[3] { return "{f[1]} {f[0]}: read {mine}, the table's warren column {f[3]}" }
+        seen[k] = seen[k] + want
+        rows += 1
+    }
+    // Nothing more came after the last case.
+    time.sleep(time.millis(200))
+    var q = 0
+    while q < 3 {
+        let total = reader_bytes(files[q]).len
+        if total != seen[q] { return "the reader in pane {panes[q]} read {total} bytes, the table's {seen[q]}" }
+        q += 1
+    }
+    if rows != 391 { return "{rows} table rows sent, not 391" }
+    ""
+}
+
+// The JSON list of strings in a table line, as words (the table writes them
+// with every non-ASCII character escaped).
+fn json_words(text: str) -> List[str] {
+    var out = List[str]()
+    let v = json.parse(text) else { return out }
+    for a in json.as_arr(v) else List[json.Value]() { (mut out).push(json.as_str(a) else "") }
+    out
+}
+
+// send-keys's refusals send nothing anywhere: a target that is not there
+// (status 1, named), no keys (status 2), and 65,537 bytes, past a pane's
+// 64 KiB input queue, in one send (status 1, named; none of them arrive).
+fn row_send_keys_refusals(mut r: Rig) -> str {
+    let why = pane_session(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    let f = beside(r, "refusals")
+    fs.remove(f) else |_| {}
+    let id = reader_tab(r, f, "normal")
+    if id.len == 0 { return "no reader pane" }
+    let missing = ask_words(r, split_words("send-keys -t p99 x"), "")
+    if missing.status != 1 || !missing.err.contains("p99") { return "a missing target: status {missing.status} '{missing.err.trim()}'" }
+    let none = ask_words(r, split_words("send-keys -t {id}"), "")
+    if none.status != 2 { return "no keys: status {none.status} '{none.err.trim()}'" }
+    var big = List[byte]()
+    var i = 0
+    while i < 65537 {
+        (mut big).push(120 as byte)
+        i += 1
+    }
+    var w = split_words("send-keys -l -t {id}")
+    (mut w).push(str_from_utf8(big) else "")
+    let over = ask_words(r, w, "")
+    if over.status != 1 || !over.err.contains("input queue") { return "65,537 bytes: status {over.status} '{over.err.trim()}'" }
+    time.sleep(time.millis(300))
+    let got = reader_bytes(f)
+    if got.len != 0 { return "the refusals sent {got.len} bytes" }
+    ""
+}
+
+// send-keys reaches the program, not the key table: the prefix (C-Space,
+// NUL) and the key after it arrive as bytes, and no client's mode moves.
+fn row_send_keys_skips_bindings(mut r: Rig) -> str {
+    let why = pane_session(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    let f = beside(r, "bindings")
+    fs.remove(f) else |_| {}
+    let id = reader_tab(r, f, "normal")
+    if id.len == 0 { return "no reader pane" }
+    var a = attach(r, 80, 26, "a", 0) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut a, 131, 5000) { return "no image" }
+    let s = ask_words(r, split_words("send-keys -t {id} C-Space |"), "")
+    if s.status != 0 { return "send-keys: status {s.status} '{s.err.trim()}'" }
+    let got = until_read(f, 2, 2000)
+    if hex_of(got) != "007c" { return "the program read {hex_of(got)}, not 007c (the prefix and |)" }
+    let l = listed(r)
+    if l.status != 0 { return l.err }
+    if panes_in(l.out) != 2 { return "the prefix and | split a pane: {panes_in(l.out)} panes" }
+    client.hang_up(mut a)
+    ""
+}
+
+// All of a send's bytes are queued or none are: a reader that does not read
+// yet takes 8 KiB sends until one is refused (its 64 KiB queue full); once
+// it reads, it gets every accepted send and nothing of the refused one.
+fn row_send_keys_all_or_nothing(mut r: Rig) -> str {
+    let why = pane_session(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    let f = beside(r, "queue")
+    let go = beside(r, "queue-go")
+    fs.remove(f) else |_| {}
+    fs.remove(go) else |_| {}
+    var w = split_words("new-tab -t a --")
+    (mut w).push(self_path())
+    (mut w).push("--key-reader")
+    (mut w).push(f)
+    (mut w).push("normal")
+    (mut w).push(go)
+    let t = ask_words(r, w, "")
+    if t.status != 0 || !until_file(f + ".ready", 5000) { return "no waiting reader: {t.status} '{t.err.trim()}'" }
+    let id = t.out.trim()
+    var chunk = List[byte]()
+    var i = 0
+    while i < 8192 {
+        (mut chunk).push(121 as byte)
+        i += 1
+    }
+    let text = str_from_utf8(chunk) else ""
+    var sent = 0
+    var refused = false
+    var n = 0
+    while n < 20 && !refused {
+        var s = split_words("send-keys -l -t {id}")
+        (mut s).push(text)
+        let a = ask_words(r, s, "")
+        if a.status == 0 { sent += 8192 } else if a.status == 1 && a.err.contains("input queue") { refused = true } else {
+            return "send {n + 1}: status {a.status} '{a.err.trim()}'"
+        }
+        n += 1
+    }
+    if !refused { return "20 sends of 8 KiB were all taken by a reader that did not read" }
+    fs.write_text(go, "go\n") else { return "go file" }
+    let _first = until_read(f, sent, 5000)
+    time.sleep(time.millis(300))
+    let all = reader_bytes(f)
+    if all.len != sent { return "the reader got {all.len} bytes of the {sent} accepted (a refused send arrived in part, or an accepted one did not)" }
+    ""
+}
+
+// A capture's output kept beside the row, checked by tests/session/capture_check.py.
+fn checked(r: Rig, out: str, leaf: str, args: List[str]) -> str {
+    let path = beside(r, leaf)
+    fs.write_text(path, out) else { return "write {path}" }
+    var c = process.command("python3")
+    process.push_arg(mut c, "-I")
+    process.push_arg(mut c, repo_root() + "/tests/session/capture_check.py")
+    process.push_arg(mut c, args[0])
+    process.push_arg(mut c, path)
+    var i = 1
+    while i < args.len {
+        process.push_arg(mut c, args[i])
+        i += 1
+    }
+    let report = beside(r, leaf + ".check")
+    let fo = fs.create(report) else |e| { return "report-{e}" }
+    process.set_stdout(mut c, fo)
+    let ch = process.start(c) else |e| { return "checker-{e}" }
+    let st = process.wait_status(take ch) else 0 - 1
+    if st != 0 { return (fs.read_text(report) else "the checker failed").trim() }
+    ""
+}
+
+// The harness's six case streams (tests/vt/cases.py), each `cat` into a pane
+// of 80x24: `capture-pane -p` gives each row of the reference emulator's
+// expected screen, and `-e` read as cells its renditions as well.
+fn capture_against_screens(mut r: Rig, escapes: bool) -> str {
+    let dir = beside(r, "cases")
+    var c = process.command("python3")
+    process.push_arg(mut c, "-I")
+    process.push_arg(mut c, repo_root() + "/tests/vt/cases.py")
+    process.push_arg(mut c, dir)
+    let ch = process.start(c) else |e| { return "cases-{e}" }
+    if (process.wait_status(take ch) else 0 - 1) != 0 { return "tests/vt/cases.py failed" }
+    var words = "capture-pane -p -t a"
+    var mode = "screen"
+    if escapes {
+        words = "capture-pane -p -e -t a"
+        mode = "escapes"
+    }
+    for name in split_words("sgr wide erase edit scroll pending-wrap") {
+        let done = beside(r, name + ".printed")
+        fs.remove(done) else |_| {}
+        let why = pane_session(mut r, self_path() + " --print-file " + dir + "/" + name + ".in " + done)
+        if why.len > 0 { return "{name}: {why}" }
+        if !until_file(done, 10000) { return "{name}: the case was not printed" }
+        time.sleep(time.millis(200))
+        let a = ask_words(r, split_words(words), "")
+        if a.status != 0 { return "{name}: capture-pane: status {a.status} '{a.err.trim()}'" }
+        var args = List[str]()
+        (mut args).push(mode)
+        (mut args).push(repo_root() + "/tests/vt/expected/" + name + ".screen")
+        let bad = checked(r, a.out, "capture-" + name, args)
+        if bad.len > 0 { return "{name}: {bad}" }
+        let _s = stop_server(mut r)
+    }
+    ""
+}
+
+fn row_capture_screen(mut r: Rig) -> str {
+    capture_against_screens(mut r, false)
+}
+
+fn row_capture_escapes(mut r: Rig) -> str {
+    capture_against_screens(mut r, true)
+}
+
+// The measurement's own cases (tests/session/capture-cases), each printed
+// into a pane of 80x24 and captured with every flag set tmux 3.4 was
+// captured with: line numbers, clamps and swaps, joins, trailing blanks,
+// renditions at a row's end, the alternate screen. Each capture equals
+// tests/session/capture-goldens.json's warren column (the -e ones read as
+// cells).
+fn row_capture_cases(mut r: Rig) -> str {
+    let goldens = repo_root() + "/tests/session/capture-goldens.json"
+    let text = fs.read_text(goldens) else { return "no goldens" }
+    let all = json.parse(text) else { return "the goldens are not JSON" }
+    for name in split_words("history join sgr-end alt") {
+        let done = beside(r, name + ".printed")
+        fs.remove(done) else |_| {}
+        let why = pane_session(mut r, self_path() + " --print-file " + repo_root() + "/tests/session/capture-cases/" + name + ".in " + done)
+        if why.len > 0 { return "{name}: {why}" }
+        if !until_file(done, 10000) { return "{name}: the case was not printed" }
+        time.sleep(time.millis(200))
+        let cases = json.get(all, name) else { return "no goldens for {name}" }
+        for flags in json.keys(cases) else List[str]() {
+            var w = split_words("capture-pane -t a")
+            let fl = json_words(flags)
+            var spans = false
+            for x in fl {
+                (mut w).push(x)
+                if x.starts_with("-") && x.contains("e") && !x.starts_with("-S") && !x.starts_with("-E") { spans = true }
+            }
+            let a = ask_words(r, w, "")
+            if a.status != 0 { return "{name} {flags}: status {a.status} '{a.err.trim()}'" }
+            var args = List[str]()
+            var how = "case"
+            if spans { how = "case-spans" }
+            (mut args).push(how)
+            (mut args).push(goldens)
+            (mut args).push(name)
+            (mut args).push(flags)
+            let bad = checked(r, a.out, "case-" + name, args)
+            if bad.len > 0 { return "{name} {flags}: {bad}" }
+        }
+        let _s = stop_server(mut r)
+    }
+    ""
+}
+
+// capture-pane without -p puts the capture in its session's register, as
+// tmux's goes to a paste buffer: the paste key then types it into a reader.
+fn row_capture_register(mut r: Rig) -> str {
+    let done = beside(r, "history.printed")
+    fs.remove(done) else |_| {}
+    let why = pane_session(mut r, self_path() + " --print-file " + repo_root() + "/tests/session/capture-cases/history.in " + done)
+    if why.len > 0 { return why }
+    if !until_file(done, 10000) { return "the case was not printed" }
+    time.sleep(time.millis(200))
+    let c = ask_words(r, split_words("capture-pane -t a -S -3 -E -1"), "")
+    if c.status != 0 || c.out.len != 0 { return "capture-pane without -p: status {c.status}, printed {c.out.len} bytes, '{c.err.trim()}'" }
+    let f = beside(r, "pasted")
+    fs.remove(f) else |_| {}
+    let id = reader_tab(r, f, "normal")
+    if id.len == 0 { return "no reader pane" }
+    var a = attach(r, 80, 26, "a", 0) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut a, 131, 5000) { return "no image" }
+    let _prefix = client.key(a, 4, 0, 32)
+    let _paste = client.key(a, 0, 0, 93)
+    let got = until_read(f, 27, 3000)
+    client.hang_up(mut a)
+    let want = "line 075\nline 076\nline 077\n"
+    if (str_from_utf8(got) else "") != want { return "the paste typed '{str_from_utf8(got) else "?"}', not the capture" }
+    ""
+}
+
+// A pane whose 2 MiB history ring is full: `-p -S -` arrives whole (past
+// 1 MiB, so from the reply buffer in fragments), one line a retained row and
+// a live row. MEASURE: its bytes and the time the command took.
+fn row_capture_full_ring(mut r: Rig) -> str {
+    let path = beside(r, "ring.in")
+    var b = List[byte]()
+    var n = 0
+    while n < 40000 {
+        for c in "{n}".bytes() { (mut b).push(c) }
+        var k = 0
+        while k < 70 {
+            (mut b).push(46 as byte)
+            k += 1
+        }
+        (mut b).push(13 as byte)
+        (mut b).push(10 as byte)
+        n += 1
+    }
+    fs.write_bytes(path, b) else { return "write the ring's input" }
+    let done = path + ".printed"
+    fs.remove(done) else |_| {}
+    let why = pane_session(mut r, self_path() + " --print-file " + path + " " + done)
+    if why.len > 0 { return why }
+    if !until_file(done, 30000) { return "the ring's input was not printed" }
+    time.sleep(time.millis(300))
+    let t0 = now_ms()
+    let a = ask_long(r, split_words("capture-pane -p -S - -t a"), 20000)
+    let ms = now_ms() - t0
+    if a.status != 0 { return "capture-pane -p -S -: status {a.status} '{a.err.trim()}'" }
+    print("MEASURE capture-full-ring bytes={a.out.len} ms={ms}")
+    if a.out.len <= 1048576 { return "the capture is {a.out.len} bytes: the ring did not fill past 1 MiB" }
+    // Every numbered line from the oldest the ring kept to the last, in
+    // order, then the live screen's blank rows.
+    var next = 0 - 1
+    var numbered = 0
+    for line in a.out.lines() {
+        if line.len == 0 { continue }
+        let dots = line.find(".") else { return "a line without its dots: '{line}'" }
+        let k = line[0..dots].to_int() else { return "a line without its number: '{line}'" }
+        if next >= 0 && k != next { return "line {k} follows line {next - 1}: the capture is not whole" }
+        next = k + 1
+        numbered += 1
+    }
+    if next != 40000 { return "the capture ends at line {next - 1}, not 39999" }
+    print("MEASURE capture-full-ring lines={numbered} first={40000 - numbered}")
+    ""
+}
+
+// A capture past the protocol's 8 MiB is refused by name (status 1), and the
+// server goes on: a full ring whose every cell changes the whole rendition
+// (nine attributes, two RGB colours) captured with -e.
+fn row_capture_over_cap(mut r: Rig) -> str {
+    let path = beside(r, "worst.in")
+    var b = List[byte]()
+    var n = 0
+    while n < 220000 {
+        let v = n % 200
+        for c in "\u{1b}[1;2;3;4;5;7;8;9;38;2;{v};{255 - v};{v};48;2;{255 - v};{v};{255 - v}mx".bytes() { (mut b).push(c) }
+        if n % 79 == 78 {
+            (mut b).push(13 as byte)
+            (mut b).push(10 as byte)
+        }
+        n += 1
+    }
+    fs.write_bytes(path, b) else { return "write the worst ring's input" }
+    let done = path + ".printed"
+    fs.remove(done) else |_| {}
+    let why = pane_session(mut r, self_path() + " --print-file " + path + " " + done)
+    if why.len > 0 { return why }
+    if !until_file(done, 60000) { return "the worst ring's input was not printed" }
+    time.sleep(time.millis(300))
+    let a = ask_long(r, split_words("capture-pane -p -e -S - -t a"), 20000)
+    if a.status != 1 || !a.err.contains("8 MiB") { return "capture-pane -p -e -S - of the worst ring: status {a.status}, {a.out.len} bytes, '{a.err.trim()}'" }
+    let l = ask_words(r, split_words("ls"), "")
+    if l.status != 0 { return "the server did not go on: ls {l.status}" }
+    ""
 }
 
 // Ids are never handed out again: a closed pane's, an ended session's and
@@ -2128,18 +2616,74 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "two-large-replies" { why = row_two_large_replies(mut r) }
     else if name == "reply-projection" { why = row_reply_projection(mut r) }
     else if name == "reply-memory-refused" { why = row_reply_memory_refused(mut r) }
+    else if name == "send-keys-bytes" { why = row_send_keys_bytes(mut r) }
+    else if name == "send-keys-refusals" { why = row_send_keys_refusals(mut r) }
+    else if name == "send-keys-skips-bindings" { why = row_send_keys_skips_bindings(mut r) }
+    else if name == "send-keys-all-or-nothing" { why = row_send_keys_all_or_nothing(mut r) }
+    else if name == "capture-screen" { why = row_capture_screen(mut r) }
+    else if name == "capture-escapes" { why = row_capture_escapes(mut r) }
+    else if name == "capture-cases" { why = row_capture_cases(mut r) }
+    else if name == "capture-register" { why = row_capture_register(mut r) }
+    else if name == "capture-full-ring" { why = row_capture_full_ring(mut r) }
+    else if name == "capture-over-cap" { why = row_capture_over_cap(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader two-large-replies reply-projection reply-memory-refused".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap".split(" ") {
         (mut x).push(n)
     }
     x
 }
 
+
+// The pane-side helper for the send-keys rows: its terminal raw, in MODE
+// (`normal`, `cursor`: application cursor keys, `keypad`: those and the
+// application keypad), it writes FILE.ready, waits for GO when one is named,
+// then logs every byte it reads to FILE as `b N` until its terminal hangs up.
+fn key_reader(path: str, mode: str, go: str) -> int {
+    let was = term.mode(fs.stdin()) else { return 1 }
+    term.set_mode(fs.stdin(), term.raw_bytes(was)) else { return 1 }
+    var out = fs.stdout()
+    if mode == "cursor" || mode == "keypad" { fs.write_chunk(mut out, "\u{1b}[?1h".bytes()) else |_| {} }
+    if mode == "keypad" { fs.write_chunk(mut out, "\u{1b}=".bytes()) else |_| {} }
+    fs.write_text(path + ".ready", "ready\n") else { return 1 }
+    if go.len > 0 {
+        while !fs.exists(go) { time.sleep(time.millis(10)) }
+    }
+    var tty = fs.stdin()
+    while true {
+        let got = fs.read_chunk(mut tty, 4096) else { break }
+        if got.len == 0 { break }
+        var log = List[byte]()
+        for b in got {
+            (mut log).push(98 as byte)
+            (mut log).push(32 as byte)
+            for d in "{b as int}".bytes() { (mut log).push(d) }
+            (mut log).push(10 as byte)
+        }
+        fs.append_text(path, str_from_utf8(log) else "") else |_| {}
+    }
+    term.set_mode(fs.stdin(), was) else |_| {}
+    0
+}
+
+// The pane-side helper for the capture rows: FILE's bytes to its terminal,
+// then DONE written, then it waits for its terminal to hang up.
+fn print_file(path: str, done: str) -> int {
+    let b = fs.read_bytes(path) else { return 1 }
+    var out = fs.stdout()
+    fs.write_chunk(mut out, b) else { return 1 }
+    fs.write_text(done, "printed\n") else { return 1 }
+    var tty = fs.stdin()
+    while true {
+        let got = fs.read_chunk(mut tty, 256) else { break }
+        if got.len == 0 { break }
+    }
+    0
+}
 
 // The pane-side helper for the reply rows: its title becomes 4,094 double
 // quotes, then it waits for its terminal to hang up.
@@ -2255,6 +2799,9 @@ fn main() -> int {
     let args = env.args()
     if args.len == 1 && args[0] == "--print-proc" { return print_proc() }
     if args.len == 1 && args[0] == "--title-quotes" { return title_quotes() }
+    if args.len == 3 && args[0] == "--key-reader" { return key_reader(args[1], args[2], "") }
+    if args.len == 4 && args[0] == "--key-reader" { return key_reader(args[1], args[2], args[3]) }
+    if args.len == 3 && args[0] == "--print-file" { return print_file(args[1], args[2]) }
     if args.len == 1 && args[0] == "--print-size" {
         let size = term.size(fs.stdin()) else |e| {
             print("size-{e}")
