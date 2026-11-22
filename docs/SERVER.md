@@ -364,9 +364,12 @@ message that is not a HELLO, a HELLO that cannot be read or is malformed, a
 peer of another user, a deadline that passed (naming the phase), a message
 that could not be queued, or the server stopping. A `new` at a terminal is two
 connections: the command that makes the session (`REPLY sent`), then the
-attach. The `close-causes` session row drives the ordinary closes, a first
-message that is not a HELLO, and a client gone before its WELCOME is written,
-and fails on any close in the trace that names no cause. Each frame is traced
+attach. Just before each close, `conn N wrote B bytes in W writes over T
+turns` counts the connection's write calls, the bytes they took and the
+server's turns while it was open. The `close-causes` session row drives the
+ordinary closes, a first message that is not a HELLO, and a client gone before
+its WELCOME is written, and fails on any close in the trace that names no
+cause. Each frame is traced
 as `frame conn N seq S turn T read-turn R`, where R is the last turn that read
 output from a shown pane of the session, and the server's last line counts
 the frames composed in the turn that read their output.

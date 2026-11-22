@@ -115,6 +115,9 @@ pub struct Conn {
     seen_layout: int,
     seen_bar: int,
     seen_damage: List[int],
+    writes: int,
+    written: int,
+    first_turn: int,
 }
 
 /// Phase 0, as server_model numbers it: accepted, before HELLO.
@@ -148,6 +151,7 @@ pub fn new_conn() -> Conn {
         resize_ready: false, resize_cols: 0, resize_rows: 0, command_ready: false, command: List[byte](),
         command_len: 0, stop_after: false, pending: 0, pending_arg: 0, message: List[byte](), message_until: 0,
         sent_kind: 0, sent_code: 0, seen_layout: 0 - 1, seen_bar: 0 - 1, seen_damage: List[int](),
+        writes: 0, written: 0, first_turn: 0,
     }
 }
 
@@ -190,6 +194,8 @@ pub fn reset_conn(mut c: Conn, fd: int, id: int, now: int) {
     c.session = 0 - 1
     c.id = id
     c.deadline = now + HELLO_MS * 1000000
+    c.writes = 0
+    c.written = 0
     c.rx_off = 0
     c.rx_len = 0
     c.paste_len = 0

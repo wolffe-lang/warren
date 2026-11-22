@@ -168,6 +168,7 @@ fn close_conn(mut s: Server, index: int, why: str) {
     s.conns[index].fd = 0 - 1
     s.conns[index].pending = 0
     empty_conn(mut s.conns[index])
+    trace(s, "conn {index} wrote {s.conns[index].written} bytes in {s.conns[index].writes} writes over {s.turns - s.conns[index].first_turn} turns")
     trace(s, "conn {index} closed: {why}")
     if s.reply_conn == index { release_reply(mut s) }
 }
@@ -316,6 +317,9 @@ fn flush(mut s: Server, index: int) {
         if "{e}" != "busy" { gone = "{e}" }
         0
     }
+    // Counted for the trace: every write call, and the bytes they took.
+    s.conns[index].writes = s.conns[index].writes + 1
+    s.conns[index].written = s.conns[index].written + n
     if gone.len > 0 {
         close_conn(mut s, index, "write failed: {gone}")
         return
@@ -3064,6 +3068,7 @@ fn accept_some(mut s: Server, now: int) {
         net.set_deadline(mut sock, 1) else |_| {}
         s.next_id = s.next_id + 1
         reset_conn(mut s.conns[slot], sock.fd, s.next_id, now)
+        s.conns[slot].first_turn = s.turns
         let key = poll.add_socket(mut s.w, sock, poll.READ) else |_| {
             net.close(take sock) else |_| {}
             s.conns[slot].live = false
