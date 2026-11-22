@@ -62,7 +62,7 @@ width/resource/platform evidence remain separate pending measurements.
 ## Three kinds of row
 
 - **Emulator rows:** bytes in, a screen out, compared cell for cell with a
-  pinned reference emulator run as a binary. Eight cases, the 151-stream census,
+  pinned reference emulator run as a binary. Eight cases, the 156-stream census,
   five recordings and frozen baseline fuzz have complete-frame comparisons.
   Written divergences and source-proved report limitations remain named rather
   than ignored. Written resize invariants and corpus-wide primary properties
@@ -166,7 +166,7 @@ their byte bounds and arithmetic are in SERVER.md.
 | the image is the pinned one: base, package list, binaries | `oracle-image`, `oracle-identity` |
 | the reference's screen can be read cell for cell, twice the same | `oracle-cases` |
 | a wrong attribute, a wrong cursor and a dropped continuation are each caught by name | `harness-mutations` (committed dumps), `oracle-mutations` (live) |
-| 151 census streams dump to the recorded digests | `oracle-census` |
+| 156 census streams dump to the recorded digests | `oracle-census` |
 | the fuzz generator is stable, and its streams dump to the recorded digests | `fuzz-generator`, `oracle-fuzz` |
 | the recordings are the committed bytes and dump to the recorded digests | `corpus-digests`, `oracle-corpus` |
 | tmux agrees with the reference on text and cursor for six cases; its split sizes, zoom, focus ring and closed pane's program, beside warren's | `tmux-rows` |

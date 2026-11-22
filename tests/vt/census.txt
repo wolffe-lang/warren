@@ -314,6 +314,21 @@ cursor 1,1 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
 == osc-utf8
 cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=中
 r1  ext=1  |X|
+== osc7-bel
+cursor 1,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  |ab|
+== osc7-st
+cursor 1,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  |ab|
+== osc7-long
+cursor 1,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  |ab|
+== osc7-malformed
+cursor 1,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  |ab|
+== osc7-empty
+cursor 1,3 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
+r1  ext=2  |ab|
 == pm
 cursor 1,2 shape=2 visible=1 pending-wrap=0 region=1-24 title=t
 r1  ext=1  |X|

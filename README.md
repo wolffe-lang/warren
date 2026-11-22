@@ -171,7 +171,7 @@ Nineteen extra synthetic reference screens are committed under
 printed text and titles: sixteen agree and one uses the named D8 policy
 (DEL is dropped from a title, rather than changed to `?`). The other two
 measure a one-row region. Those parser projections are not whole-screen
-comparisons. Current whole-frame comparisons cover eight cases, 151 census
+comparisons. Current whole-frame comparisons cover eight cases, 156 census
 streams and five recordings, plus the frozen 32-seed baseline. Named divergences
 and source-triggered report limits have complete-frame fixtures; repaired D9/D13
 and split D15 reference inputs and D10's failed raw reports never become
@@ -204,7 +204,7 @@ What the Linux gate measures today is the harness, not a multiplexer:
 - **Three planted mutations**, on the live dumps and on the committed ones:
   a wrong attribute, a wrong cursor position and a dropped wide-character
   continuation must each go red at its own row.
-- **A census of 151 small streams** that isolate one question each (what
+- **A census of 156 small streams** that isolate one question each (what
   clears a pending wrap, what an erased cell keeps, malformed input). Their
   dumps are held by digest; `tests/vt/census.txt` is the readable form.
 - **32 seeded fuzz streams** and **five recordings** (yew twice, one under

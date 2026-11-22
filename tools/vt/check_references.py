@@ -55,7 +55,7 @@ def main():
         target.write_text(json.dumps(index, indent=2) + '\n')
     else:
         assert json.loads(target.read_text()) == index
-    print('PASS frozen-reference-bindings census=151 recordings=5 fuzz-baseline=32 input+screen+pins')
+    print('PASS frozen-reference-bindings census=156 recordings=5 fuzz-baseline=32 input+screen+pins')
 
 
 if __name__ == '__main__':
