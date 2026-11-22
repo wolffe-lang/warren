@@ -284,7 +284,7 @@ remove other multiplexer markers and LINES/COLUMNS, as TERM.md specifies.
 | starting | atomic start lock unavailable | named refusal; do not remove a possible live server's path | exited |
 | starting | lock held by another starter | exit 0, let the client retry boundedly | exited |
 | starting | connect to path succeeds | release own lock, exit 0 | exited |
-| starting | proven stale path | unlink only owned stale socket, bind/listen, set mode 0600, open readiness set | running |
+| starting | proven stale path | unlink only owned stale socket, bind/listen, set mode 0600, open readiness set; learn the host name once (below) | running |
 | starting | any acquired-resource failure | close/unlink only what this attempt created; release lock | exited |
 | running | listener READ | accept bounded batch; apply admission budget; register accepted peers and 5 s deadlines | running |
 | running | connection/master/child event | tables above | running |
@@ -295,6 +295,15 @@ remove other multiplexer markers and LINES/COLUMNS, as TERM.md specifies.
 | running | fatal wait error | stop accepts; best-effort cleanup as above; report failure | stopping |
 | stopping | readiness/deadline | drain clients/reap boundedly; no new sessions | stopping |
 | stopping | all queues empty and children reaped, or 5 s elapsed | close remaining sockets/master handles; close waiter; remove only owned path/lock; save structural state; exit | exited |
+
+The host name a pane's OSC 7 report may name ([TERM](TERM.md)) is learnt once
+at start: on Linux by reading `/proc/sys/kernel/hostname`; elsewhere by running
+`/bin/hostname` by its path, with no shell, waiting at most one second
+(`HOST_NAME_WAIT_MS`) and reading at most 256 bytes; a first line longer than
+255 bytes is no name. A program still running at the end of the wait is
+killed and reaped. With no name, panes take only an
+empty host and `localhost`. `WARREN_HOST_NAME_PROGRAM` names a stand-in for
+either source, for the rows that hold the failure path.
 
 Stale-path replacement requires an exclusive atomic start lock. A failed
 connect alone is not permission to unlink somebody else's live/listening
@@ -457,7 +466,12 @@ then the terminal, so that the program's redraw after its window change lands
 in an emulator already at the new size. A pane hidden by a small area, or by
 another pane's zoom, keeps its last size and is resized when it shows again.
 A zoomed pane takes the whole area. A split's new pane starts at its rect, in
-the session's working directory, with the session's environment.
+the working directory of the pane it splits, with the session's environment.
+That directory is the one the pane's program last reported with OSC 7 while it
+names a directory, else the one `/proc` names for its live program, else the
+session's start directory ([TERM](TERM.md), [CLI](CLI.md)). A new tab's pane
+starts in the session's start directory. One function (`new_pane_dir`) makes
+this choice.
 
 **Keys and modes.** Every KEY goes through the key table (`src/config/keys.lu`)
 in the client's own mode; modes are per client, focus is per session. Normal

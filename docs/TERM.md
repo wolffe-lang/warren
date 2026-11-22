@@ -139,3 +139,38 @@ then admits a four-byte status answer exactly at the cap.
 and `HERDR_ENV` are removed, so a program does not address another
 multiplexer's protocol to warren. `LINES` and `COLUMNS` are removed: the
 pane's size is the pty's.
+
+## The directory a program reports (OSC 7)
+
+A program may tell warren which directory it is in with
+`ESC ] 7 ; file://HOST/PATH`, ended by BEL or ST, as many shells do at each
+prompt. warren keeps the last path a pane's program reported. It is the
+pane's working directory in `list --json` ([CLI](CLI.md)), and a split from
+that pane starts there. A report is read this way:
+
+- The scheme `file://` and HOST are compared without regard to ASCII case.
+  HOST must be empty, `localhost`, or this machine's name. A name with no
+  domain part also stands for a longer name whose first label it is, either
+  way round: `box` is taken for `box.example.com`, and `box.lan` when the
+  machine calls itself `box`. Any other host is ignored, since the report
+  came from another machine.
+- The server learns the machine's name once, when it starts: on Linux from
+  `/proc/sys/kernel/hostname`, elsewhere from `/bin/hostname`, run with no
+  shell and given at most one second. When neither answers, only an empty
+  host and `localhost` are taken.
+- PATH begins at the first `/` after HOST. `%XX`, with hex digits in either
+  case, stands for one byte. Every other byte stands for itself, `?` and `#`
+  included.
+- A report is refused, and the stored path kept as it was, when the scheme
+  is not `file://`, there is no path, the text holds a control byte or a
+  malformed escape, a decoded byte is NUL, or the decoded path is not UTF-8
+  or holds U+FFFD (which is what warren makes of bytes that are not UTF-8).
+  So a directory whose name is not UTF-8, or holds U+FFFD, is never taken
+  from a report, and the pane's next source is used instead.
+- A report longer than an OSC string's 4096 bytes is dropped whole.
+- An empty report (`ESC ] 7 ; BEL`) withdraws the path.
+- A reset (RIS) keeps the path: it is the program's report, not screen
+  state. A report changes nothing on the screen and raises no event.
+- A reported path is a claim. warren uses it only while it names a directory
+  that exists; otherwise the pane's working directory comes from the next
+  source, as `list --json`'s `cwd_source` says.

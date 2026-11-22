@@ -51,7 +51,9 @@ the same parser, so a verb and its `:` line always mean the same action:
 ## Making panes: `-c DIR` and `-- CMD`
 
 `split-right`, `split-down` and `new-tab` take `-c DIR`, the directory the new
-pane's program starts in (else the session's start directory), and
+pane's program starts in. Without it, a split starts in the working directory
+of the pane it splits (its `cwd` in `list --json`), and a new tab in the
+session's start directory. The verbs also take
 `-- CMD [ARG...]`, the program it runs (else the configured shell); every word
 after `--` is the program's, `-t` and `-c` among them. `new-session` takes
 `-c DIR` alone. A relative DIR is read from the directory `warren` was run in.
@@ -174,18 +176,24 @@ never goes back: a closed pane's, an ended session's or a closed tab's id is
 never handed out again while the server runs. Ids are spelled `s1`, `t1`,
 `p1`, in one place in the source (`src/cmd/ids.lu`).
 
-## `list --json`, schema 1
+## `list --json`, schema 2
 
 One line, the object below, then a newline. Field order is fixed, so two
 listings of one state are equal byte for byte.
 
 ```json
-{"schema":1,"sessions":[
+{"schema":2,"sessions":[
   {"id":"s1","name":"work","cols":80,"rows":24,"clients":1,"active_tab":"t1","tabs":[
     {"id":"t1","name":"","index":1,"focus":"p2","zoomed":false,"panes":[
-      {"id":"p1","index":1,"col":1,"row":1,"cols":40,"rows":22,"pid":4201,"title":"sh"},
-      {"id":"p2","index":2,"col":42,"row":1,"cols":39,"rows":22,"pid":4202,"title":""}]}]}]}
+      {"id":"p1","index":1,"col":1,"row":1,"cols":40,"rows":22,"pid":4201,"title":"sh",
+       "cwd":"/home/me/src","cwd_source":"osc7"},
+      {"id":"p2","index":2,"col":42,"row":1,"cols":39,"rows":22,"pid":4202,"title":"",
+       "cwd":"/home/me","cwd_source":"proc"}]}]}]}
 ```
+
+Schema 2 adds two fields to each pane, after `title`: `cwd` and
+`cwd_source`. Every field of schema 1 is unchanged, in name, meaning and
+order.
 
 - `sessions` in id order; `tabs` in their order (`index` from 1); `panes` in
   the tab's tree order (`index` from 1, the index a target names).
@@ -194,7 +202,14 @@ listings of one state are equal byte for byte.
   tab area, which is the session's size less the bar's two lines. A pane a
   zoomed tab hides has the zero rect: `0, 0, 0, 0`.
 - `pid` is the pid of the pane's program, or `null` when it has ended.
+- `cwd` is the pane's working directory, and `cwd_source` where it was learnt.
+  `osc7` means the directory the pane's program last reported with OSC 7
+  ([TERM](TERM.md)). `proc` means the directory `/proc` names for its program,
+  on Linux, while the program runs. `start` means its session's start
+  directory, used when neither of the others is available. A reported or
+  read path is used only while it names a directory that exists. A pane
+  whose program has ended keeps its last report, else falls back to `start`.
+  On macOS and PAX there is no `proc`.
 - Strings are written as they are in UTF-8, with a quote and a backslash
   escaped and every byte below 0x20, and 0x7f, as `\u00XX`.
-- A tab's `name` is empty until it is renamed. A pane's working directory is
-  not in schema 1.
+- A tab's `name` is empty until it is renamed.
