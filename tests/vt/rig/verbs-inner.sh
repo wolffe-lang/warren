@@ -6,6 +6,8 @@
 #   plant ROW  warren and the session rows built, then the one session row a
 #              plant must turn red by name (it prints FAIL ROW and ends 1):
 #              ids-never-reused, split-prints-new-id
+#   client-plant ROW  the same with the client rows (a terminal client in a
+#              pseudo-terminal): console-term-linux
 set -euo pipefail
 root=$PWD
 . tools/toolchain-env.sh
@@ -23,6 +25,15 @@ case "${1:-}" in
   "$WOLF" build --deny-warnings src/session_rows.lu -o target/native/session-rows
   rm -rf target/plant-rows && mkdir -p target/plant-rows && cd target/plant-rows
   exec ../native/session-rows ../native/warren "$row"
+  ;;
+ client-plant)
+  row=${2:?}
+  python3 -I tools/vt/generate_version.py
+  mkdir -p target/native
+  "$WOLF" build --deny-warnings src/warren.lu -o target/native/warren
+  "$WOLF" build --deny-warnings src/client_rows.lu -o target/native/client-rows
+  rm -rf target/plant-crows && mkdir -p target/plant-crows && cd target/plant-crows
+  exec ../native/client-rows ../native/warren "$row"
   ;;
  *) printf 'FAIL verbs-inner unknown-step\n'; exit 2 ;;
 esac
