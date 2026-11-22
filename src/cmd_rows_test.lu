@@ -23,7 +23,7 @@ fn row(mut t: Tally, name: str, why: str) {
 // ---- snapshots, written by hand ----
 
 fn pane(id: int, col: int, cols: int, rows: int, pid: int, title: str) -> cmd.PaneView {
-    cmd.PaneView { id: id, col: col, row: 1, cols: cols, rows: rows, pid: pid, title: title, cwd: "", cwd_source: "" }
+    cmd.PaneView { id: id, col: col, row: 1, cols: cols, rows: rows, pid: pid, title: title, cwd: "/home/u", cwd_source: "start" }
 }
 
 // Session s1 `work` (tabs t1 `main` with p1 and p2, focus p2; t2 `logs`
@@ -425,17 +425,24 @@ fn json_is(snap: cmd.Snapshot, want: str) -> str {
 }
 
 fn listing(mut t: Tally) {
-    row(mut t, "json-empty", json_is(cmd.Snapshot { sessions: List[cmd.SessionView]() }, json_text("<'schema':1,'sessions':[]>")))
+    row(mut t, "json-empty", json_is(cmd.Snapshot { sessions: List[cmd.SessionView]() }, json_text("<'schema':2,'sessions':[]>")))
     var two = world()
     let _gone = (mut two.sessions).pop() else { return }
-    let want = json_text("<'schema':1,'sessions':[<'id':'s1','name':'work','cols':80,'rows':24,'clients':1,'active_tab':'t1','tabs':[<'id':'t1','name':'main','index':1,'focus':'p2','zoomed':false,'panes':[<'id':'p1','index':1,'col':1,'row':1,'cols':40,'rows':22,'pid':4201,'title':'sh'>,<'id':'p2','index':2,'col':42,'row':1,'cols':39,'rows':22,'pid':4202,'title':'top'>]>,<'id':'t2','name':'logs','index':2,'focus':'p3','zoomed':true,'panes':[<'id':'p3','index':1,'col':1,'row':1,'cols':80,'rows':22,'pid':4203,'title':'tail'>]>]>,<'id':'s2','name':'1','cols':120,'rows':40,'clients':0,'active_tab':'t3','tabs':[<'id':'t3','name':'main','index':1,'focus':'p4','zoomed':false,'panes':[<'id':'p4','index':1,'col':1,'row':1,'cols':120,'rows':38,'pid':4204,'title':''>]>]>]>")
+    two.sessions[0].tabs[0].panes[0].cwd = "/home/u/src"
+    two.sessions[0].tabs[0].panes[0].cwd_source = "osc7"
+    two.sessions[0].tabs[0].panes[1].cwd = "/srv"
+    two.sessions[0].tabs[0].panes[1].cwd_source = "proc"
+    let want = json_text("<'schema':2,'sessions':[<'id':'s1','name':'work','cols':80,'rows':24,'clients':1,'active_tab':'t1','tabs':[<'id':'t1','name':'main','index':1,'focus':'p2','zoomed':false,'panes':[<'id':'p1','index':1,'col':1,'row':1,'cols':40,'rows':22,'pid':4201,'title':'sh','cwd':'/home/u/src','cwd_source':'osc7'>,<'id':'p2','index':2,'col':42,'row':1,'cols':39,'rows':22,'pid':4202,'title':'top','cwd':'/srv','cwd_source':'proc'>]>,<'id':'t2','name':'logs','index':2,'focus':'p3','zoomed':true,'panes':[<'id':'p3','index':1,'col':1,'row':1,'cols':80,'rows':22,'pid':4203,'title':'tail','cwd':'/home/u','cwd_source':'start'>]>]>,<'id':'s2','name':'1','cols':120,'rows':40,'clients':0,'active_tab':'t3','tabs':[<'id':'t3','name':'main','index':1,'focus':'p4','zoomed':false,'panes':[<'id':'p4','index':1,'col':1,'row':1,'cols':120,'rows':38,'pid':4204,'title':'','cwd':'/home/u','cwd_source':'start'>]>]>]>")
     row(mut t, "json-two-sessions", json_is(two, want))
     // Escapes: a quote, a backslash, a control byte (as \u00XX, DEL too),
-    // and UTF-8 as it is; a pane with no program has a null pid.
+    // and UTF-8 as it is; a pane with no program has a null pid. A reported
+    // directory may hold a control byte (OSC 7 decodes `%0A`).
     var odd = solo()
     odd.sessions[0].name = "q\"b\\s\u{1}é"
     odd.sessions[0].tabs[0].panes[0].title = "a\nb\u{7f}"
-    let esc = json_text("<'schema':1,'sessions':[<'id':'s7','name':'q\\'b\\\\s\\u0001é','cols':80,'rows':24,'clients':2,'active_tab':'t9','tabs':[<'id':'t9','name':'main','index':1,'focus':'p11','zoomed':false,'panes':[<'id':'p11','index':1,'col':1,'row':1,'cols':80,'rows':22,'pid':null,'title':'a\\u000ab\\u007f'>]>]>]>")
+    odd.sessions[0].tabs[0].panes[0].cwd = "/a\nb"
+    odd.sessions[0].tabs[0].panes[0].cwd_source = "osc7"
+    let esc = json_text("<'schema':2,'sessions':[<'id':'s7','name':'q\\'b\\\\s\\u0001é','cols':80,'rows':24,'clients':2,'active_tab':'t9','tabs':[<'id':'t9','name':'main','index':1,'focus':'p11','zoomed':false,'panes':[<'id':'p11','index':1,'col':1,'row':1,'cols':80,'rows':22,'pid':null,'title':'a\\u000ab\\u007f','cwd':'/a\\u000ab','cwd_source':'osc7'>]>]>]>")
     row(mut t, "json-escapes-and-null-pid", json_is(odd, esc))
 }
 
