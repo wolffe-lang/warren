@@ -36,6 +36,11 @@ pub struct Peer {
     pongs: int,
     clipboard: List[byte],
     clips: int,
+    // A logical message's fragments read so far (MORE seen, the last not
+    // yet), kept across waits so a message slower than one wait is whole
+    // when its last fragment comes; `chain_kind` 0 when none is open.
+    chain: List[byte],
+    chain_kind: int,
 }
 
 /// A peer that holds nothing: no connection (`fd` -1), nothing received.
@@ -43,7 +48,7 @@ pub fn no_peer(fd: int) -> Peer {
     Peer { fd: fd, rx: List[byte](), rx_off: 0, rx_len: 0, image: proto.image(), frames: 0,
         full_frames: 0, last_base: 0, title: List[byte](), bells: 0, ended: false, end_kind: 0, end_code: 0,
         end_text: List[byte](), welcome_session: List[byte](), auto_ack: true, pongs: 0,
-        clipboard: List[byte](), clips: 0 }
+        clipboard: List[byte](), clips: 0, chain: List[byte](), chain_kind: 0 }
 }
 
 /// A text a peer keeps, as a `str` ("" when its bytes are not UTF-8).
@@ -189,8 +194,6 @@ pub fn pull(mut p: Peer) -> int {
 /// The next whole logical message, waiting at most deadline_ms in all.
 pub fn next(mut p: Peer, deadline_ms: int) -> Message {
     let until = time.monotonic_ns() + deadline_ms * 1000000
-    var chain = List[byte]()
-    var chain_kind = 0
     while true {
         while p.rx_len - p.rx_off >= 6 {
             let n = le(p.rx, p.rx_off, 4)
@@ -200,16 +203,30 @@ pub fn next(mut p: Peer, deadline_ms: int) -> Message {
                 return Message { kind: 0, body: List[byte](), code: 2 }
             }
             if p.rx_len - p.rx_off < 6 + n { break }
-            let body = p.rx[p.rx_off + 6..p.rx_off + 6 + n]
+            let at = p.rx_off + 6
             p.rx_off = p.rx_off + 6 + n
-            if chain_kind != 0 && kind != chain_kind { return Message { kind: 0, body: List[byte](), code: 2 } }
-            for x in body { (mut chain).push(x) }
+            if p.chain_kind != 0 && kind != p.chain_kind {
+                (mut p.chain).reset()
+                p.chain_kind = 0
+                return Message { kind: 0, body: List[byte](), code: 2 }
+            }
+            var i = 0
+            while i < n {
+                (mut p.chain).push(p.rx[at + i])
+                i += 1
+            }
             if flags == 1 {
-                chain_kind = kind
+                p.chain_kind = kind
                 continue
             }
-            if proto.validate(kind, chain) != 0 { return Message { kind: 0, body: List[byte](), code: 2 } }
-            return Message { kind: kind, body: chain, code: 0 }
+            // The whole message, in the caller's region; the chain is
+            // emptied in place for the next.
+            var body = List[byte]()
+            for x in p.chain { (mut body).push(x) }
+            (mut p.chain).reset()
+            p.chain_kind = 0
+            if proto.validate(kind, body) != 0 { return Message { kind: 0, body: List[byte](), code: 2 } }
+            return Message { kind: kind, body: body, code: 0 }
         }
         let left = (until - time.monotonic_ns()) / 1000000
         if left <= 0 { return Message { kind: 0, body: List[byte](), code: 0 } }
