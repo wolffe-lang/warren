@@ -342,6 +342,75 @@ fn session_verbs(mut t: Tally) {
     row(mut t, "verbs-session-verbs", why)
 }
 
+// ---- send-keys and capture-pane (tmux 3.4's reading, measured) ----
+
+// A verb's words joined by `|`, for a comparison.
+fn joined(words: List[str]) -> str {
+    var out = ""
+    for w in words {
+        if out.len > 0 { out = out + "|" }
+        out = out + w
+    }
+    out
+}
+
+fn send_keys_parse(mut t: Tally) {
+    var why = ""
+    let a = verb("send-keys -t p2 ls Enter")
+    if !a.ok || a.kind != cmd.VERB_SEND_KEYS || a.target != "p2" || joined(a.keys) != "ls|Enter" || a.literal {
+        why = "send-keys -t p2 ls Enter: {a.ok} {a.kind} '{a.target}' '{joined(a.keys)}' {a.why}"
+    }
+    // Options only before the first key: `-l` after a key is a key.
+    let b = verb("send-keys x -l Enter")
+    if !b.ok || joined(b.keys) != "x|-l|Enter" || b.literal || b.target != "" { why = either(why, "send-keys x -l Enter: '{joined(b.keys)}' {b.literal} {b.why}") }
+    let c = verb("send-keys -l Enter")
+    if !c.ok || !c.literal || joined(c.keys) != "Enter" { why = either(why, "send-keys -l Enter: {c.literal} '{joined(c.keys)}' {c.why}") }
+    // `--` ends the options.
+    let d = verb("send-keys -- -l")
+    if !d.ok || d.literal || joined(d.keys) != "-l" { why = either(why, "send-keys -- -l: {d.literal} '{joined(d.keys)}' {d.why}") }
+    let e = verb("send-keys -l -- -t")
+    if !e.ok || !e.literal || joined(e.keys) != "-t" || e.target != "" { why = either(why, "send-keys -l -- -t: '{joined(e.keys)}' '{e.target}' {e.why}") }
+    let f = verb("send-keys - x")
+    if !f.ok || joined(f.keys) != "-|x" { why = either(why, "send-keys - x: '{joined(f.keys)}' {f.why}") }
+    why = either(why, usage("send-keys", "usage: send-keys [-t TARGET] [-l] [--] KEY..."))
+    why = either(why, usage("send-keys -t p1", "usage: send-keys [-t TARGET] [-l] [--] KEY..."))
+    why = either(why, usage("send-keys -t p1 -t p2 x", "usage: -t given twice"))
+    why = either(why, usage("send-keys -t", "usage: -t needs a target"))
+    for flag in "-H -K -M -N -R -X -F -c".split(" ") {
+        why = either(why, usage("send-keys {flag} x", "usage: send-keys {flag}: not in this version"))
+    }
+    why = either(why, usage("send-keys -z x", "usage: send-keys: unknown flag -z"))
+    row(mut t, "verbs-send-keys-parse", why)
+}
+
+fn capture_parse(mut t: Tally) {
+    var why = ""
+    let a = verb("capture-pane")
+    if !a.ok || a.kind != cmd.VERB_CAPTURE || a.print || a.escapes || a.join || a.start != cmd.LINE_UNSET || a.end != cmd.LINE_UNSET {
+        why = "capture-pane: {a.ok} {a.kind} {a.print} {a.escapes} {a.join} {a.start} {a.end} {a.why}"
+    }
+    let b = verb("capture-pane -t p2 -pJ -e -S -50 -E -1")
+    if !b.ok || b.target != "p2" || !b.print || !b.join || !b.escapes || b.start != 0 - 50 || b.end != 0 - 1 {
+        why = either(why, "capture-pane -t p2 -pJ -e -S -50 -E -1: '{b.target}' {b.print} {b.join} {b.escapes} {b.start} {b.end} {b.why}")
+    }
+    let c = verb("capture-pane -p -S - -E -")
+    if !c.ok || c.start != cmd.LINE_EDGE || c.end != cmd.LINE_EDGE { why = either(why, "capture-pane -p -S - -E -: {c.start} {c.end} {c.why}") }
+    let d = verb("capture-pane -pS+2 -E3")
+    if !d.ok || !d.print || d.start != 2 || d.end != 3 { why = either(why, "capture-pane -pS+2 -E3: {d.print} {d.start} {d.end} {d.why}") }
+    let e = verb("capture-pane -peJt p3")
+    if !e.ok || e.target != "p3" || !e.print || !e.escapes || !e.join { why = either(why, "capture-pane -peJt p3: '{e.target}' {e.why}") }
+    why = either(why, usage("capture-pane -S abc", "usage: -S abc: not a line number"))
+    why = either(why, usage("capture-pane -E x", "usage: -E x: not a line number"))
+    why = either(why, usage("capture-pane -S", "usage: -S needs a value"))
+    why = either(why, usage("capture-pane -t p1 -t p2", "usage: -t given twice"))
+    why = either(why, usage("capture-pane now", "usage: capture-pane takes no argument: now"))
+    for flag in "a A b C N P q T".split(" ") {
+        why = either(why, usage("capture-pane -{flag}", "usage: capture-pane -{flag}: not in this version"))
+    }
+    why = either(why, usage("capture-pane -z", "usage: capture-pane: unknown flag -z"))
+    row(mut t, "verbs-capture-parse", why)
+}
+
 // ---- list --json ----
 
 // JSON as written in a row: `<` and `>` for braces, `'` for a quote.
@@ -377,6 +446,8 @@ fn main() -> int {
     verbs(mut t)
     creating(mut t)
     session_verbs(mut t)
+    send_keys_parse(mut t)
+    capture_parse(mut t)
     listing(mut t)
     print("CMD-ROWS rows={t.rows} failed={t.failed}")
     if t.failed > 0 { return 1 }
