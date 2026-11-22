@@ -112,6 +112,11 @@ pub const A_PASTE: int = 32
 pub const A_SEARCH: int = 33
 /// Search again from the last match; arg 0 the same way, 1 the other way.
 pub const A_SEARCH_AGAIN: int = 34
+/// End the session: every pane's program hangs up and every client is told
+/// the session ended (the command line's `kill-session`).
+pub const A_KILL_SESSION: int = 35
+/// Rename the session to the command's text (`rename-session NAME`).
+pub const A_RENAME_SESSION: int = 36
 
 const SHIFT: int = 1
 const ALT: int = 2
