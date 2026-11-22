@@ -50,7 +50,15 @@ frame's receive buffer, a paste assembly, the 256 KiB event queue, a 4 KiB
 allowance for two fixed tab-hit maps, and, when attached, one worst-case image,
 a 64-byte-a-cell shadow of what its client holds, its scroll window and that
 window's scratch at the same cost a cell, and its session's 65524-byte
-register, counted for every attached client as an upper bound).
+register, counted for every attached client as an upper bound). wolf frees
+memory only a whole region at a time, and the server's slots live as long as
+it does, so a connection's buffers are emptied at close and kept for the
+slot's next connection, never given back. The projection therefore counts a
+live connection at its share or at what its slot retains, the larger, and a
+closed slot at what it retains. A REPLY too large for its connection's 256 KiB
+share is sent from one server-wide reply buffer, one reply at a time, which
+grows in place to the largest reply sent (at most 8 MiB and its fragment
+headers) and is counted at that size from then on.
 
 Most of a pane's resident size is the emulator's history ring: it is made
 whole, with a copy, when the emulator is made (16.4 MB resident for an 8 MiB
@@ -131,7 +139,7 @@ are transactional: validate first, then mutate session state.
 
 | State | Event | Actions | Next |
 |---|---|---|---|
-| accepted | 5 s without a complete HELLO | unregister, close, free buffers | closed |
+| accepted | 5 s without a complete HELLO | unregister, close, empty buffers (kept for the slot) | closed |
 | accepted | non-HELLO or bad magic | close silently | closed |
 | accepted | no version overlap | enqueue bootstrap REFUSE version | draining |
 | accepted | wrong uid (when callable) | close silently | closed |
@@ -157,7 +165,7 @@ are transactional: validate first, then mutate session state.
 | attached/commanding | PING outside a fragment chain | enqueue PONG, subject to queue cap | same |
 | attached/commanding | wrong-role, duplicate HELLO, malformed message/fragment chain | protocol-error if safe; remove membership | draining or closed |
 | draining | writable | finish queued bytes without interleaving; ignore further input | draining |
-| draining | queue empty or 2 s without a write that made progress, EOF or write error | unregister, close, free buffers | closed |
+| draining | queue empty or 2 s without a write that made progress, EOF or write error | unregister, close, empty buffers (kept for the slot) | closed |
 | closed | any stale ready event | discard by generation | closed |
 
 No BYE can interrupt a partly transmitted physical frame or logical fragment

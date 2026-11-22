@@ -167,6 +167,7 @@ fn close_conn(mut s: Server, index: int, why: str) {
     s.conns[index].key = 0 - 1
     s.conns[index].fd = 0 - 1
     s.conns[index].pending = 0
+    empty_conn(mut s.conns[index])
     trace(s, "conn {index} closed: {why}")
     if s.reply_conn == index { release_reply(mut s) }
 }
@@ -390,22 +391,24 @@ fn pending_conns(s: Server) -> int {
 }
 
 /// The projected memory of what is held now, plus an addition: every
-/// pane slot (a free one keeps its emulator) and every connection.
+/// pane slot (a free one keeps its emulator), every connection slot (a live
+/// one at its share or what it retains, the larger; a closed one at what it
+/// retains) and the reply buffer's storage.
 fn projected(s: Server, extra: int) -> int {
     var total = extra
     for p in s.panes {
         total += pane_bytes(p.screen.cols, p.screen.rows)
     }
     for c in s.conns {
+        let kept = retained_bytes(c)
         if c.live {
-            if c.member && c.session >= 0 {
-                total += attached_bytes(s.sessions[c.session].cols, s.sessions[c.session].rows)
-            } else {
-                total += connection_bytes()
-            }
+            let share = if c.member && c.session >= 0 then attached_bytes(s.sessions[c.session].cols, s.sessions[c.session].rows) else connection_bytes()
+            total += if kept > share then kept else share
+        } else {
+            total += kept
         }
     }
-    total
+    total + s.reply.len
 }
 
 /// Whether a pane of this size fits the budget beside `extra`: a free slot
@@ -2366,6 +2369,7 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
         refill_reply(mut s, index)
         trace(s, "conn {index} REPLY {wire.len} bytes, from the reply buffer")
     }
+    trace(s, "memory projected {projected(s, 0)}, reply buffer {s.reply.len}")
     s.conns[index].sent_kind = 136
     s.conns[index].sent_code = status
     s.conns[index].phase = DRAINING
