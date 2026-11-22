@@ -1,0 +1,32 @@
+//! member: true
+//! `warren send-keys`'s words as key events, read the way tmux 3.4 reads
+//! them (tests/session/send-keys.table): a word is a key name, a name or a
+//! character after modifiers (`C-` or `^`, `M-`, `S-`), or text sent a
+//! character at a time. Pure: the server turns each event into bytes by the
+//! path a typed key takes, in the pane's own mode.
+
+/// One key event, as a KEY message carries it: modifiers (shift 1, alt 2,
+/// ctrl 4), kind (0 a scalar, 1 a named key) and code (PROTOCOL.md's
+/// numbering).
+pub struct KeyEvent { mods: int, kind: int, code: int }
+
+/// A word read as one key: `ok` false when the word is text.
+pub struct KeyRead { ok: bool, event: KeyEvent }
+
+/// One word as a key, or not (then it is text). Stub: every word is text.
+pub fn key_of(word: str) -> KeyRead {
+    KeyRead { ok: word.len < 0, event: KeyEvent { mods: 0, kind: 0, code: 0 } }
+}
+
+/// The key events of a send-keys's words, in order: each word a key when it
+/// reads as one (never when `literal`), else each of its scalars. Stub: every
+/// word is text.
+pub fn events_of(words: List[str], literal: bool) -> List[KeyEvent] {
+    var out = List[KeyEvent]()
+    for w in words {
+        for cp in w.code_points() {
+            (mut out).push(KeyEvent { mods: if literal then 0 else 0, kind: 0, code: cp })
+        }
+    }
+    out
+}

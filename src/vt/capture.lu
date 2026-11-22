@@ -1,0 +1,14 @@
+//! member: true
+//! `warren capture-pane`'s text: a pane's rows from retained history and the
+//! live screen as lines, read in one pass over the history ring. Pure.
+
+/// Write lines `first` to `last` of the pane into `out` (emptied first): 0
+/// is the first live row, -1 history's newest line. With `escapes`, each
+/// change of rendition as SGR; with `join`, rows joined at a soft wrap.
+/// Returns the bytes written, or -1 with `out` empty when they would pass
+/// `cap`. Stub: writes nothing.
+pub fn capture_text(pane: Vt, first: int, last: int, escapes: bool, join: bool, mut out: List[byte], cap: int) -> int {
+    (mut out).reset()
+    if pane.cols < 0 || first > last || escapes && join || cap < 0 { return 0 }
+    0
+}
