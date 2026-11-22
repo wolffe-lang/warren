@@ -20,11 +20,21 @@ each within one take, and `ratio = increment / CAP` where CAP > 0. A `new`
 increment carries what the first pane in a fresh process pays once (the
 emulator's code paged in, the allocator's first chunk) as well as the pane.
 
+A row holds one number from its takes: the least peak of its stage less the
+least peak of its base, the least on both sides of the subtraction. The
+program is the same in every take, and a host may peak a few pages higher in
+one of them: on hosted macOS runners one take of three peaked 8 to 11 pages
+(128 to 176 KiB) higher, on either side of a subtraction, four times in the
+96 runs of four hosted jobs at caps 0 and 2 MiB, and by one or two pages a few
+times more, while the least of each row's takes moved by at most two pages
+from job to job. A cost the program pays in every take is in the least; one
+take's wobble is not.
+
 The bound of a row is read from the takes recorded for this host in
-tests/vt/ring-resident-takes.json: the largest recorded increment, plus a
-margin that is the largest of three times the recorded spread, 5% of the
-largest recorded peak of that stage, or one allocation granule (256 KiB on
-Linux, 16 KiB on macOS). The rule checks itself where a ring is made: a `new`
+tests/vt/ring-resident-takes.json: the same number from the recorded takes,
+plus a margin that is the largest of three times the recorded takes' spread,
+5% of the largest recorded peak of that stage, or one allocation granule
+(256 KiB on Linux, 16 KiB on macOS). The rule checks itself where a ring is made: a `new`
 row's margin must be under one cap, so one more cap-sized buffer at the peak
 fails; a difference row's margin must be under two caps, so a step that made
 the ring again fails. A margin past that fails by name as too loose. A host
@@ -108,9 +118,11 @@ def run(measure_child, probe, stage, cap):
 
 
 def held_increment(peaks, bases):
-    """A row's number from its takes, each take's peak with its base (the
-    same take's `none` or `new` peak): the largest take's increment."""
-    return max(p - b for p, b in zip(peaks, bases))
+    """A row's number from its takes: the least peak of the stage less the
+    least peak of its base (`none` for `new`, else `new` at the cap). A
+    take that peaks a few pages higher on one side is the host's and drops
+    out; a cost the program pays in every take stays in."""
+    return min(peaks) - min(bases)
 
 
 def bases_of(increments, peaks):
@@ -256,12 +268,12 @@ def main():
             print('FAIL ring-resident-%s cap=%d: bound too loose: %s' % (stage, cap, loose))
             failed += 1
         elif worst > limit:
-            print('FAIL ring-resident-%s cap=%d increment=%d past bound=%d%s; recorded %s, margin %d'
-                  % (stage, cap, worst, limit, ratio, takes['increments'], margin))
+            print('FAIL ring-resident-%s cap=%d increment=%d past bound=%d%s (least of takes %s); recorded %s, margin %d'
+                  % (stage, cap, worst, limit, ratio, held[name]['increments'], takes['increments'], margin))
             failed += 1
         else:
-            print('PASS ring-resident-%s cap=%d increment=%d bound=%d%s; margin %d'
-                  % (stage, cap, worst, limit, ratio, margin))
+            print('PASS ring-resident-%s cap=%d increment=%d bound=%d%s (least of takes %s); margin %d'
+                  % (stage, cap, worst, limit, ratio, held[name]['increments'], margin))
     rows += 1
     if projection is None:
         print('FAIL ring-resident-projection: the probe printed none')
