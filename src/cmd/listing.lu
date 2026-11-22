@@ -1,9 +1,87 @@
 //! member: true
 //! `warren list --json`: the server's sessions, tabs and panes as one JSON
 //! object, schema 1 (docs/CLI.md). Pure: built from a target.Snapshot.
+//! Strings are written with a quote and a backslash escaped and every byte
+//! below 0x20, and 0x7f, as `\u00XX`; other UTF-8 as it is. A pane with no
+//! program has a null pid. Field order is fixed, so two listings of one
+//! state are equal byte for byte.
+
+fn put(mut out: List[byte], text: str) {
+    for b in text.bytes() { (mut out).push(b) }
+}
+
+fn put_quoted(mut out: List[byte], text: str) {
+    let hex = "0123456789abcdef"
+    (mut out).push(34 as byte)
+    for b in text.bytes() {
+        let v = b as int
+        if v == 34 || v == 92 {
+            (mut out).push(92 as byte)
+            (mut out).push(b)
+        } else if v < 32 || v == 127 {
+            put(mut out, "\\u00")
+            (mut out).push(hex.bytes()[v / 16])
+            (mut out).push(hex.bytes()[v % 16])
+        } else {
+            (mut out).push(b)
+        }
+    }
+    (mut out).push(34 as byte)
+}
+
+// `"name":` then a quoted string.
+fn put_text_field(mut out: List[byte], name: str, value: str) {
+    put(mut out, "\"{name}\":")
+    put_quoted(mut out, value)
+}
+
+fn put_pane(mut out: List[byte], p: PaneView, index: int) {
+    put(mut out, "{{\"id\":\"{format_id(ID_PANE, p.id)}\",\"index\":{index},\"col\":{p.col},\"row\":{p.row},")
+    put(mut out, "\"cols\":{p.cols},\"rows\":{p.rows},\"pid\":")
+    if p.pid < 0 { put(mut out, "null") } else { put(mut out, "{p.pid}") }
+    put(mut out, ",")
+    put_text_field(mut out, "title", p.title)
+    put(mut out, "}}")
+}
+
+fn put_tab(mut out: List[byte], t: TabView, index: int) {
+    put(mut out, "{{\"id\":\"{format_id(ID_TAB, t.id)}\",")
+    put_text_field(mut out, "name", t.name)
+    let zoomed = if t.zoomed then "true" else "false"
+    put(mut out, ",\"index\":{index},\"focus\":\"{format_id(ID_PANE, t.focus)}\",\"zoomed\":{zoomed},\"panes\":[")
+    var i = 0
+    while i < t.panes.len {
+        if i > 0 { put(mut out, ",") }
+        put_pane(mut out, t.panes[i], i + 1)
+        i += 1
+    }
+    put(mut out, "]}}")
+}
+
+fn put_session(mut out: List[byte], s: SessionView) {
+    put(mut out, "{{\"id\":\"{format_id(ID_SESSION, s.id)}\",")
+    put_text_field(mut out, "name", s.name)
+    put(mut out, ",\"cols\":{s.cols},\"rows\":{s.rows},\"clients\":{s.clients},")
+    put(mut out, "\"active_tab\":\"{format_id(ID_TAB, s.active)}\",\"tabs\":[")
+    var i = 0
+    while i < s.tabs.len {
+        if i > 0 { put(mut out, ",") }
+        put_tab(mut out, s.tabs[i], i + 1)
+        i += 1
+    }
+    put(mut out, "]}}")
+}
 
 /// The schema-1 listing of `snap`, one line without its newline.
 pub fn list_json(snap: Snapshot) -> str {
-    let _unused = snap.sessions.len
-    ""
+    var out = List[byte]()
+    put(mut out, "{{\"schema\":1,\"sessions\":[")
+    var i = 0
+    while i < snap.sessions.len {
+        if i > 0 { put(mut out, ",") }
+        put_session(mut out, snap.sessions[i])
+        i += 1
+    }
+    put(mut out, "]}}")
+    str_from_utf8(out) else ""
 }
