@@ -541,7 +541,7 @@ fn without_pids(json: str) -> str {
         }
         out = out + rest[0..at + 6] + "N"
         var k = at + 6
-        while k < rest.len && rest.bytes()[k] != 44 && rest.bytes()[k] != 125 { k += 1 }
+        while k < rest.len && (rest.bytes()[k] as int) != 44 && (rest.bytes()[k] as int) != 125 { k += 1 }
         rest = rest[k..]
     }
     out
