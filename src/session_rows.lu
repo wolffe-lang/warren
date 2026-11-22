@@ -801,6 +801,154 @@ fn row_reply_slow_reader(mut r: Rig) -> str {
     ""
 }
 
+// The least a draining connection's peer may read in every two seconds and
+// never be closed, on this host. On Linux it is one write to a draining
+// connection (the server's 8 KiB): the kernel lets the next write through
+// once a whole earlier write has been read. On macOS it is 2 KiB, the send
+// low-water mark of the socket's 8 KiB send space.
+fn drain_floor() -> int {
+    if fs.exists("/proc/self/status") { return 8192 }
+    2048
+}
+
+// One `list --json` read `chunk` bytes at a time (each read taken whole),
+// `every_ms` after each, for `reads` reads; then the rest at full speed for
+// at most 10 s. Returns the REPLY's payload, or empty when the connection
+// ended first.
+fn read_paced(r: Rig, chunk: int, every_ms: int, reads: int) -> List[byte] {
+    var p = send_listing(r) else |_| { return List[byte]() }
+    var s = net.Socket { fd: p.fd }
+    var got = List[byte]()
+    var payload = List[byte]()
+    var ended = false
+    var n = 0
+    while n < reads && !ended && payload.len == 0 {
+        let want = got.len + chunk
+        while got.len < want && !ended {
+            let part = net.read_bytes(mut s, want - got.len) else |_| { List[byte]() }
+            if part.len == 0 { ended = true }
+            for x in part { (mut got).push(x) }
+        }
+        payload = reply_in(got)
+        n += 1
+        if !ended && payload.len == 0 { time.sleep(time.millis(every_ms)) }
+    }
+    let until = now_ms() + 10000
+    while !ended && payload.len == 0 && now_ms() < until {
+        let part = net.read_bytes(mut s, 65536) else |_| { List[byte]() }
+        if part.len == 0 { ended = true }
+        for x in part { (mut got).push(x) }
+        payload = reply_in(got)
+    }
+    client.hang_up(mut p)
+    payload
+}
+
+// How many connections the trace says the draining deadline closed.
+fn deadline_closes(path: str) -> int {
+    var n = 0
+    for line in trace_lines(path) {
+        if line.ends_with(" closed: its deadline passed while draining") { n += 1 }
+    }
+    n
+}
+
+// The floor holds: a command client that reads the floor (drain_floor) every
+// 1.8 s, a little over the floor in every two seconds, for five reads and
+// then the rest at full speed, receives its whole REPLY, and no draining
+// deadline passes.
+fn row_reply_reader_over(mut r: Rig) -> str {
+    let path = beside(r, "trace")
+    let why = traced_quoted_session(mut r, path)
+    if why.len > 0 { return why }
+    let l = quoted_listing(r)
+    if l.status != 0 { return "the listing of 32 titled panes: {l.err}" }
+    let n = drain_floor()
+    let before = deadline_closes(path)
+    let got = read_paced(r, n, 1800, 5)
+    if got.len == 0 { return "a reader of {n} bytes every 1.8 s was closed before its REPLY ended" }
+    let out_len = le4(got, 5)
+    if out_len != l.out.len { return "the paced reader's REPLY held {out_len} bytes of output, not {l.out.len}" }
+    let after = deadline_closes(path)
+    if after != before { return "{after - before} draining deadlines passed while the reader kept to {n} bytes every 1.8 s" }
+    ""
+}
+
+// And a reader a little under it is closed: one that reads the floor every
+// 2.2 s is closed by the draining deadline (the trace names it) before its
+// REPLY has gone out.
+fn row_reply_reader_under(mut r: Rig) -> str {
+    let path = beside(r, "trace")
+    let why = traced_quoted_session(mut r, path)
+    if why.len > 0 { return why }
+    let l = quoted_listing(r)
+    if l.status != 0 { return "the listing of 32 titled panes: {l.err}" }
+    let n = drain_floor()
+    let before = deadline_closes(path)
+    let got = read_paced(r, n, 2200, 3)
+    if got.len > 0 { return "a reader of {n} bytes every 2.2 s received its whole REPLY" }
+    let after = deadline_closes(path)
+    if after != before + 1 { return "{after - before} connections closed by the draining deadline, not one" }
+    ""
+}
+
+// The last large REPLY's connection's [bytes, writes, turns], from its
+// `wrote B bytes in W writes over T turns` trace line; empty before it.
+fn last_reply_counts(path: str) -> List[int] {
+    let lines = trace_lines(path)
+    var out = List[int]()
+    var at = 0 - 1
+    var holder = ""
+    var k = 0
+    while k < lines.len {
+        if lines[k].contains(" REPLY ") && lines[k].ends_with("from the reply buffer") {
+            at = k
+            holder = lines[k].split(" ")[1]
+        }
+        k += 1
+    }
+    if at < 0 { return out }
+    k = at
+    while k < lines.len {
+        if lines[k].starts_with("conn {holder} wrote ") {
+            let w = lines[k].split(" ")
+            if w.len == 11 {
+                (mut out).push(w[3].to_int() else 0)
+                (mut out).push(w[6].to_int() else 0)
+                (mut out).push(w[9].to_int() else 0)
+            }
+            return out
+        }
+        k += 1
+    }
+    out
+}
+
+// What a fast reader costs: the listing read at full speed, its time, and
+// the server's write calls and turns for its connection, each per MiB.
+fn row_reply_fast_reader(mut r: Rig) -> str {
+    let path = beside(r, "trace")
+    let why = traced_quoted_session(mut r, path)
+    if why.len > 0 { return why }
+    let l = quoted_listing(r)
+    if l.status != 0 { return "the listing of 32 titled panes: {l.err}" }
+    var p = send_listing(r) else |e| { return "dial: {e}" }
+    let t0 = now_ms()
+    let a = answer_of(read_reply(mut p, 10000))
+    let ms = now_ms() - t0
+    if a.status != 0 || a.out.len != l.out.len { return "the fast reader: status {a.status}, {a.out.len} bytes of {l.out.len}" }
+    let until = now_ms() + 2000
+    var c = last_reply_counts(path)
+    while c.len == 0 && now_ms() < until {
+        time.sleep(time.millis(20))
+        c = last_reply_counts(path)
+    }
+    if c.len != 3 || c[0] <= 0 { return "no write count in the trace for the listing's connection" }
+    let mib = 1048576
+    print("MEASURE reply-fast-reader bytes={c[0]} writes={c[1]} turns={c[2]} ms={ms} writes-per-mib={c[1] * mib / c[0]} turns-per-mib={c[2] * mib / c[0]}")
+    ""
+}
+
 // One `list --json` sent by hand on its own connection, not yet read.
 fn send_listing(r: Rig) -> client.Peer ! client.DialErrors {
     var p = client.dial(socket(r))?
@@ -2125,6 +2273,9 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "title-on-focus" { why = row_title_on_focus(mut r) }
     else if name == "list-json-over-queue" { why = row_list_json_over_queue(mut r) }
     else if name == "reply-slow-reader" { why = row_reply_slow_reader(mut r) }
+    else if name == "reply-reader-over" { why = row_reply_reader_over(mut r) }
+    else if name == "reply-reader-under" { why = row_reply_reader_under(mut r) }
+    else if name == "reply-fast-reader" { why = row_reply_fast_reader(mut r) }
     else if name == "two-large-replies" { why = row_two_large_replies(mut r) }
     else if name == "reply-projection" { why = row_reply_projection(mut r) }
     else if name == "reply-memory-refused" { why = row_reply_memory_refused(mut r) }
@@ -2134,7 +2285,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader two-large-replies reply-projection reply-memory-refused".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused".split(" ") {
         (mut x).push(n)
     }
     x
