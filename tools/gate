@@ -52,6 +52,7 @@ corpus_digests() {
 }
 step pin-metadata python3 -I tools/check-pins.py
 step version-generation-rows python3 -I tests/vt/version_generation.py
+step version-flag-rows python3 -I tests/vt/version_flag.py --self-test
 step version-generation python3 -I tools/vt/generate_version.py
 step frozen-references python3 -I tools/vt/check_references.py
 step frozen-checkpoints python3 -I tools/vt/check_checkpoints.py
@@ -115,6 +116,7 @@ step checked-vt python3 -I tests/vt/checked_rows.py "$WOLF"
 step checked-keys python3 -I tests/vt/checked_rows.py --out "$root/target/checked-keys" --label checked-keys "$WOLF" keys_test
 step checked-pacing python3 -I tests/vt/checked_rows.py --out "$root/target/checked-pacing" --label checked-pacing "$WOLF" pacing_test
 step build "$WOLF" build --deny-warnings src/warren.lu -o "$root/target/native/warren"
+step version-flag python3 -I tests/vt/version_flag.py "$root/target/native/warren"
 step cli-native python3 -I tests/vt/cli_rows.py "$root/target/native/warren"
 step cases-native python3 -I tests/vt/compare_cases.py "$root/target/native/warren"
 step census-native python3 -I tests/vt/compare_suite.py --suite census "$root/target/native/warren"
