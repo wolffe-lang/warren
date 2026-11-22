@@ -558,15 +558,14 @@ pub fn command_reply(argv: List[str]) -> Reply {
     command_sized(argv, 0, 0, false)
 }
 
-/// Run one command on the server (`kill-server`, `list-sessions`) and
-/// print its reply; the exit code is the reply's status (1 when there is
-/// no server, as before).
+/// Run one command on the server (`warren <verb>`) and print its reply;
+/// the exit code is the reply's status: 0 done, 1 refused, 2 usage, 3 no
+/// server.
 pub fn command(argv: List[str]) -> int {
     let r = command_reply(argv)
     var so = fs.stdout()
     var se = fs.stderr()
     fs.write_chunk(mut so, r.out) else |_| {}
     fs.write_chunk(mut se, r.err) else |_| {}
-    if r.status == 3 { return 1 }
     r.status
 }
