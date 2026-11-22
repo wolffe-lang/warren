@@ -1,0 +1,85 @@
+//! member: false
+//! capture-pane's text, held by expectations written before the writer (and
+//! after tmux 3.4 was measured: tests/session/capture-goldens.json): rows as
+//! lines with trailing blanks dropped, a wide glyph once and marks after
+//! their base, joins at a soft wrap, line numbers over history and the live
+//! rows with clamps and a swap, the alternate screen, renditions as the
+//! whole pen, and the byte cap. Pure: native, the checked machine and lupin.
+use vt
+
+fn fed(cols: int, rows: int, text: str) -> vt.Vt {
+    var pane = vt.new(cols, rows, 65536)
+    vt.feed(mut pane, text.bytes())
+    pane
+}
+
+fn cap(pane: vt.Vt, first: int, last: int, escapes: bool, join: bool) -> str {
+    var out = List[byte]()
+    let n = vt.capture_text(pane, first, last, escapes, join, mut out, 1048576)
+    if n < 0 { return "OVER" }
+    str_from_utf8(out) else "?"
+}
+
+fn test_capture_rows() {
+    let p = fed(10, 3, "ab  \u{1b}[Kcd\r\n\u{4e2d}x\u{301}y\r\nz\u{1b}[4Cw")
+    assert(cap(p, 0, 2, false, false) == "ab  cd\n\u{4e2d}x\u{301}y\nz    w\n", "capture-rows-text")
+    let q = fed(10, 3, "a\u{1b}[44m   \u{1b}[0m\r\n")
+    assert(cap(q, 0, 0, false, false) == "a\n", "capture-rows-trailing-blanks-dropped")
+    assert(cap(q, 0, 2, false, false) == "a\n\n\n", "capture-rows-every-row-a-line")
+}
+
+fn test_capture_join() {
+    let p = fed(10, 4, "0123456789abc   \r\nxyz")
+    assert(cap(p, 0, 3, false, false) == "0123456789\nabc\nxyz\n\n", "capture-join-off")
+    assert(cap(p, 0, 3, false, true) == "0123456789abc   \nxyz\n\n", "capture-join-keeps-written-spaces")
+    let w = fed(10, 3, "wwwwwwwww\u{65e5}\r\n")
+    assert(cap(w, 0, 1, false, true) == "wwwwwwwww\u{65e5}\n", "capture-join-wide-glyph-column")
+}
+
+fn test_capture_range() {
+    var text = ""
+    var i = 1
+    while i <= 10 {
+        text = text + "L{i}\r\n"
+        i += 1
+    }
+    // Ten lines in four rows: L1..L7 in history, L8..L10 and a blank live.
+    let p = fed(8, 4, text)
+    assert(cap(p, 0, 3, false, false) == "L8\nL9\nL10\n\n", "capture-range-default-rows")
+    assert(cap(p, 0 - 2, 0 - 1, false, false) == "L6\nL7\n", "capture-range-history")
+    assert(cap(p, 0 - 1000, 1, false, false) == "L1\nL2\nL3\nL4\nL5\nL6\nL7\nL8\nL9\n", "capture-range-clamped-start")
+    assert(cap(p, 2, 0, false, false) == "L8\nL9\nL10\n", "capture-range-swapped")
+    assert(cap(p, 0 - 1, 1000, false, false) == "L7\nL8\nL9\nL10\n\n", "capture-range-clamped-end")
+    var alt = fed(8, 4, text)
+    vt.feed(mut alt, "\u{1b}[?1049h\u{1b}[HALT".bytes())
+    assert(cap(alt, 0 - 5, 0, false, false) == "ALT\n", "capture-range-alternate-has-no-history")
+}
+
+fn test_capture_escapes() {
+    let p = fed(12, 2, "\u{1b}[31mr\u{1b}[0m p \u{1b}[1;4;38;5;200;48;2;1;2;3mX\u{1b}[0m\r\n\u{1b}[44m  \u{1b}[0m")
+    assert(cap(p, 0, 0, true, false) == "\u{1b}[0;31mr\u{1b}[0m p \u{1b}[0;1;4;38;5;200;48;2;1;2;3mX\u{1b}[0m\n", "capture-escapes-whole-pen")
+    assert(cap(p, 1, 1, true, false) == "\u{1b}[0;44m  \u{1b}[0m\n", "capture-escapes-written-coloured-spaces-stay")
+    assert(cap(p, 1, 1, false, false) == "\n", "capture-escapes-plain-drops-them")
+    let q = fed(12, 1, "\u{1b}[91mb\u{1b}[39m\u{1b}[21md\u{1b}[0m")
+    assert(cap(q, 0, 0, true, false) == "\u{1b}[0;91mb\u{1b}[0;21md\u{1b}[0m\n", "capture-escapes-bright-and-double-underline")
+}
+
+fn test_capture_cap() {
+    let p = fed(10, 3, "0123456789\r\nabc")
+    var out = List[byte]()
+    (mut out).push(65 as byte)
+    let n = vt.capture_text(p, 0, 2, false, false, mut out, 12)
+    assert(n == 0 - 1 && out.len == 0, "capture-cap-refused-and-empty")
+    var fits = List[byte]()
+    assert(vt.capture_text(p, 0, 2, false, false, mut fits, 16) == 16 && fits.len == 16, "capture-cap-exact")
+}
+
+fn main() -> int {
+    test_capture_rows()
+    test_capture_join()
+    test_capture_range()
+    test_capture_escapes()
+    test_capture_cap()
+    print("PASS capture-text")
+    0
+}
