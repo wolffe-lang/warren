@@ -877,8 +877,11 @@ fn row_session_names(warren: str) -> str {
     ""
 }
 
-// A verb this server does not know (a newer client's) is refused by name
-// with the usage status, and the server goes on.
+// A verb this server does not know is refused by name with the usage
+// status, and the server goes on. `split-window` is tmux's spelling, which
+// warren does not take: its verbs are the command line's own, so the refusal
+// is the command line's own (`unknown command: NAME`), not a promise that a
+// later version will take it.
 fn row_unknown_verb(warren: str) -> str {
     var r = launch(warren, "verb", List[str](), 80, 24) else |e| { return "launch: {e}" }
     if !until_screen(mut r, "$", 10000) {
@@ -891,7 +894,9 @@ fn row_unknown_verb(warren: str) -> str {
     let alive = until_screen(mut r, "still-7", 5000)
     close_run(r)
     if reply.status != 2 { return "an unknown verb got status {reply.status}, not 2 (usage): " + err.trim() }
-    if !err.contains("split-window: not implemented") { return "an unknown verb was not refused by name: '" + err.trim() + "'" }
+    if !err.contains("unknown command: split-window") || err.contains("not implemented") {
+        return "an unknown verb was not refused by name: '" + err.trim() + "'"
+    }
     if !alive { return "the session did not go on after the refusal" }
     ""
 }
