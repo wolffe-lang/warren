@@ -639,6 +639,87 @@ fn row_list_json(mut r: Rig) -> str {
     ""
 }
 
+// The JSON of one title of 4,094 double quotes, each escaped.
+fn quoted_title_json() -> str {
+    var b = List[byte]()
+    for c in "\"title\":\"".bytes() { (mut b).push(c) }
+    var i = 0
+    while i < 4094 {
+        (mut b).push(92 as byte)
+        (mut b).push(34 as byte)
+        i += 1
+    }
+    (mut b).push(34 as byte)
+    str_from_utf8(b) else ""
+}
+
+// One session `a` of 32 panes, one a tab, each running `--title-quotes`;
+// "" when every pane was made, else why not.
+fn quoted_session(mut r: Rig) -> str {
+    let why = start_server(mut r, self_path() + " --title-quotes")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "a", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut a, 131, 5000) { return "no first image" }
+    var n = 1
+    while n < 32 {
+        let t = ask(r, "new-tab -t a", "")
+        if t.status != 0 { return "new-tab {n + 1}: {t.status} '{t.err.trim()}'" }
+        n += 1
+    }
+    client.hang_up(mut a)
+    ""
+}
+
+// How many panes of a listing carry the whole quoted title.
+fn quoted_titles_in(json: str) -> int {
+    json.split(quoted_title_json()).len - 1
+}
+
+// A listing of the quoted session once all 32 titles are in it: its
+// Answer, or a refusal (status -1) naming what came back.
+fn quoted_listing(r: Rig) -> Answer {
+    let until = now_ms() + 5000
+    while true {
+        let l = ask(r, "list --json", "")
+        if l.status != 0 { return Answer { status: 0 - 1, out: "", err: "list --json: status {l.status} '{l.err.trim()}'" } }
+        let n = quoted_titles_in(l.out)
+        if n == 32 { return l }
+        if now_ms() > until { return Answer { status: 0 - 1, out: "", err: "{n} of 32 titles after 5 s" } }
+        time.sleep(time.millis(100))
+    }
+    Answer { status: 0 - 1, out: "", err: "unreachable" }
+}
+
+// Whether python3's json reads `text` as one object with 32 panes, each
+// titled 4,094 double quotes.
+fn json_reads(r: Rig, text: str) -> bool {
+    let path = beside(r, "listing.json")
+    fs.write_text(path, text) else { return false }
+    var c = process.command("python3")
+    process.push_arg(mut c, "-I")
+    process.push_arg(mut c, "-c")
+    process.push_arg(mut c, "import json, sys; d = json.load(open(sys.argv[1])); t = [p['title'] for s in d['sessions'] for x in s['tabs'] for p in x['panes']]; sys.exit(0 if len(t) == 32 and all(v == '\"' * 4094 for v in t) else 1)")
+    process.push_arg(mut c, path)
+    let ch = process.start(c) else { return false }
+    let st = process.wait_status(take ch) else 0 - 1
+    st == 0
+}
+
+// 32 panes whose titles are 4,094 `"` each (an OSC string holds 4,096
+// bytes, less `2;`): their listing is about 265,600 bytes, past the 256 KiB
+// an attached client's events are held to. Its REPLY arrives whole and
+// python3's json reads every title (warren#77).
+fn row_list_json_over_queue(mut r: Rig) -> str {
+    let why = quoted_session(mut r)
+    if why.len > 0 { return why }
+    let l = quoted_listing(r)
+    if l.status != 0 { return "the listing of 32 titled panes: {l.err}" }
+    if l.out.len <= 262144 { return "the listing is {l.out.len} bytes, not past the event queue's 262,144" }
+    if !l.out.ends_with("}}\n") { return "the listing does not end its object and line" }
+    if !json_reads(r, l.out) { return "python3's json did not read 32 quoted titles from the {l.out.len} bytes" }
+    ""
+}
+
 // Ids are never handed out again: a closed pane's, an ended session's and
 // its tab's.
 fn row_ids_never_reused(mut r: Rig) -> str {
@@ -1728,18 +1809,40 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "command-exits-at-once" { why = row_command_exits_at_once(mut r) }
     else if name == "title-flood-survives" { why = row_title_flood_survives(mut r) }
     else if name == "title-on-focus" { why = row_title_on_focus(mut r) }
+    else if name == "list-json-over-queue" { why = row_list_json_over_queue(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue".split(" ") {
         (mut x).push(n)
     }
     x
 }
 
+
+// The pane-side helper for the reply rows: its title becomes 4,094 double
+// quotes, then it waits for its terminal to hang up.
+fn title_quotes() -> int {
+    var b = List[byte]()
+    for c in "\u{1b}]2;".bytes() { (mut b).push(c) }
+    var i = 0
+    while i < 4094 {
+        (mut b).push(34 as byte)
+        i += 1
+    }
+    (mut b).push(7 as byte)
+    var out = fs.stdout()
+    fs.write_chunk(mut out, b) else { return 1 }
+    var tty = fs.stdin()
+    while true {
+        let got = fs.read_chunk(mut tty, 256) else { break }
+        if got.len == 0 { break }
+    }
+    0
+}
 
 // The pane-side helper: this process's blocked and ignored signal masks
 // and every descriptor above 2 that names a socket, a pseudo-terminal
@@ -1833,6 +1936,7 @@ fn self_path() -> str {
 fn main() -> int {
     let args = env.args()
     if args.len == 1 && args[0] == "--print-proc" { return print_proc() }
+    if args.len == 1 && args[0] == "--title-quotes" { return title_quotes() }
     if args.len == 1 && args[0] == "--print-size" {
         let size = term.size(fs.stdin()) else |e| {
             print("size-{e}")
