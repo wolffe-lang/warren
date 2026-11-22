@@ -6,8 +6,9 @@
 //! rows on every machine.
 
 /// One pane as the snapshot holds it: its id, place and size inside the
-/// session's tab area (1-based), the pid of its program, its title.
-pub struct PaneView { id: int, col: int, row: int, cols: int, rows: int, pid: int, title: str }
+/// session's tab area (1-based), the pid of its program, its title, and its
+/// working directory with where that was learnt (`osc7`, `proc`, `start`).
+pub struct PaneView { id: int, col: int, row: int, cols: int, rows: int, pid: int, title: str, cwd: str, cwd_source: str }
 
 /// One tab: its id, name, focused pane's id, whether it is zoomed, and its
 /// panes in tree order.

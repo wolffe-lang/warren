@@ -23,7 +23,7 @@ fn row(mut t: Tally, name: str, why: str) {
 // ---- snapshots, written by hand ----
 
 fn pane(id: int, col: int, cols: int, rows: int, pid: int, title: str) -> cmd.PaneView {
-    cmd.PaneView { id: id, col: col, row: 1, cols: cols, rows: rows, pid: pid, title: title }
+    cmd.PaneView { id: id, col: col, row: 1, cols: cols, rows: rows, pid: pid, title: title, cwd: "", cwd_source: "" }
 }
 
 // Session s1 `work` (tabs t1 `main` with p1 and p2, focus p2; t2 `logs`
