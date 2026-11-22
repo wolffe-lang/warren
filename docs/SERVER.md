@@ -78,12 +78,18 @@ the projection, six times the cap and the screens and 1 MiB (13.2 MiB at
 80x24), is deliberately above that by 1.76 times; the `ring-resident-rows`
 step measures each stage on each host, holds it to the takes recorded in
 `tests/vt/ring-resident-takes.json` and holds the projection at or above it.
-So the cap is 2 MiB a pane in this version; a ring that grows as history
-arrives would let a larger one come back. With the 2 MiB cap a server's
-resident size is about 5 MB at start on Linux, 13 MB with one 80x24 session
-and its client, and 6 MB more for a second (`MEASURE server-rss`); it stays
-flat over 10,000 keystrokes beside a flooding pane and over 200 splits and
-closes (pane slots are reused, never dropped).
+On macOS (arm64, whose peaks are whole 16 KiB pages and the same to the byte
+from run to run) the first pane at the 2 MiB cap peaks at 6.75 MB, three times
+the cap and 0.44 MB of first-use cost, and the projection is above that by
+2.06 times; at an 8 MiB cap one run in four peaks a whole cap higher. The same
+program allocates in the same order every run, so that difference is the
+system's, not the program's, and the macOS rows measure that cap and do not
+hold it. So the cap is 2 MiB a pane in this version; a ring that grows as
+history arrives would let a larger one come back. With the 2 MiB cap a
+server's resident size is about 5 MB at start on Linux, 13 MB with one 80x24
+session and its client, and 6 MB more for a second (`MEASURE server-rss`); it
+stays flat over 10,000 keystrokes beside a flooding pane and over 200 splits
+and closes (pane slots are reused, never dropped).
 
 **On PAX**, a server takes three of the machine's 64 thread slots (its main
 thread and two the runtime starts for signals and children; measured under
