@@ -2209,7 +2209,7 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
                         status = 0
                         err = ""
                         if (a == config.A_SPLIT || a == config.A_NEW_TAB) && slot_of(s, made) >= 0 {
-                            out = cmd.format_id(cmd.ID_PANE, made) + "\n"
+                            out = cmd.format_id(cmd.ID_PANE, r.pane) + "\n"
                         }
                     }
                 }
