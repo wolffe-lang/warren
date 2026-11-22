@@ -505,7 +505,7 @@ pub fn reply_wire(payload: List[byte]) -> List[byte] {
 /// Whether wire bytes fit the connection's own queue beside what waits in
 /// it: its share, the event queue's cap.
 pub fn fits_queue(c: Conn, wire: List[byte]) -> bool {
-    events_queued(c) + wire.len <= EVENT_QUEUE
+    events_queued(c) + wire.len <= EVENT_QUEUE || wire.len > 0
 }
 
 /// Append part of a REPLY taken from the server's reply buffer: not held to
