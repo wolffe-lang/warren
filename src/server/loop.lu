@@ -1308,7 +1308,30 @@ fn run_prompt(mut s: Server, index: int, was: int) {
         rename_active(mut s, index, c.text)
         return
     }
+    if c.action == config.A_RENAME_SESSION {
+        rename_session(mut s, index, s.conns[index].session, c.text)
+        return
+    }
     act(mut s, index, c.action, c.arg, c.count)
+}
+
+// Rename session `si`, or tell client `index` why not: a name the server
+// does not allow, or one another live session holds.
+fn rename_session(mut s: Server, index: int, si: int, name: str) {
+    if si < 0 || !s.sessions[si].live { return }
+    let problem = name_problem(name)
+    if problem.len > 0 {
+        tell(mut s, index, problem)
+        return
+    }
+    let other = find_session(s, name)
+    if other >= 0 && other != si {
+        tell(mut s, index, "a session named {name} already exists")
+        return
+    }
+    set_name(mut s.sessions[si], name)
+    s.sessions[si].bar_gen = s.sessions[si].bar_gen + 1
+    session_changed(mut s, si, now_ns())
 }
 
 // The prompt's bytes: the active tab's name for a rename, else empty.
@@ -1977,6 +2000,8 @@ fn command_action(mut s: Server, si: int, tab: int, pane: int, c: config.Command
     if c.action == config.A_RENAME_TAB {
         layout.rename_tab(mut s.sessions[si].layout, tab, c.text) else |_| { keep_told(mut s, "no-such-tab") }
         s.sessions[si].bar_gen = s.sessions[si].bar_gen + 1
+    } else if c.action == config.A_RENAME_SESSION {
+        rename_session(mut s, 0 - 1, si, c.text)
     } else {
         var n = 0
         while n < c.count && result == DONE && s.told.len == 0 && s.sessions[si].live {
