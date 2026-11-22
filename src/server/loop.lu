@@ -2024,6 +2024,17 @@ fn command_action(mut s: Server, si: int, tab: int, pane: int, c: config.Command
     result
 }
 
+// Every client attached to session `si` is detached (BYE detached).
+fn detach_members(mut s: Server, si: int) {
+    var i = 0
+    while i < s.conns.len {
+        if s.conns[i].live && s.conns[i].member && s.conns[i].session == si && !s.conns[i].ending {
+            terminal(mut s, i, 135, 1, "detached")
+        }
+        i += 1
+    }
+}
+
 // Keep a COMMAND to be asked again next turn, once a slot is made (as a
 // HELLO is).
 fn command_later(mut s: Server, index: int, body: List[byte]) {
@@ -2097,7 +2108,7 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
     } else if v.ok {
         status = cmd.EXIT_REFUSED
         let a = v.command.action
-        if a == config.A_LOCK || a == config.A_DETACH {
+        if a == config.A_LOCK {
             err = "warren: {verb}: acts on an attached client\n"
         } else {
             let from = cmd.parse_id(pane_field_of(body))
@@ -2105,6 +2116,12 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
             let r = cmd.resolve(snapshot(s), v.target, caller)
             if !r.ok {
                 err = if v.target.len > 0 then "warren: {verb}: {r.why}: {v.target}\n" else "warren: {verb}: {r.why}\n"
+            } else if a == config.A_DETACH {
+                // From a shell there is no client of its own to detach: every
+                // client attached to the target's session is.
+                detach_members(mut s, session_with_id(s, r.session))
+                status = 0
+                err = ""
             } else {
                 let si = session_with_id(s, r.session)
                 if command_action(mut s, si, r.tab, r.pane, v.command) == LATER {
