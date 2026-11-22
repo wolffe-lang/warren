@@ -154,14 +154,123 @@ pub fn parse_verb(argv: List[str]) -> Verb {
         join: false, start: LINE_UNSET, end: LINE_UNSET }
 }
 
-// `send-keys`'s arguments. Stub: not in this version.
-fn parse_send_keys(argv: List[str]) -> Verb {
-    usage_error("usage: send-keys: not in this version ({argv.len - 1} arguments)")
+// send-keys's flags that tmux has and this version does not.
+fn refused_send_flag(a: str) -> bool {
+    for f in "-H -K -M -N -R -X -F -c".split(" ") {
+        if f == a { return true }
+    }
+    false
 }
 
-// `capture-pane`'s arguments. Stub: not in this version.
+// `send-keys [-t TARGET] [-l] [--] KEY...`: options only before the first
+// key (getopt's rule, as tmux reads them), `--` ends them.
+fn parse_send_keys(argv: List[str]) -> Verb {
+    var target = ""
+    var targeted = false
+    var literal = false
+    var i = 1
+    var reading = true
+    while reading && i < argv.len {
+        let a = argv[i]
+        if a == "--" {
+            i += 1
+            reading = false
+        } else if a == "-t" {
+            if targeted { return usage_error("usage: -t given twice") }
+            if i + 1 >= argv.len { return usage_error("usage: -t needs a target") }
+            target = argv[i + 1]
+            targeted = true
+            i += 2
+        } else if a == "-l" {
+            literal = true
+            i += 1
+        } else if a.len > 1 && a.starts_with("-") {
+            if refused_send_flag(a) { return usage_error("usage: send-keys {a}: not in this version") }
+            return usage_error("usage: send-keys: unknown flag {a}")
+        } else {
+            reading = false
+        }
+    }
+    var keys = List[str]()
+    while i < argv.len {
+        (mut keys).push(argv[i])
+        i += 1
+    }
+    if keys.len == 0 { return usage_error("usage: send-keys [-t TARGET] [-l] [--] KEY...") }
+    var v = verb_of(VERB_SEND_KEYS, target, "")
+    v.keys = keys
+    v.literal = literal
+    v
+}
+
+/// A capture's line number read: `-` (LINE_EDGE), or digits after an
+/// optional `+` or `-`; `ok` false for anything else.
+pub struct LineRead { ok: bool, n: int }
+
+/// Read a `-S` or `-E` value.
+pub fn line_of(text: str) -> LineRead {
+    if text == "-" { return LineRead { ok: true, n: LINE_EDGE } }
+    var sign = 1
+    var digits = text
+    if text.starts_with("-") || text.starts_with("+") {
+        if text.starts_with("-") { sign = 0 - 1 }
+        digits = text[1..text.len]
+    }
+    if digits.len == 0 || digits.len > 12 { return LineRead { ok: false, n: 0 } }
+    var n = 0
+    for b in digits.bytes() {
+        let d = (b as int) - 48
+        if d < 0 || d > 9 { return LineRead { ok: false, n: 0 } }
+        n = n * 10 + d
+    }
+    LineRead { ok: true, n: sign * n }
+}
+
+// `capture-pane [-t TARGET] [-p] [-e] [-J] [-S LINE] [-E LINE]`: flags may be
+// clustered (`-pJ`), a value may follow its flag in the same word (`-S-50`).
 fn parse_capture(argv: List[str]) -> Verb {
-    usage_error("usage: capture-pane: not in this version ({argv.len - 1} arguments)")
+    var v = verb_of(VERB_CAPTURE, "", "")
+    var targeted = false
+    var i = 1
+    while i < argv.len {
+        let a = argv[i]
+        if a.len < 2 || !a.starts_with("-") { return usage_error("usage: capture-pane takes no argument: {a}") }
+        var k = 1
+        while k < a.len {
+            let f = a[k..k + 1]
+            if f == "p" {
+                v.print = true
+            } else if f == "e" {
+                v.escapes = true
+            } else if f == "J" {
+                v.join = true
+            } else if f == "S" || f == "E" || f == "t" {
+                var value = a[k + 1..a.len]
+                if value.len == 0 {
+                    if i + 1 >= argv.len { return usage_error("usage: -{f} needs a value") }
+                    i += 1
+                    value = argv[i]
+                }
+                if f == "t" {
+                    if targeted { return usage_error("usage: -t given twice") }
+                    v.target = value
+                    targeted = true
+                } else {
+                    let line = line_of(value)
+                    if !line.ok { return usage_error("usage: -{f} {value}: not a line number") }
+                    if f == "S" { v.start = line.n } else { v.end = line.n }
+                }
+                k = a.len
+            } else if "aAbCNPqT".contains(f) {
+                return usage_error("usage: capture-pane -{f}: not in this version")
+            } else {
+                return usage_error("usage: capture-pane: unknown flag -{f}")
+            }
+            k += 1
+        }
+        i += 1
+    }
+    v
 }
 
 // The verbs that make a pane, and so take `-c DIR` (and, but for
