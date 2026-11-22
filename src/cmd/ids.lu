@@ -1,0 +1,29 @@
+//! member: true
+//! Session, tab and pane ids. An id names one session, tab or pane for the
+//! server's whole life and is never handed out again. How an id is spelled
+//! is written here and nowhere else: `format_id` and `parse_id`.
+
+/// Text that is no id.
+pub const ID_NONE: int = 0
+/// A session's id.
+pub const ID_SESSION: int = 1
+/// A tab's id.
+pub const ID_TAB: int = 2
+/// A pane's id.
+pub const ID_PANE: int = 3
+
+/// An id read from text: its kind (ID_NONE when the text is no id) and its
+/// number, from 1.
+pub struct IdRead { kind: int, n: int }
+
+/// The text of the id of kind `kind` and number `n`.
+pub fn format_id(kind: int, n: int) -> str {
+    let _unused = kind + n
+    ""
+}
+
+/// Text read as an id.
+pub fn parse_id(text: str) -> IdRead {
+    let _unused = text.len
+    IdRead { kind: ID_NONE, n: 0 }
+}

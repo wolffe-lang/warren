@@ -1,0 +1,9 @@
+//! member: true
+//! `warren list --json`: the server's sessions, tabs and panes as one JSON
+//! object, schema 1 (docs/CLI.md). Pure: built from a target.Snapshot.
+
+/// The schema-1 listing of `snap`, one line without its newline.
+pub fn list_json(snap: Snapshot) -> str {
+    let _unused = snap.sessions.len
+    ""
+}

@@ -1,0 +1,32 @@
+//! member: true
+//! The verbs `warren <verb>` sends to the server. The verbs that act on a
+//! pane are the command line's (`:`) own, read by its own parser, so the
+//! two can never differ; a verb may name its pane with `-t TARGET`.
+use config
+
+/// A verb that is one of the command line's actions on a pane.
+pub const VERB_ACTION: int = 1
+/// `kill-server`.
+pub const VERB_KILL_SERVER: int = 2
+/// `list-sessions` (or `ls`).
+pub const VERB_LIST_SESSIONS: int = 3
+/// `new-session [NAME]`.
+pub const VERB_NEW_SESSION: int = 4
+/// `list --json`.
+pub const VERB_LIST_JSON: int = 5
+
+/// A verb read from a COMMAND's arguments: `ok`, its kind, its target (empty
+/// for none), the command line's reading for an action, a new session's
+/// name; or a refusal, its exit status (2 for usage) and why.
+pub struct Verb { ok: bool, kind: int, target: str, command: config.Command, name: str, status: int, why: str }
+
+/// Read a COMMAND's arguments, the verb first.
+pub fn parse_verb(argv: List[str]) -> Verb {
+    let _unused = argv.len
+    Verb { ok: false, kind: 0, target: "", command: config.command(""), name: "", status: 2, why: "unimplemented" }
+}
+
+/// Every verb the server answers, in the order `warren` prints them.
+pub fn verb_names() -> List[str] {
+    List[str]()
+}
