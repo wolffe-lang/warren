@@ -14,6 +14,7 @@ use std.poll
 use std.process
 use std.signal
 use std.time
+use cmd
 use config
 use layout
 use proto
@@ -43,6 +44,9 @@ pub struct Server {
     // counter each that never goes back.
     next_session: int,
     next_tab: int,
+    // What the last action would have told a client, when it was run for
+    // a command and there was no client to tell.
+    told: str,
     stopping: bool,
     stop_deadline: int,
     started: int,
@@ -900,6 +904,10 @@ fn bar_cells(s: Server, si: int, index: int, now: int, tab_cells: List[vt.Cell])
 
 /// Show a message on one client's hint line for MESSAGE_MS.
 fn tell(mut s: Server, index: int, text: str) {
+    if index < 0 {
+        s.told = text
+        return
+    }
     (mut s.conns[index].message).reset()
     for b in text.bytes() { (mut s.conns[index].message).push(b) }
     s.conns[index].message_until = now_ns() + MESSAGE_MS * 1000000
@@ -1077,7 +1085,12 @@ fn close_tab(mut s: Server, si: int) {
 /// Do a key's action for a client. LATER when it waits for a pane slot
 /// made between turns (it is taken again on the next turn).
 fn do_action(mut s: Server, index: int, action: int, arg: int) -> int {
-    let si = s.conns[index].session
+    do_action_in(mut s, index, s.conns[index].session, action, arg)
+}
+
+/// An action on session `si`'s focused pane, for client `index` (-1 for a
+/// command, which has no client: what it would be told is kept in `told`).
+fn do_action_in(mut s: Server, index: int, si: int, action: int, arg: int) -> int {
     if si < 0 || !s.sessions[si].live { return DONE }
     let cols = s.sessions[si].cols
     let area = s.sessions[si].rows - BAR_LINES
@@ -1086,7 +1099,7 @@ fn do_action(mut s: Server, index: int, action: int, arg: int) -> int {
     if action == config.A_SPLIT { return act_split(mut s, index, si, arg) }
     if action == config.A_NEW_TAB { return act_new_tab(mut s, index, si) }
     if action == config.A_DETACH {
-        terminal(mut s, index, 135, 1, "detached")
+        if index >= 0 { terminal(mut s, index, 135, 1, "detached") }
         return DONE
     }
     if action == config.A_SEND_PREFIX {
@@ -1098,7 +1111,7 @@ fn do_action(mut s: Server, index: int, action: int, arg: int) -> int {
         return DONE
     }
     if action == config.A_QUICK_CLOSE {
-        if from < 0 { return DONE }
+        if from < 0 || index < 0 { return DONE }
         if pane_count(s, si) == 1 {
             s.conns[index].back = config.MODE_NORMAL
             s.conns[index].confirm = config.A_CLOSE
@@ -1846,6 +1859,145 @@ fn free_number(s: Server) -> str {
     "{n}"
 }
 
+// A COMMAND's pane field (after its arguments and its working directory):
+// the pane the command came from, as `WARREN_PANE` spells it, or "".
+fn pane_field_of(body: List[byte]) -> str {
+    let count = u(body, 4, 2)
+    var at = 6
+    var i = 0
+    while i < count + 1 && at + 2 <= body.len {
+        at = at + 2 + u(body, at, 2)
+        i += 1
+    }
+    if at + 2 > body.len { return "" }
+    let n = u(body, at, 2)
+    if at + 2 + n > body.len { return "" }
+    str_from_utf8(body[at + 2..at + 2 + n]) else ""
+}
+
+// One session as the command client's rules see it: its tabs in order,
+// each tab's panes in tree order with their rects in the tab area (a hidden
+// pane's rect is zero), the pid of a pane whose program is alive.
+fn session_view(s: Server, si: int) -> cmd.SessionView {
+    let cols = s.sessions[si].cols
+    let area = s.sessions[si].rows - BAR_LINES
+    var tabs = List[cmd.TabView]()
+    for t in s.sessions[si].layout.tabs {
+        var panes = List[cmd.PaneView]()
+        for r in layout.rects(s.sessions[si].layout, t.id, cols, area) {
+            let k = slot_of(s, r.pane)
+            var pid = 0 - 1
+            var title = ""
+            if k >= 0 {
+                if s.panes[k].child_live { pid = s.panes[k].pid }
+                title = str_from_utf8(s.panes[k].screen.title_storage[0..s.panes[k].screen.title_length]) else ""
+            }
+            (mut panes).push(cmd.PaneView { id: r.pane, col: r.col, row: r.row, cols: r.cols, rows: r.rows, pid: pid, title: title })
+        }
+        (mut tabs).push(cmd.TabView { id: t.id, name: str_from_utf8(t.name) else "", focus: t.focus, zoomed: t.zoomed, panes: panes })
+    }
+    cmd.SessionView { id: s.sessions[si].id, name: name_of(s.sessions[si]), cols: cols, rows: s.sessions[si].rows,
+        clients: s.sessions[si].members, active: s.sessions[si].layout.active, tabs: tabs }
+}
+
+/// The server's live sessions, in id order, as the command client's rules
+/// (targets, `list --json`) read them.
+fn snapshot(s: Server) -> cmd.Snapshot {
+    var sessions = List[cmd.SessionView]()
+    var last = 0
+    while true {
+        var pick = 0 - 1
+        var k = 0
+        while k < s.sessions.len {
+            if s.sessions[k].live && s.sessions[k].id > last && (pick < 0 || s.sessions[k].id < s.sessions[pick].id) { pick = k }
+            k += 1
+        }
+        if pick < 0 { break }
+        last = s.sessions[pick].id
+        (mut sessions).push(session_view(s, pick))
+    }
+    cmd.Snapshot { sessions: sessions }
+}
+
+// The slot of the live session with id `id`, or -1.
+fn session_with_id(s: Server, id: int) -> int {
+    var i = 0
+    while i < s.sessions.len {
+        if s.sessions[i].live && s.sessions[i].id == id { return i }
+        i += 1
+    }
+    0 - 1
+}
+
+// The focused pane's id of tab `tab` in session `si`, or -1.
+fn tab_focus(s: Server, si: int, tab: int) -> int {
+    for t in s.sessions[si].layout.tabs {
+        if t.id == tab { return t.focus }
+    }
+    0 - 1
+}
+
+// The actions whose point is to move the focus or the active tab. Every
+// other action sent as a command leaves both where they were.
+fn moves_focus(action: int) -> bool {
+    action == config.A_FOCUS || action == config.A_FOCUS_NEXT || action == config.A_SELECT_TAB ||
+        action == config.A_NEXT_TAB || action == config.A_PREVIOUS_TAB || action == config.A_ZOOM
+}
+
+/// A command line action sent as `warren VERB`, on pane `pane` of tab `tab`
+/// in session `si`: run by the path a key takes, as if that pane had the
+/// focus; then the session's focus and active tab are put back, unless
+/// moving them is the action's point. DONE, with `s.told` set when the
+/// action was refused, or LATER when a pane's slot is made between turns.
+fn command_action(mut s: Server, si: int, tab: int, pane: int, c: config.Command) -> int {
+    s.told = ""
+    let before_tab = s.sessions[si].layout.active
+    let before_focus = tab_focus(s, si, tab)
+    let from = focused_slot(s, si)
+    var gone = false
+    layout.focus_pane(mut s.sessions[si].layout, pane) else |_| { gone = true }
+    if gone {
+        s.told = "no-such-pane"
+        return DONE
+    }
+    var result = DONE
+    if c.action == config.A_RENAME_TAB {
+        layout.rename_tab(mut s.sessions[si].layout, tab, c.text) else |_| { s.told = "no-such-tab" }
+        s.sessions[si].bar_gen = s.sessions[si].bar_gen + 1
+    } else {
+        var n = 0
+        while n < c.count && result == DONE && s.told.len == 0 && s.sessions[si].live {
+            result = do_action_in(mut s, 0 - 1, si, c.action, c.arg)
+            n += 1
+        }
+    }
+    if !s.sessions[si].live { return result }
+    if !moves_focus(c.action) {
+        let after = focused_slot(s, si)
+        if before_focus >= 0 && slot_of(s, before_focus) >= 0 {
+            layout.focus_pane(mut s.sessions[si].layout, before_focus) else |_| {}
+        }
+        layout.select_tab_id(mut s.sessions[si].layout, before_tab) else |_| {}
+        focus_moved(mut s, si, after)
+    } else if from >= 0 && focused_slot(s, si) != from {
+        focus_moved(mut s, si, from)
+    }
+    layout_changed(mut s, si)
+    result
+}
+
+// Keep a COMMAND to be asked again next turn, once a slot is made (as a
+// HELLO is).
+fn command_later(mut s: Server, index: int, body: List[byte]) {
+    var j = 0
+    for b in body {
+        if j < s.conns[index].command.len { s.conns[index].command[j] = b } else { (mut s.conns[index].command).push(b) }
+        j += 1
+    }
+    s.conns[index].command_len = body.len
+    s.conns[index].command_ready = true
+}
+
 fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
     if kind == 12 {
         let _p = send(mut s.conns[index], 137, number_payload(u(body, 0, 4)))
@@ -1856,29 +2008,33 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
         return
     }
     let id = u(body, 0, 4)
-    let argc = u(body, 4, 2)
-    let first_len = u(body, 6, 2)
-    let verb = str_from_utf8(body[8..8 + first_len]) else ""
-    var status = 2
+    let argv = argv_of(body)
+    let verb = if argv.len > 0 then argv[0] else ""
+    // One table: the command line's verbs and the server's own (cmd.parse_verb).
+    let v = cmd.parse_verb(argv)
+    var status = cmd.EXIT_USAGE
     var out = ""
-    var err = "warren: {verb}: not implemented in this version\n"
-    if verb == "kill-server" && argc == 1 {
+    var err = "warren: {v.why}\n"
+    if v.ok && v.kind == cmd.VERB_KILL_SERVER {
         status = 0
         err = ""
         s.conns[index].stop_after = true
-    } else if verb == "list-sessions" && argc == 1 {
+    } else if v.ok && v.kind == cmd.VERB_LIST_SESSIONS {
         status = 0
         err = ""
         for x in s.sessions {
             if x.live { out = out + "{name_of(x)}: {x.cols}x{x.rows} ({x.members} attached)\n" }
         }
-    } else if verb == "new-session" && (argc == 1 || argc == 2) {
-        let argv = argv_of(body)
+    } else if v.ok && v.kind == cmd.VERB_LIST_JSON {
+        status = 0
+        err = ""
+        out = cmd.list_json(snapshot(s)) + "\n"
+    } else if v.ok && v.kind == cmd.VERB_NEW_SESSION {
         let h = read_hello(s.conns[index].hello[0..s.conns[index].hello_len])
-        let name = if argc == 2 then argv[1] else free_number(s)
+        let name = if v.name.len > 0 then v.name else free_number(s)
         let cols = if h.cols == 0 then 80 else h.cols
         let rows = if h.rows == 0 then 24 else h.rows
-        status = 1
+        status = cmd.EXIT_REFUSED
         let problem = name_problem(name)
         if problem.len > 0 {
             err = "warren: new-session: {problem}\n"
@@ -1889,14 +2045,7 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
         } else {
             let m = make_session(mut s, name, cols, rows, h.cwd, h.names, h.values, 0)
             if m.later {
-                // Asked again next turn, once a slot is made (as a HELLO is).
-                var j = 0
-                for b in body {
-                    if j < s.conns[index].command.len { s.conns[index].command[j] = b } else { (mut s.conns[index].command).push(b) }
-                    j += 1
-                }
-                s.conns[index].command_len = body.len
-                s.conns[index].command_ready = true
+                command_later(mut s, index, body)
                 return
             }
             if m.si < 0 {
@@ -1907,6 +2056,31 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
                 err = ""
             }
         }
+    } else if v.ok {
+        status = cmd.EXIT_REFUSED
+        let a = v.command.action
+        if a == config.A_LOCK || a == config.A_DETACH {
+            err = "warren: {verb}: acts on an attached client\n"
+        } else {
+            let from = cmd.parse_id(pane_field_of(body))
+            let caller = if from.kind == cmd.ID_PANE then from.n else 0
+            let r = cmd.resolve(snapshot(s), v.target, caller)
+            if !r.ok {
+                err = if v.target.len > 0 then "warren: {verb}: {r.why}: {v.target}\n" else "warren: {verb}: {r.why}\n"
+            } else {
+                let si = session_with_id(s, r.session)
+                if command_action(mut s, si, r.tab, r.pane, v.command) == LATER {
+                    command_later(mut s, index, body)
+                    return
+                }
+                if s.told.len > 0 {
+                    err = "warren: {verb}: {s.told}\n"
+                } else {
+                    status = 0
+                    err = ""
+                }
+            }
+        }
     }
     let ok = send(mut s.conns[index], 136, reply_payload(id, status, out, err))
     s.conns[index].sent_kind = 136
@@ -1914,9 +2088,8 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
     s.conns[index].phase = DRAINING
     s.conns[index].deadline = now_ns() + DRAIN_MS * 1000000
     if !ok { close_conn(mut s, index, "the REPLY to {verb} could not be queued") }
-    if s.conns[index].stop_after || (!ok && verb == "kill-server") { begin_stop(mut s, "kill-server") }
+    if s.conns[index].stop_after || (!ok && v.kind == cmd.VERB_KILL_SERVER) { begin_stop(mut s, "kill-server") }
 }
-
 /// One complete logical message from a connection.
 fn message(mut s: Server, index: int, kind: int, body: List[byte]) {
     let phase = s.conns[index].phase
@@ -2906,7 +3079,7 @@ pub fn serve() -> int {
     var s = Server {
         place: place, w: waiter, listen_key: 0 - 1, listening: false,
         conns: conns, sessions: List[Session](), panes: List[Pane](), orphans: List[int](), key_kind: List[int](),
-        key_owner: List[int](), key_gen: List[int](), next_id: 0, next_pane: 1, next_session: 1, next_tab: 1, stopping: false, stop_deadline: 0,
+        key_owner: List[int](), key_gen: List[int](), next_id: 0, next_pane: 1, next_session: 1, next_tab: 1, told: "", stopping: false, stop_deadline: 0,
         started: now_ns(), idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
         version: vt.package_version(), again: false, need_slot: false, need_pane: false, need_view: false, settings: load_settings(), want_cols: 0,
         want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, frames: 0, prompt_frames: 0,
