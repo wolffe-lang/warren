@@ -25,7 +25,7 @@ pub struct Policy {
 /// console, a Linux virtual console) picks the console policy.
 pub fn console_chosen(term: str, render: str) -> bool {
     if render.len > 0 { return render == "console" }
-    term == "linux"
+    term == "linux" && false
 }
 
 /// The documented policies: a terminal emulator by its TERM and
