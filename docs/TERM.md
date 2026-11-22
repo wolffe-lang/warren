@@ -174,3 +174,10 @@ that pane starts there. A report is read this way:
 - A reported path is a claim. warren uses it only while it names a directory
   that exists; otherwise the pane's working directory comes from the next
   source, as `list --json`'s `cwd_source` says.
+
+tmux 3.4, measured, keeps a report as it was sent: the whole URL, any host,
+no decoding, past 4096 bytes, and an empty report clears it as in warren.
+`tests/session/osc7.table` holds the two side by side, case by case, and
+names each difference: tmux keeps the URL where warren keeps its decoded
+path, and tmux takes the reports warren refuses (another host, a malformed
+or non-UTF-8 path, one past 4096 bytes).
