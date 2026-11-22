@@ -157,7 +157,7 @@ are transactional: validate first, then mutate session state.
 | attached/commanding | PING outside a fragment chain | enqueue PONG, subject to queue cap | same |
 | attached/commanding | wrong-role, duplicate HELLO, malformed message/fragment chain | protocol-error if safe; remove membership | draining or closed |
 | draining | writable | finish queued bytes without interleaving; ignore further input | draining |
-| draining | queue empty or 2 s elapsed, EOF or write error | unregister, close, free buffers | closed |
+| draining | queue empty or 2 s without a write that made progress, EOF or write error | unregister, close, free buffers | closed |
 | closed | any stale ready event | discard by generation | closed |
 
 No BYE can interrupt a partly transmitted physical frame or logical fragment

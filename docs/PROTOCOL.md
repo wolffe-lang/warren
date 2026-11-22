@@ -130,7 +130,8 @@ REFUSE codes: 1 version, 2 no-session, 3 read-only, 4 permission, 5 busy,
 WELCOME client is nonzero; session is empty for command role. REPLY id is
 nonzero and matches COMMAND; status 0 successful, 1 refused, 2 usage,
 3 no-server. Output/error are bytes, not necessarily UTF-8. REFUSE and BYE
-are terminal: close after draining or after two seconds. Error text is
+are terminal: close after draining, or two seconds after the last write
+that made progress (a peer that keeps reading is never cut). Error text is
 explanatory, never parsed as a code. A malformed message after bootstrap
 gets BYE protocol-error if it can be appended without corrupting a partial
 frame/fragment chain; otherwise close immediately. Queued writes are never

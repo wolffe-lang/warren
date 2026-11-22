@@ -282,6 +282,9 @@ fn flush(mut s: Server, index: int) {
         return
     }
     wrote(mut s.conns[index], n)
+    // A draining connection's two seconds count from its last write that
+    // made progress: a peer that reads is never cut, one that stops is.
+    if n > 0 && s.conns[index].phase == DRAINING { s.conns[index].deadline = now_ns() + DRAIN_MS * 1000000 }
     after_write(mut s, index)
 }
 
