@@ -97,6 +97,9 @@ pub struct Server {
     clock_hour: int,
     clock_minute: int,
     clock_next: int,
+    // The name this machine answers to in a pane's OSC 7 report, learnt
+    // once at start (host.lu); "" when nothing named it.
+    host_name: str,
 }
 
 fn now_ns() -> int {
@@ -604,6 +607,7 @@ fn spawn_pane_in(mut s: Server, si: int, k: int, id: int, cols: int, rows: int, 
     s.panes[k].damage = s.panes[k].damage + 1
     s.panes[k].shown = false
     s.panes[k].sync_since = 0
+    let _named = vt.set_local_host(mut s.panes[k].screen, s.host_name)
     let sp = Spawn { cols: cols, rows: rows, cwd: if dir.len > 0 then dir else cwd_of(s.sessions[si]),
         names: copy s.sessions[si].env_names, values: copy s.sessions[si].env_values, pane_id: id }
     let program = if argv.len > 0 then argv else shell_argv()
@@ -3473,6 +3477,7 @@ pub fn serve() -> int {
         finish(take place)
         return 1
     }
+    let host = machine_name()
     var s = Server {
         place: place, w: waiter, listen_key: 0 - 1, listening: false,
         conns: conns, sessions: List[Session](), panes: List[Pane](), orphans: List[int](), key_kind: List[int](),
@@ -3483,12 +3488,13 @@ pub fn serve() -> int {
         want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, frames: 0, prompt_frames: 0,
         master_read: master_read,
         budget: budget, uid: env.euid() else 0 - 1, inherited: inherited, keys: keys, help: help,
-        clock_hour: 0, clock_minute: 0, clock_next: 0,
+        clock_hour: 0, clock_minute: 0, clock_next: 0, host_name: host,
     }
     read_clock(mut s)
     net.set_listener_deadline(mut s.place.listener, 1) else |_| {}
     listener_interest(mut s)
     trace(s, "listening at {s.place.socket}")
+    trace(s, "host name '{s.host_name}'")
     var running = true
     while running {
         region scratch {
