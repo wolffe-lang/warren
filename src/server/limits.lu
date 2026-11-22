@@ -63,6 +63,16 @@ pub fn attached_bytes(cols: int, rows: int) -> int {
 pub const READ_BUDGET: int = 65536
 /// Bytes written to one handle in one turn.
 pub const WRITE_BUDGET: int = 65536
+/// Bytes written to a draining connection in one write, so that its peer's
+/// reading lets each write through. Linux reports a Unix socket writable
+/// only once the bytes its peer has not read, counted in whole kernel
+/// buffers (skbs) of up to 36,544 bytes, are at most a quarter of its send
+/// buffer (53,248 of 212,992): an 8 KiB write is one such buffer, so a peer
+/// that reads 8 KiB in every two seconds is never closed by DRAIN_MS. A write
+/// past 36,544 bytes is two buffers, and its peer must read most of it before
+/// the next (a 64 KiB write needs 36,544 bytes read): do not raise this past
+/// 36,544 without measuring the floor again (the reply-reader rows on Linux).
+pub const DRAIN_WRITE: int = 8192
 /// Already-buffered bytes parsed for one connection in one turn.
 pub const PARSE_BUDGET: int = 65536
 /// Non-FRAME bytes queued for one attached client before it is too slow.
@@ -77,7 +87,8 @@ pub const HELLO_MS: int = 5000
 /// A REPLY that needs the server-wide reply buffer while another holds it
 /// waits at most this long; then it is refused by name.
 pub const REPLY_WAIT_MS: int = 5000
-/// A draining connection is closed after this long.
+/// A draining connection is closed this long after its last write that
+/// made progress.
 pub const DRAIN_MS: int = 2000
 /// A closing pane's child is given this long before its pane is removed.
 pub const CLOSING_MS: int = 3000

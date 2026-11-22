@@ -85,6 +85,11 @@ in panes may write the clipboard too; by default they may not. `vt-dump` is a di
 - **One TOML file** for configuration, and a command socket so that scripts
   can drive it: every command line verb with a target (`warren split-right -t
   work`) and `warren list --json` today ([CLI](docs/CLI.md)); `send-keys` later.
+  A script that reads a long answer slowly is never cut off while it reads at
+  least 8 KiB in every two seconds on Linux, or 2 KiB on macOS, and is closed
+  two seconds after it stops reading ([PROTOCOL](docs/PROTOCOL.md)). Those
+  floors are a property of each host's socket rule and may differ on a host
+  not listed here, PAX among them.
 - **Layouts and working directories are saved and restored.** Running programs
   are not resurrected.
 

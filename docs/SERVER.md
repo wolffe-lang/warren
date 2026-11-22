@@ -107,7 +107,17 @@ work schedules a zero-deadline turn. No phase may run an unbounded drain
 loop while a descriptor remains ready. At most one wait blocks a turn.
 
 Enable WRITE with `poll.modify` only when an output/input queue is nonempty;
-restore READ when it drains. For ptys, use `fs.read_chunk` and
+restore READ when it drains. A draining connection (one sending its last
+message) is written at most 8 KiB at a time (`DRAIN_WRITE`) and closed two
+seconds after its last write that made progress (`DRAIN_MS`), so its peer's
+reading is what lets each write through: on Linux, where the kernel reports
+a Unix socket writable only once its peer's unread bytes, counted in whole
+kernel buffers, are at most a quarter of the send buffer, a peer that reads
+8 KiB in every two seconds is never closed; on macOS, with 8 KiB of send
+space writable again at 2 KiB free, one that reads 2 KiB. A 64 KiB write is
+two such buffers on Linux and needed 36,544 bytes read before the next. The
+`reply-reader-over` and `reply-reader-under` session rows read a little over
+and a little under each host's floor. For ptys, use `fs.read_chunk` and
 `fs.write_some`, never UTF-8-decoding reads (partial characters are normal).
 Only consume the count a write returns. `busy` leaves the offset unchanged;
 EOF/read error closes or advances that owner, not the loop. Socket M2 must

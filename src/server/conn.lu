@@ -423,9 +423,12 @@ pub fn title_owed(c: Conn) -> bool {
     c.title_dirty && (c.title_end < 0 || c.tx_off >= c.title_end)
 }
 
-/// The bytes of the next write: at most WRITE_BUDGET from the queue.
+/// The bytes of the next write: at most WRITE_BUDGET from the queue, and
+/// at most DRAIN_WRITE once the connection is draining, so that its peer's
+/// reading, not the kernel's buffering, is what lets each write through.
 pub fn next_write(c: Conn) -> List[byte] {
-    let end = if c.tx_len - c.tx_off > WRITE_BUDGET then c.tx_off + WRITE_BUDGET else c.tx_len
+    let cap = if c.phase == DRAINING then DRAIN_WRITE else WRITE_BUDGET
+    let end = if c.tx_len - c.tx_off > cap then c.tx_off + cap else c.tx_len
     c.tx[c.tx_off..end]
 }
 

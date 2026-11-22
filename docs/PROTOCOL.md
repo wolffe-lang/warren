@@ -130,8 +130,17 @@ REFUSE codes: 1 version, 2 no-session, 3 read-only, 4 permission, 5 busy,
 WELCOME client is nonzero; session is empty for command role. REPLY id is
 nonzero and matches COMMAND; status 0 successful, 1 refused, 2 usage,
 3 no-server. Output/error are bytes, not necessarily UTF-8. REFUSE and BYE
-are terminal: close after draining, or two seconds after the last write
-that made progress (a peer that keeps reading is never cut). Error text is
+are terminal, as a command connection's REPLY is: the server closes after
+draining. A connection sending its last message is never closed while its
+peer reads at least N bytes, or all that is left, in every two seconds; once
+its peer stops reading, it is closed within two seconds. N is 8 KiB on Linux
+and 2 KiB on macOS. N is a property of each host's socket rule, and may
+differ on a host not named here: on Linux the server writes a draining
+connection 8 KiB at a time and the kernel lets the next write through once a
+whole earlier one is read; on macOS the socket's send space is 8 KiB and it
+is writable again once 2 KiB are free. Between the two (a peer that reads
+less than N in some two seconds but does not stop) it may be closed or not,
+as the kernel's pieces fall. Error text is
 explanatory, never parsed as a code. A malformed message after bootstrap
 gets BYE protocol-error if it can be appended without corrupting a partial
 frame/fragment chain; otherwise close immediately. Queued writes are never
