@@ -6,10 +6,11 @@
 #   preflight   the image held to the package list and the binary pins
 #   gate-linux  the whole Linux gate inside the image, started by
 #               tools/container-run.sh as tools/in-container starts it
-#   plant       inside the image, tests/vt/rig/verbs-inner.sh plant: warren
-#               and the session rows built, then the row that holds ids never
-#               handed out again, which a plant that hands out a freed session
-#               id must turn red: it prints FAIL ids-never-reused and ends 1
+#   plant ROW   inside the image, tests/vt/rig/verbs-inner.sh plant ROW:
+#               warren and the session rows built, then the one row its plant
+#               must turn red by name (ids-never-reused for a plant that hands
+#               out a freed session id, split-prints-new-id for one that prints
+#               the old pane's id): it prints FAIL ROW and ends 1
 #   toolchain   inside the image, tests/vt/rig/verbs-inner.sh toolchain: the
 #               staged pin found and run as the plant step finds it
 set -euo pipefail
@@ -45,7 +46,7 @@ case "${1:-}" in
   ;;
  plant)
   rc=0
-  inside bash tests/vt/rig/verbs-inner.sh plant || rc=$?
+  inside bash tests/vt/rig/verbs-inner.sh plant "${2:?}" || rc=$?
   exit "$rc"
   ;;
  toolchain)
