@@ -359,9 +359,10 @@ pub fn queue_title(mut c: Conn, wire: List[byte]) -> bool {
     true
 }
 
-/// Whether a newer title waits to be queued.
+/// Whether a newer title is owed: one came while the waiting TITLE was
+/// unwritten, and that TITLE is now written (or none waits).
 pub fn title_owed(c: Conn) -> bool {
-    false
+    c.title_dirty && (c.title_end < 0 || c.tx_off >= c.title_end)
 }
 
 /// The bytes of the next write: at most WRITE_BUDGET from the queue.
