@@ -54,7 +54,7 @@ fn ended_by(slot: int, deadline: int) -> bool {
 /// cannot start, prints no name, or has not ended within HOST_NAME_WAIT_MS
 /// (it is then killed and reaped).
 pub fn host_name_from(program: str) -> str {
-    let deadline = now_ms() + HOST_NAME_WAIT_MS
+    let deadline = now_ms() + 60000
     let p = process.pipe() else { return "" }
     var from_child = p.read
     var to_parent = p.write
