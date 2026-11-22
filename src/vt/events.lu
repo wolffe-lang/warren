@@ -192,6 +192,8 @@ fn dispatch_osc(mut pane: Vt) {
         }
         pane.title_length = length
         if changed { pane.events.title_changed = true }
+    } else if command == 7 {
+        take_osc7(mut pane, split + 1)
     } else if command == 52 {
         var start = split + 1
         while start < pane.parser.payload_len && pane.parser.payload[start] as int != 59 { start += 1 }

@@ -19,21 +19,188 @@ fn new_host_buffer() -> List[byte] {
 /// name besides the empty host and `localhost`. False, and no name kept,
 /// when `name` is empty or longer than 255 bytes.
 pub fn set_local_host(mut pane: Vt, name: str) -> bool {
-    let bytes = name.bytes()
-    if bytes.len == 0 || bytes.len >= HOST_BYTES {
+    if name.len == 0 || name.len >= HOST_BYTES {
         pane.local_host_length = 0
         return false
     }
     var i = 0
-    while i < bytes.len {
-        pane.local_host[i] = bytes[i]
+    while i < name.len {
+        pane.local_host[i] = name.bytes()[i]
         i += 1
     }
-    pane.local_host_length = bytes.len
+    pane.local_host_length = name.len
     true
 }
 
 /// The directory the pane's program last reported, "" when none.
 pub fn reported_dir(pane: Vt) -> str {
     str_from_utf8(pane.cwd_storage[0..pane.cwd_length]) else ""
+}
+
+fn lower_ascii(v: int) -> int {
+    if v >= 65 && v <= 90 { v + 32 } else { v }
+}
+
+// Whether payload[from..to] is `text`, ASCII case ignored.
+fn payload_is(p: Parser, from: int, to: int, text: str) -> bool {
+    if to - from != text.len { return false }
+    var i = 0
+    while i < text.len {
+        if lower_ascii(p.payload[from + i] as int) != lower_ascii(text.bytes()[i] as int) { return false }
+        i += 1
+    }
+    true
+}
+
+// Whether payload[from..to] is local_host[0..n], ASCII case ignored.
+fn payload_is_local(pane: Vt, from: int, to: int, n: int) -> bool {
+    if to - from != n { return false }
+    var i = 0
+    while i < n {
+        if lower_ascii(pane.parser.payload[from + i] as int) != lower_ascii(pane.local_host[i] as int) { return false }
+        i += 1
+    }
+    true
+}
+
+// Where the first `.` is in payload[from..to], else `to`.
+fn payload_label_end(p: Parser, from: int, to: int) -> int {
+    var i = from
+    while i < to && p.payload[i] as int != 46 { i += 1 }
+    i
+}
+
+// The length of the local name's first label.
+fn local_label_end(pane: Vt) -> int {
+    var i = 0
+    while i < pane.local_host_length && pane.local_host[i] as int != 46 { i += 1 }
+    i
+}
+
+// Whether the host payload[from..to] names this machine: empty, `localhost`,
+// or the pane's name, ASCII case ignored, where a name with no domain part
+// stands for a name it is the first label of, both ways.
+fn local_host_named(pane: Vt, from: int, to: int) -> bool {
+    if from == to || payload_is(pane.parser, from, to, "localhost") { return true }
+    let n = pane.local_host_length
+    if n == 0 { return false }
+    if payload_is_local(pane, from, to, n) { return true }
+    let label = payload_label_end(pane.parser, from, to)
+    let local_label = local_label_end(pane)
+    if label == to && local_label < n { return payload_is_local(pane, from, to, local_label) }
+    if label < to && local_label == n { return payload_is_local(pane, from, label, n) }
+    false
+}
+
+fn hex_digit(v: int) -> int {
+    if v >= 48 && v <= 57 { return v - 48 }
+    let l = lower_ascii(v)
+    if l >= 97 && l <= 102 { return l - 87 }
+    0 - 1
+}
+
+// The byte the path's text at `i` stands for (a `%XX` escape decoded), or
+// -1 when the text there is a control byte or a malformed escape.
+fn path_byte(p: Parser, i: int, end: int) -> int {
+    let v = p.payload[i] as int
+    if v < 32 || v == 127 { return 0 - 1 }
+    if v != 37 { return v }
+    if i + 2 >= end { return 0 - 1 }
+    let high = hex_digit(p.payload[i + 1] as int)
+    let low = hex_digit(p.payload[i + 2] as int)
+    if high < 0 || low < 0 { return 0 - 1 }
+    high * 16 + low
+}
+
+fn path_step(p: Parser, i: int) -> int {
+    if p.payload[i] as int == 37 { 3 } else { 1 }
+}
+
+// Whether the path payload[from..end] decodes to UTF-8 holding no NUL and no
+// U+FFFD (what the parser makes of bytes that are not UTF-8). One pass, no
+// storage.
+fn path_decodes(p: Parser, from: int, end: int) -> bool {
+    var need = 0
+    var low = 128
+    var high = 191
+    var replacement = 0
+    var i = from
+    while i < end {
+        let v = path_byte(p, i, end)
+        if v <= 0 { return false }
+        if need == 0 {
+            replacement = 0
+            if v == 239 { replacement = 1 }
+            low = 128
+            high = 191
+            if v < 128 {
+                need = 0
+            } else if v >= 194 && v <= 223 {
+                need = 1
+            } else if v == 224 {
+                need = 2
+                low = 160
+            } else if v == 237 {
+                need = 2
+                high = 159
+            } else if v >= 225 && v <= 239 {
+                need = 2
+            } else if v == 240 {
+                need = 3
+                low = 144
+            } else if v >= 241 && v <= 243 {
+                need = 3
+            } else if v == 244 {
+                need = 3
+                high = 143
+            } else {
+                return false
+            }
+        } else {
+            if v < low || v > high { return false }
+            if replacement == 1 && v == 191 {
+                replacement = 2
+            } else if replacement == 2 && v == 189 {
+                return false
+            } else {
+                replacement = 0
+            }
+            need -= 1
+            low = 128
+            high = 191
+        }
+        i += path_step(p, i)
+    }
+    need == 0
+}
+
+/// Read the OSC 7 report in the parser's payload from `start` (past `7;`).
+/// `file://HOST/PATH` with HOST naming this machine and PATH decoding to
+/// UTF-8 is stored decoded, `%XX` in either case of hex giving a byte and
+/// every other byte (`?` and `#` too) itself; an empty report clears the
+/// path; anything else (another host or scheme, no path, a control byte, a
+/// malformed escape, NUL, text that is not UTF-8 or holds U+FFFD) leaves
+/// the stored path as it was. Two passes over at most 4096 bytes, no
+/// allocation.
+fn take_osc7(mut pane: Vt, start: int) {
+    let end = pane.parser.payload_len
+    if start == end {
+        pane.cwd_length = 0
+        return
+    }
+    if end - start < 7 || !payload_is(pane.parser, start, start + 7, "file://") { return }
+    var slash = start + 7
+    while slash < end && pane.parser.payload[slash] as int != 47 { slash += 1 }
+    if slash == end || !local_host_named(pane, start + 7, slash) { return }
+    if !path_decodes(pane.parser, slash, end) { return }
+    var n = 0
+    var i = slash
+    while i < end {
+        let v = path_byte(pane.parser, i, end)
+        let step = path_step(pane.parser, i)
+        pane.cwd_storage[n] = v as byte
+        n += 1
+        i += step
+    }
+    pane.cwd_length = n
 }
