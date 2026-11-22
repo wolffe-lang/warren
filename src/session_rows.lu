@@ -665,13 +665,15 @@ fn traced_quoted_session(mut r: Rig, trace: str) -> str {
     if why.len > 0 { return why }
     var a = attach(r, 80, 24, "a", 1) else |e| { return "dial-{e}" }
     if !client.until_kind(mut a, 131, 5000) { return "no first image" }
+    // The tabs are made with no client attached, so the projection they are
+    // made under is the one a later command sees.
+    client.hang_up(mut a)
     var n = 1
     while n < 32 {
         let t = ask(r, "new-tab -t a", "")
         if t.status != 0 { return "new-tab {n + 1}: {t.status} '{t.err.trim()}'" }
         n += 1
     }
-    client.hang_up(mut a)
     ""
 }
 
