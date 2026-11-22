@@ -1,6 +1,6 @@
 # The command line: verbs, targets, ids, exit statuses
 
-`warren VERB [-t TARGET] [ARGUMENT...]` sends one command to the server over
+`warren VERB [-t TARGET] [-c DIR] [ARGUMENT...] [-- CMD [ARG...]]` sends one command to the server over
 the same socket clients attach through, prints the server's answer (standard
 output and standard error), and exits with the answer's status.
 
@@ -21,17 +21,50 @@ The server's own verbs take no target:
 |---|---|
 | `kill-server` | stops the server; every attached client is told |
 | `list-sessions`, `ls` | one line a session: `NAME: COLSxROWS (N attached)` |
-| `new-session [NAME]` | makes a session (named by the lowest free number when no name is given) and prints its name |
+| `new-session [-c DIR] [NAME]` | makes a session (named by the lowest free number when no name is given) and prints its name; its first pane's program starts in DIR |
 | `list --json` | the server's sessions, tabs and panes as one JSON object (below) |
 
 Every verb of the command line (`:` in a client) is also a verb here, read by
 the same parser, so a verb and its `:` line always mean the same action:
 `split-right`, `split-down`, `focus-next`, `zoom`, `equalize`, `close-pane`,
 `new-tab`, `close-tab`, `next-tab`, `previous-tab`, `focus DIRECTION`,
-`resize DIRECTION [N]`, `select-tab N`, `rename-tab NAME`, and `detach` and
-`lock`, which act on an attached client and are refused when sent as a
-command. A command line verb takes `-t TARGET` anywhere after the verb, at
-most once.
+`resize DIRECTION [N]`, `select-tab N`, `rename-tab NAME`, `kill-session`,
+`rename-session NAME`, `detach` and `lock`. A command line verb takes
+`-t TARGET` anywhere after the verb, at most once.
+
+- `kill-session` ends the target's session: every pane's program hangs up and
+  every client attached to it is told the session ended. Ending the last
+  session ends the server, as the last pane's end does.
+- `rename-session NAME` renames the target's session; a name the server does
+  not allow (empty, holding `/` or a control byte) or one another session
+  holds is refused, status 1.
+- `detach` sent from a shell detaches every client attached to the target's
+  session; the session lives on. At the `:` line it detaches only the client
+  that typed it.
+- `lock` acts on the client that typed it, so sent from a shell it is refused:
+  `warren: lock: acts on an attached client`.
+
+## Making panes: `-c DIR` and `-- CMD`
+
+`split-right`, `split-down` and `new-tab` take `-c DIR`, the directory the new
+pane's program starts in (else the session's start directory), and
+`-- CMD [ARG...]`, the program it runs (else the configured shell); every word
+after `--` is the program's, `-t` and `-c` among them. `new-session` takes
+`-c DIR` alone. A relative DIR is read from the directory `warren` was run in.
+Each of these verbs prints the id of the pane it made (`p7`) and a newline;
+`new-session` prints its name.
+
+CMD runs as the words given, with no shell in between: `warren split-right --
+vim 'my notes.txt'` gives vim one argument, and `$HOME` in a word stays
+`$HOME`. A shell is asked for by name: `warren split-right -- sh -c 'make;
+read x'`.
+
+A DIR that is not a directory (`no such directory: DIR`) and a program found
+neither at its path nor on the session's `PATH` (`the program did not start:
+...`) are refused, status 1, before anything is made: the panes, the focus and
+the tabs stay as they were. A program that starts and exits at once ends its
+pane as a shell that exits does. `-c` and `--` belong to a shell's words: the
+`:` line, which has no shell quoting, does not take them.
 
 A command line verb acts on its target's pane as a key would on the focused
 pane, and then leaves the session's focus and its active tab where they were,
@@ -39,6 +72,10 @@ except for the verbs whose purpose is to move them: `focus`, `focus-next`,
 `zoom`, `select-tab`, `next-tab` and `previous-tab`. So `warren split-right
 -t work` splits `work`'s focused pane and keeps that pane focused, where tmux
 would focus the new one.
+
+Other differences from tmux, on purpose: a creating verb always prints the id
+it made (tmux prints it only with `-P`), and `-- CMD` runs the words given as
+the program's arguments where tmux runs a command through `sh -c`.
 
 ## Targets
 
