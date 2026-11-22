@@ -51,6 +51,9 @@ pub struct Conn {
     image_start: int,
     image_end: int,
     image_seq: int,
+    title_start: int,
+    title_end: int,
+    title_dirty: bool,
     ack: proto.AckState,
     force_full: bool,
     ending: bool,
@@ -132,6 +135,7 @@ pub fn new_conn() -> Conn {
         id: 0, deadline: 0,
         rx: List[byte](), rx_off: 0, rx_len: 0, paste: List[byte](), paste_len: 0, paste_active: false,
         tx: List[byte](), tx_off: 0, tx_len: 0, image_start: 0, image_end: 0 - 1, image_seq: 0,
+        title_start: 0, title_end: 0 - 1, title_dirty: false,
         ack: proto.ack_state(), force_full: true, ending: false, ending_gen: 0, stale: false, stale_since: 0, last_frame: 0,
         shadow: no_shadow(), cols: 0, rows: 0, depth: 0, features: 0, write_on: false, read_on: false,
         mode: 0, back: 0, prompt: List[byte](), confirm: 0, help_top: 0, mouse_consumed: 0, tabs: tab_hits(),
@@ -167,6 +171,9 @@ pub fn reset_conn(mut c: Conn, fd: int, id: int, now: int) {
     c.image_start = 0
     c.image_end = 0 - 1
     c.image_seq = 0
+    c.title_start = 0
+    c.title_end = 0 - 1
+    c.title_dirty = false
     c.ack.last_sent = 0
     c.ack.last_ack = 0
     c.ack.pending = 0
@@ -334,6 +341,16 @@ pub fn send(mut c: Conn, kind: int, payload: List[byte]) -> bool {
     let r = proto.encode(kind, 0, payload)
     if r.code != 0 { return false }
     enqueue(mut c, r.bytes, false)
+}
+
+/// Queue a TITLE's wire bytes. False when the event queue is full.
+pub fn queue_title(mut c: Conn, wire: List[byte]) -> bool {
+    enqueue(mut c, wire, false)
+}
+
+/// Whether a newer title waits to be queued.
+pub fn title_owed(c: Conn) -> bool {
+    false
 }
 
 /// The bytes of the next write: at most WRITE_BUDGET from the queue.
