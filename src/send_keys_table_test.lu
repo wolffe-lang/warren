@@ -1,0 +1,59 @@
+//! member: false
+//! Every row of tests/session/send-keys.table, read by `warren send-keys`'s
+//! own parser and sent through the server's typed-key path (`key_bytes`) in
+//! the row's mode, gives the table's warren column. Native only: the server
+//! module is not one the reference interpreter loads.
+use std.fs
+use std.json
+use cmd
+use server
+use vt
+
+fn hex(b: List[byte]) -> str {
+    let digits = "0123456789abcdef"
+    var out = List[byte]()
+    for x in b {
+        let v = x as int
+        (mut out).push(digits.bytes()[v / 16])
+        (mut out).push(digits.bytes()[v % 16])
+    }
+    str_from_utf8(out) else ""
+}
+
+// The bytes warren's send-keys gives for `args` in `mode`, or a reason.
+fn warren_bytes(args: List[str], mode: str) -> str {
+    var argv = List[str]()
+    (mut argv).push("send-keys")
+    (mut argv).push("-t")
+    (mut argv).push("p1")
+    for a in args { (mut argv).push(a) }
+    let v = cmd.parse_verb(argv)
+    if !v.ok { return "refused: {v.why}" }
+    var pane = vt.new(80, 24, 0)
+    if mode == "cursor" || mode == "keypad" { pane.mode_values[2] = 1 }
+    if mode == "keypad" { pane.mode_values[7] = 1 }
+    var out = List[byte]()
+    for e in cmd.events_of(v.keys, v.literal) {
+        for b in server.key_bytes(pane, e.mods, e.kind, e.code) { (mut out).push(b) }
+    }
+    hex(out)
+}
+
+fn test_send_keys_table() {
+    let text = fs.read_text("tests/session/send-keys.table") else ""
+    assert(text.len > 0, "send-keys-table-read")
+    var rows = 0
+    for line in text.lines() {
+        if line.len == 0 || line.starts_with("#") { continue }
+        let f = line.split("\t")
+        assert(f.len == 5, "send-keys-table-columns")
+        let parsed = json.parse(f[1]) else { assert(false, "send-keys-table-args-json"); continue }
+        var args = List[str]()
+        for a in json.as_arr(parsed) else List[json.Value]() { (mut args).push(json.as_str(a) else "") }
+        let got = warren_bytes(args, f[0])
+        if got != f[3] { print("FAIL send-keys-table {f[0]} {f[1]}: warren {got}, the table's warren column {f[3]}") }
+        assert(got == f[3], "send-keys-table-warren-column")
+        rows += 1
+    }
+    assert(rows == 391, "send-keys-table-rows")
+}
