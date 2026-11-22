@@ -11,6 +11,7 @@
 #               must turn red by name (ids-never-reused for a plant that hands
 #               out a freed session id, split-prints-new-id for one that prints
 #               the old pane's id): it prints FAIL ROW and ends 1
+#   client-plant ROW  inside the image, the same with the client rows
 #   toolchain   inside the image, tests/vt/rig/verbs-inner.sh toolchain: the
 #               staged pin found and run as the plant step finds it
 set -euo pipefail
@@ -47,6 +48,11 @@ case "${1:-}" in
  plant)
   rc=0
   inside bash tests/vt/rig/verbs-inner.sh plant "${2:?}" || rc=$?
+  exit "$rc"
+  ;;
+ client-plant)
+  rc=0
+  inside bash tests/vt/rig/verbs-inner.sh client-plant "${2:?}" || rc=$?
   exit "$rc"
   ;;
  toolchain)

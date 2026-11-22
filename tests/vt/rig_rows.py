@@ -43,7 +43,8 @@ def main():
         (RIG, 'verbs.manifest', ['gate-linux']),
         (RIG, 'verbs-plant.manifest', ['ids-never-reused']),
         (RIG, 'verbs-create-plant.manifest', ['split-prints-new-id']),
-        (RIG, 'title-plant.manifest', ['title-flood-survives'])):
+        (RIG, 'title-plant.manifest', ['title-flood-survives']),
+        (RIG, 'console-plant.manifest', ['console-term-linux'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
@@ -65,7 +66,8 @@ def main():
     inner = inner_path.read_text()
     assert inner.index('root=$PWD') < inner.index('. tools/toolchain-env.sh'), 'verbs-plant-toolchain: root'
     assert 'exec ../native/session-rows ../native/warren "$row"' in inner
-    for mode in ('plant', 'toolchain'):
+    assert 'exec ../native/client-rows ../native/warren "$row"' in inner
+    for mode in ('plant', 'client-plant', 'toolchain'):
         assert f'inside bash tests/vt/rig/verbs-inner.sh {mode}' in verbs, ('verbs-plant-toolchain', mode)
     plant = (RIG / 'w1-plant-step.sh').read_text()
     assert 'FAIL vt-scalar-value ' in plant and 'exit "$rc"' in plant
