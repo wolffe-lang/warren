@@ -313,6 +313,9 @@ pub fn enqueue(mut c: Conn, wire: List[byte], frame: bool) -> bool {
         c.tx_len = 0
         c.image_start = 0
         c.image_end = if c.image_end >= 0 then 0 else 0 - 1
+        // Everything was written: no TITLE waits.
+        c.title_start = 0
+        c.title_end = 0 - 1
     } else if c.tx_off > 0 && c.tx_len + wire.len > c.tx.len {
         var j = 0
         while c.tx_off + j < c.tx_len {
@@ -322,6 +325,14 @@ pub fn enqueue(mut c: Conn, wire: List[byte], frame: bool) -> bool {
         if c.image_end >= 0 {
             c.image_end = c.image_end - c.tx_off
             c.image_start = c.image_start - c.tx_off
+        }
+        if c.title_end >= 0 {
+            if c.title_end <= c.tx_off {
+                c.title_end = 0 - 1
+            } else {
+                c.title_end = c.title_end - c.tx_off
+                c.title_start = c.title_start - c.tx_off
+            }
         }
         c.tx_len = c.tx_len - c.tx_off
         c.tx_off = 0
@@ -371,9 +382,11 @@ pub fn next_write(c: Conn) -> List[byte] {
     c.tx[c.tx_off..end]
 }
 
-/// Advance the queue by what a write took.
+/// Advance the queue by what a write took; a TITLE wholly written no
+/// longer waits.
 pub fn wrote(mut c: Conn, n: int) {
     c.tx_off = c.tx_off + n
+    if c.title_end >= 0 && c.tx_off >= c.title_end { c.title_end = 0 - 1 }
 }
 
 /// A WELCOME payload.
