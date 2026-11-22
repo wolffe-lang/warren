@@ -64,15 +64,15 @@ Most of a pane's resident size is the emulator's history ring, which is made
 whole, zero-filled, when the pane is made (warren#67). As measured on Linux
 (glibc 2.39), making it takes four cap-sized allocations in turn, each written
 in full before the one before it is freed; the last is the copy out of the
-short-lived region that becomes the ring.
-At most three are live at once, so a pane's creation peaks at three times its
-cap. glibc's malloc gives the first of the freed buffers back to the system,
-which raises its threshold for mapping large buffers, so the later ones come
-from its heap, and the one freed there stays resident: a made pane keeps two
-times its cap, the ring and that freed buffer, and with glibc's threshold
-pinned (`MALLOC_MMAP_THRESHOLD_`) it keeps one. A first resize costs nothing
-measurable over a made pane (warren#7's resize half). The first pane made in a
-process also pays 1.3 to 1.6 MB once, the emulator's code and first
+short-lived region that becomes the ring (wolf-lang#1176). At most three are
+live at once, so a pane's creation peaks at three times its cap. glibc's
+malloc gives the first of the freed buffers back to the system, which raises
+its threshold for mapping large buffers, so the later ones come from its heap,
+and the one freed there stays resident: a made pane keeps two times its cap,
+the ring and that freed buffer, and with glibc's threshold pinned
+(`MALLOC_MMAP_THRESHOLD_`) it keeps one (wolf-lang#1175). A first resize costs
+nothing measurable over a made pane (warren#7's resize half). The first pane
+made in a process also pays 1.3 to 1.6 MB once, the emulator's code and first
 allocations. So the first pane at the 2 MiB cap peaks at 7.5 to 7.9 MB, and
 the projection, six times the cap and the screens and 1 MiB (13.2 MiB at
 80x24), is deliberately above that by 1.76 times; the `ring-resident-rows`
