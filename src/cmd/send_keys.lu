@@ -13,19 +13,133 @@ pub struct KeyEvent { mods: int, kind: int, code: int }
 /// A word read as one key: `ok` false when the word is text.
 pub struct KeyRead { ok: bool, event: KeyEvent }
 
-/// One word as a key, or not (then it is text). Stub: every word is text.
+// A named key's code (PROTOCOL.md's numbering), by its lower-case name; 0
+// for none. `btab` is Tab with shift.
+fn named_code(name: str) -> int {
+    let names = ["up", "down", "right", "left", "home", "end", "ppage", "npage", "ic", "dc", "bspace", "tab", "enter",
+        "escape"]
+    var i = 0
+    while i < names.len {
+        if names[i] == name { return i + 1 }
+        i += 1
+    }
+    if name == "pageup" || name == "pgup" { return 7 }
+    if name == "pagedown" || name == "pgdn" { return 8 }
+    if name == "insert" { return 9 }
+    if name == "delete" { return 10 }
+    if name == "btab" { return 12 }
+    if name == "kpenter" { return 54 }
+    if name == "kp." { return 49 }
+    if name == "kp/" { return 50 }
+    if name == "kp*" { return 51 }
+    if name == "kp-" { return 52 }
+    if name == "kp+" { return 53 }
+    if name.len == 3 && name.starts_with("kp") {
+        let d = (name.bytes()[2] as int) - 48
+        if d >= 0 && d <= 9 { return 39 + d }
+    }
+    if name.starts_with("f") && name.len >= 2 && name.len <= 3 {
+        var n = 0
+        for b in name[1..name.len].bytes() {
+            let d = (b as int) - 48
+            if d < 0 || d > 9 { return 0 }
+            n = n * 10 + d
+        }
+        if n >= 1 && n <= 12 && !name.starts_with("f0") { return 14 + n }
+    }
+    0
+}
+
+// The named keys whose sequences carry a modifier, so `S-` may come before
+// them: the cursor keys, Home, End, the page keys, Insert, Delete, F1 to F12.
+fn shiftable(code: int) -> bool {
+    (code >= 1 && code <= 10) || (code >= 15 && code <= 26)
+}
+
+// The lower-case form of ASCII letters in `text`.
+fn lower(text: str) -> str {
+    var out = List[byte]()
+    for b in text.bytes() {
+        let v = b as int
+        if v >= 65 && v <= 90 { (mut out).push((v + 32) as byte) } else { (mut out).push(b) }
+    }
+    str_from_utf8(out) else text
+}
+
+// Whether `text` starts with the modifier letter `letter` (lower case, as
+// a byte) in either case, then `-`.
+fn modifier(text: str, letter: int) -> bool {
+    let b = text.bytes()
+    let first = b[0] as int
+    (first == letter || first == letter - 32) && (b[1] as int) == 45
+}
+
+// The scalar of a one-scalar string, or -1.
+fn only_scalar(text: str) -> int {
+    var n = 0
+    var cp = 0 - 1
+    for c in text.code_points() {
+        cp = c
+        n += 1
+    }
+    if n == 1 { return cp }
+    0 - 1
+}
+
+/// One word as a key, or not (then it is text): modifiers first (`C-` or
+/// `^` ctrl, `M-` alt, `S-` shift; `C-` and `M-` in either case), then a
+/// key name in any case or one character. `S-` holds only before a key
+/// whose sequence carries it; anywhere else the word is text, as tmux 3.4
+/// reads it.
 pub fn key_of(word: str) -> KeyRead {
-    KeyRead { ok: word.len < 0, event: KeyEvent { mods: 0, kind: 0, code: 0 } }
+    let none = KeyRead { ok: false, event: KeyEvent { mods: 0, kind: 0, code: 0 } }
+    var mods = 0
+    var rest = word
+    var reading = true
+    while reading {
+        if rest.len > 2 && modifier(rest, 99) {
+            mods = mods | 4
+            rest = rest[2..rest.len]
+        } else if rest.len > 1 && rest.starts_with("^") {
+            mods = mods | 4
+            rest = rest[1..rest.len]
+        } else if rest.len > 2 && modifier(rest, 109) {
+            mods = mods | 2
+            rest = rest[2..rest.len]
+        } else if rest.len > 2 && modifier(rest, 115) {
+            mods = mods | 1
+            rest = rest[2..rest.len]
+        } else {
+            reading = false
+        }
+    }
+    let name = lower(rest)
+    if name == "space" {
+        if mods & 1 != 0 { return none }
+        return KeyRead { ok: true, event: KeyEvent { mods: mods, kind: 0, code: 32 } }
+    }
+    let code = named_code(name)
+    if code > 0 {
+        var m = mods
+        if name == "btab" { m = m | 1 } else if mods & 1 != 0 && !shiftable(code) { return none }
+        return KeyRead { ok: true, event: KeyEvent { mods: m, kind: 1, code: code } }
+    }
+    let cp = only_scalar(rest)
+    if cp >= 0 && mods & 1 == 0 { return KeyRead { ok: true, event: KeyEvent { mods: mods, kind: 0, code: cp } } }
+    none
 }
 
 /// The key events of a send-keys's words, in order: each word a key when it
-/// reads as one (never when `literal`), else each of its scalars. Stub: every
-/// word is text.
+/// reads as one (never when `literal`), else each of its scalars.
 pub fn events_of(words: List[str], literal: bool) -> List[KeyEvent] {
     var out = List[KeyEvent]()
     for w in words {
-        for cp in w.code_points() {
-            (mut out).push(KeyEvent { mods: if literal then 0 else 0, kind: 0, code: cp })
+        var k = KeyRead { ok: false, event: KeyEvent { mods: 0, kind: 0, code: 0 } }
+        if !literal { k = key_of(w) }
+        if k.ok {
+            (mut out).push(k.event)
+        } else {
+            for cp in w.code_points() { (mut out).push(KeyEvent { mods: 0, kind: 0, code: cp }) }
         }
     }
     out
