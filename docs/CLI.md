@@ -24,6 +24,10 @@ The server's own verbs take no target:
 | `new-session [-c DIR] [NAME]` | makes a session (named by the lowest free number when no name is given) and prints its name; its first pane's program starts in DIR |
 | `list --json` | the server's sessions, tabs and panes as one JSON object (below) |
 
+Two verbs act on a pane but are not command line verbs (they print, or type
+for a program): `send-keys` and `capture-pane`, each below. They take
+`-t TARGET` among their own options.
+
 Every verb of the command line (`:` in a client) is also a verb here, read by
 the same parser, so a verb and its `:` line always mean the same action:
 `split-right`, `split-down`, `focus-next`, `zoom`, `equalize`, `close-pane`,
@@ -81,6 +85,61 @@ the program's arguments where tmux runs a command through `sh -c`.
 version on one line and exits 0, before any verb is looked up and without a
 server. The version is the one `src/wolf.pkg` names; with any other argument
 `--version` is a usage error, status 2.
+
+## `send-keys [-t TARGET] [-l] [--] KEY...`
+
+Types into the target pane's program, past the key table: no prefix, no
+binding, whatever mode a client is in. Options come only before the first
+key, and `--` ends them, so `warren send-keys -t p2 ls -l Enter` types `ls`,
+`-l` and Enter.
+
+- A word is a key when it is one of tmux's names, in any case: `Up`, `Down`,
+  `Left`, `Right`, `Home`, `End`, `PPage`/`PageUp`/`PgUp`,
+  `NPage`/`PageDown`/`PgDn`, `IC`/`Insert`, `DC`/`Delete`, `BSpace`, `Tab`,
+  `BTab`, `Enter`, `Escape`, `Space`, `F1` to `F12`, `KP0` to `KP9`, `KP.`,
+  `KP/`, `KP*`, `KP-`, `KP+`, `KPEnter`; or one character. Modifiers come
+  first: `C-` or `^` (Ctrl), `M-` (Alt), `S-` (Shift, only before the keys
+  whose sequences carry it: the cursor keys, Home, End, the page keys,
+  Insert, Delete, F1 to F12). Any other word (`Esc`, `F13`, `S-a`, `ls -l`) is
+  text, typed a character at a time; `-l` makes every word text.
+- Each key is sent as the key would type it in the pane's mode (application
+  cursor keys and keypad included), by the path a client's keys take. tmux
+  3.4 was measured key by key (`tests/session/send-keys.table`): every
+  name agrees but for three, named there and here. Home and End go as xterm
+  types them (`ESC [ H`, `ESC [ F`; `ESC O H`, `ESC O F` in application
+  cursor mode), where tmux sends `ESC [ 1 ~`, `ESC [ 4 ~`. Keypad Enter
+  outside keypad mode is CR, where tmux sends LF. Ctrl with a key that has no
+  control byte (C-1, C-3 to C-8, C-0, C-BSpace, C-Enter, C-Escape) is the key
+  as typed (the digit, BS, CR, ESC), where tmux sends nothing.
+- A send is all or nothing: its bytes fit the pane's 64 KiB input queue, or
+  it is refused (status 1) and none are sent. No key at all is a usage error
+  (status 2), where tmux succeeds and sends nothing. tmux's `-H`, `-K`, `-M`,
+  `-N`, `-R`, `-X`, `-F` and `-c` are refused by name.
+
+## `capture-pane [-t TARGET] [-p] [-e] [-J] [-S LINE] [-E LINE]`
+
+The target pane's rows as text, one line a row with a newline after each.
+With `-p` it is printed; without, it goes to the session's register, as
+tmux's goes to a paste buffer, and the paste key (prefix `]`) types it.
+
+- Lines: 0 is the first visible row, -1 history's newest row. `-S` defaults
+  to 0 and `-S -` is history's first row; `-E` defaults to, and `-E -` is,
+  the last visible row. `+N` is N. A line outside clamps to the nearest, and
+  an end before the start is swapped, as tmux does. A value that is not a
+  line is a usage error (status 2), where tmux takes it as the default. On the
+  alternate screen there is no history, where tmux's negative lines still
+  reach the main screen's.
+- A row's trailing blanks are dropped. With `-e`, a space written in a
+  rendition other than the default stays, and each change of rendition is
+  written as the whole pen from a reset (`ESC [ 0;… m`), with a reset at a
+  line's end; tmux writes each change as it comes, so the bytes differ while
+  the cells are the same. With `-J`, rows are joined at a soft wrap and a
+  row's written trailing spaces stay; a column a wide character could not use
+  does not.
+- Flags may be clustered (`-pJ`). A printed capture past the protocol's
+  8 MiB, or a kept one past the register's 65,524 bytes, is refused by name
+  (status 1). tmux's `-a`, `-A`, `-b`, `-C`, `-N`, `-P`, `-q` and `-T` are
+  refused by name.
 
 ## Targets
 
