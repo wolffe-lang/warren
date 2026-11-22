@@ -45,8 +45,9 @@ pub struct Server {
     next_session: int,
     next_tab: int,
     // What the last action would have told a client, when it was run for
-    // a command and there was no client to tell.
-    told: str,
+    // a command and there was no client to tell (bytes the server keeps:
+    // a turn's region may not leave a str in it).
+    told: List[byte],
     stopping: bool,
     stop_deadline: int,
     started: int,
@@ -905,7 +906,7 @@ fn bar_cells(s: Server, si: int, index: int, now: int, tab_cells: List[vt.Cell])
 /// Show a message on one client's hint line for MESSAGE_MS.
 fn tell(mut s: Server, index: int, text: str) {
     if index < 0 {
-        s.told = text
+        keep_told(mut s, text)
         return
     }
     (mut s.conns[index].message).reset()
@@ -1929,6 +1930,12 @@ fn session_with_id(s: Server, id: int) -> int {
     0 - 1
 }
 
+// What an action run for a command would have told its client.
+fn keep_told(mut s: Server, text: str) {
+    (mut s.told).reset()
+    for b in text.bytes() { (mut s.told).push(b) }
+}
+
 // The focused pane's id of tab `tab` in session `si`, or -1.
 fn tab_focus(s: Server, si: int, tab: int) -> int {
     for t in s.sessions[si].layout.tabs {
@@ -1950,19 +1957,19 @@ fn moves_focus(action: int) -> bool {
 /// moving them is the action's point. DONE, with `s.told` set when the
 /// action was refused, or LATER when a pane's slot is made between turns.
 fn command_action(mut s: Server, si: int, tab: int, pane: int, c: config.Command) -> int {
-    s.told = ""
+    (mut s.told).reset()
     let before_tab = s.sessions[si].layout.active
     let before_focus = tab_focus(s, si, tab)
     let from = focused_slot(s, si)
     var gone = false
     layout.focus_pane(mut s.sessions[si].layout, pane) else |_| { gone = true }
     if gone {
-        s.told = "no-such-pane"
+        keep_told(mut s, "no-such-pane")
         return DONE
     }
     var result = DONE
     if c.action == config.A_RENAME_TAB {
-        layout.rename_tab(mut s.sessions[si].layout, tab, c.text) else |_| { s.told = "no-such-tab" }
+        layout.rename_tab(mut s.sessions[si].layout, tab, c.text) else |_| { keep_told(mut s, "no-such-tab") }
         s.sessions[si].bar_gen = s.sessions[si].bar_gen + 1
     } else {
         var n = 0
@@ -2074,7 +2081,7 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
                     return
                 }
                 if s.told.len > 0 {
-                    err = "warren: {verb}: {s.told}\n"
+                    err = "warren: {verb}: {str_from_utf8(s.told[0..s.told.len]) else ""}\n"
                 } else {
                     status = 0
                     err = ""
@@ -3079,7 +3086,7 @@ pub fn serve() -> int {
     var s = Server {
         place: place, w: waiter, listen_key: 0 - 1, listening: false,
         conns: conns, sessions: List[Session](), panes: List[Pane](), orphans: List[int](), key_kind: List[int](),
-        key_owner: List[int](), key_gen: List[int](), next_id: 0, next_pane: 1, next_session: 1, next_tab: 1, told: "", stopping: false, stop_deadline: 0,
+        key_owner: List[int](), key_gen: List[int](), next_id: 0, next_pane: 1, next_session: 1, next_tab: 1, told: List[byte](), stopping: false, stop_deadline: 0,
         started: now_ns(), idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
         version: vt.package_version(), again: false, need_slot: false, need_pane: false, need_view: false, settings: load_settings(), want_cols: 0,
         want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, frames: 0, prompt_frames: 0,
