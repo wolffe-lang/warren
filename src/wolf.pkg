@@ -3,7 +3,7 @@
 // pseudo-terminals and their programs and waits on signals (exec).
 pkg {
     name: "warren",
-    version: "0.0.0",
+    version: "0.1.0",
     edition: "1",
     capabilities: [fs, env, net, exec],
 }
