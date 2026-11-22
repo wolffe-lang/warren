@@ -44,7 +44,8 @@ def main():
         (RIG, 'verbs-plant.manifest', ['ids-never-reused']),
         (RIG, 'verbs-create-plant.manifest', ['split-prints-new-id']),
         (RIG, 'title-plant.manifest', ['title-flood-survives']),
-        (RIG, 'console-plant.manifest', ['console-term-linux'])):
+        (RIG, 'console-plant.manifest', ['console-term-linux']),
+        (RIG, 'reply-plant.manifest', ['list-json-over-queue'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
