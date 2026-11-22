@@ -881,6 +881,74 @@ fn row_session_names(warren: str) -> str {
 }
 
 // A verb this server does not know is refused by name with the usage
+// How many whole physical frames `got` holds, from its first byte.
+fn frames_in(got: List[byte]) -> int {
+    var at = 0
+    var n = 0
+    while at + 6 <= got.len {
+        let len = (got[at] as int) + (got[at + 1] as int) * 256 + (got[at + 2] as int) * 65536 + (got[at + 3] as int) * 16777216
+        if at + 6 + len > got.len { break }
+        n += 1
+        at = at + 6 + len
+    }
+    n
+}
+
+// The command client keeps a REPLY's fragment chain across its one-second
+// waits: a fake server sends the REPLY's first fragment, waits 1.5 s, then
+// sends the last, and `warren ls` prints the whole output (warren#78).
+fn row_reply_slower_than_a_second(warren: str) -> str {
+    let dir = row_dir("reply-slow")
+    fs.remove_dir_all(dir) else |_| {}
+    fs.create_dir_mode(dir, 448) else { return "dir" }
+    var l = unix.listen(dir + "/default") else |e| { return "listen: {e}" }
+    let out_path = dir + "-out.txt"
+    let err_path = dir + "-err.txt"
+    let fo = fs.create(out_path) else |e| { return "out-file-{e}" }
+    let fe = fs.create(err_path) else |e| { return "err-file-{e}" }
+    let was = env.get("WARREN_RUNTIME_DIR") else ""
+    env.set("WARREN_RUNTIME_DIR", dir) else { return "env" }
+    var c = process.command(warren)
+    process.push_arg(mut c, "ls")
+    process.set_stdout(mut c, fo)
+    process.set_stderr(mut c, fe)
+    var failed = ""
+    let ch = process.start(c) else |e| {
+        failed = "start-{e}"
+        process.Child { slot: 0 - 1 }
+    }
+    if was.len > 0 { env.set("WARREN_RUNTIME_DIR", was) else |_| {} } else { env.unset("WARREN_RUNTIME_DIR") else |_| {} }
+    if failed.len > 0 { return failed }
+    var s = net.accept(mut l) else |e| { return "accept: {e}" }
+    // Its HELLO and its COMMAND, both whole.
+    var got = List[byte]()
+    let until = time.monotonic_ns() / 1000000 + 5000
+    while frames_in(got) < 2 && time.monotonic_ns() / 1000000 < until {
+        let part = net.read_bytes(mut s, 65536) else |_| { break }
+        if part.len == 0 { break }
+        for x in part { (mut got).push(x) }
+    }
+    // The REPLY: id 1 (the command client's), status 0, the output, no error.
+    var payload = List[byte]()
+    proto.put(mut payload, 1, 4)
+    proto.put(mut payload, 0, 1)
+    proto.put_bytes(mut payload, "first-half second-half\n".bytes())
+    proto.put_bytes(mut payload, List[byte]())
+    let one = proto.encode_part(136, 1, payload[0..12])
+    let two = proto.encode_part(136, 0, payload[12..payload.len])
+    net.write_bytes(mut s, one.bytes) else |_| {}
+    time.sleep(time.millis(1500))
+    net.write_bytes(mut s, two.bytes) else |_| {}
+    let st = process.wait_status(take ch) else 0 - 1
+    net.close(take s) else |_| {}
+    net.close_listener(take l) else |_| {}
+    let out = fs.read_text(out_path) else ""
+    let err = fs.read_text(err_path) else ""
+    if frames_in(got) < 2 { return "the client's HELLO and COMMAND did not both arrive" }
+    if st != 0 || out != "first-half second-half\n" { return "warren ls ended {st}: out '{out.trim()}', err '{err.trim()}'" }
+    ""
+}
+
 // status, and the server goes on. `split-window` is tmux's spelling, which
 // warren does not take: its verbs are the command line's own, so the refusal
 // is the command line's own (`unknown command: NAME`), not a promise that a
@@ -1568,6 +1636,7 @@ fn run_row(warren: str, name: str) -> str {
     if name == "second-client" { return row_second_client(warren) }
     if name == "server-outlives-client" { return row_server_outlives_client(warren) }
     if name == "unknown-verb" { return row_unknown_verb(warren) }
+    if name == "reply-slower-than-a-second" { return row_reply_slower_than_a_second(warren) }
     if name == "session-names" { return row_session_names(warren) }
     if name == "split-e2e" { return row_split_e2e(warren) }
     if name == "mouse-sgr" { return row_mouse_e2e(warren, false) }
@@ -1614,7 +1683,7 @@ fn main() -> int {
     }
     let quick_defaults = rows.len == 0
     if rows.len == 0 {
-        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names split-e2e mouse-sgr mouse-legacy clipboard-osc52 clipboard-console console-term-linux console-term-linux-variable console-term-linux-overridden console-term-other zero-window zero-window-env window-too-large")
+        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names split-e2e mouse-sgr mouse-legacy clipboard-osc52 clipboard-console console-term-linux console-term-linux-variable console-term-linux-overridden console-term-other zero-window zero-window-env window-too-large reply-slower-than-a-second")
         // The memory row reads the client's resident set from /proc.
         if fs.exists("/proc/self/status") {
             (mut rows).push("memory-bounded")
