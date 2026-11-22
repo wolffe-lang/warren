@@ -25,10 +25,146 @@ pub struct Snapshot { sessions: List[SessionView] }
 /// `ambiguous`).
 pub struct Resolved { ok: bool, session: int, tab: int, pane: int, why: str }
 
+fn refusal(why: str) -> Resolved {
+    Resolved { ok: false, session: 0, tab: 0, pane: 0, why: why }
+}
+
+fn led(session: int, tab: int, pane: int) -> Resolved {
+    Resolved { ok: true, session: session, tab: tab, pane: pane, why: "" }
+}
+
+// The byte offset of the last `b` in `text`, or -1.
+fn last_at(text: str, b: int) -> int {
+    var i = text.len - 1
+    while i >= 0 {
+        if (text.bytes()[i] as int) == b { return i }
+        i -= 1
+    }
+    0 - 1
+}
+
+// A number written in decimal digits alone, or -1.
+fn digits_of(text: str) -> int {
+    if text.len == 0 || text.len > 12 { return 0 - 1 }
+    var n: int = 0
+    for b in text.bytes() {
+        let d = (b as int) - 48
+        if d < 0 || d > 9 { return 0 - 1 }
+        n = n * 10 + d
+    }
+    n
+}
+
+// A session's active tab's focused pane.
+fn session_focus(s: SessionView) -> Resolved {
+    for t in s.tabs {
+        if t.id == s.active { return led(s.id, t.id, t.focus) }
+    }
+    refusal("no-such-tab")
+}
+
+// The session with id `id`, or -1.
+fn session_with_id(snap: Snapshot, id: int) -> int {
+    var i = 0
+    while i < snap.sessions.len {
+        if snap.sessions[i].id == id { return i }
+        i += 1
+    }
+    0 - 1
+}
+
+// The session named `name`, or -1.
+fn session_named(snap: Snapshot, name: str) -> int {
+    var i = 0
+    while i < snap.sessions.len {
+        if snap.sessions[i].name == name { return i }
+        i += 1
+    }
+    0 - 1
+}
+
+// The pane with id `id` anywhere, as its session, tab and pane.
+fn pane_with_id(snap: Snapshot, id: int) -> Resolved {
+    for s in snap.sessions {
+        for t in s.tabs {
+            for p in t.panes {
+                if p.id == id { return led(s.id, t.id, p.id) }
+            }
+        }
+    }
+    refusal("no-such-pane")
+}
+
+// The tab with id `id` anywhere, at its focused pane.
+fn tab_with_id(snap: Snapshot, id: int) -> Resolved {
+    for s in snap.sessions {
+        for t in s.tabs {
+            if t.id == id { return led(s.id, t.id, t.focus) }
+        }
+    }
+    refusal("no-such-tab")
+}
+
+// `TAB[.PANE]` inside session `s`: the tab by 1-based index (digits alone)
+// or by name; the pane by 1-based index in tree order, else the tab's focus.
+fn in_session(s: SessionView, rest: str) -> Resolved {
+    var tab_part = rest
+    var pane_part = ""
+    let dot = last_at(rest, 46)
+    if dot >= 0 {
+        let after = rest[dot + 1..]
+        if after.len == 0 { return refusal("malformed") }
+        if digits_of(after) >= 0 {
+            tab_part = rest[0..dot]
+            pane_part = after
+            if tab_part.len == 0 { return refusal("malformed") }
+        }
+    }
+    let index = digits_of(tab_part)
+    var found = 0 - 1
+    var i = 0
+    while i < s.tabs.len {
+        if (index >= 0 && i + 1 == index) || (index < 0 && s.tabs[i].name == tab_part) { found = i }
+        i += 1
+    }
+    if found < 0 { return refusal("no-such-tab") }
+    if pane_part.len == 0 { return led(s.id, s.tabs[found].id, s.tabs[found].focus) }
+    let n = digits_of(pane_part)
+    if n < 1 || n > s.tabs[found].panes.len { return refusal("no-such-pane") }
+    led(s.id, s.tabs[found].id, s.tabs[found].panes[n - 1].id)
+}
+
 /// Resolve `target` over `snap`. An empty target is the caller's own pane
 /// (`caller`, a pane id, or 0 when the verb did not come from a pane), else
-/// the only session's focused pane.
+/// the only session's focused pane. An id is read before a name; the whole
+/// text names a session before it is parted at its last `:`, and a last
+/// `.` parts a pane only when digits follow it.
 pub fn resolve(snap: Snapshot, target: str, caller: int) -> Resolved {
-    let _unused = snap.sessions.len + target.len + caller
-    Resolved { ok: false, session: 0, tab: 0, pane: 0, why: "unimplemented" }
+    if target.len == 0 {
+        if caller > 0 {
+            let own = pane_with_id(snap, caller)
+            if own.ok { return own }
+        }
+        if snap.sessions.len == 1 { return session_focus(snap.sessions[0]) }
+        if snap.sessions.len == 0 { return refusal("no-such-session") }
+        return refusal("ambiguous")
+    }
+    let id = parse_id(target)
+    if id.kind == ID_PANE { return pane_with_id(snap, id.n) }
+    if id.kind == ID_TAB { return tab_with_id(snap, id.n) }
+    if id.kind == ID_SESSION {
+        let at = session_with_id(snap, id.n)
+        if at < 0 { return refusal("no-such-session") }
+        return session_focus(snap.sessions[at])
+    }
+    let whole = session_named(snap, target)
+    if whole >= 0 { return session_focus(snap.sessions[whole]) }
+    let colon = last_at(target, 58)
+    if colon < 0 { return refusal("no-such-session") }
+    let left = target[0..colon]
+    let right = target[colon + 1..]
+    if left.len == 0 || right.len == 0 { return refusal("malformed") }
+    let si = session_named(snap, left)
+    if si < 0 { return refusal("no-such-session") }
+    in_session(snap.sessions[si], right)
 }
