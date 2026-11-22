@@ -107,10 +107,23 @@ def run(measure_child, probe, stage, cap):
     return got
 
 
+def held_increment(peaks, bases):
+    """A row's number from its takes, each take's peak with its base (the
+    same take's `none` or `new` peak): the largest take's increment."""
+    return max(p - b for p, b in zip(peaks, bases))
+
+
+def bases_of(increments, peaks):
+    """Each take's base, from its peak and increment as recorded."""
+    return [p - i for p, i in zip(peaks, increments)]
+
+
 def bound(increments, peaks, granule):
-    """The bound, its margin, and the parts the margin was the largest of."""
-    top = max(increments)
-    spread = top - min(increments)
+    """The bound and its margin: the recorded takes' number, plus the
+    largest of three times their spread, 5% of their largest peak, or a
+    granule."""
+    top = held_increment(peaks, bases_of(increments, peaks))
+    spread = max(increments) - min(increments)
     margin = max(3 * spread, max(peaks) // 20, granule)
     return top + margin, margin
 
@@ -127,20 +140,48 @@ def too_loose(stage, cap, margin):
 
 
 def self_test():
+    """The rule on fixed takes; a FAIL line names each case it breaks."""
+    fails = []
+
+    def check(name, ok, detail):
+        if not ok:
+            fails.append(name)
+            print('FAIL ring-resident-self-test %s: %s' % (name, detail))
+
     cap = 2097152
     granule = 262144
     # Close takes of a pane at about 3.7 caps: the takes pass, one more cap fails.
     inc = [7471104, 7720960, 7872512]
     peaks = [10055680, 10268672, 10347520]
     held, margin = bound(inc, peaks, granule)
-    assert max(inc) <= held < max(inc) + cap and too_loose('new', cap, margin) is None, (held, margin)
+    check('close-takes', max(inc) <= held < max(inc) + cap and too_loose('new', cap, margin) is None,
+          'bound %d margin %d' % (held, margin))
     # A spread that wide cannot hold a `new` row: the rule says so by name.
     _, margin = bound([7000000, 7800000, 8600000], peaks, granule)
-    assert too_loose('new', cap, margin) is not None, margin
+    check('too-loose', too_loose('new', cap, margin) is not None, 'margin %d passed' % margin)
     # A difference row: noise of half a megabyte passes, the ring made again (two caps) fails.
     held, margin = bound([-544768, 147456, 229376], [9723904, 10285056, 10244096], granule)
-    assert 229376 <= held < 2 * cap and too_loose('resize', cap, margin) is None, (held, margin)
-    print('PASS ring-resident-self-test')
+    check('difference-noise', 229376 <= held < 2 * cap and too_loose('resize', cap, margin) is None,
+          'bound %d margin %d' % (held, margin))
+    # macOS, hosted: one take of three peaked ten pages higher than the other
+    # two and than every recorded take (screenful at cap 0, trunk's push run
+    # 45069173446). One take's wobble is the host's: the row holds.
+    recorded = [278528, 278528, 278528]
+    limit, _ = bound(recorded, [2277376, 2277376, 2277376], 16384)
+    peaks = [2277376, 2277376, 2441216]
+    got = held_increment(peaks, [1998848, 1998848, 1998848])
+    check('one-take-wobble', got <= limit, 'held %d past bound %d' % (got, limit))
+    # The base wobbles instead (`none` eleven pages higher in one take): the
+    # row's number is the pane's, not lowered or raised by it.
+    got = held_increment([1998848, 1998848, 1998848], [1556480, 1736704, 1556480])
+    check('base-wobble', got == 442368, 'held %d, not 442368' % got)
+    # A cost paid in every take (one more cap-sized buffer at `new`) fails.
+    limit, _ = bound([6750208, 6750208, 6750208], [8306688, 8306688, 8306688], 16384)
+    got = held_increment([8306688 + cap] * 3, [1556480] * 3)
+    check('every-take-cost', got > limit, 'held %d within bound %d' % (got, limit))
+    if not fails:
+        print('PASS ring-resident-self-test')
+    return not fails
 
 
 def main():
@@ -151,7 +192,9 @@ def main():
     p.add_argument('measure_child')
     p.add_argument('probe')
     args = p.parse_args()
-    self_test()
+    if not self_test():
+        print('RING-RESIDENT rows=1 failed=1')
+        return 1
     host = this_host()
     granule = GRANULE[host]
     held = {}
@@ -207,7 +250,7 @@ def main():
             continue
         limit, margin = bound(takes['increments'], takes['peaks'], granule)
         loose = too_loose(stage, cap, margin)
-        worst = max(held[name]['increments'])
+        worst = held_increment(held[name]['peaks'], bases_of(held[name]['increments'], held[name]['peaks']))
         ratio = ' (ratio %.2fx, bound %.2fx)' % (worst / cap, limit / cap) if cap else ''
         if loose:
             print('FAIL ring-resident-%s cap=%d: bound too loose: %s' % (stage, cap, loose))
