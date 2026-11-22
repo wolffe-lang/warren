@@ -1,0 +1,396 @@
+# send-keys: the bytes a raw-mode reader in a pane reads, by mode (normal; cursor: application cursor
+# keys; keypad: application cursor keys and keypad). tmux: tmux 3.4 measured (send-keys -t PANE ARGS...).
+# warren: warren send-keys -t PANE ARGS..., the same key names through the typed-key path. A row whose
+# columns differ names why; every other row is equal.
+# mode	args	tmux	warren	difference
+normal	["Up"]	1b5b41	1b5b41	-
+normal	["Down"]	1b5b42	1b5b42	-
+normal	["Left"]	1b5b44	1b5b44	-
+normal	["Right"]	1b5b43	1b5b43	-
+normal	["Home"]	1b5b317e	1b5b48	home-end-as-typed
+normal	["End"]	1b5b347e	1b5b46	home-end-as-typed
+normal	["BSpace"]	7f	7f	-
+normal	["BTab"]	1b5b5a	1b5b5a	-
+normal	["DC"]	1b5b337e	1b5b337e	-
+normal	["IC"]	1b5b327e	1b5b327e	-
+normal	["Delete"]	1b5b337e	1b5b337e	-
+normal	["Insert"]	1b5b327e	1b5b327e	-
+normal	["Enter"]	0d	0d	-
+normal	["Escape"]	1b	1b	-
+normal	["Esc"]	457363	457363	-
+normal	["Space"]	20	20	-
+normal	["Tab"]	09	09	-
+normal	["NPage"]	1b5b367e	1b5b367e	-
+normal	["PageDown"]	1b5b367e	1b5b367e	-
+normal	["PgDn"]	1b5b367e	1b5b367e	-
+normal	["PPage"]	1b5b357e	1b5b357e	-
+normal	["PageUp"]	1b5b357e	1b5b357e	-
+normal	["PgUp"]	1b5b357e	1b5b357e	-
+normal	["F1"]	1b4f50	1b4f50	-
+normal	["F2"]	1b4f51	1b4f51	-
+normal	["F3"]	1b4f52	1b4f52	-
+normal	["F4"]	1b4f53	1b4f53	-
+normal	["F5"]	1b5b31357e	1b5b31357e	-
+normal	["F6"]	1b5b31377e	1b5b31377e	-
+normal	["F7"]	1b5b31387e	1b5b31387e	-
+normal	["F8"]	1b5b31397e	1b5b31397e	-
+normal	["F9"]	1b5b32307e	1b5b32307e	-
+normal	["F10"]	1b5b32317e	1b5b32317e	-
+normal	["F11"]	1b5b32337e	1b5b32337e	-
+normal	["F12"]	1b5b32347e	1b5b32347e	-
+normal	["F13"]	463133	463133	-
+normal	["F24"]	463234	463234	-
+normal	["KP0"]	30	30	-
+normal	["KP1"]	31	31	-
+normal	["KP9"]	39	39	-
+normal	["KP/"]	2f	2f	-
+normal	["KP*"]	2a	2a	-
+normal	["KP-"]	2d	2d	-
+normal	["KP+"]	2b	2b	-
+normal	["KP."]	2e	2e	-
+normal	["KPEnter"]	0a	0d	keypad-enter-cr-as-typed
+normal	["Backspace"]	4261636b7370616365	4261636b7370616365	-
+normal	["BackSpace"]	4261636b5370616365	4261636b5370616365	-
+normal	["enter"]	0d	0d	-
+normal	["ENTER"]	0d	0d	-
+normal	["up"]	1b5b41	1b5b41	-
+normal	["UP"]	1b5b41	1b5b41	-
+normal	["f1"]	1b4f50	1b4f50	-
+normal	["bspace"]	7f	7f	-
+normal	["escape"]	1b	1b	-
+normal	["space"]	20	20	-
+normal	["tab"]	09	09	-
+normal	["home"]	1b5b317e	1b5b48	home-end-as-typed
+normal	["pgup"]	1b5b357e	1b5b357e	-
+normal	["npage"]	1b5b367e	1b5b367e	-
+normal	["C-a"]	01	01	-
+normal	["C-c"]	03	03	-
+normal	["C-z"]	1a	1a	-
+normal	["C-b"]	02	02	-
+normal	["C-Space"]	00	00	-
+normal	["C-@"]	00	00	-
+normal	["C-["]	1b	1b	-
+normal	["C-]"]	1d	1d	-
+normal	["C-\\"]	1c	1c	-
+normal	["C-^"]	1e	1e	-
+normal	["C-_"]	1f	1f	-
+normal	["C-?"]	7f	7f	-
+normal	["C-/"]	1f	1f	-
+normal	["C-2"]	00	00	-
+normal	["C-3"]		33	ctrl-without-a-byte
+normal	["C-8"]		38	ctrl-without-a-byte
+normal	["C-1"]		31	ctrl-without-a-byte
+normal	["C-0"]		30	ctrl-without-a-byte
+normal	["^c"]	03	03	-
+normal	["^C"]	03	03	-
+normal	["^a"]	01	01	-
+normal	["C-C"]	03	03	-
+normal	["C-A"]	01	01	-
+normal	["M-a"]	1b61	1b61	-
+normal	["M-A"]	1b41	1b41	-
+normal	["M-x"]	1b78	1b78	-
+normal	["M-Enter"]	1b0d	1b0d	-
+normal	["M-Up"]	1b5b313b3341	1b5b313b3341	-
+normal	["M-BSpace"]	1b7f	1b7f	-
+normal	["M-Escape"]	1b1b	1b1b	-
+normal	["M-Space"]	1b20	1b20	-
+normal	["M-\u00e9"]	1bc3a9	1bc3a9	-
+normal	["C-\u00e9"]	c3a9	c3a9	-
+normal	["C-Up"]	1b5b313b3541	1b5b313b3541	-
+normal	["S-Up"]	1b5b313b3241	1b5b313b3241	-
+normal	["M-Down"]	1b5b313b3342	1b5b313b3342	-
+normal	["C-M-a"]	1b01	1b01	-
+normal	["M-C-a"]	1b01	1b01	-
+normal	["C-M-Up"]	1b5b313b3741	1b5b313b3741	-
+normal	["S-a"]	532d61	532d61	-
+normal	["S-A"]	532d41	532d41	-
+normal	["S-Tab"]	532d546162	532d546162	-
+normal	["C-Tab"]	09	09	-
+normal	["M-Tab"]	1b09	1b09	-
+normal	["S-F1"]	1b5b313b3250	1b5b313b3250	-
+normal	["C-F5"]	1b5b31353b357e	1b5b31353b357e	-
+normal	["M-F12"]	1b5b32343b337e	1b5b32343b337e	-
+normal	["S-Left"]	1b5b313b3244	1b5b313b3244	-
+normal	["C-Left"]	1b5b313b3544	1b5b313b3544	-
+normal	["C-S-Left"]	1b5b313b3644	1b5b313b3644	-
+normal	["S-Home"]	1b5b313b3248	1b5b313b3248	-
+normal	["C-End"]	1b5b313b3546	1b5b313b3546	-
+normal	["S-DC"]	1b5b333b327e	1b5b333b327e	-
+normal	["C-NPage"]	1b5b363b357e	1b5b363b357e	-
+normal	["C-BSpace"]		08	ctrl-without-a-byte
+normal	["S-Enter"]	532d456e746572	532d456e746572	-
+normal	["C-Enter"]		0d	ctrl-without-a-byte
+normal	["C-Escape"]		1b	ctrl-without-a-byte
+normal	["S-Escape"]	532d457363617065	532d457363617065	-
+normal	["C-S-a"]	432d532d61	432d532d61	-
+normal	["s-a"]	732d61	732d61	-
+normal	["c-a"]	01	01	-
+normal	["m-a"]	1b61	1b61	-
+normal	["Entre"]	456e747265	456e747265	-
+normal	["ls -l"]	6c73202d6c	6c73202d6c	-
+normal	["hello"]	68656c6c6f	68656c6c6f	-
+normal	["\u00e9"]	c3a9	c3a9	-
+normal	["\u65e5\u672c"]	e697a5e69cac	e697a5e69cac	-
+normal	["a b"]	612062	612062	-
+normal	["C-"]	432d	432d	-
+normal	["M-"]	4d2d	4d2d	-
+normal	["-"]	2d	2d	-
+normal	["C-x-y"]	432d782d79	432d782d79	-
+normal	["Up", "Down"]	1b5b411b5b42	1b5b411b5b42	-
+normal	["echo", "Space", "hi", "Enter"]	6563686f2068690d	6563686f2068690d	-
+normal	["abc\n"]	6162630a	6162630a	-
+normal	["tab\there"]	7461620968657265	7461620968657265	-
+normal	["-l", "Enter"]	456e746572	456e746572	-
+normal	["-l", "C-c"]	432d63	432d63	-
+normal	["-l", "\u00e9"]	c3a9	c3a9	-
+normal	["-l", "Up", "Down"]	5570446f776e	5570446f776e	-
+normal	["-l", "a b"]	612062	612062	-
+normal	["--", "-l"]	2d6c	2d6c	-
+normal	["-l", "--", "x"]	78	78	-
+normal	["x", "-l", "Enter"]	782d6c0d	782d6c0d	-
+cursor	["Up"]	1b4f41	1b4f41	-
+cursor	["Down"]	1b4f42	1b4f42	-
+cursor	["Left"]	1b4f44	1b4f44	-
+cursor	["Right"]	1b4f43	1b4f43	-
+cursor	["Home"]	1b5b317e	1b4f48	home-end-as-typed
+cursor	["End"]	1b5b347e	1b4f46	home-end-as-typed
+cursor	["BSpace"]	7f	7f	-
+cursor	["BTab"]	1b5b5a	1b5b5a	-
+cursor	["DC"]	1b5b337e	1b5b337e	-
+cursor	["IC"]	1b5b327e	1b5b327e	-
+cursor	["Delete"]	1b5b337e	1b5b337e	-
+cursor	["Insert"]	1b5b327e	1b5b327e	-
+cursor	["Enter"]	0d	0d	-
+cursor	["Escape"]	1b	1b	-
+cursor	["Esc"]	457363	457363	-
+cursor	["Space"]	20	20	-
+cursor	["Tab"]	09	09	-
+cursor	["NPage"]	1b5b367e	1b5b367e	-
+cursor	["PageDown"]	1b5b367e	1b5b367e	-
+cursor	["PgDn"]	1b5b367e	1b5b367e	-
+cursor	["PPage"]	1b5b357e	1b5b357e	-
+cursor	["PageUp"]	1b5b357e	1b5b357e	-
+cursor	["PgUp"]	1b5b357e	1b5b357e	-
+cursor	["F1"]	1b4f50	1b4f50	-
+cursor	["F2"]	1b4f51	1b4f51	-
+cursor	["F3"]	1b4f52	1b4f52	-
+cursor	["F4"]	1b4f53	1b4f53	-
+cursor	["F5"]	1b5b31357e	1b5b31357e	-
+cursor	["F6"]	1b5b31377e	1b5b31377e	-
+cursor	["F7"]	1b5b31387e	1b5b31387e	-
+cursor	["F8"]	1b5b31397e	1b5b31397e	-
+cursor	["F9"]	1b5b32307e	1b5b32307e	-
+cursor	["F10"]	1b5b32317e	1b5b32317e	-
+cursor	["F11"]	1b5b32337e	1b5b32337e	-
+cursor	["F12"]	1b5b32347e	1b5b32347e	-
+cursor	["F13"]	463133	463133	-
+cursor	["F24"]	463234	463234	-
+cursor	["KP0"]	30	30	-
+cursor	["KP1"]	31	31	-
+cursor	["KP9"]	39	39	-
+cursor	["KP/"]	2f	2f	-
+cursor	["KP*"]	2a	2a	-
+cursor	["KP-"]	2d	2d	-
+cursor	["KP+"]	2b	2b	-
+cursor	["KP."]	2e	2e	-
+cursor	["KPEnter"]	0a	0d	keypad-enter-cr-as-typed
+cursor	["Backspace"]	4261636b7370616365	4261636b7370616365	-
+cursor	["BackSpace"]	4261636b5370616365	4261636b5370616365	-
+cursor	["enter"]	0d	0d	-
+cursor	["ENTER"]	0d	0d	-
+cursor	["up"]	1b4f41	1b4f41	-
+cursor	["UP"]	1b4f41	1b4f41	-
+cursor	["f1"]	1b4f50	1b4f50	-
+cursor	["bspace"]	7f	7f	-
+cursor	["escape"]	1b	1b	-
+cursor	["space"]	20	20	-
+cursor	["tab"]	09	09	-
+cursor	["home"]	1b5b317e	1b4f48	home-end-as-typed
+cursor	["pgup"]	1b5b357e	1b5b357e	-
+cursor	["npage"]	1b5b367e	1b5b367e	-
+cursor	["C-a"]	01	01	-
+cursor	["C-c"]	03	03	-
+cursor	["C-z"]	1a	1a	-
+cursor	["C-b"]	02	02	-
+cursor	["C-Space"]	00	00	-
+cursor	["C-@"]	00	00	-
+cursor	["C-["]	1b	1b	-
+cursor	["C-]"]	1d	1d	-
+cursor	["C-\\"]	1c	1c	-
+cursor	["C-^"]	1e	1e	-
+cursor	["C-_"]	1f	1f	-
+cursor	["C-?"]	7f	7f	-
+cursor	["C-/"]	1f	1f	-
+cursor	["C-2"]	00	00	-
+cursor	["C-3"]		33	ctrl-without-a-byte
+cursor	["C-8"]		38	ctrl-without-a-byte
+cursor	["C-1"]		31	ctrl-without-a-byte
+cursor	["C-0"]		30	ctrl-without-a-byte
+cursor	["^c"]	03	03	-
+cursor	["^C"]	03	03	-
+cursor	["^a"]	01	01	-
+cursor	["C-C"]	03	03	-
+cursor	["C-A"]	01	01	-
+cursor	["M-a"]	1b61	1b61	-
+cursor	["M-A"]	1b41	1b41	-
+cursor	["M-x"]	1b78	1b78	-
+cursor	["M-Enter"]	1b0d	1b0d	-
+cursor	["M-Up"]	1b5b313b3341	1b5b313b3341	-
+cursor	["M-BSpace"]	1b7f	1b7f	-
+cursor	["M-Escape"]	1b1b	1b1b	-
+cursor	["M-Space"]	1b20	1b20	-
+cursor	["M-\u00e9"]	1bc3a9	1bc3a9	-
+cursor	["C-\u00e9"]	c3a9	c3a9	-
+cursor	["C-Up"]	1b5b313b3541	1b5b313b3541	-
+cursor	["S-Up"]	1b5b313b3241	1b5b313b3241	-
+cursor	["M-Down"]	1b5b313b3342	1b5b313b3342	-
+cursor	["C-M-a"]	1b01	1b01	-
+cursor	["M-C-a"]	1b01	1b01	-
+cursor	["C-M-Up"]	1b5b313b3741	1b5b313b3741	-
+cursor	["S-a"]	532d61	532d61	-
+cursor	["S-A"]	532d41	532d41	-
+cursor	["S-Tab"]	532d546162	532d546162	-
+cursor	["C-Tab"]	09	09	-
+cursor	["M-Tab"]	1b09	1b09	-
+cursor	["S-F1"]	1b5b313b3250	1b5b313b3250	-
+cursor	["C-F5"]	1b5b31353b357e	1b5b31353b357e	-
+cursor	["M-F12"]	1b5b32343b337e	1b5b32343b337e	-
+cursor	["S-Left"]	1b5b313b3244	1b5b313b3244	-
+cursor	["C-Left"]	1b5b313b3544	1b5b313b3544	-
+cursor	["C-S-Left"]	1b5b313b3644	1b5b313b3644	-
+cursor	["S-Home"]	1b5b313b3248	1b5b313b3248	-
+cursor	["C-End"]	1b5b313b3546	1b5b313b3546	-
+cursor	["S-DC"]	1b5b333b327e	1b5b333b327e	-
+cursor	["C-NPage"]	1b5b363b357e	1b5b363b357e	-
+cursor	["C-BSpace"]		08	ctrl-without-a-byte
+cursor	["S-Enter"]	532d456e746572	532d456e746572	-
+cursor	["C-Enter"]		0d	ctrl-without-a-byte
+cursor	["C-Escape"]		1b	ctrl-without-a-byte
+cursor	["S-Escape"]	532d457363617065	532d457363617065	-
+cursor	["C-S-a"]	432d532d61	432d532d61	-
+cursor	["s-a"]	732d61	732d61	-
+cursor	["c-a"]	01	01	-
+cursor	["m-a"]	1b61	1b61	-
+keypad	["Up"]	1b4f41	1b4f41	-
+keypad	["Down"]	1b4f42	1b4f42	-
+keypad	["Left"]	1b4f44	1b4f44	-
+keypad	["Right"]	1b4f43	1b4f43	-
+keypad	["Home"]	1b5b317e	1b4f48	home-end-as-typed
+keypad	["End"]	1b5b347e	1b4f46	home-end-as-typed
+keypad	["BSpace"]	7f	7f	-
+keypad	["BTab"]	1b5b5a	1b5b5a	-
+keypad	["DC"]	1b5b337e	1b5b337e	-
+keypad	["IC"]	1b5b327e	1b5b327e	-
+keypad	["Delete"]	1b5b337e	1b5b337e	-
+keypad	["Insert"]	1b5b327e	1b5b327e	-
+keypad	["Enter"]	0d	0d	-
+keypad	["Escape"]	1b	1b	-
+keypad	["Esc"]	457363	457363	-
+keypad	["Space"]	20	20	-
+keypad	["Tab"]	09	09	-
+keypad	["NPage"]	1b5b367e	1b5b367e	-
+keypad	["PageDown"]	1b5b367e	1b5b367e	-
+keypad	["PgDn"]	1b5b367e	1b5b367e	-
+keypad	["PPage"]	1b5b357e	1b5b357e	-
+keypad	["PageUp"]	1b5b357e	1b5b357e	-
+keypad	["PgUp"]	1b5b357e	1b5b357e	-
+keypad	["F1"]	1b4f50	1b4f50	-
+keypad	["F2"]	1b4f51	1b4f51	-
+keypad	["F3"]	1b4f52	1b4f52	-
+keypad	["F4"]	1b4f53	1b4f53	-
+keypad	["F5"]	1b5b31357e	1b5b31357e	-
+keypad	["F6"]	1b5b31377e	1b5b31377e	-
+keypad	["F7"]	1b5b31387e	1b5b31387e	-
+keypad	["F8"]	1b5b31397e	1b5b31397e	-
+keypad	["F9"]	1b5b32307e	1b5b32307e	-
+keypad	["F10"]	1b5b32317e	1b5b32317e	-
+keypad	["F11"]	1b5b32337e	1b5b32337e	-
+keypad	["F12"]	1b5b32347e	1b5b32347e	-
+keypad	["F13"]	463133	463133	-
+keypad	["F24"]	463234	463234	-
+keypad	["KP0"]	1b4f70	1b4f70	-
+keypad	["KP1"]	1b4f71	1b4f71	-
+keypad	["KP9"]	1b4f79	1b4f79	-
+keypad	["KP/"]	1b4f6f	1b4f6f	-
+keypad	["KP*"]	1b4f6a	1b4f6a	-
+keypad	["KP-"]	1b4f6d	1b4f6d	-
+keypad	["KP+"]	1b4f6b	1b4f6b	-
+keypad	["KP."]	1b4f6e	1b4f6e	-
+keypad	["KPEnter"]	1b4f4d	1b4f4d	-
+keypad	["Backspace"]	4261636b7370616365	4261636b7370616365	-
+keypad	["BackSpace"]	4261636b5370616365	4261636b5370616365	-
+keypad	["enter"]	0d	0d	-
+keypad	["ENTER"]	0d	0d	-
+keypad	["up"]	1b4f41	1b4f41	-
+keypad	["UP"]	1b4f41	1b4f41	-
+keypad	["f1"]	1b4f50	1b4f50	-
+keypad	["bspace"]	7f	7f	-
+keypad	["escape"]	1b	1b	-
+keypad	["space"]	20	20	-
+keypad	["tab"]	09	09	-
+keypad	["home"]	1b5b317e	1b4f48	home-end-as-typed
+keypad	["pgup"]	1b5b357e	1b5b357e	-
+keypad	["npage"]	1b5b367e	1b5b367e	-
+keypad	["C-a"]	01	01	-
+keypad	["C-c"]	03	03	-
+keypad	["C-z"]	1a	1a	-
+keypad	["C-b"]	02	02	-
+keypad	["C-Space"]	00	00	-
+keypad	["C-@"]	00	00	-
+keypad	["C-["]	1b	1b	-
+keypad	["C-]"]	1d	1d	-
+keypad	["C-\\"]	1c	1c	-
+keypad	["C-^"]	1e	1e	-
+keypad	["C-_"]	1f	1f	-
+keypad	["C-?"]	7f	7f	-
+keypad	["C-/"]	1f	1f	-
+keypad	["C-2"]	00	00	-
+keypad	["C-3"]		33	ctrl-without-a-byte
+keypad	["C-8"]		38	ctrl-without-a-byte
+keypad	["C-1"]		31	ctrl-without-a-byte
+keypad	["C-0"]		30	ctrl-without-a-byte
+keypad	["^c"]	03	03	-
+keypad	["^C"]	03	03	-
+keypad	["^a"]	01	01	-
+keypad	["C-C"]	03	03	-
+keypad	["C-A"]	01	01	-
+keypad	["M-a"]	1b61	1b61	-
+keypad	["M-A"]	1b41	1b41	-
+keypad	["M-x"]	1b78	1b78	-
+keypad	["M-Enter"]	1b0d	1b0d	-
+keypad	["M-Up"]	1b5b313b3341	1b5b313b3341	-
+keypad	["M-BSpace"]	1b7f	1b7f	-
+keypad	["M-Escape"]	1b1b	1b1b	-
+keypad	["M-Space"]	1b20	1b20	-
+keypad	["M-\u00e9"]	1bc3a9	1bc3a9	-
+keypad	["C-\u00e9"]	c3a9	c3a9	-
+keypad	["C-Up"]	1b5b313b3541	1b5b313b3541	-
+keypad	["S-Up"]	1b5b313b3241	1b5b313b3241	-
+keypad	["M-Down"]	1b5b313b3342	1b5b313b3342	-
+keypad	["C-M-a"]	1b01	1b01	-
+keypad	["M-C-a"]	1b01	1b01	-
+keypad	["C-M-Up"]	1b5b313b3741	1b5b313b3741	-
+keypad	["S-a"]	532d61	532d61	-
+keypad	["S-A"]	532d41	532d41	-
+keypad	["S-Tab"]	532d546162	532d546162	-
+keypad	["C-Tab"]	09	09	-
+keypad	["M-Tab"]	1b09	1b09	-
+keypad	["S-F1"]	1b5b313b3250	1b5b313b3250	-
+keypad	["C-F5"]	1b5b31353b357e	1b5b31353b357e	-
+keypad	["M-F12"]	1b5b32343b337e	1b5b32343b337e	-
+keypad	["S-Left"]	1b5b313b3244	1b5b313b3244	-
+keypad	["C-Left"]	1b5b313b3544	1b5b313b3544	-
+keypad	["C-S-Left"]	1b5b313b3644	1b5b313b3644	-
+keypad	["S-Home"]	1b5b313b3248	1b5b313b3248	-
+keypad	["C-End"]	1b5b313b3546	1b5b313b3546	-
+keypad	["S-DC"]	1b5b333b327e	1b5b333b327e	-
+keypad	["C-NPage"]	1b5b363b357e	1b5b363b357e	-
+keypad	["C-BSpace"]		08	ctrl-without-a-byte
+keypad	["S-Enter"]	532d456e746572	532d456e746572	-
+keypad	["C-Enter"]		0d	ctrl-without-a-byte
+keypad	["C-Escape"]		1b	ctrl-without-a-byte
+keypad	["S-Escape"]	532d457363617065	532d457363617065	-
+keypad	["C-S-a"]	432d532d61	432d532d61	-
+keypad	["s-a"]	732d61	732d61	-
+keypad	["c-a"]	01	01	-
+keypad	["m-a"]	1b61	1b61	-

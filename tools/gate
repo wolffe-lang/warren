@@ -141,6 +141,10 @@ step modules-run modules_run "$root/target/native/warren"
 step wolf-test "$WOLF" test --deny-warnings src
 step lupin-pure "$LUPIN" run src/pure_test.lu
 step keys-lupin "$LUPIN" run src/keys_test.lu
+step send-keys-lupin "$LUPIN" run src/send_keys_test.lu
+step send-keys-table python3 -I tests/session/send_keys_table.py
+step send-keys-table-build "$WOLF" build --deny-warnings src/send_keys_table_test.lu -o "$root/target/native/send-keys-table"
+step send-keys-table-native "$root/target/native/send-keys-table"
 step pacing-lupin "$LUPIN" run src/pacing_test.lu
 step client-input-lupin "$LUPIN" run src/client_input_test.lu
 step client-keyboard-lupin "$LUPIN" run src/client_keyboard_test.lu

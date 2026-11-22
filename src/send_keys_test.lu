@@ -1,0 +1,84 @@
+//! member: false
+//! send-keys's words read as tmux 3.4 reads them (tests/session/send-keys.table,
+//! measured): key names in any case, the modifiers, text, and `-l`. Written
+//! before the reader. Pure: native, the checked machine and lupin.
+use cmd
+
+// One word's reading: `mods/kind/code`, or `text`.
+fn ev(word: str) -> str {
+    let r = cmd.key_of(word)
+    if !r.ok { return "text" }
+    "{r.event.mods}/{r.event.kind}/{r.event.code}"
+}
+
+// A word list's events, each `mods/kind/code`, space-separated.
+fn evs(words: List[str], literal: bool) -> str {
+    var out = ""
+    for e in cmd.events_of(words, literal) {
+        if out.len > 0 { out = out + " " }
+        out = out + "{e.mods}/{e.kind}/{e.code}"
+    }
+    out
+}
+
+fn test_key_names() {
+    assert(ev("Enter") == "0/1/13", "key-name-enter")
+    assert(ev("enter") == "0/1/13" && ev("ENTER") == "0/1/13" && ev("pgup") == "0/1/7", "key-name-any-case")
+    assert(ev("Up") == "0/1/1" && ev("Down") == "0/1/2" && ev("Right") == "0/1/3" && ev("Left") == "0/1/4", "key-name-cursor")
+    assert(ev("Home") == "0/1/5" && ev("End") == "0/1/6", "key-name-home-end")
+    assert(ev("PPage") == "0/1/7" && ev("PageUp") == "0/1/7" && ev("PgUp") == "0/1/7", "key-name-page-up")
+    assert(ev("NPage") == "0/1/8" && ev("PageDown") == "0/1/8" && ev("PgDn") == "0/1/8", "key-name-page-down")
+    assert(ev("IC") == "0/1/9" && ev("Insert") == "0/1/9" && ev("DC") == "0/1/10" && ev("Delete") == "0/1/10", "key-name-insert-delete")
+    assert(ev("BSpace") == "0/1/11" && ev("Tab") == "0/1/12" && ev("BTab") == "1/1/12", "key-name-backspace-tab")
+    assert(ev("Escape") == "0/1/14" && ev("Space") == "0/0/32", "key-name-escape-space")
+    assert(ev("F1") == "0/1/15" && ev("F4") == "0/1/18" && ev("F12") == "0/1/26", "key-name-function")
+    assert(ev("KP0") == "0/1/39" && ev("KP9") == "0/1/48" && ev("KP.") == "0/1/49" && ev("KP/") == "0/1/50", "key-name-keypad-digits")
+    assert(ev("KP*") == "0/1/51" && ev("KP-") == "0/1/52" && ev("KP+") == "0/1/53" && ev("KPEnter") == "0/1/54", "key-name-keypad-operators")
+    assert(ev("Esc") == "text" && ev("Backspace") == "text" && ev("BackSpace") == "text", "key-name-not-tmux")
+    assert(ev("F13") == "text" && ev("F24") == "text" && ev("F0") == "text", "key-name-function-past-twelve")
+}
+
+fn test_key_modifiers() {
+    assert(ev("C-a") == "4/0/97" && ev("^a") == "4/0/97" && ev("c-a") == "4/0/97" && ev("^C") == "4/0/67", "modifier-ctrl")
+    assert(ev("M-x") == "2/0/120" && ev("m-a") == "2/0/97" && ev("M-A") == "2/0/65", "modifier-alt")
+    assert(ev("C-M-a") == "6/0/97" && ev("M-C-a") == "6/0/97", "modifier-ctrl-alt")
+    assert(ev("C-Up") == "4/1/1" && ev("C-M-Up") == "6/1/1" && ev("M-Enter") == "2/1/13" && ev("C-BSpace") == "4/1/11", "modifier-on-a-name")
+    assert(ev("S-Up") == "1/1/1" && ev("S-F1") == "1/1/15" && ev("S-Home") == "1/1/5" && ev("S-DC") == "1/1/10" && ev("C-S-Left") == "5/1/4", "modifier-shift-on-a-special-key")
+    assert(ev("S-a") == "text" && ev("S-A") == "text" && ev("S-Tab") == "text" && ev("S-Enter") == "text", "modifier-shift-elsewhere-is-text")
+    assert(ev("S-Escape") == "text" && ev("C-S-a") == "text" && ev("s-a") == "text", "modifier-shift-text-more")
+    assert(ev("C-Space") == "4/0/32" && ev("M-Space") == "2/0/32" && ev("C-@") == "4/0/64", "modifier-space")
+    assert(ev("M-\u{e9}") == "2/0/233" && ev("C-\u{e9}") == "4/0/233", "modifier-non-ascii")
+}
+
+fn test_unknown_is_text() {
+    assert(ev("Entre") == "text" && ev("ls -l") == "text" && ev("hello") == "text", "unknown-word-is-text")
+    assert(ev("C-") == "text" && ev("M-") == "text" && ev("C-x-y") == "text" && ev("^") == "0/0/94", "unknown-modifier-is-text")
+    assert(ev("-") == "0/0/45" && ev("x") == "0/0/120" && ev("\u{e9}") == "0/0/233", "one-character-is-a-key")
+    var w = List[str]()
+    (mut w).push("Entre")
+    assert(evs(w, false) == "0/0/69 0/0/110 0/0/116 0/0/114 0/0/101", "text-a-character-at-a-time")
+    var n = List[str]()
+    (mut n).push("abc\n")
+    (mut n).push("Up")
+    assert(evs(n, false) == "0/0/97 0/0/98 0/0/99 0/0/10 0/1/1", "text-then-a-key")
+}
+
+fn test_literal() {
+    var w = List[str]()
+    (mut w).push("Enter")
+    (mut w).push("C-c")
+    assert(evs(w, true) == "0/0/69 0/0/110 0/0/116 0/0/101 0/0/114 0/0/67 0/0/45 0/0/99", "literal-names-are-text")
+    var u = List[str]()
+    (mut u).push("Up")
+    (mut u).push("Down")
+    assert(evs(u, false) == "0/1/1 0/1/2", "keys-in-order")
+}
+
+fn main() -> int {
+    test_key_names()
+    test_key_modifiers()
+    test_unknown_is_text()
+    test_literal()
+    print("PASS send-keys-reader")
+    0
+}

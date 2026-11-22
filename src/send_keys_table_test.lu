@@ -1,0 +1,80 @@
+//! member: false
+//! Every row of tests/session/send-keys.table, read by `warren send-keys`'s
+//! own parser and sent through the server's typed-key path (`key_bytes`) in
+//! the row's mode, gives the table's warren column. A native program (the
+//! table is past `wolf test`'s step budget, and the server module is not one
+//! the reference interpreter loads): `PASS send-keys-table rows=391`, or a
+//! FAIL naming the first row that differs; exit 1 then.
+use std.fs
+use std.json
+use cmd
+use server
+use vt
+
+fn hex(b: List[byte]) -> str {
+    let digits = "0123456789abcdef"
+    var out = List[byte]()
+    for x in b {
+        let v = x as int
+        (mut out).push(digits.bytes()[v / 16])
+        (mut out).push(digits.bytes()[v % 16])
+    }
+    str_from_utf8(out) else ""
+}
+
+// The bytes warren's send-keys gives for `args` in the pane, or a reason.
+fn warren_bytes(args: List[str], pane: vt.Vt) -> str {
+    var argv = List[str]()
+    (mut argv).push("send-keys")
+    (mut argv).push("-t")
+    (mut argv).push("p1")
+    for a in args { (mut argv).push(a) }
+    let v = cmd.parse_verb(argv)
+    if !v.ok { return "refused: {v.why}" }
+    var out = List[byte]()
+    for e in cmd.events_of(v.keys, v.literal) {
+        for b in server.key_bytes(pane, e.mods, e.kind, e.code) { (mut out).push(b) }
+    }
+    hex(out)
+}
+
+fn main() -> int {
+    let text = fs.read_text("tests/session/send-keys.table") else {
+        print("FAIL send-keys-table the table did not read")
+        return 1
+    }
+    var normal = vt.new(80, 24, 0)
+    var cursor = vt.new(80, 24, 0)
+    cursor.mode_values[2] = 1
+    var keypad = vt.new(80, 24, 0)
+    keypad.mode_values[2] = 1
+    keypad.mode_values[7] = 1
+    var rows = 0
+    for line in text.lines() {
+        if line.len == 0 || line.starts_with("#") { continue }
+        let f = line.split("\t")
+        if f.len != 5 {
+            print("FAIL send-keys-table a line of {f.len} columns")
+            return 1
+        }
+        var args = List[str]()
+        let parsed = json.parse(f[1]) else {
+            print("FAIL send-keys-table {f[1]} is not JSON")
+            return 1
+        }
+        for a in json.as_arr(parsed) else List[json.Value]() { (mut args).push(json.as_str(a) else "") }
+        var got = ""
+        if f[0] == "cursor" { got = warren_bytes(args, cursor) } else if f[0] == "keypad" { got = warren_bytes(args, keypad) } else { got = warren_bytes(args, normal) }
+        if got != f[3] {
+            print("FAIL send-keys-table {f[0]} {f[1]}: warren {got}, the table's warren column {f[3]}")
+            return 1
+        }
+        rows += 1
+    }
+    if rows != 391 {
+        print("FAIL send-keys-table {rows} rows, not 391")
+        return 1
+    }
+    print("PASS send-keys-table rows={rows}")
+    0
+}
