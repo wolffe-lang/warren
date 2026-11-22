@@ -1412,19 +1412,38 @@ fn row_resize_crossing(mut r: Rig) -> str {
     ""
 }
 
+// A client whose terminal takes OSC 52 writes (feature bit 8).
+fn attach_clipboard(r: Rig) -> client.Peer ! client.DialErrors {
+    var p = client.dial(socket(r))?
+    let here = env.cwd() else "/"
+    let _h = client.send(p, 1, client.hello_with(1, 80, 24, 3, 8, "xterm-256color", "", 1, here, env_names(), env_values()))
+    p
+}
+
+// A client that stops reading is closed, alone, once what it has yet to
+// take passes the event queue's cap: a pane writes eight clipboard writes
+// (OSC 52) of 64 KiB each, which warren.toml lets programs make, to two
+// clients whose terminals take them. The flood is of events, not titles: a
+// title is state, and a flood of titles never passes the cap.
 fn row_too_slow(mut r: Rig) -> str {
+    let config = beside(r, "config")
+    fs.create_dir_all(config + "/warren") else |e| { return "mkdir: {e}" }
+    fs.write_text(config + "/warren/warren.toml", "[clipboard]\nprograms = true\n") else |e| { return "warren.toml: {e}" }
+    let was = env.get("XDG_CONFIG_HOME") else ""
+    env.set("XDG_CONFIG_HOME", config) else { return "env" }
     let why = start_server(mut r, "/bin/sh")
+    if was.len > 0 { env.set("XDG_CONFIG_HOME", was) else { return "env" } } else { env.unset("XDG_CONFIG_HOME") else |_| {} }
     if why.len > 0 { return why }
-    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    var p = attach_clipboard(r) else |e| { return "dial-{e}" }
     if !client.until_line(mut p, "$", 5000) { return "no prompt" }
-    var w = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    var w = attach_clipboard(r) else |e| { return "dial-{e}" }
     if !client.until_kind(mut w, 129, 3000) { return "watcher: no WELCOME" }
-    // The first client stops reading; the pane sends titles faster than it
-    // could take them. Past its event queue it is closed, alone.
-    let _i = client.input(w, "i=0; t=$(printf '%04000d' 0); while [ $i -lt 200 ]; do printf '\\033]2;%s%s\\007' $i $t; i=$((i+1)); done; echo titles-$((100+100))\r")
+    // The first client stops reading; the pane writes the clipboard faster
+    // than it could take it. Past its event queue it is closed, alone.
+    let _i = client.input(w, "d=$(head -c 49152 /dev/zero | base64 | tr -d '\\n'); i=0; while [ $i -lt 8 ]; do printf '\\033]52;c;%s\\007' \"$d\"; i=$((i+1)); done; echo clips-$((4+4))\r")
     let t0 = now_ms()
-    if !client.until_text(mut w, "titles-200", 90000) { return "the second client stalled: " + client.screen_text(w) }
-    print("MEASURE too-slow titles-ms={now_ms() - t0}")
+    if !client.until_text(mut w, "clips-8", 90000) { return "the second client stalled: " + client.screen_text(w) }
+    print("MEASURE too-slow clips-ms={now_ms() - t0} second-client-clips={w.clips}")
     // The stalled client finds its connection closed, without a BYE that
     // could not fit.
     var closed = false
