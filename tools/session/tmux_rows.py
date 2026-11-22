@@ -19,6 +19,9 @@ Rows:
                        second tmux whose pane runs a client of the first; warren
                        draws the same cells (its frame-golden row)
   tmux-kill-pane       a killed pane's program has ended within a second
+  tmux-missing-target  a split aimed at a session that does not exist is
+                       refused with a non-zero exit and a reason, and no pane
+                       is made or changed (warren: verb-refused-target)
 
 Each client is a pty of the suite's own. Nothing is signalled: clients are
 detached by tmux's own command and the server is ended with kill-server.
@@ -298,6 +301,27 @@ def row_kill_pane(out):
     return 0
 
 
+def row_missing_target(out):
+    tmux = Tmux(out, 'target')
+    try:
+        tmux.run('new-session', '-d', '-s', 'work', '-x', '80', '-y', '24', 'sleep 60')
+        before = panes(tmux)
+        refused = subprocess.run(['tmux', '-S', tmux.socket, '-f', '/dev/null', 'split-window', '-h',
+                                  '-t', 'nosuch:', 'sleep 60'],
+                                 env=tmux.env, capture_output=True, text=True, timeout=30)
+        after = panes(tmux)
+    finally:
+        tmux.close()
+    reason = refused.stderr.strip()
+    print('  measured: exit %d, %r, panes %s then %s' % (refused.returncode, reason, before, after))
+    if refused.returncode == 0 or not reason or len(before) != 1 or after != before:
+        print('FAIL tmux-missing-target: exit %d, reason %r, panes %d then %d, expected a non-zero exit with a '
+              'reason and the one pane unchanged' % (refused.returncode, reason, len(before), len(after)))
+        return 1
+    print('PASS tmux-missing-target (warren: verb-refused-target, exit 1 naming no-such-session, the pane untouched)')
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cases', type=Path, required=True)
@@ -320,6 +344,7 @@ def main():
     failed += row_zoom(args.out)
     failed += row_focus_ring(args.out)
     failed += row_kill_pane(args.out)
+    failed += row_missing_target(args.out)
     return 1 if failed else 0
 
 
