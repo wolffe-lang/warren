@@ -370,6 +370,14 @@ pub fn queue_title(mut c: Conn, wire: List[byte]) -> bool {
     true
 }
 
+/// Encode a pane's title and queue it as the client's one waiting TITLE
+/// (see queue_title). False when it is invalid or the event queue is full.
+pub fn send_title(mut c: Conn, title: List[byte]) -> bool {
+    let r = proto.encode(134, 0, title_payload(title))
+    if r.code != 0 { return false }
+    queue_title(mut c, r.bytes)
+}
+
 /// Whether a newer title is owed: one came while the waiting TITLE was
 /// unwritten, and that TITLE is now written (or none waits).
 pub fn title_owed(c: Conn) -> bool {

@@ -238,7 +238,21 @@ fn after_write(mut s: Server, index: int) {
         close_conn(mut s, index, "{sent_name(s.conns[index].sent_kind, s.conns[index].sent_code)} sent")
         return
     }
+    if title_owed(s.conns[index]) { owed_title(mut s, index) }
     sync_interest(mut s, index)
+}
+
+// The waiting TITLE was written while a newer title came: queue the
+// session's focused pane's title as it is now (it may have changed again).
+fn owed_title(mut s: Server, index: int) {
+    s.conns[index].title_dirty = false
+    if !s.conns[index].member || s.conns[index].ending { return }
+    let si = s.conns[index].session
+    if si < 0 || !s.sessions[si].live { return }
+    let k = focused_slot(s, si)
+    if k < 0 { return }
+    let title = s.panes[k].screen.title_storage[0..s.panes[k].screen.title_length]
+    if !send_title(mut s.conns[index], title) { terminal(mut s, index, 135, 5, "too slow") }
 }
 
 // ---- sessions ----
@@ -940,7 +954,7 @@ fn title_to_members(mut s: Server, si: int) {
     var i = 0
     while i < s.conns.len {
         if s.conns[i].live && s.conns[i].member && s.conns[i].session == si && !s.conns[i].ending {
-            if !send(mut s.conns[i], 134, title_payload(title)) { terminal(mut s, i, 135, 5, "too slow") }
+            if !send_title(mut s.conns[i], title) { terminal(mut s, i, 135, 5, "too slow") }
         }
         i += 1
     }
@@ -2637,7 +2651,7 @@ fn read_master(mut s: Server, k: int, now: int) {
                 var ok = true
                 if ev.kind == 1 && focused {
                     let title = s.panes[k].screen.title_storage[0..s.panes[k].screen.title_length]
-                    ok = send(mut s.conns[i], 134, title_payload(title))
+                    ok = send_title(mut s.conns[i], title)
                 } else if ev.kind == 2 && active {
                     ok = send(mut s.conns[i], 132, List[byte]())
                 } else if ev.kind == 4 && ev.payload.len <= 65536 && s.settings.clipboard_programs &&
