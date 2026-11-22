@@ -104,6 +104,9 @@ fn launch_window(warren: str, name: str, tag: str, args: List[str], cols: int, r
     env.set("COLORTERM", "truecolor") else { return io }
     env.unset("COLUMNS") else { return io }
     env.unset("LINES") else { return io }
+    // Each row starts with no render policy of its own: one row's
+    // WARREN_RENDER never reaches the next.
+    env.unset("WARREN_RENDER") else { return io }
     for kv in extra {
         let at = kv.find("=") else 0 - 1
         if at > 0 { env.set(kv[0..at], kv[at + 1..kv.len]) else { return io } }
@@ -979,9 +982,42 @@ fn terminal_mouse(mut r: Run, legacy: bool, col: int, row: int) {
 // advertises no OSC 52 and writes none.
 fn row_clipboard_e2e(warren: str, console: bool) -> str {
     let name = if console then "clipboard-console" else "clipboard-osc52"
+    var words_in = List[str]()
+    if console { (mut words_in).push("WARREN_RENDER=console") }
+    clipboard_under(warren, name, words_in, console)
+}
+
+// Which policy the client picks from TERM and WARREN_RENDER, seen end to
+// end by the clipboard row: TERM=linux with the variable unset (empty) is
+// the console; the variable set decides either way; another TERM with it
+// unset is a terminal.
+fn row_console_choice(warren: str, name: str) -> str {
+    var words_in = List[str]()
+    var console = true
+    if name == "console-term-linux" {
+        (mut words_in).push("TERM=linux")
+        (mut words_in).push("WARREN_RENDER=")
+    } else if name == "console-term-linux-variable" {
+        (mut words_in).push("TERM=linux")
+        (mut words_in).push("WARREN_RENDER=console")
+    } else if name == "console-term-linux-overridden" {
+        (mut words_in).push("TERM=linux")
+        (mut words_in).push("WARREN_RENDER=terminal")
+        console = false
+    } else {
+        (mut words_in).push("TERM=xterm-256color")
+        (mut words_in).push("WARREN_RENDER=")
+        console = false
+    }
+    clipboard_under(warren, name, words_in, console)
+}
+
+// The clipboard row under `words_in` (NAME=VALUE words for the client's
+// environment), expecting the console policy or the terminal one.
+fn clipboard_under(warren: str, name: str, words_in: List[str], console: bool) -> str {
     var extra = List[str]()
     (mut extra).push("XDG_CONFIG_HOME=" + row_dir(name) + "-config")
-    if console { (mut extra).push("WARREN_RENDER=console") }
+    for w in words_in { (mut extra).push(w) }
     var r = launch_window(warren, name, "", words("new -s c"), 80, 24, 80, 24, extra) else |e| { return "launch: {e}" }
     if !until_screen(mut r, "$", 10000) { close_run(r); return "no prompt" }
     type_text(mut r, "printf 'S1 alpha\\nS2 beta\\n'\r")
@@ -1538,6 +1574,7 @@ fn run_row(warren: str, name: str) -> str {
     if name == "mouse-legacy" { return row_mouse_e2e(warren, true) }
     if name == "clipboard-osc52" { return row_clipboard_e2e(warren, false) }
     if name == "clipboard-console" { return row_clipboard_e2e(warren, true) }
+    if name.starts_with("console-term-") { return row_console_choice(warren, name) }
     if name == "zero-window" { return row_zero_window(warren) }
     if name == "zero-window-env" { return row_zero_window_env(warren) }
     if name == "quick-legacy" { return row_quick_e2e(warren, 0) }
@@ -1577,7 +1614,7 @@ fn main() -> int {
     }
     let quick_defaults = rows.len == 0
     if rows.len == 0 {
-        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names split-e2e mouse-sgr mouse-legacy clipboard-osc52 clipboard-console zero-window zero-window-env window-too-large")
+        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names split-e2e mouse-sgr mouse-legacy clipboard-osc52 clipboard-console console-term-linux console-term-linux-variable console-term-linux-overridden console-term-other zero-window zero-window-env window-too-large")
         // The memory row reads the client's resident set from /proc.
         if fs.exists("/proc/self/status") {
             (mut rows).push("memory-bounded")
