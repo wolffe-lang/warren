@@ -196,8 +196,10 @@ session_rows() (
     list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies
     reply-projection reply-memory-refused
     send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes
-    capture-cases capture-register capture-full-ring capture-over-cap)
-  if [ "$mode" = linux ]; then rows+=(pane-signals-and-handles threads rss-flat); fi
+    capture-cases capture-register capture-full-ring capture-over-cap
+    pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited split-starts-in-pane-cwd split-reported-missing
+    split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails)
+  if [ "$mode" = linux ]; then rows+=(pane-signals-and-handles threads rss-flat pane-cwd-from-proc); fi
   rm -rf target/rows && mkdir -p target/rows && cd target/rows
   "$root/target/native/session-rows" "$root/target/native/warren" "${rows[@]}"
 )

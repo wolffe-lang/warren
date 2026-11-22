@@ -18,6 +18,7 @@ use std.fs
 use std.json
 use std.net
 use std.net.unix
+use std.os
 use std.process
 use std.signal
 use std.sort
@@ -631,7 +632,12 @@ fn row_list_json(mut r: Rig) -> str {
     if !client.until_text(mut b, "$", 5000) { return "no prompt in two" }
     let l = listed(r)
     if l.status != 0 { return l.err }
-    let want = "{{\"schema\":1,\"sessions\":[{{\"id\":\"s1\",\"name\":\"one\",\"cols\":80,\"rows\":24,\"clients\":1,\"active_tab\":\"t1\",\"tabs\":[{{\"id\":\"t1\",\"name\":\"\",\"index\":1,\"focus\":\"p1\",\"zoomed\":false,\"panes\":[{{\"id\":\"p1\",\"index\":1,\"col\":1,\"row\":1,\"cols\":80,\"rows\":22,\"pid\":N,\"title\":\"\"}}]}}]}},{{\"id\":\"s2\",\"name\":\"two\",\"cols\":100,\"rows\":30,\"clients\":1,\"active_tab\":\"t2\",\"tabs\":[{{\"id\":\"t2\",\"name\":\"\",\"index\":1,\"focus\":\"p2\",\"zoomed\":false,\"panes\":[{{\"id\":\"p2\",\"index\":1,\"col\":1,\"row\":1,\"cols\":100,\"rows\":28,\"pid\":N,\"title\":\"\"}}]}}]}}]}}"
+    // Each shell is where it started, the session's start directory: /proc
+    // says so on Linux, and elsewhere the start is the source.
+    let place = moved_listing(env.cwd() else "/").split("|")
+    let cwd = place[0]
+    let source = place[1]
+    let want = "{{\"schema\":2,\"sessions\":[{{\"id\":\"s1\",\"name\":\"one\",\"cols\":80,\"rows\":24,\"clients\":1,\"active_tab\":\"t1\",\"tabs\":[{{\"id\":\"t1\",\"name\":\"\",\"index\":1,\"focus\":\"p1\",\"zoomed\":false,\"panes\":[{{\"id\":\"p1\",\"index\":1,\"col\":1,\"row\":1,\"cols\":80,\"rows\":22,\"pid\":N,\"title\":\"\",\"cwd\":\"{cwd}\",\"cwd_source\":\"{source}\"}}]}}]}},{{\"id\":\"s2\",\"name\":\"two\",\"cols\":100,\"rows\":30,\"clients\":1,\"active_tab\":\"t2\",\"tabs\":[{{\"id\":\"t2\",\"name\":\"\",\"index\":1,\"focus\":\"p2\",\"zoomed\":false,\"panes\":[{{\"id\":\"p2\",\"index\":1,\"col\":1,\"row\":1,\"cols\":100,\"rows\":28,\"pid\":N,\"title\":\"\",\"cwd\":\"{cwd}\",\"cwd_source\":\"{source}\"}}]}}]}}]}}"
     let got = without_pids(l.out)
     if got != want { return "listing: {got}" }
     if !l.out.ends_with("\n") { return "the listing does not end its line" }
@@ -1834,6 +1840,325 @@ fn row_split_in_dir(mut r: Rig) -> str {
     ""
 }
 
+// ---- a pane's working directory (OSC 7, /proc, the session's start) ----
+
+// The shell text that prints OSC 7 for `path` on `host` (a shell word: it
+// may be `$(uname -n)`).
+fn osc7_report(host: str, path: str) -> str {
+    "printf '\\033]7;file://%s%s\\007' \"" + host + "\" \"" + path + "\"; "
+}
+
+// The shell text that prints `CWD-%N=LEAF`: the pane's id and the last part
+// of the directory its program started in.
+fn print_start() -> str {
+    "p=$(pwd -P); printf 'CWD-%s=%s\\n' \"$WARREN_PANE\" \"$" + "{{p##*/}}\"; "
+}
+
+// The last part of `path` once its links are resolved.
+fn last_part(path: str) -> str {
+    let full = fs.realpath(path) else path
+    fs.file_name(full) else full
+}
+
+// `path` with its links resolved (what /proc names).
+fn resolved(path: str) -> str {
+    fs.realpath(path) else path
+}
+
+// The `cwd` and `cwd_source` of pane `id` in a listing, as `CWD|SOURCE`,
+// or "" when the listing has no such pane or fields.
+fn listed_cwd(json: str, id: str) -> str {
+    let at = json.find("{{\"id\":\"{id}\",") else { return "" }
+    let rest = json[at..json.len]
+    let c = rest.find("\"cwd\":\"") else { return "" }
+    let after = rest[c + 7..rest.len]
+    let q = after.find("\",\"cwd_source\":\"") else { return "" }
+    let source = after[q + 16..after.len]
+    let e = source.find("\"") else { return "" }
+    after[0..q] + "|" + source[0..e]
+}
+
+// Whether pane `id`'s pid is null in a listing.
+fn listed_pid_null(json: str, id: str) -> bool {
+    let at = json.find("{{\"id\":\"{id}\",") else { return false }
+    let rest = json[at..json.len]
+    let end = rest.find("}}") else { return false }
+    rest[0..end].contains("\"pid\":null,")
+}
+
+// Ask for the listing until pane `id`'s directory and source are `want`
+// (`CWD|SOURCE`), for at most 5 s: "" when they were, else what was listed.
+fn until_cwd(r: Rig, id: str, want: str) -> str {
+    let until = now_ms() + 5000
+    var last = ""
+    while now_ms() < until {
+        let l = ask(r, "list --json", "")
+        if l.status == 0 {
+            last = listed_cwd(l.out, id)
+            if last == want { return "" }
+        }
+        time.sleep(time.millis(100))
+    }
+    "pane {id} listed '{last}', not '{want}'"
+}
+
+// Ask for the listing until pane `id`'s pid is null, for at most 5 s.
+fn until_pid_null(r: Rig, id: str) -> bool {
+    let until = now_ms() + 5000
+    while now_ms() < until {
+        let l = ask(r, "list --json", "")
+        if l.status == 0 && listed_pid_null(l.out, id) { return true }
+        time.sleep(time.millis(100))
+    }
+    false
+}
+
+// The directory and source a pane whose program moved to `moved` without a
+// report is listed with: what /proc says on Linux, else the session's start.
+fn moved_listing(moved: str) -> str {
+    if os.name() == "linux" { return resolved(moved) + "|proc" }
+    (env.cwd() else "/") + "|start"
+}
+
+// The plant's row: a pane's program reports, by OSC 7, a directory it did
+// not start in, and the listing names that directory, learnt from `osc7`.
+fn row_pane_cwd_from_osc7(mut r: Rig) -> str {
+    let told = beside(r, "told")
+    fs.create_dir_all(told) else |e| { return "mkdir: {e}" }
+    let script = beside(r, "osc7.sh")
+    fs.write_text(script, osc7_report("", told) + "printf 'SENT\\n'; exec /bin/sh\n") else |e| { return "the script: {e}" }
+    let why = start_server(mut r, "/bin/sh " + script)
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "SENT", 5000) { return "the pane printed nothing: " + client.screen_text(a) }
+    let w = until_cwd(r, "p1", told + "|osc7")
+    client.hang_up(mut a)
+    w
+}
+
+// Linux: a shell that moves without a report is listed where /proc says it
+// is, learnt from `proc`.
+fn row_pane_cwd_from_proc(mut r: Rig) -> str {
+    let moved = beside(r, "moved")
+    fs.create_dir_all(moved) else |e| { return "mkdir: {e}" }
+    let script = beside(r, "move.sh")
+    fs.write_text(script, "cd \"" + moved + "\" || exit 1; printf 'MOVED\\n'; exec /bin/sh\n") else |e| { return "the script: {e}" }
+    let why = start_server(mut r, "/bin/sh " + script)
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "MOVED", 5000) { return "the pane printed nothing: " + client.screen_text(a) }
+    let w = until_cwd(r, "p1", resolved(moved) + "|proc")
+    client.hang_up(mut a)
+    w
+}
+
+// With no report, a pane is listed at its session's start directory,
+// learnt from `start`. On a host with no /proc: a live program that moved.
+// On Linux: a pane whose program has ended (its pid null), though it moved
+// first; it leaves a child that ignores hangup holding the terminal open
+// (where the host revokes a terminal when its session leader ends, as BSDs
+// do, the pane ends with its program and there is no such pane to list).
+fn row_pane_cwd_start(mut r: Rig) -> str {
+    let moved = beside(r, "moved")
+    fs.create_dir_all(moved) else |e| { return "mkdir: {e}" }
+    let here = env.cwd() else "/"
+    let script = beside(r, "move.sh")
+    fs.write_text(script, "cd \"" + moved + "\" || exit 1; if [ \"$WARREN_PANE\" = %1 ]; then printf 'MOVED\\n'; exec sleep 60; fi; " +
+        "(trap '' HUP; exec sleep 60) & printf 'ENDING\\n'; exit 0\n") else |e| { return "the script: {e}" }
+    let why = start_server(mut r, "/bin/sh " + script)
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "MOVED", 5000) { return "the pane printed nothing: " + client.screen_text(a) }
+    if os.name() != "linux" {
+        let live = until_cwd(r, "p1", here + "|start")
+        client.hang_up(mut a)
+        if live.len > 0 { return "a live pane on a host with no /proc: " + live }
+        return ""
+    }
+    let s = ask(r, "split-right -t work", "")
+    if s.status != 0 { return "split-right: {s.status} '{s.err.trim()}'" }
+    if !client.until_text(mut a, "ENDING", 5000) { return "the second pane printed nothing: " + client.screen_text(a) }
+    if !until_pid_null(r, "p2") { return "the second pane's program did not end with its terminal held open" }
+    let w = until_cwd(r, "p2", here + "|start")
+    client.hang_up(mut a)
+    if w.len > 0 { return "an ended program: " + w }
+    ""
+}
+
+// A pane made in a slot another pane left does not inherit that pane's
+// report: pane 1 reports, is closed, and pane 3 takes its slot.
+fn row_pane_cwd_not_inherited(mut r: Rig) -> str {
+    let told = beside(r, "told")
+    let other = beside(r, "other")
+    fs.create_dir_all(told) else |e| { return "mkdir: {e}" }
+    fs.create_dir_all(other) else |e| { return "mkdir: {e}" }
+    let script = beside(r, "osc7.sh")
+    fs.write_text(script, "if [ \"$WARREN_PANE\" = %1 ]; then " + osc7_report("", told) + "fi; printf 'READY-%s\\n' \"$WARREN_PANE\"; exec /bin/sh\n") else |e| { return "the script: {e}" }
+    let why = start_server(mut r, "/bin/sh " + script)
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "READY-%1", 5000) { return "the pane printed nothing: " + client.screen_text(a) }
+    let first = until_cwd(r, "p1", told + "|osc7")
+    if first.len > 0 { return "the first report: " + first }
+    let s = ask(r, "split-right -t work -c " + other, "")
+    if s.status != 0 { return "split-right: {s.status} '{s.err.trim()}'" }
+    let c = ask(r, "close-pane -t p1", "")
+    if c.status != 0 { return "close-pane: {c.status} '{c.err.trim()}'" }
+    let t = ask(r, "split-right -t p2 -c " + other, "")
+    if t.status != 0 || t.out != "p3\n" { return "split-right made '{t.out.trim()}' ({t.status} '{t.err.trim()}')" }
+    if !client.until_text(mut a, "READY-%3", 5000) { return "the third pane printed nothing: " + client.screen_text(a) }
+    let w = until_cwd(r, "p3", moved_listing(other))
+    client.hang_up(mut a)
+    w
+}
+
+// Where a new pane starts with no -c: a split in the directory of the pane
+// it splits (here, the one that pane reported), a new tab in the session's
+// start directory; -c overrides.
+fn row_split_starts_in_pane_cwd(mut r: Rig) -> str {
+    let told = beside(r, "told")
+    let other = beside(r, "other")
+    fs.create_dir_all(told) else |e| { return "mkdir: {e}" }
+    fs.create_dir_all(other) else |e| { return "mkdir: {e}" }
+    let here = env.cwd() else "/"
+    let script = beside(r, "start.sh")
+    fs.write_text(script, print_start() + osc7_report("", told) + "exec /bin/sh\n") else |e| { return "the script: {e}" }
+    let why = start_server(mut r, "/bin/sh " + script)
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "CWD-%1={last_part(here)}", 5000) { return "the first pane: " + client.screen_text(a) }
+    let first = until_cwd(r, "p1", told + "|osc7")
+    if first.len > 0 { return "the report: " + first }
+    let s = ask(r, "split-right -t work", "")
+    if s.status != 0 { return "split-right: {s.status} '{s.err.trim()}'" }
+    if !client.until_text(mut a, "CWD-%2={last_part(told)}", 5000) { return "the split did not start where its pane reported: " + client.screen_text(a) }
+    let t = ask(r, "new-tab -t work", "")
+    if t.status != 0 { return "new-tab: {t.status} '{t.err.trim()}'" }
+    if !client.until_text(mut a, "CWD-%3={last_part(here)}", 5000) { return "the new tab did not start in the session's directory: " + client.screen_text(a) }
+    let c = ask(r, "split-right -t work -c " + other, "")
+    if c.status != 0 { return "split-right -c: {c.status} '{c.err.trim()}'" }
+    if !client.until_text(mut a, "CWD-%4={last_part(other)}", 5000) { return "-c did not override: " + client.screen_text(a) }
+    client.hang_up(mut a)
+    ""
+}
+
+// A reported path is used only if it names a directory that exists: pane 1
+// moves without a report, then reports `reported`, and both its listing and
+// a split from it fall back to the next source (/proc on Linux, else the
+// session's start).
+fn split_falls_back(mut r: Rig, reported: str) -> str {
+    let moved = beside(r, "moved")
+    fs.create_dir_all(moved) else |e| { return "mkdir: {e}" }
+    let script = beside(r, "told.sh")
+    fs.write_text(script, print_start() + "cd \"" + moved + "\" || exit 1; " + osc7_report("", reported) +
+        "printf 'TOLD-%s\\n' \"$WARREN_PANE\"; exec /bin/sh\n") else |e| { return "the script: {e}" }
+    let why = start_server(mut r, "/bin/sh " + script)
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "TOLD-%1", 5000) { return "the pane printed nothing: " + client.screen_text(a) }
+    let want = moved_listing(moved)
+    let w = until_cwd(r, "p1", want)
+    if w.len > 0 { return "the listing: " + w }
+    let s = ask(r, "split-right -t work", "")
+    if s.status != 0 { return "split-right: {s.status} '{s.err.trim()}'" }
+    let dir = want.split("|")[0]
+    if !client.until_text(mut a, "CWD-%2={last_part(dir)}", 5000) { return "the split did not start in {dir}: " + client.screen_text(a) }
+    client.hang_up(mut a)
+    ""
+}
+
+fn row_split_reported_missing(mut r: Rig) -> str {
+    let absent = beside(r, "absent")
+    split_falls_back(mut r, absent)
+}
+
+fn row_split_reported_file(mut r: Rig) -> str {
+    let file = beside(r, "a-file")
+    fs.write_text(file, "not a directory\n") else |e| { return "the file: {e}" }
+    split_falls_back(mut r, file)
+}
+
+// With no stand-in, a report naming this machine as `uname -n` prints it is
+// taken (the server's own name for it agrees).
+fn row_host_name_this_host(mut r: Rig) -> str {
+    let told = beside(r, "told")
+    fs.create_dir_all(told) else |e| { return "mkdir: {e}" }
+    let script = beside(r, "osc7.sh")
+    fs.write_text(script, osc7_report("$(uname -n)", told) + "printf 'SENT\\n'; exec /bin/sh\n") else |e| { return "the script: {e}" }
+    let why = start_server(mut r, "/bin/sh " + script)
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "SENT", 5000) { return "the pane printed nothing: " + client.screen_text(a) }
+    let w = until_cwd(r, "p1", told + "|osc7")
+    client.hang_up(mut a)
+    w
+}
+
+// A server started with a stand-in for the host-name program.
+fn start_with_stand_in(mut r: Rig, stand_in: str, pane_command: str) -> str {
+    let path = beside(r, "hostname.sh")
+    fs.write_text(path, "#!/bin/sh\n" + stand_in + "\n") else |e| { return "the stand-in: {e}" }
+    fs.set_mode(path, 493) else |e| { return "the stand-in's mode: {e}" }
+    env.set("WARREN_HOST_NAME_PROGRAM", path) else { return "env" }
+    let why = start_server(mut r, pane_command)
+    env.unset("WARREN_HOST_NAME_PROGRAM") else |_| {}
+    why
+}
+
+// The machine named `box.example.com`: a report naming `box` (the short
+// name for the long) is taken, then one naming `box.other.org` is not.
+fn row_host_name_stand_in(mut r: Rig) -> str {
+    let told = beside(r, "told")
+    let other = beside(r, "other")
+    fs.create_dir_all(told) else |e| { return "mkdir: {e}" }
+    fs.create_dir_all(other) else |e| { return "mkdir: {e}" }
+    let script = beside(r, "osc7.sh")
+    fs.write_text(script, osc7_report("box", told) + osc7_report("box.other.org", other) + "printf 'SENT\\n'; exec /bin/sh\n") else |e| { return "the script: {e}" }
+    let why = start_with_stand_in(mut r, "echo box.example.com", "/bin/sh " + script)
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "SENT", 5000) { return "the pane printed nothing: " + client.screen_text(a) }
+    let w = until_cwd(r, "p1", told + "|osc7")
+    client.hang_up(mut a)
+    w
+}
+
+// One server with a stand-in for the host-name program: it answers within
+// 4 s of starting, a report naming the machine is not taken (the server
+// has no name for it), and one naming `localhost` still is.
+fn host_name_fails(mut r: Rig, stand_in: str, label: str) -> str {
+    let named = beside(r, "named")
+    let loopback = beside(r, "loopback")
+    fs.create_dir_all(named) else |e| { return "mkdir: {e}" }
+    fs.create_dir_all(loopback) else |e| { return "mkdir: {e}" }
+    let script = beside(r, "osc7.sh")
+    fs.write_text(script, osc7_report("localhost", loopback) + osc7_report("box.example.com", named) + "printf 'SENT\\n'; exec /bin/sh\n") else |e| { return "the script: {e}" }
+    let t0 = now_ms()
+    let why = start_with_stand_in(mut r, stand_in, "/bin/sh " + script)
+    if why.len > 0 { return "{label}: {why}" }
+    let l = ask(r, "list --json", "")
+    let t1 = now_ms()
+    print("MEASURE host-name-stand-in-fails {label} start-to-answer-ms={t1 - t0}")
+    if l.status != 0 { return "{label}: list --json: {l.status} '{l.err.trim()}'" }
+    if t1 - t0 > 4000 { return "{label}: the server answered {t1 - t0} ms after it started" }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "{label}: dial-{e}" }
+    if !client.until_text(mut a, "SENT", 5000) { return "{label}: the pane printed nothing: " + client.screen_text(a) }
+    let w = until_cwd(r, "p1", loopback + "|osc7")
+    client.hang_up(mut a)
+    if w.len > 0 { return "{label}: " + w }
+    let _s = stop_server(mut r)
+    ""
+}
+
+// The host-name program fails (exits 3, printing nothing) and never ends
+// (killed at the wait's end): either way the server starts and takes only
+// the empty host and `localhost`.
+fn row_host_name_stand_in_fails(mut r: Rig) -> str {
+    let fails = host_name_fails(mut r, "exit 3", "exits")
+    if fails.len > 0 { return fails }
+    host_name_fails(mut r, "exec sleep 30", "never-ends")
+}
+
 // `-- CMD` runs CMD with its words as given: no shell joins and splits
 // them again, so a word with a space and a word with a `$` arrive as they
 // were sent.
@@ -2763,6 +3088,16 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "rename-session" { why = row_rename_session(mut r) }
     else if name == "detach-from-shell" { why = row_detach_from_shell(mut r) }
     else if name == "split-in-dir" { why = row_split_in_dir(mut r) }
+    else if name == "pane-cwd-from-osc7" { why = row_pane_cwd_from_osc7(mut r) }
+    else if name == "pane-cwd-from-proc" { why = row_pane_cwd_from_proc(mut r) }
+    else if name == "pane-cwd-start" { why = row_pane_cwd_start(mut r) }
+    else if name == "pane-cwd-not-inherited" { why = row_pane_cwd_not_inherited(mut r) }
+    else if name == "split-starts-in-pane-cwd" { why = row_split_starts_in_pane_cwd(mut r) }
+    else if name == "split-reported-missing" { why = row_split_reported_missing(mut r) }
+    else if name == "split-reported-file" { why = row_split_reported_file(mut r) }
+    else if name == "host-name-this-host" { why = row_host_name_this_host(mut r) }
+    else if name == "host-name-stand-in" { why = row_host_name_stand_in(mut r) }
+    else if name == "host-name-stand-in-fails" { why = row_host_name_stand_in_fails(mut r) }
     else if name == "split-runs-command" { why = row_split_runs_command(mut r) }
     else if name == "split-prints-new-id" { why = row_split_prints_new_id(mut r) }
     else if name == "create-refusals-change-nothing" { why = row_create_refusals(mut r) }
@@ -2793,7 +3128,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails".split(" ") {
         (mut x).push(n)
     }
     x
