@@ -656,7 +656,12 @@ fn quoted_title_json() -> str {
 // One session `a` of 32 panes, one a tab, each running `--title-quotes`;
 // "" when every pane was made, else why not.
 fn quoted_session(mut r: Rig) -> str {
-    let why = start_server(mut r, self_path() + " --title-quotes")
+    traced_quoted_session(mut r, "")
+}
+
+// The same, the server's trace kept at `trace` when that is not empty.
+fn traced_quoted_session(mut r: Rig, trace: str) -> str {
+    let why = start_traced(mut r, self_path() + " --title-quotes", 60000, trace)
     if why.len > 0 { return why }
     var a = attach(r, 80, 24, "a", 1) else |e| { return "dial-{e}" }
     if !client.until_kind(mut a, 131, 5000) { return "no first image" }
@@ -792,6 +797,239 @@ fn row_reply_slow_reader(mut r: Rig) -> str {
     let stalled = read_slowly(r, 0, 8192, 0, 3000)
     if stalled.len > 0 { print("NOTE reply-slow-reader: the stalled reader's socket took the whole REPLY") }
     ""
+}
+
+// One `list --json` sent by hand on its own connection, not yet read.
+fn send_listing(r: Rig) -> client.Peer ! client.DialErrors {
+    var p = client.dial(socket(r))?
+    var none = List[str]()
+    let _h = client.send(p, 1, client.hello_payload(2, 0, 0, "", 0, "", none, none))
+    var b = List[byte]()
+    proto.put(mut b, 9, 4)
+    proto.put(mut b, 2, 2)
+    proto.put_text(mut b, "list")
+    proto.put_text(mut b, "--json")
+    proto.put_text(mut b, "/")
+    proto.put_text(mut b, "")
+    let _c = client.send(p, 11, b)
+    p
+}
+
+// A REPLY's payload read whole from a connection sent by `send_listing`,
+// at full speed for at most `ms`; empty when the connection ended first.
+fn read_reply(mut p: client.Peer, ms: int) -> List[byte] {
+    var s = net.Socket { fd: p.fd }
+    var got = List[byte]()
+    var payload = List[byte]()
+    let until = now_ms() + ms
+    while now_ms() < until {
+        let part = net.read_bytes(mut s, 65536) else |_| { break }
+        if part.len == 0 { break }
+        for x in part { (mut got).push(x) }
+        payload = reply_in(got)
+        if payload.len > 0 { break }
+    }
+    client.hang_up(mut p)
+    payload
+}
+
+// A REPLY payload's status, output and error.
+fn answer_of(payload: List[byte]) -> Answer {
+    if payload.len < 13 { return Answer { status: 0 - 1, out: "", err: "no REPLY" } }
+    let out_len = le4(payload, 5)
+    let err_len = le4(payload, 9 + out_len)
+    Answer { status: payload[4] as int, out: str_from_utf8(payload[9..9 + out_len]) else "",
+        err: str_from_utf8(payload[13 + out_len..13 + out_len + err_len]) else "" }
+}
+
+// The server's trace lines, `warren-server: ` taken off.
+fn trace_lines(path: str) -> List[str] {
+    var out = List[str]()
+    let text = fs.read_text(path) else ""
+    for line in text.lines() {
+        if line.starts_with("warren-server: ") { (mut out).push(line[15..line.len]) }
+    }
+    out
+}
+
+// The figures of the trace's `memory projected P, reply buffer R` lines, in
+// order: P then R for each.
+fn memory_figures(path: str) -> List[int] {
+    var out = List[int]()
+    for line in trace_lines(path) {
+        if line.starts_with("memory projected ") {
+            let parts = line[17..line.len].split(", reply buffer ")
+            if parts.len == 2 {
+                (mut out).push(parts[0].to_int() else 0 - 1)
+                (mut out).push(parts[1].to_int() else 0 - 1)
+            }
+        }
+    }
+    out
+}
+
+// The figures after the latest REPLY: [projected, reply buffer], or [-1, -1].
+fn last_memory(path: str) -> List[int] {
+    let all = memory_figures(path)
+    var out = List[int]()
+    if all.len < 2 {
+        (mut out).push(0 - 1)
+        (mut out).push(0 - 1)
+        return out
+    }
+    (mut out).push(all[all.len - 2])
+    (mut out).push(all[all.len - 1])
+    out
+}
+
+// The memory projection around large REPLYs (warren#79 as ruled: retained
+// storage bounded and counted). A large REPLY goes out from the one
+// server-wide reply buffer, which stays counted once its connection has
+// closed; the connection's slot is counted at its share, which does not
+// grow when the slot is reused; a second large REPLY reuses the buffer
+// without growing it. Figures from the trace's `memory projected` line
+// after each REPLY.
+fn row_reply_projection(mut r: Rig) -> str {
+    let path = beside(r, "trace")
+    let why = traced_quoted_session(mut r, path)
+    if why.len > 0 { return why }
+    let a = ask(r, "ls", "")
+    if a.status != 0 { return "ls: {a.status} '{a.err.trim()}'" }
+    let before = last_memory(path)
+    if before[0] < 0 { return "no memory line after the first ls" }
+    if before[1] != 0 { return "the reply buffer held {before[1]} bytes before any large REPLY" }
+    let l = quoted_listing(r)
+    if l.status != 0 { return "the listing of 32 titled panes: {l.err}" }
+    let b = ask(r, "ls", "")
+    if b.status != 0 { return "ls after: {b.status} '{b.err.trim()}'" }
+    let after = last_memory(path)
+    if after[1] <= l.out.len { return "the reply buffer holds {after[1]} bytes, not the listing's {l.out.len} and more" }
+    if after[0] != before[0] + after[1] { return "projected {before[0]} before and {after[0]} after: {after[0] - before[0]} more, not the reply buffer's {after[1]}" }
+    let again = ask(r, "list --json", "")
+    if again.status != 0 { return "a second listing: {again.status} '{again.err.trim()}'" }
+    let second = last_memory(path)
+    if second[1] != after[1] { return "the second large REPLY grew the reply buffer from {after[1]} to {second[1]}" }
+    let c = ask(r, "ls", "")
+    if c.status != 0 { return "ls last: {c.status} '{c.err.trim()}'" }
+    let last = last_memory(path)
+    if last[0] != after[0] { return "projected {after[0]} after the first large REPLY and {last[0]} after the second: a slot grew on reuse" }
+    ""
+}
+
+// A large REPLY the memory budget has no room for is refused by name
+// (status 1), and the server goes on. The projection is read from a first
+// server's trace; a second server is given that figure and 64 KiB more,
+// less than the listing's reply buffer needs.
+fn row_reply_memory_refused(mut r: Rig) -> str {
+    let path = beside(r, "trace")
+    let why = traced_quoted_session(mut r, path)
+    if why.len > 0 { return why }
+    let a = ask(r, "ls", "")
+    if a.status != 0 { return "ls: {a.status} '{a.err.trim()}'" }
+    let first = last_memory(path)
+    if first[0] < 0 { return "no memory line after ls" }
+    let st = stop_server(mut r)
+    if st != 0 { return "the first server's exit {st}" }
+    let budget = first[0] + 65536
+    let path2 = beside(r, "trace-2")
+    env.set("WARREN_MEMORY_BUDGET", "{budget}") else { return "env" }
+    let why2 = traced_quoted_session(mut r, path2)
+    env.set("WARREN_MEMORY_BUDGET", "0") else { return "env" }
+    if why2.len > 0 { return "under a budget of {budget}: {why2}" }
+    let b = ask(r, "ls", "")
+    if b.status != 0 { return "ls under the budget: {b.status} '{b.err.trim()}'" }
+    let second = last_memory(path2)
+    // The two servers hold the same panes and slots; the images their
+    // attached client was sent may differ a little, so within 32 KiB.
+    let drift = if second[0] > first[0] then second[0] - first[0] else first[0] - second[0]
+    if drift > 32768 { return "projected {first[0]} on the first server and {second[0]} on the second" }
+    time.sleep(time.millis(1500))
+    let l = ask(r, "list --json", "")
+    if l.status == 0 { return "a listing of {l.out.len} bytes was sent under a budget with 64 KiB to spare" }
+    if l.status != 1 || !l.err.contains("memory budget") { return "the listing: status {l.status}, '{l.err.trim()}', not refused by the memory budget" }
+    let c = ask(r, "ls", "")
+    if c.status != 0 { return "the server did not go on: ls {c.status}" }
+    ""
+}
+
+// Two large REPLYs at once share the one reply buffer in turn: both
+// arrive whole, the second only after the first's connection has closed.
+// The second's wait is bounded (WARREN_REPLY_WAIT_MS lowered to 500 ms for
+// the row): when the first holds the buffer longer, the second is refused
+// by name.
+fn row_two_large_replies(mut r: Rig) -> str {
+    let path = beside(r, "trace")
+    env.set("WARREN_REPLY_WAIT_MS", "500") else { return "env" }
+    let why = traced_quoted_session(mut r, path)
+    env.set("WARREN_REPLY_WAIT_MS", "0") else { return "env" }
+    if why.len > 0 { return why }
+    let l = quoted_listing(r)
+    if l.status != 0 { return "the listing of 32 titled panes: {l.err}" }
+    var a = send_listing(r) else |e| { return "dial a: {e}" }
+    time.sleep(time.millis(50))
+    var b = send_listing(r) else |e| { return "dial b: {e}" }
+    time.sleep(time.millis(200))
+    let pa = answer_of(read_reply(mut a, 10000))
+    let pb = answer_of(read_reply(mut b, 10000))
+    if pa.status != 0 || pa.out.len != l.out.len { return "the first of two: status {pa.status}, {pa.out.len} bytes of {l.out.len} '{pa.err.trim()}'" }
+    if pb.status != 0 || pb.out.len != l.out.len { return "the second of two: status {pb.status}, {pb.out.len} bytes of {l.out.len} '{pb.err.trim()}'" }
+    let lines = trace_lines(path)
+    var waiter = ""
+    var holder = ""
+    var k = 0
+    var waited_at = 0 - 1
+    while k < lines.len {
+        if lines[k].ends_with(" waits for the reply buffer") && waited_at < 0 {
+            waiter = lines[k].split(" ")[1]
+            waited_at = k
+        }
+        k += 1
+    }
+    if waited_at < 0 {
+        print("NOTE two-large-replies: the second never waited (the first's socket took its REPLY at once)")
+    } else {
+        k = waited_at
+        while k >= 0 && holder.len == 0 {
+            if lines[k].contains(" REPLY ") && lines[k].ends_with("from the reply buffer") { holder = lines[k].split(" ")[1] }
+            k -= 1
+        }
+        var closed_at = 0 - 1
+        var second_at = 0 - 1
+        k = waited_at
+        while k < lines.len {
+            if closed_at < 0 && lines[k].starts_with("conn {holder} closed") { closed_at = k }
+            if second_at < 0 && lines[k].starts_with("conn {waiter} REPLY ") { second_at = k }
+            k += 1
+        }
+        if holder.len == 0 || closed_at < 0 || second_at < 0 || second_at < closed_at {
+            return "the second REPLY (conn {waiter}) went out at trace line {second_at}, the holder (conn {holder}) closed at {closed_at}"
+        }
+    }
+    let waits_before = waits_in(path)
+    var c = send_listing(r) else |e| { return "dial c: {e}" }
+    time.sleep(time.millis(50))
+    var d = send_listing(r) else |e| { return "dial d: {e}" }
+    time.sleep(time.millis(1500))
+    let pc = answer_of(read_reply(mut c, 10000))
+    let pd = answer_of(read_reply(mut d, 10000))
+    if pc.status != 0 || pc.out.len != l.out.len { return "the holder of a long wait: status {pc.status}, {pc.out.len} bytes '{pc.err.trim()}'" }
+    if waits_in(path) == waits_before {
+        print("NOTE two-large-replies: the long wait never happened (the first's socket took its REPLY at once)")
+        return ""
+    }
+    if pd.status != 1 || !pd.err.contains("reply buffer") {
+        return "the second waited 1.5 s past a 500 ms bound: status {pd.status}, {pd.out.len} bytes, '{pd.err.trim()}', not refused by name"
+    }
+    ""
+}
+
+// How many times the trace says a connection waits for the reply buffer.
+fn waits_in(path: str) -> int {
+    var n = 0
+    for line in trace_lines(path) {
+        if line.ends_with(" waits for the reply buffer") { n += 1 }
+    }
+    n
 }
 
 // Ids are never handed out again: a closed pane's, an ended session's and
@@ -1885,13 +2123,16 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "title-on-focus" { why = row_title_on_focus(mut r) }
     else if name == "list-json-over-queue" { why = row_list_json_over_queue(mut r) }
     else if name == "reply-slow-reader" { why = row_reply_slow_reader(mut r) }
+    else if name == "two-large-replies" { why = row_two_large_replies(mut r) }
+    else if name == "reply-projection" { why = row_reply_projection(mut r) }
+    else if name == "reply-memory-refused" { why = row_reply_memory_refused(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader two-large-replies reply-projection reply-memory-refused".split(" ") {
         (mut x).push(n)
     }
     x

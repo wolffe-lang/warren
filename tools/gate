@@ -183,7 +183,7 @@ session_rows() (
     prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json
     ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command
     split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus
-    list-json-over-queue reply-slow-reader)
+    list-json-over-queue reply-slow-reader two-large-replies reply-projection reply-memory-refused)
   if [ "$mode" = linux ]; then rows+=(pane-signals-and-handles threads rss-flat); fi
   rm -rf target/rows && mkdir -p target/rows && cd target/rows
   "$root/target/native/session-rows" "$root/target/native/warren" "${rows[@]}"
