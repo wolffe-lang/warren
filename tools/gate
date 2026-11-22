@@ -110,6 +110,7 @@ step peak-bound-rows python3 -I tests/vt/peak_bound_rows.py "$root/target/native
 # takes recorded for this host in tests/vt/ring-resident-takes.json; early, so a change that makes a pane dearer
 # stops the gate here.
 step ring-probe-build "$WOLF" build --deny-warnings src/ring_probe.lu -o "$root/target/native/ring-probe"
+step ring-resident-rows python3 -I tests/vt/ring_resident_rows.py "$root/target/native/measure-child" "$root/target/native/ring-probe"
 step width-vector-build "$WOLF" build --deny-warnings src/vt_width_vector.lu -o "$root/target/native/vt-width-vector"
 step width-vector-native python3 -I tests/vt/width_vector_rows.py --out "$root/target/vt/native-widths.bin" "$root/target/native/vt-width-vector"
 step resource-smoke-build "$WOLF" build --deny-warnings src/vt_resource_test.lu -o "$root/target/native/resource-smoke"
