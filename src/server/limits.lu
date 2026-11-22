@@ -11,8 +11,9 @@ pub const MAX_CONNECTIONS: int = 32
 /// Connections accepted and not yet past HELLO, held at once.
 pub const MAX_PENDING: int = 4
 /// Scrollback history bytes retained per pane. 2 MiB while the emulator
-/// makes its whole ring at creation and again at its first resize
-/// (warren#7): a pane then costs about six times this.
+/// makes its whole ring when a pane is made (warren#67): measured on Linux,
+/// that peaks at three times this and keeps two times this resident
+/// (docs/SERVER.md, the `ring-resident-rows` step).
 pub const HISTORY_BYTES: int = 2097152
 /// Projected server memory past which a new connection or session is
 /// refused with REFUSE resource-limit (7).
@@ -22,10 +23,13 @@ pub const CELL_BYTES: int = 64
 /// Wire bytes a cell may cost in the worst image (a run and three scalars).
 pub const WIRE_CELL_BYTES: int = 34
 
-/// Projected bytes of a pane as measured resident: its history ring six
-/// times over (made whole with a copy when the emulator is made, then
-/// four times more at its first resize: 16.4 MB and 32.8 MB for an 8 MiB
-/// ring), both screens, and 1 MiB for its fixed buffers.
+/// Projected bytes of a pane: its history ring six times over, both screens
+/// and 1 MiB for its fixed buffers. This is deliberately above the measured
+/// cost, not the cost: on Linux the first pane made at the 2 MiB cap peaks
+/// at 7.5 to 7.9 MB (the ring three times over while it is made, the screens,
+/// and 1.3 to 1.6 MB the first pane in a process pays once), and this
+/// projection, 13.2 MiB at 80x24, is above that by 1.76 times. The
+/// `ring-resident-rows` step holds it at or above the measurement.
 pub fn pane_bytes(cols: int, rows: int) -> int {
     6 * HISTORY_BYTES + 2 * cols * rows * CELL_BYTES + 1048576
 }

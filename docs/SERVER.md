@@ -60,17 +60,30 @@ share is sent from one server-wide reply buffer, one reply at a time, which
 grows in place to the largest reply sent (at most 8 MiB and its fragment
 headers) and is counted at that size from then on.
 
-Most of a pane's resident size is the emulator's history ring: it is made
-whole, with a copy, when the emulator is made (16.4 MB resident for an 8 MiB
-ring) and four times over at the emulator's first resize (32.8 MB more; later
-resizes reuse those buffers), about six times the cap in all (warren#7). So
-the cap is 2 MiB a pane in this version, and the projection counts six times
-it. A ring that grows as history arrives, and a resize that keeps it, are the
-emulator's to do; a larger cap comes back with them. With the 2 MiB cap a
-server's resident size is about 4 MB at start on Linux, 11 MB with one 80x24
-session and its client, and 6 MB more for a second (`MEASURE server-rss`);
-it stays flat over 10,000 keystrokes beside a flooding pane and over 200
-splits and closes (pane slots are reused, never dropped).
+Most of a pane's resident size is the emulator's history ring, which is made
+whole, zero-filled, when the pane is made (warren#67). As measured on Linux
+(glibc 2.39), making it takes four cap-sized allocations in turn, each written
+in full before the one before it is freed; the last is the copy out of the
+short-lived region that becomes the ring.
+At most three are live at once, so a pane's creation peaks at three times its
+cap. glibc's malloc gives the first of the freed buffers back to the system,
+which raises its threshold for mapping large buffers, so the later ones come
+from its heap, and the one freed there stays resident: a made pane keeps two
+times its cap, the ring and that freed buffer, and with glibc's threshold
+pinned (`MALLOC_MMAP_THRESHOLD_`) it keeps one. A first resize costs nothing
+measurable over a made pane (warren#7's resize half). The first pane made in a
+process also pays 1.3 to 1.6 MB once, the emulator's code and first
+allocations. So the first pane at the 2 MiB cap peaks at 7.5 to 7.9 MB, and
+the projection, six times the cap and the screens and 1 MiB (13.2 MiB at
+80x24), is deliberately above that by 1.76 times; the `ring-resident-rows`
+step measures each stage on each host, holds it to the takes recorded in
+`tests/vt/ring-resident-takes.json` and holds the projection at or above it.
+So the cap is 2 MiB a pane in this version; a ring that grows as history
+arrives would let a larger one come back. With the 2 MiB cap a server's
+resident size is about 5 MB at start on Linux, 13 MB with one 80x24 session
+and its client, and 6 MB more for a second (`MEASURE server-rss`); it stays
+flat over 10,000 keystrokes beside a flooding pane and over 200 splits and
+closes (pane slots are reused, never dropped).
 
 **On PAX**, a server takes three of the machine's 64 thread slots (its main
 thread and two the runtime starts for signals and children; measured under
