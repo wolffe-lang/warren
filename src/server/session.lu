@@ -229,6 +229,46 @@ fn become_pane(name: str, c: process.Command, environ: List[str], cwd: str, inhe
     process.exit(127)
 }
 
+/// Why `program` would not start in directory `dir` under a session's
+/// environment, or "" when it would: a name with a `/` is that file (read
+/// from `dir` when relative); a bare name is searched along the
+/// environment's `PATH` (`/usr/bin:/bin` without one), as exec searches.
+/// What is found must be a file, not a directory, that this server may
+/// run. Asked before anything is made, so a command that names no program
+/// changes nothing; an exec that still fails is the pane's own message.
+pub fn program_problem(program: str, dir: str, names: List[str], values: List[str]) -> str {
+    if program.contains("/") {
+        if runnable(from_dir(dir, program)) { return "" }
+        return "no program at {program}"
+    }
+    var path = "/usr/bin:/bin"
+    var i = 0
+    while i < names.len {
+        if names[i] == "PATH" { path = values[i] }
+        i += 1
+    }
+    for d in path.split(":") {
+        let place = if d.len == 0 then "." else d
+        if runnable(from_dir(dir, place) + "/" + program) { return "" }
+    }
+    "no program named {program} on PATH"
+}
+
+// `path` read from directory `dir` when it is relative.
+fn from_dir(dir: str, path: str) -> str {
+    if path.starts_with("/") || dir.len == 0 { return path }
+    dir + "/" + path
+}
+
+// A file, not a directory, that this process may run.
+fn runnable(path: str) -> bool {
+    let info = fs.stat(path) else { return false }
+    if info.kind == 1 { return false }
+    var ok = true
+    fs.access(path, 1) else |_| { ok = false }
+    ok
+}
+
 /// Start the pane's program on a new pseudo-terminal of the session's
 /// size: a forked child leads a session of its own, takes the terminal as
 /// its controlling terminal, sets every signal to its default, keeps none
