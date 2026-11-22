@@ -2,8 +2,9 @@
 //! warren's host dispatcher. With no arguments: attach to the default
 //! session, starting the server and the session when there are none.
 //! `attach [-t NAME]` attaches to an existing session; `new [-d] [-s NAME]`
-//! makes one (and attaches unless -d); `kill-server` and
-//! `list-sessions` ask the server; `server` runs one in the foreground;
+//! makes one (and attaches unless -d); every verb of the server's table
+//! (`kill-server`, `list-sessions`, `list --json`, the command line's verbs
+//! with `-t TARGET`) asks the server; `server` runs one in the foreground;
 //! `vt-dump` works without a server; `modules` lists the modules and their
 //! milestones.
 use std.io
@@ -39,11 +40,13 @@ fn main() -> int {
         return cmd.usage()
     }
     if args[0] == "new" { return new_verb(args) }
-    if (args[0] == "kill-server" || args[0] == "list-sessions") && args.len == 1 {
-        return client.command(args)
-    }
     if args[0] == "modules" && args.len == 1 { return modules() }
-    for later in "detach split close focus resize zoom tab rename source".split(" ") {
+    // Every verb of the server's table (docs/CLI.md) goes to the server,
+    // which reads its arguments and answers with its exit status.
+    for verb in cmd.verb_names() {
+        if args[0] == verb { return client.command(args) }
+    }
+    for later in "split close tab rename source".split(" ") {
         if args[0] == later {
             io.write_err_line("warren: {later} is not implemented in this version")
             return 2
