@@ -46,7 +46,8 @@ def main():
         (RIG, 'title-plant.manifest', ['title-flood-survives']),
         (RIG, 'console-plant.manifest', ['console-term-linux']),
         (RIG, 'reply-plant.manifest', ['list-json-over-queue']),
-        (RIG, 'send-keys-plant.manifest', ['send-keys-bytes'])):
+        (RIG, 'send-keys-plant.manifest', ['send-keys-bytes']),
+        (RIG, 'ring-plant.manifest', ['ring-resident-new'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
@@ -71,6 +72,11 @@ def main():
     assert 'exec ../native/client-rows ../native/warren "$row"' in inner
     for mode in ('plant', 'client-plant', 'toolchain'):
         assert f'inside bash tests/vt/rig/verbs-inner.sh {mode}' in verbs, ('verbs-plant-toolchain', mode)
+    # The ring rows' step generates the version member before it builds, as
+    # the gate does: a bare build of a fresh clone has no package_version.
+    ring = (RIG / 'ring-step.sh').read_text()
+    assert '. tools/container-run.sh' in ring and 'bash tests/vt/rig/ring-step.sh rows' in ring
+    assert ring.index('tools/vt/generate_version.py') < ring.index('"$WOLF" build'), 'ring-step: version before build'
     plant = (RIG / 'w1-plant-step.sh').read_text()
     assert 'FAIL vt-scalar-value ' in plant and 'exit "$rc"' in plant
     assert '[ "$rc" -eq 134 ]' in plant
