@@ -1412,6 +1412,11 @@ fn row_resize_crossing(mut r: Rig) -> str {
     ""
 }
 
+// The shell line that floods titles: 200 of 4,000 bytes, then a mark.
+fn title_flood() -> str {
+    "i=0; t=$(printf '%04000d' 0); while [ $i -lt 200 ]; do printf '\\033]2;%s%s\\007' $i $t; i=$((i+1)); done; echo titles-$((100+100))\r"
+}
+
 // A client whose terminal takes OSC 52 writes (feature bit 8).
 fn attach_clipboard(r: Rig) -> client.Peer ! client.DialErrors {
     var p = client.dial(socket(r))?
@@ -1459,6 +1464,71 @@ fn row_too_slow(mut r: Rig) -> str {
     client.hang_up(mut w)
     let st = stop_server(mut r)
     if st != 0 { return "server exit {st}" }
+    ""
+}
+
+// A title is state: a client that stops reading through a flood of 200
+// titles of 4,000 bytes stays attached (one TITLE waits in its queue, a
+// newer one only marks it), and once it reads again it ends with the same
+// last title as a client that read all along.
+fn row_title_flood_survives(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_line(mut p, "$", 5000) { return "no prompt" }
+    var w = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut w, 129, 3000) { return "watcher: no WELCOME" }
+    let _i = client.input(w, title_flood())
+    if !client.until_text(mut w, "titles-200", 90000) { return "the reading client stalled: " + client.screen_text(w) }
+    if !client.until_text(mut p, "titles-200", 30000) { return "the stalled client did not catch up: ended={p.ended} BYE {p.end_code}" }
+    var n = 0
+    while n < 20 {
+        let _a = client.step(mut p, 100)
+        let _b = client.step(mut w, 100)
+        n += 1
+    }
+    if p.ended { return "the stalled client was detached: BYE {p.end_code}" }
+    let pt = str_from_utf8(p.title[0..p.title.len]) else ""
+    let wt = str_from_utf8(w.title[0..w.title.len]) else ""
+    if !wt.starts_with("199") || pt != wt {
+        let ph = if pt.len > 8 then pt[0..8] else pt
+        let wh = if wt.len > 8 then wt[0..8] else wt
+        return "the last titles differ: the stalled client's '{ph}…' ({pt.len} bytes), the reader's '{wh}…' ({wt.len} bytes)"
+    }
+    client.hang_up(mut p)
+    client.hang_up(mut w)
+    let st = stop_server(mut r)
+    if st != 0 { return "server exit {st}" }
+    ""
+}
+
+// A focus move still brings the newly focused pane's title: a split's
+// program sets its title while another pane has the focus, and focus-next
+// brings that title to the attached client.
+fn row_title_on_focus(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let s = ask_words(r, carets("split-right^-t^work^--^/bin/sh^-c^printf '\\033]2;two\\007'; exec sleep 30"), "")
+    if s.status != 0 { return "split-right: {s.status} '{s.err.trim()}'" }
+    var n = 0
+    while n < 5 {
+        let _k = client.step(mut a, 100)
+        n += 1
+    }
+    let before = str_from_utf8(a.title[0..a.title.len]) else ""
+    if before == "two" { return "the unfocused pane's title reached the client" }
+    let f = ask(r, "focus-next -t work", "")
+    if f.status != 0 { return "focus-next: {f.status} '{f.err.trim()}'" }
+    let until = now_ms() + 3000
+    var title = before
+    while title != "two" && now_ms() < until {
+        let _k = client.step(mut a, 100)
+        title = str_from_utf8(a.title[0..a.title.len]) else ""
+    }
+    if title != "two" { return "after focus-next the title is '{title}'" }
+    client.hang_up(mut a)
     ""
 }
 
@@ -1654,13 +1724,15 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "split-prints-new-id" { why = row_split_prints_new_id(mut r) }
     else if name == "create-refusals-change-nothing" { why = row_create_refusals(mut r) }
     else if name == "command-exits-at-once" { why = row_command_exits_at_once(mut r) }
+    else if name == "title-flood-survives" { why = row_title_flood_survives(mut r) }
+    else if name == "title-on-focus" { why = row_title_on_focus(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus".split(" ") {
         (mut x).push(n)
     }
     x
