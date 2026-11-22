@@ -19,9 +19,13 @@ pub struct Policy {
     shape: bool,
 }
 
-/// Whether the console policy applies, from `TERM` and `WARREN_RENDER`.
+/// Whether the console policy applies, from `TERM` and `WARREN_RENDER`: a
+/// set (non-empty) `WARREN_RENDER` decides, `console` for the console policy
+/// and anything else for the terminal one; unset, `TERM=linux` (PAX's
+/// console, a Linux virtual console) picks the console policy.
 pub fn console_chosen(term: str, render: str) -> bool {
-    render == "console"
+    if render.len > 0 { return render == "console" }
+    term == "linux"
 }
 
 /// The documented policies: a terminal emulator by its TERM and
