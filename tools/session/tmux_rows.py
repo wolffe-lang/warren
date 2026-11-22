@@ -34,6 +34,16 @@ Rows:
   tmux-capture         each case of tests/session/capture-cases, captured
                        with each flag set of tests/session/capture-goldens.json,
                        equals the golden's tmux text (warren: capture-cases)
+  tmux-osc7            every row of tests/session/osc7.table: a pane that
+                       printed OSC 7 for /tmp/osc7-base and then the row's
+                       payload keeps the table's tmux column as #{pane_path}
+                       (warren: src/osc7_table_test.lu, to the warren column)
+  tmux-split-start     a pane reports a directory by OSC 7 in a session made
+                       in another: split-window and new-window from a command
+                       client start in the client's directory, split-window
+                       from an attached (control-mode) client in the
+                       session's, none in the reported one (warren:
+                       split-starts-in-pane-cwd, a named difference)
 
 Each client is a pty of the suite's own. Nothing is signalled: clients are
 detached by tmux's own command and the server is ended with kill-server.
@@ -45,6 +55,7 @@ import os
 from pathlib import Path
 import pty
 import select
+import socket
 import struct
 import subprocess
 import sys
@@ -459,6 +470,143 @@ def row_capture(out):
     return 1 if fails else 0
 
 
+OSC7_PRINTER = ('import os, sys, time\n'
+                'stem = sys.argv[1]\n'
+                'def put(suffix):\n'
+                '    with open(stem + suffix, "rb") as f:\n'
+                '        sys.stdout.buffer.write(f.read())\n'
+                '    sys.stdout.buffer.flush()\n'
+                'put(".first")\n'
+                'open(stem + ".one", "w").close()\n'
+                'while not os.path.exists(stem + ".go"): time.sleep(0.02)\n'
+                'put(".second")\n'
+                'open(stem + ".two", "w").close()\n'
+                'time.sleep(60)\n')
+OSC7_SLEEPER = "python3 -I -c 'import time; time.sleep(60)'"
+
+
+def osc7(body):
+    return b'\x1b]7;' + body + b'\x07'
+
+
+def osc7_expand(column, host):
+    """An osc7.table column's bytes: hex, {host} this machine's name, {hh*N} byte hh N times."""
+    out, i = bytearray(), 0
+    while i < len(column):
+        if column[i] == '{':
+            j = column.index('}', i)
+            token = column[i + 1:j]
+            if token == 'host':
+                out += host
+            else:
+                pair, n = token.split('*')
+                out += bytes.fromhex(pair) * int(n)
+            i = j + 1
+        else:
+            out += bytes.fromhex(column[i:i + 2])
+            i += 2
+    return bytes(out)
+
+
+def wait_path(path, limit=10.0):
+    end = time.monotonic() + limit
+    while time.monotonic() < end:
+        if path.exists():
+            return True
+        time.sleep(0.02)
+    return False
+
+
+def osc7_pane(t, out, name, first, second, cwd):
+    """A detached session whose pane printed `first`, then, once told, `second`: its stem, or None."""
+    stem = out / ('osc7-' + name)
+    Path(str(stem) + '.first').write_bytes(first)
+    Path(str(stem) + '.second').write_bytes(second)
+    t.run('new-session', '-d', '-s', name, '-x', '80', '-y', '24', '-c', cwd,
+          'python3 -I %s %s' % (out / 'osc7-printer.py', stem))
+    if not wait_path(Path(str(stem) + '.one')):
+        return None
+    time.sleep(0.4)
+    Path(str(stem) + '.go').touch()
+    if not wait_path(Path(str(stem) + '.two')):
+        return None
+    time.sleep(0.4)
+    return stem
+
+
+def row_osc7(out):
+    (out / 'osc7-printer.py').write_text(OSC7_PRINTER)
+    host = socket.gethostname().encode()
+    base = b'file:///tmp/osc7-base'
+    t = Tmux(out, 'osc7')
+    fails, rows = [], 0
+    try:
+        for line in (SESSION / 'osc7.table').read_text(encoding='utf-8').splitlines():
+            if not line or line.startswith('#'):
+                continue
+            case, payload, tmux_column, _warren, _why = line.split('\t')
+            name = 'c%d' % rows
+            if osc7_pane(t, out, name, osc7(base), osc7_expand(payload, host), '/') is None:
+                fails.append('%s: the pane did not print' % case)
+                break
+            got = t.run('display-message', '-p', '-t', name, '#{pane_path}').rstrip('\n').encode()
+            want = base if tmux_column == 'kept' else (b'' if tmux_column == 'none' else osc7_expand(tmux_column, host))
+            if got != want:
+                fails.append('%s: pane_path %r, the table %r' % (case, got[:80], want[:80]))
+            t.run('kill-session', '-t', name, check=False)
+            rows += 1
+    except (RuntimeError, subprocess.TimeoutExpired) as e:
+        fails.append(str(e))
+    finally:
+        t.close()
+    for f in fails:
+        print('FAIL tmux-osc7 ' + f)
+    if not fails:
+        print('PASS tmux-osc7 rows=%d' % rows)
+    return 1 if fails else 0
+
+
+def row_split_start(out):
+    (out / 'osc7-printer.py').write_text(OSC7_PRINTER)
+    fails = []
+    for how in ('split-command', 'window-command', 'split-control'):
+        dirs = {k: out / ('start-%s-%s' % (how, k)) for k in ('session', 'osc7', 'caller')}
+        for d in dirs.values():
+            d.mkdir(parents=True, exist_ok=True)
+        t = Tmux(out, 'start-' + how)
+        try:
+            if osc7_pane(t, out, how, osc7(b'file://' + str(dirs['osc7']).encode()), b'', str(dirs['session'])) is None:
+                fails.append('%s: the pane did not print' % how)
+                continue
+            if how == 'split-command':
+                subprocess.run(['tmux', '-S', t.socket, '-f', '/dev/null', 'split-window', '-t', how, OSC7_SLEEPER],
+                               env=t.env, cwd=str(dirs['caller']), capture_output=True, timeout=30, check=True)
+            elif how == 'window-command':
+                subprocess.run(['tmux', '-S', t.socket, '-f', '/dev/null', 'new-window', '-t', how, OSC7_SLEEPER],
+                               env=t.env, cwd=str(dirs['caller']), capture_output=True, timeout=30, check=True)
+            else:
+                subprocess.run(['tmux', '-S', t.socket, '-f', '/dev/null', '-C', 'attach-session', '-t', how],
+                               env=t.env, cwd=str(dirs['caller']), capture_output=True, timeout=30,
+                               input=('split-window "%s"\ndetach-client\n' % OSC7_SLEEPER).encode())
+            time.sleep(0.6)
+            panes = t.run('list-panes', '-s', '-t', how, '-F', '#{pane_current_path}').splitlines()
+            reported = t.run('display-message', '-p', '-t', how + ':0.0', '#{pane_path}').strip()
+            want = str(dirs['session'] if how == 'split-control' else dirs['caller'])
+            if len(panes) != 2 or panes[1] != want or str(dirs['osc7']) in panes[1:]:
+                fails.append('%s: the new pane is in %s, not %s' % (how, panes[1:], want))
+            if reported != 'file://' + str(dirs['osc7']):
+                fails.append('%s: the first pane reported %r' % (how, reported))
+        except (RuntimeError, subprocess.SubprocessError) as e:
+            fails.append('%s: %s' % (how, e))
+        finally:
+            t.close()
+    for f in fails:
+        print('FAIL tmux-split-start ' + f)
+    if not fails:
+        print('PASS tmux-split-start (split and new window from a command: the caller\'s; from a client: the session\'s)')
+    return 1 if fails else 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cases', type=Path, required=True)
@@ -485,6 +633,8 @@ def main():
     failed += row_session_verbs(args.out)
     failed += row_send_keys(args.out)
     failed += row_capture(args.out)
+    failed += row_osc7(args.out)
+    failed += row_split_start(args.out)
     return 1 if failed else 0
 
 
