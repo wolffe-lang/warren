@@ -496,16 +496,21 @@ fn le4(body: List[byte], at: int) -> int {
 // One COMMAND on the row's server: `argv` (words), sent from pane `pane`
 // ("" when it comes from no pane), as `warren <verb>` sends it.
 fn ask(r: Rig, argv: str, pane: str) -> Answer {
+    var words = List[str]()
+    for w in argv.split(" ") {
+        if w.len > 0 { (mut words).push(w) }
+    }
+    ask_words(r, words, pane)
+}
+
+// One COMMAND whose words are given one by one (a word may hold spaces).
+fn ask_words(r: Rig, words: List[str], pane: str) -> Answer {
     var p = client.dial(socket(r)) else |e| { return Answer { status: 0 - 1, out: "", err: "dial-{e}" } }
     var none = List[str]()
     let _h = client.send(p, 1, client.hello_payload(2, 0, 0, "", 0, "", none, none))
     if !client.until_kind(mut p, 129, 2000) {
         client.hang_up(mut p)
         return Answer { status: 0 - 1, out: "", err: "no WELCOME" }
-    }
-    var words = List[str]()
-    for w in argv.split(" ") {
-        if w.len > 0 { (mut words).push(w) }
     }
     var b = List[byte]()
     proto.put(mut b, 9, 4)
@@ -659,6 +664,250 @@ fn row_ids_never_reused(mut r: Rig) -> str {
     if two.out.contains("\"name\":\"b\"") { return "session b is still listed: {two.out}" }
     if !two.out.contains("\"id\":\"s3\",\"name\":\"c\"") { return "session c is not s3: {two.out}" }
     if !two.out.contains("\"active_tab\":\"t3\"") || !two.out.contains("\"id\":\"p5\"") { return "session c's tab or pane reused an id: {two.out}" }
+    client.hang_up(mut a)
+    ""
+}
+
+// Words split at `^`, for a COMMAND whose words hold spaces.
+fn carets(text: str) -> List[str] {
+    var out = List[str]()
+    for w in text.split("^") { (mut out).push(w) }
+    out
+}
+
+// A path beside the row's runtime directory, absolute.
+fn beside(r: Rig, leaf: str) -> str {
+    (env.cwd() else ".") + "/" + r.dir + "-" + leaf
+}
+
+// Wait for the server to end by itself (bounded by its lifetime): its exit
+// status, or -1.
+fn server_ended(mut r: Rig) -> int {
+    var ch = process.Child { slot: r.server }
+    r.started = false
+    process.wait_status(take ch) else 0 - 1
+}
+
+// `kill-session -t b` ends b alone: its client is told the session ended and
+// the listing no longer has it, while a's client goes on. Ending the last
+// session ends the server, as the last pane's end does.
+fn row_kill_session_ends(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "a", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt in a" }
+    var b = attach(r, 80, 24, "b", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut b, "$", 5000) { return "no prompt in b" }
+    let k = ask(r, "kill-session -t b", "")
+    if k.status != 0 { return "kill-session -t b: {k.status} '{k.err.trim()}'" }
+    if !client.until_kind(mut b, 135, 5000) || b.end_code != 2 { return "b's client: BYE {b.end_code}, expected session-ended" }
+    client.hang_up(mut b)
+    let after = listed(r)
+    if after.status != 0 { return after.err }
+    if after.out.contains("\"name\":\"b\"") || !after.out.contains("\"name\":\"a\"") { return "after kill-session -t b: {after.out}" }
+    let _i = client.input(a, "echo still-$((2+3))\r")
+    if !client.until_text(mut a, "still-5", 5000) { return "a's client did not go on" }
+    let last = ask(r, "kill-session -t a", "")
+    if last.status != 0 { return "kill-session -t a: {last.status} '{last.err.trim()}'" }
+    if !client.until_kind(mut a, 135, 5000) || a.end_code != 2 { return "a's client: BYE {a.end_code}, expected session-ended" }
+    client.hang_up(mut a)
+    let st = server_ended(mut r)
+    if st != 0 { return "after the last session: server exit {st}" }
+    ""
+}
+
+// `rename-session` renames by target and refuses a name in use, a name the
+// server does not allow and a missing session, each by name and changing
+// nothing.
+fn row_rename_session(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let o = ask(r, "new-session other", "")
+    if o.status != 0 { return "new-session other: {o.status} '{o.err.trim()}'" }
+    let n = ask(r, "rename-session -t work notes", "")
+    if n.status != 0 { return "rename-session -t work notes: {n.status} '{n.err.trim()}'" }
+    let after = listed(r)
+    if after.status != 0 { return after.err }
+    if after.out.contains("\"name\":\"work\"") || !after.out.contains("\"id\":\"s1\",\"name\":\"notes\"") { return "after the rename: {after.out}" }
+    let taken = ask(r, "rename-session -t notes other", "")
+    if taken.status != 1 || !taken.err.contains("already exists") { return "a name in use: {taken.status} '{taken.err.trim()}'" }
+    let slash = ask(r, "rename-session -t notes a/b", "")
+    if slash.status != 1 || !slash.err.contains("may not hold '/'") { return "a name with '/': {slash.status} '{slash.err.trim()}'" }
+    let none = ask(r, "rename-session -t nosuch x", "")
+    if none.status != 1 || !none.err.contains("no-such-session") { return "a missing session: {none.status} '{none.err.trim()}'" }
+    let still = listed(r)
+    if still.status != 0 { return still.err }
+    if still.out != after.out { return "a refused rename changed the listing: {still.out}" }
+    client.hang_up(mut a)
+    ""
+}
+
+// `detach -t work` from a shell detaches every client of that session; the
+// session lives on. `lock` stays refused from a shell.
+fn row_detach_from_shell(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    var b = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut b, "$", 5000) { return "no prompt in the second client" }
+    let d = ask(r, "detach -t work", "")
+    if d.status != 0 { return "detach -t work: {d.status} '{d.err.trim()}'" }
+    if !client.until_kind(mut a, 135, 5000) || a.end_code != 1 { return "the first client: BYE {a.end_code}, expected detached" }
+    if !client.until_kind(mut b, 135, 5000) || b.end_code != 1 { return "the second client: BYE {b.end_code}, expected detached" }
+    client.hang_up(mut a)
+    client.hang_up(mut b)
+    let after = listed(r)
+    if after.status != 0 { return after.err }
+    if !after.out.contains("\"name\":\"work\",\"cols\":80,\"rows\":24,\"clients\":0") { return "after the detach: {after.out}" }
+    let l = ask(r, "lock -t work", "")
+    if l.status != 1 || !l.err.contains("acts on an attached client") { return "lock from a shell: {l.status} '{l.err.trim()}'" }
+    ""
+}
+
+// `-c DIR` starts a split's program (the configured one) and a new
+// session's in DIR: each pane's program prints the last part of its
+// working directory.
+fn row_split_in_dir(mut r: Rig) -> str {
+    let script = beside(r, "cwd.sh")
+    fs.write_text(script, "p=$(pwd -P); printf 'CWD=%s\\n' \"$" + "{{p##*/}}\"; exec /bin/sh\n") else |e| { return "the script: {e}" }
+    let place = beside(r, "place")
+    let other = beside(r, "other")
+    fs.create_dir_all(place) else |e| { return "mkdir: {e}" }
+    fs.create_dir_all(other) else |e| { return "mkdir: {e}" }
+    let why = start_server(mut r, "/bin/sh " + script)
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "CWD=", 5000) { return "the first pane printed nothing: " + client.screen_text(a) }
+    let s = ask(r, "split-right -t work -c " + place, "")
+    if s.status != 0 { return "split-right -c: {s.status} '{s.err.trim()}'" }
+    if !client.until_text(mut a, "CWD={r.dir}-place", 5000) { return "the split's program is not in DIR: " + client.screen_text(a) }
+    let n = ask(r, "new-session -c " + other + " away", "")
+    if n.status != 0 || n.out != "away\n" { return "new-session -c: {n.status} '{n.out.trim()}' '{n.err.trim()}'" }
+    var b = attach(r, 80, 24, "away", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut b, "CWD={r.dir}-other", 5000) { return "the new session's program is not in DIR: " + client.screen_text(b) }
+    client.hang_up(mut a)
+    client.hang_up(mut b)
+    ""
+}
+
+// `-- CMD` runs CMD with its words as given: no shell joins and splits
+// them again, so a word with a space and a word with a `$` arrive as they
+// were sent.
+fn row_split_runs_command(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let s = ask_words(r, carets("split-right^-t^work^--^/bin/sh^-c^printf 'ARGV=%s+%s\\n' \"$0\" \"$1\"; exec sleep 30^a b^$HOME"), "")
+    if s.status != 0 { return "split-right -- CMD: {s.status} '{s.err.trim()}'" }
+    if !client.until_text(mut a, "ARGV=a b+$HOME", 5000) { return "the words did not arrive as sent: " + client.screen_text(a) }
+    client.hang_up(mut a)
+    ""
+}
+
+// Each creating verb prints the id of the pane it made, the one the
+// listing then has.
+fn row_split_prints_new_id(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let s = ask(r, "split-right -t work", "")
+    if s.status != 0 || s.out != "p2\n" { return "split-right printed '{s.out.trim()}' (status {s.status}), not p2" }
+    let t = ask(r, "new-tab -t work", "")
+    if t.status != 0 || t.out != "p3\n" { return "new-tab printed '{t.out.trim()}' (status {t.status}), not p3" }
+    let d = ask(r, "split-down -t p1 -- /bin/sh", "")
+    if d.status != 0 || d.out != "p4\n" { return "split-down printed '{d.out.trim()}' (status {d.status}), not p4" }
+    let l = listed(r)
+    if l.status != 0 { return l.err }
+    if panes_in(l.out) != 4 || !l.out.contains("\"id\":\"p4\"") { return "the listing: {l.out}" }
+    client.hang_up(mut a)
+    ""
+}
+
+// A directory that is not one and a program that does not start are each
+// refused by name, and the listing (panes, focus, tabs) is byte for byte
+// what it was.
+fn row_create_refusals(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let before = listed(r)
+    if before.status != 0 { return before.err }
+    let gone = beside(r, "absent")
+    let d = ask(r, "split-right -t work -c " + gone, "")
+    if d.status != 1 || !d.err.contains("no such directory: " + gone) { return "split-right -c ABSENT: {d.status} '{d.err.trim()}'" }
+    let c = ask(r, "split-right -t work -- " + gone + "/program", "")
+    if c.status != 1 || !c.err.contains("did not start") { return "split-right -- ABSENT: {c.status} '{c.err.trim()}'" }
+    let t = ask(r, "new-tab -t work -- " + gone + "/program", "")
+    if t.status != 1 || !t.err.contains("did not start") { return "new-tab -- ABSENT: {t.status} '{t.err.trim()}'" }
+    let n = ask(r, "new-session -c " + gone + " other", "")
+    if n.status != 1 || !n.err.contains("no such directory: " + gone) { return "new-session -c ABSENT: {n.status} '{n.err.trim()}'" }
+    let after = listed(r)
+    if after.status != 0 { return after.err }
+    if after.out != before.out { return "a refusal changed the listing:\n{before.out}\n{after.out}" }
+    client.hang_up(mut a)
+    ""
+}
+
+// The status after "child ended status " on each line of a trace that has
+// one, in order.
+fn ended_statuses(text: str) -> List[str] {
+    var out = List[str]()
+    for line in text.lines() {
+        let at = line.find("child ended status ") else 0 - 1
+        if at >= 0 { (mut out).push(line[at + 19..line.len].trim()) }
+    }
+    out
+}
+
+// A command that exits at once ends the way a split's shell that exits
+// does: the split answers with its id, the pane closes, the listing is what
+// it was, and the server's trace records the same status for both.
+fn row_command_exits_at_once(mut r: Rig) -> str {
+    let path = beside(r, "trace")
+    fs.remove(path) else |_| {}
+    let why = start_traced(mut r, "/bin/sh", 60000, path)
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let before = listed(r)
+    if before.status != 0 { return before.err }
+    let s = ask_words(r, carets("split-right^-t^work^--^/bin/sh^-c^exit 3"), "")
+    if s.status != 0 || s.out != "p2\n" { return "split-right -- sh -c 'exit 3': {s.status} '{s.out.trim()}' '{s.err.trim()}'" }
+    var until = now_ms() + 5000
+    var now = listed(r)
+    while now.out != before.out && now_ms() < until {
+        time.sleep(time.millis(50))
+        now = listed(r)
+    }
+    if now.out != before.out { return "the command's pane did not close: {now.out}" }
+    let h = ask(r, "split-right -t work", "")
+    if h.status != 0 || h.out != "p3\n" { return "split-right (the shell): {h.status} '{h.out.trim()}'" }
+    let f = ask(r, "focus-next -t work", "")
+    if f.status != 0 { return "focus-next: {f.status} '{f.err.trim()}'" }
+    let _x = client.input(a, "exit 3\r")
+    until = now_ms() + 5000
+    now = listed(r)
+    while now.out != before.out && now_ms() < until {
+        time.sleep(time.millis(50))
+        now = listed(r)
+    }
+    if now.out != before.out { return "the shell's pane did not close: {now.out}" }
+    until = now_ms() + 5000
+    var ended = List[str]()
+    while ended.len < 2 && now_ms() < until {
+        let text = fs.read_text(path) else ""
+        ended = ended_statuses(text)
+        if ended.len < 2 { time.sleep(time.millis(50)) }
+    }
+    if ended.len < 2 { return "the trace has {ended.len} ended statuses" }
+    if ended[0] != ended[1] || ended[0] == "0" { return "the command ended with status {ended[0]}, the shell with {ended[1]}" }
+    print("MEASURE command-exits-at-once status={ended[0]}")
     client.hang_up(mut a)
     ""
 }
@@ -1378,13 +1627,21 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "verb-inside-pane" { why = row_verb_inside_pane(mut r) }
     else if name == "list-json" { why = row_list_json(mut r) }
     else if name == "ids-never-reused" { why = row_ids_never_reused(mut r) }
+    else if name == "kill-session-ends" { why = row_kill_session_ends(mut r) }
+    else if name == "rename-session" { why = row_rename_session(mut r) }
+    else if name == "detach-from-shell" { why = row_detach_from_shell(mut r) }
+    else if name == "split-in-dir" { why = row_split_in_dir(mut r) }
+    else if name == "split-runs-command" { why = row_split_runs_command(mut r) }
+    else if name == "split-prints-new-id" { why = row_split_prints_new_id(mut r) }
+    else if name == "create-refusals-change-nothing" { why = row_create_refusals(mut r) }
+    else if name == "command-exits-at-once" { why = row_command_exits_at_once(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once".split(" ") {
         (mut x).push(n)
     }
     x
