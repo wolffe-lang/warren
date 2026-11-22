@@ -237,8 +237,17 @@ fn verbs(mut t: Tally) {
     if !l.ok || l.kind != cmd.VERB_LIST_SESSIONS || !ls.ok || ls.kind != cmd.VERB_LIST_SESSIONS { why = "list-sessions or ls: {l.why} {ls.why}" }
     let n0 = verb("new-session")
     let n1 = verb("new-session work")
-    if !n0.ok || n0.kind != cmd.VERB_NEW_SESSION || n0.name != "" || !n1.ok || n1.name != "work" {
-        why = "new-session: '{n0.name}' '{n1.name}' {n0.why} {n1.why}"
+    if !n0.ok || n0.kind != cmd.VERB_NEW_SESSION || n0.name != "" || n0.named || !n1.ok || n1.name != "work" || !n1.named {
+        why = "new-session: '{n0.name}' {n0.named} '{n1.name}' {n1.named} {n0.why} {n1.why}"
+    }
+    // An empty name given is a name, for the server to refuse; it is not the
+    // same as no name, which takes the lowest free number.
+    var empty = List[str]()
+    (mut empty).push("new-session")
+    (mut empty).push("")
+    let ne = cmd.parse_verb(empty)
+    if !ne.ok || ne.kind != cmd.VERB_NEW_SESSION || ne.name != "" || !ne.named {
+        why = "new-session '': {ne.ok} '{ne.name}' named={ne.named} {ne.why}"
     }
     let j = verb("list --json")
     if !j.ok || j.kind != cmd.VERB_LIST_JSON { why = "list --json: {j.ok} {j.kind} {j.why}" }

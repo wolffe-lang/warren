@@ -17,8 +17,9 @@ pub const VERB_LIST_JSON: int = 5
 
 /// A verb read from a COMMAND's arguments: `ok`, its kind, its target (empty
 /// for none), the command line's reading for an action, a new session's
-/// name; or a refusal, its exit status (2 for usage) and why.
-pub struct Verb { ok: bool, kind: int, target: str, command: config.Command, name: str, status: int, why: str }
+/// name and whether one was given (an empty name given is still a name, which
+/// the server refuses); or a refusal, its exit status (2 for usage) and why.
+pub struct Verb { ok: bool, kind: int, target: str, command: config.Command, name: str, named: bool, status: int, why: str }
 
 // The server's own verbs, besides the command line's (a function: the
 // reference interpreter does not resolve a method on a module constant).
@@ -27,11 +28,11 @@ fn server_verbs() -> str {
 }
 
 fn usage_error(why: str) -> Verb {
-    Verb { ok: false, kind: 0, target: "", command: config.command(""), name: "", status: EXIT_USAGE, why: why }
+    Verb { ok: false, kind: 0, target: "", command: config.command(""), name: "", named: false, status: EXIT_USAGE, why: why }
 }
 
 fn verb_of(kind: int, target: str, name: str) -> Verb {
-    Verb { ok: true, kind: kind, target: target, command: config.command(""), name: name, status: EXIT_DONE, why: "" }
+    Verb { ok: true, kind: kind, target: target, command: config.command(""), name: name, named: false, status: EXIT_DONE, why: "" }
 }
 
 fn is_server_verb(v: str) -> bool {
@@ -95,7 +96,7 @@ pub fn parse_verb(argv: List[str]) -> Verb {
     for a in rest { line = line + " " + a }
     let c = config.command(line)
     if !c.ok { return usage_error(c.why) }
-    Verb { ok: true, kind: VERB_ACTION, target: target, command: c, name: "", status: EXIT_DONE, why: "" }
+    Verb { ok: true, kind: VERB_ACTION, target: target, command: c, name: "", named: false, status: EXIT_DONE, why: "" }
 }
 
 /// Every verb the server answers: its own, then the command line's.
