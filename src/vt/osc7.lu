@@ -37,6 +37,12 @@ pub fn reported_dir(pane: Vt) -> str {
     str_from_utf8(pane.cwd_storage[0..pane.cwd_length]) else ""
 }
 
+/// Forget the reported directory, as for a new program in a reused pane (a
+/// reset keeps it: it is the program's report, not screen state).
+pub fn forget_reported_dir(mut pane: Vt) {
+    pane.cwd_length = 0
+}
+
 fn lower_ascii(v: int) -> int {
     if v >= 65 && v <= 90 { v + 32 } else { v }
 }
