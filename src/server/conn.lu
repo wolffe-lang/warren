@@ -343,9 +343,20 @@ pub fn send(mut c: Conn, kind: int, payload: List[byte]) -> bool {
     enqueue(mut c, r.bytes, false)
 }
 
-/// Queue a TITLE's wire bytes. False when the event queue is full.
+/// Queue a TITLE's wire bytes as the client's one waiting TITLE. While an
+/// earlier one waits unwritten, a newer title only marks the client
+/// (`title_dirty`; true, nothing appended): the protocol promises the
+/// current title, not every title. False when the event queue is full.
 pub fn queue_title(mut c: Conn, wire: List[byte]) -> bool {
-    enqueue(mut c, wire, false)
+    if c.title_end >= 0 && c.tx_off < c.title_end {
+        c.title_dirty = true
+        return true
+    }
+    if !enqueue(mut c, wire, false) { return false }
+    c.title_end = c.tx_len
+    c.title_start = c.tx_len - wire.len
+    c.title_dirty = false
+    true
 }
 
 /// Whether a newer title waits to be queued.
