@@ -1,10 +1,10 @@
 //! member: false
 //! Every row of tests/session/osc7.table, fed to a pane named
 //! `warren-table-host` after it reported /tmp/osc7-base, leaves the table's
-//! warren column: the stored path in hex, `kept` for /tmp/osc7-base, `none`
-//! for no path. A native program (the table holds a 70,000-byte payload):
-//! `PASS osc7-table rows=40`, or a FAIL naming the first row that differs;
-//! exit 1 then.
+//! warren column: the stored path in hex (written as the payload is, with
+//! `{hh*N}` for a run), `kept` for /tmp/osc7-base, `none` for no path. A
+//! native program (the table holds a 70,000-byte payload): `PASS osc7-table
+//! rows=40`, or a FAIL naming the first row that differs; exit 1 then.
 use std.fs
 use vt
 
@@ -96,7 +96,16 @@ fn main() -> int {
             return 1
         }
         let got = warren_column(payload.data)
-        if got != f[3] {
+        var want = f[3]
+        if want != "kept" && want != "none" {
+            let column = expand(f[3])
+            if !column.ok {
+                print("FAIL osc7-table {f[0]}: the warren column is not hex")
+                return 1
+            }
+            want = hex(column.data)
+        }
+        if got != want {
             print("FAIL osc7-table {f[0]}: warren {got}, the table's warren column {f[3]}")
             return 1
         }
