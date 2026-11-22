@@ -4,34 +4,40 @@
     ring_resident_rows.py [--measure] [--takes N] [--takes-file FILE] MEASURE_CHILD RING_PROBE
 
 Each stage of ring-probe (src/ring_probe.lu) runs in a process of its own,
-spawned by measure-child, the small C parent: `none` once, then `new`,
+spawned by measure-child, the small C parent: `none` once a take, then `new`,
 `resize`, `screenful` and `filled` at history caps of 0, 2 MiB and 8 MiB
 (`filled` only where there is a ring), every pair TAKES times (3).
 
 Every run prints, raw, measure-child's peak, the floor it reports (the C
-child's high-water mark before exec, which ru_maxrss keeps across exec) and
-the parent's own peak, the same take's `none` peak, and, where the host has
+child's high-water mark before exec, which ru_maxrss keeps across exec; it
+reads 0 in some runs on Linux, and is never used in arithmetic) and the
+parent's own peak, the same take's `none` peak, and, where the host has
 /proc, the probe's last VmRSS and VmHWM. Nothing is subtracted without being
 printed. The quantity a row holds is printed beside its formula:
   new                          increment = peak(new, CAP) - peak(none)
   resize, screenful, filled    increment = peak(STAGE, CAP) - peak(new, CAP)
-each within one take, and `ratio = increment / CAP` where CAP > 0.
+each within one take, and `ratio = increment / CAP` where CAP > 0. A `new`
+increment carries what the first pane in a fresh process pays once (the
+emulator's code paged in, the allocator's first chunk) as well as the pane.
 
 The bound of a row is read from the takes recorded for this host in
-tests/vt/ring-resident-takes.json: the largest recorded take, plus a margin
-that is the largest of three times their spread, 5% of the largest, or one
-allocation granule (256 KiB on Linux, 16 KiB on macOS). A `new` row whose
-bound would come out above 2.6 times its cap is held to 2.6 times instead,
-so that no spread lets a second copy of the ring (about 3 times) or a doubled
-ring (about 4 times) pass. A host with no recorded takes fails by name.
+tests/vt/ring-resident-takes.json: the largest recorded increment, plus a
+margin that is the largest of three times the recorded spread, 5% of the
+largest recorded peak of that stage, or one allocation granule (256 KiB on
+Linux, 16 KiB on macOS). The rule checks itself where a ring is made: a `new`
+row's margin must be under one cap, so one more cap-sized buffer at the peak
+fails; a difference row's margin must be under two caps, so a step that made
+the ring again fails. A margin past that fails by name as too loose. A host
+with no recorded takes fails by name.
 
 The projection row holds the server's projection of an 80x24 pane
 (`pane_bytes`, printed by the probe) at or above the largest `new` increment
 at the server's history cap, and prints how far above.
 
-Every run ends its measurements with one `TAKES-JSON` line for this host, the
-form the takes file records; --measure stops there and holds nothing. Exit 0 when every row holds, 1 when one does not,
-2 on a probe that did not run.
+Every run ends its measurements with one `TAKES-JSON` line for this host, in
+the form the takes file records; --measure stops there and holds nothing.
+Exit 0 when every row holds, 1 when one does not, 2 on a probe that did not
+run.
 """
 import argparse
 import json
@@ -43,7 +49,6 @@ from pathlib import Path
 CAPS = (0, 2097152, 8388608)
 STAGES = ('new', 'resize', 'screenful', 'filled')
 GRANULE = {'linux': 262144, 'macos': 16384}
-BAND = 2.6
 TAKES_FILE = Path(__file__).with_name('ring-resident-takes.json')
 MEASURE = re.compile(r'^MEASURE process exit=(\d+) signal=(\d+) wall-nanoseconds=(\d+) peak-rss-bytes=(\d+) '
                      r'child-before-exec-peak-rss-bytes=(-?\d+) parent-inherited-peak-rss-bytes=(-?\d+) ')
@@ -93,33 +98,39 @@ def run(measure_child, probe, stage, cap):
     return got
 
 
-def bound(values, granule, stage, cap):
-    top = max(values)
-    spread = top - min(values)
-    margin = max(3 * spread, top // 20, granule)
-    held = top + margin
-    band = False
-    if stage == 'new' and cap > 0 and held > int(BAND * cap):
-        held = int(BAND * cap)
-        band = True
-    return held, margin, band
+def bound(increments, peaks, granule):
+    """The bound, its margin, and the parts the margin was the largest of."""
+    top = max(increments)
+    spread = top - min(increments)
+    margin = max(3 * spread, max(peaks) // 20, granule)
+    return top + margin, margin
+
+
+def too_loose(stage, cap, margin):
+    """Why a margin cannot see what its row is for, or None."""
+    if cap == 0:
+        return None
+    if stage == 'new' and margin >= cap:
+        return 'margin %d is not under one cap (%d): one more cap-sized buffer at the peak would pass' % (margin, cap)
+    if stage != 'new' and margin >= 2 * cap:
+        return 'margin %d is not under two caps (%d): a step that made the ring again would pass' % (margin, 2 * cap)
+    return None
 
 
 def self_test():
-    # A bound from three close takes of the ring and its copy (about twice a
-    # 2 MiB cap) passes those takes and fails a second copy and a doubling.
     cap = 2097152
-    takes = [4300000, 4310000, 4325000]
-    held, _, band = bound(takes, 262144, 'new', cap)
-    assert not band and max(takes) <= held < 3 * cap, held
-    assert 2 * max(takes) > held and 3 * cap > held
-    # A wide spread cannot widen a `new` bound past the band.
-    held, _, band = bound([4300000, 5000000, 5600000], 262144, 'new', cap)
-    assert band and held == int(BAND * cap), held
-    # The other stages have no band: a resize that made the ring again
-    # (two caps more) fails a bound read from takes under 1 MB.
-    held, _, band = bound([200000, 260000, 310000], 262144, 'resize', cap)
-    assert not band and held < 2 * cap, held
+    granule = 262144
+    # Close takes of a pane at about 3.7 caps: the takes pass, one more cap fails.
+    inc = [7471104, 7720960, 7872512]
+    peaks = [10055680, 10268672, 10347520]
+    held, margin = bound(inc, peaks, granule)
+    assert max(inc) <= held < max(inc) + cap and too_loose('new', cap, margin) is None, (held, margin)
+    # A spread that wide cannot hold a `new` row: the rule says so by name.
+    _, margin = bound([7000000, 7800000, 8600000], peaks, granule)
+    assert too_loose('new', cap, margin) is not None, margin
+    # A difference row: noise of half a megabyte passes, the ring made again (two caps) fails.
+    held, margin = bound([-544768, 147456, 229376], [9723904, 10285056, 10244096], granule)
+    assert 229376 <= held < 2 * cap and too_loose('resize', cap, margin) is None, (held, margin)
     print('PASS ring-resident-self-test')
 
 
@@ -159,51 +170,60 @@ def main():
                   'increment=%d ratio=%s vmrss-kb=%d vmhwm-kb=%d formula="%s"'
                   % (host, stage, cap, take, got['peak'], got['floor'], got['parent'], none['peak'], increment, ratio,
                      got['vmrss'], got['vmhwm'], formula))
-            held.setdefault(key(stage, cap), []).append(increment)
-    print('TAKES-JSON ' + json.dumps({host: held}, sort_keys=True))
+            row = held.setdefault(key(stage, cap), {'increments': [], 'peaks': []})
+            row['increments'].append(increment)
+            row['peaks'].append(got['peak'])
+    print('TAKES-JSON ' + json.dumps({host: {'pairs': held}}, sort_keys=True))
     if args.measure:
         return 0
     recorded = json.loads(args.takes_file.read_text()) if args.takes_file.exists() else {}
-    failed = 0
-    rows = 0
     if host not in recorded:
         print('FAIL ring-resident host=%s: no recorded takes in %s' % (host, args.takes_file.name))
         print('RING-RESIDENT rows=1 failed=1')
         return 1
+    print('ring-resident: %s takes recorded from %s' % (host, recorded[host].get('source', 'an unnamed source')))
+    failed = 0
+    rows = 0
     for stage, cap in pairs():
         rows += 1
         name = key(stage, cap)
-        takes = recorded[host].get(name)
+        takes = recorded[host]['pairs'].get(name)
         if not takes:
             print('FAIL ring-resident %s cap=%d: no recorded takes for host=%s' % (stage, cap, host))
             failed += 1
             continue
-        limit, margin, band = bound(takes, granule, stage, cap)
-        worst = max(held[name])
-        how = 'band %.1fx' % BAND if band else 'margin %d' % margin
-        if worst > limit:
-            ratio = ' (ratio %.2fx, bound %.2fx)' % (worst / cap, limit / cap) if cap else ''
-            print('FAIL ring-resident %s cap=%d increment=%d past bound=%d%s; recorded %s, %s'
-                  % (stage, cap, worst, limit, ratio, takes, how))
+        limit, margin = bound(takes['increments'], takes['peaks'], granule)
+        loose = too_loose(stage, cap, margin)
+        worst = max(held[name]['increments'])
+        ratio = ' (ratio %.2fx, bound %.2fx)' % (worst / cap, limit / cap) if cap else ''
+        if loose:
+            print('FAIL ring-resident %s cap=%d: bound too loose: %s' % (stage, cap, loose))
+            failed += 1
+        elif worst > limit:
+            print('FAIL ring-resident %s cap=%d increment=%d past bound=%d%s; recorded %s, margin %d'
+                  % (stage, cap, worst, limit, ratio, takes['increments'], margin))
             failed += 1
         else:
-            print('PASS ring-resident %s cap=%d increment=%d bound=%d; recorded %s, %s' % (stage, cap, worst, limit, takes, how))
+            print('PASS ring-resident %s cap=%d increment=%d bound=%d%s; margin %d'
+                  % (stage, cap, worst, limit, ratio, margin))
     rows += 1
     if projection is None:
         print('FAIL ring-resident projection: the probe printed none')
         failed += 1
     else:
         history_bytes, pane_bytes = projection
-        measured = max(held[key('new', history_bytes)]) if key('new', history_bytes) in held else None
-        if measured is None:
+        name = key('new', history_bytes)
+        if name not in held:
             print('FAIL ring-resident projection: no `new` row at the server\'s cap %d' % history_bytes)
             failed += 1
-        elif pane_bytes < measured:
-            print('FAIL ring-resident projection pane-bytes-80x24=%d under the measured %d' % (pane_bytes, measured))
-            failed += 1
         else:
-            print('PASS ring-resident projection pane-bytes-80x24=%d measured=%d over=%.2fx'
-                  % (pane_bytes, measured, pane_bytes / measured))
+            measured = max(held[name]['increments'])
+            if pane_bytes < measured:
+                print('FAIL ring-resident projection pane-bytes-80x24=%d under the measured %d' % (pane_bytes, measured))
+                failed += 1
+            else:
+                print('PASS ring-resident projection pane-bytes-80x24=%d measured=%d over=%.2fx'
+                      % (pane_bytes, measured, pane_bytes / measured))
     print('RING-RESIDENT rows=%d failed=%d' % (rows, failed))
     return 1 if failed else 0
 
