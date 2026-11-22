@@ -359,10 +359,6 @@ pub fn send(mut c: Conn, kind: int, payload: List[byte]) -> bool {
 /// (`title_dirty`; true, nothing appended): the protocol promises the
 /// current title, not every title. False when the event queue is full.
 pub fn queue_title(mut c: Conn, wire: List[byte]) -> bool {
-    if c.title_end >= 0 && c.tx_off < c.title_end {
-        c.title_dirty = true
-        return true
-    }
     if !enqueue(mut c, wire, false) { return false }
     c.title_end = c.tx_len
     c.title_start = c.tx_len - wire.len
