@@ -308,6 +308,11 @@ pub fn events_queued(c: Conn) -> int {
 /// from `image_start` to `image_end`.
 pub fn enqueue(mut c: Conn, wire: List[byte], frame: bool) -> bool {
     if !frame && events_queued(c) + wire.len > EVENT_QUEUE { return false }
+    append_wire(mut c, wire, frame)
+}
+
+// Append wire bytes, compacting first when the buffer would grow.
+fn append_wire(mut c: Conn, wire: List[byte], frame: bool) -> bool {
     if c.tx_off == c.tx_len {
         c.tx_off = 0
         c.tx_len = 0
@@ -449,12 +454,37 @@ pub fn reply_payload(id: int, status: int, out: str, err: str) -> List[byte] {
     b
 }
 
-/// A REPLY's wire bytes. Stub: one physical frame, as `send` encodes
-/// every message; empty past the physical frame's 1 MiB.
+/// A REPLY's wire bytes: one physical frame, or a chain of fragments of at
+/// most 1 MiB each, MORE on all but the last (as `frame_wire` sends an
+/// image). Empty when the payload is invalid or past the protocol's 8 MiB:
+/// the server refuses such a reply by name instead.
 pub fn reply_wire(payload: List[byte]) -> List[byte] {
-    let r = proto.encode(136, 0, payload)
-    if r.code != 0 { return List[byte]() }
-    r.bytes
+    if payload.len > proto.REPLY_MAX || proto.validate(136, payload) != 0 { return List[byte]() }
+    var wire = List[byte]()
+    var at = 0
+    while true {
+        let end = if payload.len - at > proto.PHYSICAL_MAX then at + proto.PHYSICAL_MAX else payload.len
+        let more = if end < payload.len then 1 else 0
+        let part = proto.encode_part(136, more, payload[at..end])
+        if part.code != 0 { return List[byte]() }
+        for x in part.bytes { (mut wire).push(x) }
+        at = end
+        if more == 0 { break }
+    }
+    wire
+}
+
+/// Whether wire bytes fit the connection's own queue beside what waits in
+/// it: its share, the event queue's cap.
+pub fn fits_queue(c: Conn, wire: List[byte]) -> bool {
+    events_queued(c) + wire.len <= EVENT_QUEUE
+}
+
+/// Append part of a REPLY taken from the server's reply buffer: not held to
+/// the event cap, since the buffer, not the queue, holds the reply; the
+/// part is at most one write's worth.
+pub fn append_reply_part(mut c: Conn, part: List[byte]) {
+    let _a = append_wire(mut c, part, false)
 }
 
 /// A HELLO, read after the codec validated it.

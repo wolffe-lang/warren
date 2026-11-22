@@ -48,6 +48,21 @@ pub struct Server {
     // a command and there was no client to tell (bytes the server keeps:
     // a turn's region may not leave a str in it).
     told: List[byte],
+    // The one server-wide reply buffer: a REPLY past its connection's share
+    // (the event cap) is sent from here, one at a time. Its storage grows in
+    // place to the largest reply sent (8 MiB and fragment headers at most)
+    // and is kept. `reply_len` bytes are the current reply's, `reply_off` of
+    // them already moved into `reply_conn`'s queue (generation
+    // `reply_gen`); -1 when no connection holds it. A connection whose
+    // reply needs the buffer while another holds it waits in
+    // `reply_waiters` (with their generations), first come first served.
+    reply: List[byte],
+    reply_len: int,
+    reply_off: int,
+    reply_conn: int,
+    reply_gen: int,
+    reply_waiters: List[int],
+    reply_waiter_gens: List[int],
     // While a command's action runs, the end of the last session owes the
     // stop instead of starting it, so the command's REPLY is queued first.
     hold_stop: bool,
@@ -151,6 +166,48 @@ fn close_conn(mut s: Server, index: int, why: str) {
     s.conns[index].fd = 0 - 1
     s.conns[index].pending = 0
     trace(s, "conn {index} closed: {why}")
+    if s.reply_conn == index { release_reply(mut s) }
+}
+
+// The reply buffer is free: its bytes stay (the storage is kept), and the
+// first connection still waiting for it asks again on the next turn.
+fn release_reply(mut s: Server) {
+    s.reply_conn = 0 - 1
+    s.reply_len = 0
+    s.reply_off = 0
+    while s.reply_waiters.len > 0 {
+        let w = s.reply_waiters[0]
+        let g = s.reply_waiter_gens[0]
+        drop_waiter(mut s, 0)
+        if w >= 0 && w < s.conns.len && s.conns[w].live && s.conns[w].gen == g && s.conns[w].command_len > 0 {
+            s.conns[w].command_ready = true
+            s.again = true
+            return
+        }
+    }
+}
+
+// Remove waiter `k` of the reply buffer, keeping the others' order.
+fn drop_waiter(mut s: Server, k: int) {
+    var j = k
+    while j + 1 < s.reply_waiters.len {
+        s.reply_waiters[j] = s.reply_waiters[j + 1]
+        s.reply_waiter_gens[j] = s.reply_waiter_gens[j + 1]
+        j += 1
+    }
+    let _w = (mut s.reply_waiters).pop() else { return }
+    let _g = (mut s.reply_waiter_gens).pop() else { return }
+}
+
+// The next part of the reply buffer into its holder's queue, once that
+// queue has been written out: at most one write's worth at a time, so the
+// connection's own queue never holds more than that of it.
+fn refill_reply(mut s: Server, index: int) {
+    if s.reply_conn != index || s.conns[index].gen != s.reply_gen || s.reply_off >= s.reply_len { return }
+    if queued(s.conns[index]) > 0 { return }
+    let end = if s.reply_len - s.reply_off > WRITE_BUDGET then s.reply_off + WRITE_BUDGET else s.reply_len
+    append_reply_part(mut s.conns[index], s.reply[s.reply_off..end])
+    s.reply_off = end
 }
 
 // A phase's name in the trace.
@@ -234,6 +291,7 @@ fn after_write(mut s: Server, index: int) {
         let _sent = proto.sent(mut s.conns[index].ack, seq)
         s.conns[index].image_end = 0 - 1
     }
+    refill_reply(mut s, index)
     if s.conns[index].phase == DRAINING && queued(s.conns[index]) == 0 {
         close_conn(mut s, index, "{sent_name(s.conns[index].sent_kind, s.conns[index].sent_code)} sent")
         return
@@ -2230,7 +2288,39 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
             }
         }
     }
-    let ok = send(mut s.conns[index], 136, reply_payload(id, status, out, err))
+    let payload = reply_payload(id, status, out, err)
+    let wire = reply_wire(payload)
+    var ok = true
+    if wire.len == 0 {
+        status = cmd.EXIT_REFUSED
+        ok = send(mut s.conns[index], 136, reply_payload(id, status, "",
+            "warren: {verb}: its reply of {payload.len} bytes is past the protocol's 8 MiB\n"))
+        trace(s, "conn {index} REPLY of {payload.len} bytes refused: past the protocol's cap")
+    } else if fits_queue(s.conns[index], wire) {
+        ok = enqueue(mut s.conns[index], wire, false)
+        trace(s, "conn {index} REPLY {wire.len} bytes, in its queue")
+    } else if s.reply_conn >= 0 {
+        // Another reply holds the buffer: this one is asked again when it is
+        // free (the COMMAND is kept as one waiting for a slot is).
+        command_later(mut s, index, body)
+        s.conns[index].command_ready = false
+        (mut s.reply_waiters).push(index)
+        (mut s.reply_waiter_gens).push(s.conns[index].gen)
+        trace(s, "conn {index} waits for the reply buffer")
+        return
+    } else {
+        var j = 0
+        for b in wire {
+            if j < s.reply.len { s.reply[j] = b } else { (mut s.reply).push(b) }
+            j += 1
+        }
+        s.reply_len = wire.len
+        s.reply_off = 0
+        s.reply_conn = index
+        s.reply_gen = s.conns[index].gen
+        refill_reply(mut s, index)
+        trace(s, "conn {index} REPLY {wire.len} bytes, from the reply buffer")
+    }
     s.conns[index].sent_kind = 136
     s.conns[index].sent_code = status
     s.conns[index].phase = DRAINING
@@ -3231,7 +3321,8 @@ pub fn serve() -> int {
     var s = Server {
         place: place, w: waiter, listen_key: 0 - 1, listening: false,
         conns: conns, sessions: List[Session](), panes: List[Pane](), orphans: List[int](), key_kind: List[int](),
-        key_owner: List[int](), key_gen: List[int](), next_id: 0, next_pane: 1, next_session: 1, next_tab: 1, told: List[byte](), hold_stop: false, stop_owed: false, stopping: false, stop_deadline: 0,
+        key_owner: List[int](), key_gen: List[int](), next_id: 0, next_pane: 1, next_session: 1, next_tab: 1, told: List[byte](), reply: List[byte](), reply_len: 0, reply_off: 0, reply_conn: 0 - 1, reply_gen: 0,
+        reply_waiters: List[int](), reply_waiter_gens: List[int](), hold_stop: false, stop_owed: false, stopping: false, stop_deadline: 0,
         started: now_ns(), idle_since: now_ns(), lifetime: lifetime_ms * 1000000, pid: env.pid(),
         version: vt.package_version(), again: false, need_slot: false, need_pane: false, need_view: false, settings: load_settings(), want_cols: 0,
         want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, frames: 0, prompt_frames: 0,
