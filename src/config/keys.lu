@@ -684,14 +684,21 @@ fn rest_after_verb(line: str) -> str {
 
 // The command line's verbs: those without arguments (in the order of their
 // actions in `command`), then those with. `warren <verb>` reads the same.
-const PLAIN_VERBS: str = "split-right split-down focus-next zoom equalize close-pane new-tab close-tab next-tab previous-tab detach lock"
-const ARGUMENT_VERBS: str = "focus resize select-tab rename-tab"
+// Functions, not module constants: the reference interpreter does not
+// resolve a method called on a module constant.
+fn plain_verbs() -> str {
+    "split-right split-down focus-next zoom equalize close-pane new-tab close-tab next-tab previous-tab detach lock"
+}
+
+fn argument_verbs() -> str {
+    "focus resize select-tab rename-tab"
+}
 
 /// Every verb of the command line, the ones without arguments first.
 pub fn command_verbs() -> List[str] {
     var out = List[str]()
-    for v in PLAIN_VERBS.split(" ") { (mut out).push(v) }
-    for v in ARGUMENT_VERBS.split(" ") { (mut out).push(v) }
+    for v in plain_verbs().split(" ") { (mut out).push(v) }
+    for v in argument_verbs().split(" ") { (mut out).push(v) }
     out
 }
 
@@ -703,7 +710,7 @@ pub fn command(line: str) -> Command {
     let w = words(line)
     if w.len == 0 { return refused("") }
     let v = w[0]
-    let plain = PLAIN_VERBS.split(" ")
+    let plain = plain_verbs().split(" ")
     let acts = [A_SPLIT, A_SPLIT, A_FOCUS_NEXT, A_ZOOM, A_EQUALIZE, A_CLOSE, A_NEW_TAB, A_CLOSE_TAB, A_NEXT_TAB,
         A_PREVIOUS_TAB, A_DETACH, A_LOCK]
     var i = 0
