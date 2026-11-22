@@ -42,7 +42,8 @@ def main():
         (RIG, 'container-limits-plant.manifest', ['container-memory-cap']),
         (RIG, 'verbs.manifest', ['gate-linux']),
         (RIG, 'verbs-plant.manifest', ['ids-never-reused']),
-        (RIG, 'verbs-create-plant.manifest', ['split-prints-new-id'])):
+        (RIG, 'verbs-create-plant.manifest', ['split-prints-new-id']),
+        (RIG, 'title-plant.manifest', ['title-flood-survives'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
