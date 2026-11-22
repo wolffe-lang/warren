@@ -1,6 +1,7 @@
 //! member: true
 //! `warren list --json`: the server's sessions, tabs and panes as one JSON
-//! object, schema 1 (docs/CLI.md). Pure: built from a target.Snapshot.
+//! object, schema 2 (docs/CLI.md): schema 1 and each pane's working
+//! directory with its source. Pure: built from a target.Snapshot.
 //! Strings are written with a quote and a backslash escaped and every byte
 //! below 0x20, and 0x7f, as `\u00XX`; other UTF-8 as it is. A pane with no
 //! program has a null pid. Field order is fixed, so two listings of one
@@ -41,6 +42,10 @@ fn put_pane(mut out: List[byte], p: PaneView, index: int) {
     if p.pid < 0 { put(mut out, "null") } else { put(mut out, "{p.pid}") }
     put(mut out, ",")
     put_text_field(mut out, "title", p.title)
+    put(mut out, ",")
+    put_text_field(mut out, "cwd", p.cwd)
+    put(mut out, ",")
+    put_text_field(mut out, "cwd_source", p.cwd_source)
     put(mut out, "}}")
 }
 
@@ -72,10 +77,10 @@ fn put_session(mut out: List[byte], s: SessionView) {
     put(mut out, "]}}")
 }
 
-/// The schema-1 listing of `snap`, one line without its newline.
+/// The schema-2 listing of `snap`, one line without its newline.
 pub fn list_json(snap: Snapshot) -> str {
     var out = List[byte]()
-    put(mut out, "{{\"schema\":1,\"sessions\":[")
+    put(mut out, "{{\"schema\":2,\"sessions\":[")
     var i = 0
     while i < snap.sessions.len {
         if i > 0 { put(mut out, ",") }
