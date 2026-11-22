@@ -28,7 +28,9 @@ Linux, 16 KiB on macOS). The rule checks itself where a ring is made: a `new`
 row's margin must be under one cap, so one more cap-sized buffer at the peak
 fails; a difference row's margin must be under two caps, so a step that made
 the ring again fails. A margin past that fails by name as too loose. A host
-with no recorded takes fails by name.
+with no recorded takes fails by name. Each verdict names its row: `ring-resident-STAGE`
+(new, resize, screenful, filled), `ring-resident-projection`, `ring-resident-takes`
+and `ring-resident-probe`.
 
 The projection row holds the server's projection of an 80x24 pane
 (`pane_bytes`, printed by the probe) at or above the largest `new` increment
@@ -91,7 +93,7 @@ def run(measure_child, probe, stage, cap):
             got['projection'] = (int(m.group(1)), int(m.group(2)))
     last = 'start' if stage == 'none' else stage
     if got['exit'] != 0 or got['step'] != last:
-        print('FAIL ring-resident probe %s cap=%d: exit %s at step %s' % (stage, cap, got['exit'], got['step']))
+        print('FAIL ring-resident-probe %s cap=%d: exit %s at step %s' % (stage, cap, got['exit'], got['step']))
         sys.stdout.write(done.stdout[-2000:])
         sys.stderr.write(done.stderr[-2000:])
         return None
@@ -178,7 +180,7 @@ def main():
         return 0
     recorded = json.loads(args.takes_file.read_text()) if args.takes_file.exists() else {}
     if host not in recorded:
-        print('FAIL ring-resident host=%s: no recorded takes in %s' % (host, args.takes_file.name))
+        print('FAIL ring-resident-takes host=%s: no recorded takes in %s' % (host, args.takes_file.name))
         print('RING-RESIDENT rows=1 failed=1')
         return 1
     print('ring-resident: %s takes recorded from %s' % (host, recorded[host].get('source', 'an unnamed source')))
@@ -189,7 +191,7 @@ def main():
         name = key(stage, cap)
         takes = recorded[host]['pairs'].get(name)
         if not takes:
-            print('FAIL ring-resident %s cap=%d: no recorded takes for host=%s' % (stage, cap, host))
+            print('FAIL ring-resident-%s cap=%d: no recorded takes for host=%s' % (stage, cap, host))
             failed += 1
             continue
         limit, margin = bound(takes['increments'], takes['peaks'], granule)
@@ -197,32 +199,32 @@ def main():
         worst = max(held[name]['increments'])
         ratio = ' (ratio %.2fx, bound %.2fx)' % (worst / cap, limit / cap) if cap else ''
         if loose:
-            print('FAIL ring-resident %s cap=%d: bound too loose: %s' % (stage, cap, loose))
+            print('FAIL ring-resident-%s cap=%d: bound too loose: %s' % (stage, cap, loose))
             failed += 1
         elif worst > limit:
-            print('FAIL ring-resident %s cap=%d increment=%d past bound=%d%s; recorded %s, margin %d'
+            print('FAIL ring-resident-%s cap=%d increment=%d past bound=%d%s; recorded %s, margin %d'
                   % (stage, cap, worst, limit, ratio, takes['increments'], margin))
             failed += 1
         else:
-            print('PASS ring-resident %s cap=%d increment=%d bound=%d%s; margin %d'
+            print('PASS ring-resident-%s cap=%d increment=%d bound=%d%s; margin %d'
                   % (stage, cap, worst, limit, ratio, margin))
     rows += 1
     if projection is None:
-        print('FAIL ring-resident projection: the probe printed none')
+        print('FAIL ring-resident-projection: the probe printed none')
         failed += 1
     else:
         history_bytes, pane_bytes = projection
         name = key('new', history_bytes)
         if name not in held:
-            print('FAIL ring-resident projection: no `new` row at the server\'s cap %d' % history_bytes)
+            print('FAIL ring-resident-projection: no `new` row at the server\'s cap %d' % history_bytes)
             failed += 1
         else:
             measured = max(held[name]['increments'])
             if pane_bytes < measured:
-                print('FAIL ring-resident projection pane-bytes-80x24=%d under the measured %d' % (pane_bytes, measured))
+                print('FAIL ring-resident-projection pane-bytes-80x24=%d under the measured %d' % (pane_bytes, measured))
                 failed += 1
             else:
-                print('PASS ring-resident projection pane-bytes-80x24=%d measured=%d over=%.2fx'
+                print('PASS ring-resident-projection pane-bytes-80x24=%d measured=%d over=%.2fx'
                       % (pane_bytes, measured, pane_bytes / measured))
     print('RING-RESIDENT rows=%d failed=%d' % (rows, failed))
     return 1 if failed else 0
