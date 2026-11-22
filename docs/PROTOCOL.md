@@ -240,7 +240,14 @@ another immediate turn rather than waiting for a new kernel edge. Large
 messages span turns. Non-FRAME outbound data is capped at 256 KiB per attach
 client; command REPLY uses one bounded message, not that attach-event queue.
 Exceeding the event queue detaches only that client (BYE too-slow if safe,
-else close). One unacknowledged FRAME has no timeout in v1; it cannot prevent
+else close). A title is state, not an event: at most one TITLE waits in a
+client's queue, a newer title while it waits only marks the client, and
+once it is written the focused pane's title as it is then is queued. A
+client is promised the current title, not every title, so a pane that writes
+titles as fast as it can never fills the queue. A pane's OSC string (a
+title, a clipboard write) holds at most 4,096 bytes; a longer one is dropped
+whole, and a pane's titles or clipboard writes within one read come out as
+one event. One unacknowledged FRAME has no timeout in v1; it cannot prevent
 pty draining or another client progressing. No peer can make a blocking
 write or an unbounded allocation. Connection count and global memory limits
 are server admission policy; the next implementation contract must budget
