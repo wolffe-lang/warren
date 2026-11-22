@@ -138,8 +138,8 @@ left drag in such a pane (or a Shift drag in one that asked for reports)
 selects text for this client; release copies it into the session's register.
 
 The client tells the server (HELLO feature bit 3) that its terminal takes OSC
-52 clipboard writes, except at the console (`WARREN_RENDER=console`), which
-never gets one. For each CLIPBOARD the server sends, it writes
+52 clipboard writes, except under the console policy (below), which never
+gets one. For each CLIPBOARD the server sends, it writes
 `ESC ] 52 ; c ; base64 BEL` to the terminal: best effort, write-only, never
 read back, so a terminal may refuse or ignore it and the register still holds
 the text. The server sends CLIPBOARD for this client's own copies; a program's
@@ -156,7 +156,14 @@ environment:
 | policy | when | colours | wide glyphs | marks | sync, cursor shape |
 |---|---|---|---|---|---|
 | terminal | default | RGB with `COLORTERM=truecolor` or `24bit`; 256 with `TERM` naming `256color`; else 16; none for `TERM=dumb` | the glyph, then the next cell placed | sent | yes |
-| console | `WARREN_RENDER=console` (PAX's console) | 16 | the glyph, then a blank for its continuation | left out, later cells keep their columns | no |
+| console | `TERM=linux` with `WARREN_RENDER` unset (PAX's console, a Linux virtual console), or `WARREN_RENDER=console` | 16 | the glyph, then a blank for its continuation | left out, later cells keep their columns | no |
+
+`WARREN_RENDER`, when set, decides either way: `console` picks the console
+policy under any `TERM`, and any other value (`terminal`, say) picks the
+terminal policy even under `TERM=linux`. Since a Linux virtual console says
+`TERM=linux` as PAX's console does, the console policy is its default too
+(sixteen colours, wide glyphs placed for one cell a code point, no OSC);
+`WARREN_RENDER=terminal` keeps the terminal policy there.
 
 Colours a policy cannot show are downsampled: RGB to the nearest of the 6x6x6
 cube or the grey ramp, and either to the nearest of the sixteen. The console
