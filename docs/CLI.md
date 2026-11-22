@@ -207,9 +207,9 @@ order.
   ([TERM](TERM.md)). `proc` means the directory `/proc` names for its program,
   on Linux, while the program runs. `start` means its session's start
   directory, used when neither of the others is available. A reported or
-  read path is used only while it names a directory that exists. A pane
-  whose program has ended keeps its last report, else falls back to `start`.
-  On macOS and PAX there is no `proc`.
+  read path is used only while it names a directory that exists, so a shell
+  whose directory was removed is listed at `start`. On macOS and PAX there is
+  no `proc`.
 - Strings are written as they are in UTF-8, with a quote and a backslash
   escaped and every byte below 0x20, and 0x7f, as `\u00XX`.
 - A tab's `name` is empty until it is renamed.
