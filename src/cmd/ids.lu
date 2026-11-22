@@ -18,12 +18,33 @@ pub struct IdRead { kind: int, n: int }
 
 /// The text of the id of kind `kind` and number `n`.
 pub fn format_id(kind: int, n: int) -> str {
-    let _unused = kind + n
+    if n < 1 { return "" }
+    if kind == ID_SESSION { return "s{n}" }
+    if kind == ID_TAB { return "t{n}" }
+    if kind == ID_PANE { return "p{n}" }
     ""
 }
 
-/// Text read as an id.
+/// Text read as an id: `s`, `t` or `p` and a number from 1, written
+/// without a leading zero; `%` and a number is a pane too (the form
+/// `WARREN_PANE` has carried).
 pub fn parse_id(text: str) -> IdRead {
-    let _unused = text.len
-    IdRead { kind: ID_NONE, n: 0 }
+    let none = IdRead { kind: ID_NONE, n: 0 }
+    if text.len < 2 || text.len > 13 { return none }
+    let lead = text.bytes()[0] as int
+    var kind = ID_NONE
+    if lead == 115 { kind = ID_SESSION }
+    if lead == 116 { kind = ID_TAB }
+    if lead == 112 || lead == 37 { kind = ID_PANE }
+    if kind == ID_NONE { return none }
+    if (text.bytes()[1] as int) == 48 { return none }
+    var n: int = 0
+    var i = 1
+    while i < text.len {
+        let d = (text.bytes()[i] as int) - 48
+        if d < 0 || d > 9 { return none }
+        n = n * 10 + d
+        i += 1
+    }
+    IdRead { kind: kind, n: n }
 }
