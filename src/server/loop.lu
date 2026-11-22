@@ -2038,7 +2038,7 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
         out = cmd.list_json(snapshot(s)) + "\n"
     } else if v.ok && v.kind == cmd.VERB_NEW_SESSION {
         let h = read_hello(s.conns[index].hello[0..s.conns[index].hello_len])
-        let name = if v.name.len > 0 then v.name else free_number(s)
+        let name = if v.named then v.name else free_number(s)
         let cols = if h.cols == 0 then 80 else h.cols
         let rows = if h.rows == 0 then 24 else h.rows
         status = cmd.EXIT_REFUSED

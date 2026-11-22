@@ -87,7 +87,9 @@ pub fn parse_verb(argv: List[str]) -> Verb {
         if v == "new-session" {
             if rest.len > 1 { return usage_error("usage: new-session [NAME]") }
             let name = if rest.len == 1 then rest[0] else ""
-            return verb_of(VERB_NEW_SESSION, "", name)
+            var n = verb_of(VERB_NEW_SESSION, "", name)
+            n.named = rest.len == 1
+            return n
         }
         if rest.len != 1 || rest[0] != "--json" { return usage_error("usage: list --json") }
         return verb_of(VERB_LIST_JSON, "", "")
