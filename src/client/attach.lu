@@ -486,7 +486,9 @@ fn command_on(mut p: Peer, argv: List[str], cols: int, rows: int, with_env: bool
     proto.put(mut b, argv.len, 2)
     for a in argv { proto.put_text(mut b, a) }
     proto.put_text(mut b, cwd)
-    proto.put_text(mut b, "")
+    // The pane this command runs in, when it runs in one: a verb with no
+    // target acts there.
+    proto.put_text(mut b, env.get("WARREN_PANE") else "")
     let _c = send(p, 11, b)
     let t0 = now_ms()
     while ms_since(t0) < 10000 {
