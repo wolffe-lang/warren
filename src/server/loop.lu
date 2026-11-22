@@ -1129,9 +1129,10 @@ fn act_split_in(mut s: Server, index: int, si: int, axis: int, dir: str, argv: L
     let k = acquire_pane(mut s, nc, nr)
     if k < 0 { return LATER }
     let from = focused_slot(s, si)
+    let start = if dir.len > 0 then dir else new_pane_dir(s, si, from, true)
     s.next_pane = s.next_pane + 1
     layout.split(mut s.sessions[si].layout, tab, focus, axis, id, true, cols, area) else |_| {}
-    let why = spawn_pane_in(mut s, si, k, id, nc, nr, dir, argv)
+    let why = spawn_pane_in(mut s, si, k, id, nc, nr, start, argv)
     if why.len > 0 {
         layout.close(mut s.sessions[si].layout, id) else |_| {}
         tell(mut s, index, "split refused: the program did not start: {why}")
@@ -1171,7 +1172,8 @@ fn act_new_tab_in(mut s: Server, index: int, si: int, dir: str, argv: List[str])
     s.sessions[si].layout.next_id = s.next_tab
     let _t = layout.new_tab(mut s.sessions[si].layout, id, "") else |_| { 0 }
     s.next_tab = s.sessions[si].layout.next_id
-    let why = spawn_pane_in(mut s, si, k, id, cols, area, dir, argv)
+    let start = if dir.len > 0 then dir else new_pane_dir(s, si, from, false)
+    let why = spawn_pane_in(mut s, si, k, id, cols, area, start, argv)
     if why.len > 0 {
         layout.close(mut s.sessions[si].layout, id) else |_| {}
         tell(mut s, index, "new tab refused: the program did not start: {why}")
@@ -2086,6 +2088,15 @@ fn pane_dir(s: Server, k: int) -> PaneDir {
     PaneDir { path: cwd_of(s.sessions[s.panes[k].session]), source: "start" }
 }
 
+/// Where a new pane's program starts when no `-c` names a directory: a split
+/// in the working directory of the pane it splits (pane_dir), a new tab and
+/// a new session in the session's start directory. warren's one choice of
+/// it, which differs from tmux's (README).
+fn new_pane_dir(s: Server, si: int, from: int, splitting: bool) -> str {
+    if splitting && from >= 0 { return pane_dir(s, from).path }
+    cwd_of(s.sessions[si])
+}
+
 // One session as the command client's rules see it: its tabs in order,
 // each tab's panes in tree order with their rects in the tab area (a hidden
 // pane's rect is zero), the pid of a pane whose program is alive.
@@ -2399,7 +2410,7 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
             } else {
                 let si = session_with_id(s, r.session)
                 let dir = if v.has_dir then command_dir(body, v.dir) else ""
-                let start = if dir.len > 0 then dir else cwd_of(s.sessions[si])
+                let start = if dir.len > 0 then dir else new_pane_dir(s, si, slot_of(s, r.pane), a == config.A_SPLIT)
                 let missing = if v.argv.len > 0 then program_problem(v.argv[0], start, s.sessions[si].env_names,
                     s.sessions[si].env_values) else ""
                 if dir.len > 0 && !is_directory(dir) {
