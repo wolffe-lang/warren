@@ -2356,6 +2356,13 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
         if s.conns[index].deadline == 0 { s.conns[index].deadline = now_ns() + s.reply_wait_ms * 1000000 }
         trace(s, "conn {index} waits for the reply buffer")
         return
+    } else if wire.len > s.reply.len && projected(s, wire.len - s.reply.len) > s.budget {
+        // The buffer would grow past what the memory budget has room for.
+        if s.reply_conn == index && s.reply_gen == s.conns[index].gen { release_reply(mut s) }
+        status = cmd.EXIT_REFUSED
+        ok = send(mut s.conns[index], 136, reply_payload(id, status, "",
+            "warren: {verb}: its reply of {wire.len} bytes would pass the server's memory budget\n"))
+        trace(s, "conn {index} REPLY of {wire.len} bytes refused: the memory budget")
     } else {
         var j = 0
         for b in wire {
