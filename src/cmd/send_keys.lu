@@ -114,6 +114,7 @@ pub fn key_of(word: str) -> KeyRead {
         }
     }
     let name = lower(rest)
+    if name == "enter" { return KeyRead { ok: true, event: KeyEvent { mods: mods, kind: 0, code: 10 } } }
     if name == "space" {
         if mods & 1 != 0 { return none }
         return KeyRead { ok: true, event: KeyEvent { mods: mods, kind: 0, code: 32 } }
