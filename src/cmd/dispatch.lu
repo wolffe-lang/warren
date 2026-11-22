@@ -20,13 +20,85 @@ pub const VERB_LIST_JSON: int = 5
 /// name; or a refusal, its exit status (2 for usage) and why.
 pub struct Verb { ok: bool, kind: int, target: str, command: config.Command, name: str, status: int, why: str }
 
-/// Read a COMMAND's arguments, the verb first.
-pub fn parse_verb(argv: List[str]) -> Verb {
-    let _unused = argv.len
-    Verb { ok: false, kind: 0, target: "", command: config.command(""), name: "", status: 2, why: "unimplemented" }
+// The server's own verbs, besides the command line's.
+const SERVER_VERBS: str = "kill-server list-sessions ls new-session list"
+
+fn usage_error(why: str) -> Verb {
+    Verb { ok: false, kind: 0, target: "", command: config.command(""), name: "", status: EXIT_USAGE, why: why }
 }
 
-/// Every verb the server answers, in the order `warren` prints them.
+fn verb_of(kind: int, target: str, name: str) -> Verb {
+    Verb { ok: true, kind: kind, target: target, command: config.command(""), name: name, status: EXIT_DONE, why: "" }
+}
+
+fn is_server_verb(v: str) -> bool {
+    for n in SERVER_VERBS.split(" ") {
+        if n == v { return true }
+    }
+    false
+}
+
+fn is_command_verb(v: str) -> bool {
+    for n in config.command_verbs() {
+        if n == v { return true }
+    }
+    false
+}
+
+/// Read a COMMAND's arguments, the verb first: `VERB [-t TARGET]
+/// [ARGUMENT...]`, `-t` anywhere after the verb, at most once. The command
+/// line's verbs are read by the command line's own parser, so a verb and
+/// its `:` line are one reading; the server's verbs take no target.
+pub fn parse_verb(argv: List[str]) -> Verb {
+    if argv.len == 0 { return usage_error("usage: warren <verb> [-t TARGET] [ARGUMENT...]") }
+    let v = argv[0]
+    let server_verb = is_server_verb(v)
+    if !server_verb && !is_command_verb(v) { return usage_error("unknown command: " + v) }
+    var target = ""
+    var targeted = false
+    var rest = List[str]()
+    var i = 1
+    while i < argv.len {
+        if argv[i] == "-t" {
+            if targeted { return usage_error("usage: -t given twice") }
+            if i + 1 >= argv.len { return usage_error("usage: -t needs a target") }
+            target = argv[i + 1]
+            targeted = true
+            i += 2
+        } else {
+            (mut rest).push(argv[i])
+            i += 1
+        }
+    }
+    if server_verb {
+        if targeted { return usage_error("usage: {v} takes no target") }
+        if v == "kill-server" {
+            if rest.len > 0 { return usage_error("usage: kill-server") }
+            return verb_of(VERB_KILL_SERVER, "", "")
+        }
+        if v == "list-sessions" || v == "ls" {
+            if rest.len > 0 { return usage_error("usage: {v}") }
+            return verb_of(VERB_LIST_SESSIONS, "", "")
+        }
+        if v == "new-session" {
+            if rest.len > 1 { return usage_error("usage: new-session [NAME]") }
+            let name = if rest.len == 1 then rest[0] else ""
+            return verb_of(VERB_NEW_SESSION, "", name)
+        }
+        if rest.len != 1 || rest[0] != "--json" { return usage_error("usage: list --json") }
+        return verb_of(VERB_LIST_JSON, "", "")
+    }
+    var line = v
+    for a in rest { line = line + " " + a }
+    let c = config.command(line)
+    if !c.ok { return usage_error(c.why) }
+    Verb { ok: true, kind: VERB_ACTION, target: target, command: c, name: "", status: EXIT_DONE, why: "" }
+}
+
+/// Every verb the server answers: its own, then the command line's.
 pub fn verb_names() -> List[str] {
-    List[str]()
+    var out = List[str]()
+    for n in SERVER_VERBS.split(" ") { (mut out).push(n) }
+    for n in config.command_verbs() { (mut out).push(n) }
+    out
 }
