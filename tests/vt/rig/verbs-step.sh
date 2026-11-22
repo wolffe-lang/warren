@@ -6,10 +6,12 @@
 #   preflight   the image held to the package list and the binary pins
 #   gate-linux  the whole Linux gate inside the image, started by
 #               tools/container-run.sh as tools/in-container starts it
-#   plant       inside the image: warren and the session rows built, then the
-#               row that holds ids never handed out again, which a plant that
-#               hands out a freed session id must turn red: it prints
-#               FAIL ids-never-reused and ends 1
+#   plant       inside the image, tests/vt/rig/verbs-inner.sh plant: warren
+#               and the session rows built, then the row that holds ids never
+#               handed out again, which a plant that hands out a freed session
+#               id must turn red: it prints FAIL ids-never-reused and ends 1
+#   toolchain   inside the image, tests/vt/rig/verbs-inner.sh toolchain: the
+#               staged pin found and run as the plant step finds it
 set -euo pipefail
 root=$PWD
 engine=${WARREN_ENGINE:?set WARREN_ENGINE}
@@ -43,15 +45,12 @@ case "${1:-}" in
   ;;
  plant)
   rc=0
-  inside bash -c '
-    set -e
-    . tools/toolchain-env.sh
-    python3 -I tools/vt/generate_version.py
-    mkdir -p target/native
-    "$WOLF" build --deny-warnings src/warren.lu -o target/native/warren
-    "$WOLF" build --deny-warnings src/session_rows.lu -o target/native/session-rows
-    rm -rf target/plant-rows && mkdir -p target/plant-rows && cd target/plant-rows
-    exec ../native/session-rows ../native/warren ids-never-reused' || rc=$?
+  inside bash tests/vt/rig/verbs-inner.sh plant || rc=$?
+  exit "$rc"
+  ;;
+ toolchain)
+  rc=0
+  inside bash tests/vt/rig/verbs-inner.sh toolchain || rc=$?
   exit "$rc"
   ;;
  *) printf 'FAIL verbs-rig unknown-step\n'; exit 2 ;;
