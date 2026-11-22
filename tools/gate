@@ -145,7 +145,7 @@ step client-keyboard-lupin "$LUPIN" run src/client_keyboard_test.lu
 step cmd-rows-build "$WOLF" build --deny-warnings src/cmd_rows_test.lu -o "$root/target/native/cmd-rows"
 step cmd-rows-native "$root/target/native/cmd-rows"
 step cmd-rows-lupin "$LUPIN" run src/cmd_rows_test.lu
-step cli-lupin python3 -I tests/vt/cli_rows.py "$LUPIN" run src/warren.lu
+step cli-lupin python3 -I tests/vt/cli_rows.py --interpreted "$LUPIN" run src/warren.lu
 step cases-lupin python3 -I tests/vt/compare_cases.py "$LUPIN" run src/warren.lu
 step combining-frames-lupin python3 -I tests/vt/compare_combining.py "$LUPIN" run src/warren.lu
 step combine-anchor-frames-lupin python3 -I tests/vt/compare_combine_anchor.py "$LUPIN" run src/warren.lu

@@ -15,6 +15,8 @@ import screen
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--native-default', action='store_true')
+    parser.add_argument('--interpreted', action='store_true',
+                        help='the command is the reference interpreter running src/warren.lu')
     parser.add_argument('command', nargs=argparse.REMAINDER)
     args = parser.parse_args()
     assert args.command
@@ -85,11 +87,20 @@ def main():
     unknown = subprocess.run(args.command + ['unknown'], cwd=ROOT, capture_output=True, timeout=180)
     assert unknown.returncode == 2 and not unknown.stdout
     # No server: every verb that asks one exits 3, saying so (EXIT_NO_SERVER).
+    # The reference interpreter cannot take the client's way to a server: the
+    # runtime directory's last fallback is named by the user id, which it
+    # cannot read, and it refuses that call by name (`os_euid`, as
+    # tests/deps/expect.txt records for the start lock) even when the
+    # fallback is not taken. There each verb ends 4 naming it.
     with tempfile.TemporaryDirectory(dir=root) as temporary:
         env = dict(os.environ, WARREN_RUNTIME_DIR=str(Path(temporary) / 'rt'))
         for verb in (['list-sessions'], ['kill-server'], ['list', '--json'], ['split-right']):
             got = subprocess.run(args.command + verb, cwd=ROOT, capture_output=True, timeout=180, env=env)
-            assert got.returncode == 3 and got.stderr == b'warren: no server is running\n' and not got.stdout, (
+            if args.interpreted:
+                ok = got.returncode == 4 and b'unsupported: `os_euid`' in got.stderr
+            else:
+                ok = got.returncode == 3 and got.stderr == b'warren: no server is running\n'
+            assert ok and not got.stdout, (
                 'cli-no-server-exit-3', verb, got.returncode, got.stdout[:200], got.stderr[:200])
     # With no arguments warren attaches, which needs a terminal: here there is none.
     bare = subprocess.run(args.command, cwd=ROOT, capture_output=True, timeout=180, stdin=subprocess.DEVNULL)
