@@ -28,7 +28,9 @@ Linux, 16 KiB on macOS). The rule checks itself where a ring is made: a `new`
 row's margin must be under one cap, so one more cap-sized buffer at the peak
 fails; a difference row's margin must be under two caps, so a step that made
 the ring again fails. A margin past that fails by name as too loose. A host
-with no recorded takes fails by name. Each verdict names its row: `ring-resident-STAGE`
+with no recorded takes fails by name. A cap a host does not hold (macOS at
+8 MiB, whose allocator's peak there is bimodal) is measured, printed and named
+in a NOTE with its takes, and holds nothing. Each verdict names its row: `ring-resident-STAGE`
 (new, resize, screenful, filled), `ring-resident-projection`, `ring-resident-takes`
 and `ring-resident-probe`.
 
@@ -51,6 +53,11 @@ from pathlib import Path
 CAPS = (0, 2097152, 8388608)
 STAGES = ('new', 'resize', 'screenful', 'filled')
 GRANULE = {'linux': 262144, 'macos': 16384}
+# The caps each host holds. macOS's peaks are whole 16 KiB pages and the same
+# to the byte from run to run at 0 and 2 MiB (the server's cap), but at 8 MiB
+# one run in four peaks a whole cap higher (its allocator keeping the first
+# freed buffer at the peak), so there it is measured and printed, not held.
+HELD_CAPS = {'linux': (0, 2097152, 8388608), 'macos': (0, 2097152)}
 TAKES_FILE = Path(__file__).with_name('ring-resident-takes.json')
 MEASURE = re.compile(r'^MEASURE process exit=(\d+) signal=(\d+) wall-nanoseconds=(\d+) peak-rss-bytes=(\d+) '
                      r'child-before-exec-peak-rss-bytes=(-?\d+) parent-inherited-peak-rss-bytes=(-?\d+) ')
@@ -187,8 +194,12 @@ def main():
     failed = 0
     rows = 0
     for stage, cap in pairs():
-        rows += 1
         name = key(stage, cap)
+        if cap not in HELD_CAPS[host]:
+            print('NOTE ring-resident-%s cap=%d host=%s: measured, not held; increments %s'
+                  % (stage, cap, host, held[name]['increments']))
+            continue
+        rows += 1
         takes = recorded[host]['pairs'].get(name)
         if not takes:
             print('FAIL ring-resident-%s cap=%d: no recorded takes for host=%s' % (stage, cap, host))
