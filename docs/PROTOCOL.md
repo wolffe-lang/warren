@@ -136,7 +136,10 @@ gets BYE protocol-error if it can be appended without corrupting a partial
 frame/fragment chain; otherwise close immediately. Queued writes are never
 rewound or interleaved to insert an error. WELCOME precedes other ordinary
 server messages. Role command accepts one COMMAND then replies and closes;
-it never receives FRAME. Role attach never sends COMMAND. PING/PONG are
+it never receives FRAME. A COMMAND's argv is a verb and its arguments as
+[CLI.md](CLI.md) gives them; its pane is the pane the command runs in, as
+`WARREN_PANE` spells it (`%N`), or empty, and a verb with no target acts
+there. Role attach never sends COMMAND. PING/PONG are
 permitted only after WELCOME and before draining, outside fragment chains.
 
 ## 4. FRAME and image rules
