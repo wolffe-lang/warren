@@ -1,0 +1,145 @@
+{
+ "alt": {
+  "[\"-p\", \"-S\", \"-\"]": {
+   "difference": "alternate-has-no-history",
+   "tmux": "p01\np02\np03\np04\np05\np06\np07\nALT one\nALT two\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+   "warren": "ALT one\nALT two\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+  },
+  "[\"-p\", \"-S\", \"-10\"]": {
+   "difference": "alternate-has-no-history",
+   "tmux": "p01\np02\np03\np04\np05\np06\np07\nALT one\nALT two\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+   "warren": "ALT one\nALT two\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+  },
+  "[\"-p\"]": {
+   "difference": "-",
+   "tmux": "ALT one\nALT two\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+   "warren": "ALT one\nALT two\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+  },
+  "[\"-pe\"]": {
+   "difference": "-",
+   "tmux": "ALT one\nALT two\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+   "warren": "ALT one\nALT two\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+  }
+ },
+ "history": {
+  "[\"-p\", \"-E\", \"-\"]": {
+   "difference": "-",
+   "tmux": "line 078\nline 079\nline 080\nline 081\nline 082\nline 083\nline 084\nline 085\nline 086\nline 087\nline 088\nline 089\nline 090\nline 091\nline 092\nline 093\nline 094\nline 095\nline 096\nline 097\nline 098\nline 099\nline 100\n\n",
+   "warren": "line 078\nline 079\nline 080\nline 081\nline 082\nline 083\nline 084\nline 085\nline 086\nline 087\nline 088\nline 089\nline 090\nline 091\nline 092\nline 093\nline 094\nline 095\nline 096\nline 097\nline 098\nline 099\nline 100\n\n"
+  },
+  "[\"-p\", \"-E\", \"2\"]": {
+   "difference": "-",
+   "tmux": "line 078\nline 079\nline 080\n",
+   "warren": "line 078\nline 079\nline 080\n"
+  },
+  "[\"-p\", \"-S\", \"+2\"]": {
+   "difference": "-",
+   "tmux": "line 080\nline 081\nline 082\nline 083\nline 084\nline 085\nline 086\nline 087\nline 088\nline 089\nline 090\nline 091\nline 092\nline 093\nline 094\nline 095\nline 096\nline 097\nline 098\nline 099\nline 100\n\n",
+   "warren": "line 080\nline 081\nline 082\nline 083\nline 084\nline 085\nline 086\nline 087\nline 088\nline 089\nline 090\nline 091\nline 092\nline 093\nline 094\nline 095\nline 096\nline 097\nline 098\nline 099\nline 100\n\n"
+  },
+  "[\"-p\", \"-S\", \"-\", \"-E\", \"3\"]": {
+   "difference": "-",
+   "tmux": "line 001\nline 002\nline 003\nline 004\nline 005\nline 006\nline 007\nline 008\nline 009\nline 010\nline 011\nline 012\nline 013\nline 014\nline 015\nline 016\nline 017\nline 018\nline 019\nline 020\nline 021\nline 022\nline 023\nline 024\nline 025\nline 026\nline 027\nline 028\nline 029\nline 030\nline 031\nline 032\nline 033\nline 034\nline 035\nline 036\nline 037\nline 038\nline 039\nline 040\nline 041\nline 042\nline 043\nline 044\nline 045\nline 046\nline 047\nline 048\nline 049\nline 050\nline 051\nline 052\nline 053\nline 054\nline 055\nline 056\nline 057\nline 058\nline 059\nline 060\nline 061\nline 062\nline 063\nline 064\nline 065\nline 066\nline 067\nline 068\nline 069\nline 070\nline 071\nline 072\nline 073\nline 074\nline 075\nline 076\nline 077\nline 078\nline 079\nline 080\nline 081\n",
+   "warren": "line 001\nline 002\nline 003\nline 004\nline 005\nline 006\nline 007\nline 008\nline 009\nline 010\nline 011\nline 012\nline 013\nline 014\nline 015\nline 016\nline 017\nline 018\nline 019\nline 020\nline 021\nline 022\nline 023\nline 024\nline 025\nline 026\nline 027\nline 028\nline 029\nline 030\nline 031\nline 032\nline 033\nline 034\nline 035\nline 036\nline 037\nline 038\nline 039\nline 040\nline 041\nline 042\nline 043\nline 044\nline 045\nline 046\nline 047\nline 048\nline 049\nline 050\nline 051\nline 052\nline 053\nline 054\nline 055\nline 056\nline 057\nline 058\nline 059\nline 060\nline 061\nline 062\nline 063\nline 064\nline 065\nline 066\nline 067\nline 068\nline 069\nline 070\nline 071\nline 072\nline 073\nline 074\nline 075\nline 076\nline 077\nline 078\nline 079\nline 080\nline 081\n"
+  },
+  "[\"-p\", \"-S\", \"-\"]": {
+   "difference": "-",
+   "tmux": "line 001\nline 002\nline 003\nline 004\nline 005\nline 006\nline 007\nline 008\nline 009\nline 010\nline 011\nline 012\nline 013\nline 014\nline 015\nline 016\nline 017\nline 018\nline 019\nline 020\nline 021\nline 022\nline 023\nline 024\nline 025\nline 026\nline 027\nline 028\nline 029\nline 030\nline 031\nline 032\nline 033\nline 034\nline 035\nline 036\nline 037\nline 038\nline 039\nline 040\nline 041\nline 042\nline 043\nline 044\nline 045\nline 046\nline 047\nline 048\nline 049\nline 050\nline 051\nline 052\nline 053\nline 054\nline 055\nline 056\nline 057\nline 058\nline 059\nline 060\nline 061\nline 062\nline 063\nline 064\nline 065\nline 066\nline 067\nline 068\nline 069\nline 070\nline 071\nline 072\nline 073\nline 074\nline 075\nline 076\nline 077\nline 078\nline 079\nline 080\nline 081\nline 082\nline 083\nline 084\nline 085\nline 086\nline 087\nline 088\nline 089\nline 090\nline 091\nline 092\nline 093\nline 094\nline 095\nline 096\nline 097\nline 098\nline 099\nline 100\n\n",
+   "warren": "line 001\nline 002\nline 003\nline 004\nline 005\nline 006\nline 007\nline 008\nline 009\nline 010\nline 011\nline 012\nline 013\nline 014\nline 015\nline 016\nline 017\nline 018\nline 019\nline 020\nline 021\nline 022\nline 023\nline 024\nline 025\nline 026\nline 027\nline 028\nline 029\nline 030\nline 031\nline 032\nline 033\nline 034\nline 035\nline 036\nline 037\nline 038\nline 039\nline 040\nline 041\nline 042\nline 043\nline 044\nline 045\nline 046\nline 047\nline 048\nline 049\nline 050\nline 051\nline 052\nline 053\nline 054\nline 055\nline 056\nline 057\nline 058\nline 059\nline 060\nline 061\nline 062\nline 063\nline 064\nline 065\nline 066\nline 067\nline 068\nline 069\nline 070\nline 071\nline 072\nline 073\nline 074\nline 075\nline 076\nline 077\nline 078\nline 079\nline 080\nline 081\nline 082\nline 083\nline 084\nline 085\nline 086\nline 087\nline 088\nline 089\nline 090\nline 091\nline 092\nline 093\nline 094\nline 095\nline 096\nline 097\nline 098\nline 099\nline 100\n\n"
+  },
+  "[\"-p\", \"-S\", \"-1\", \"-E\", \"-1\"]": {
+   "difference": "-",
+   "tmux": "line 077\n",
+   "warren": "line 077\n"
+  },
+  "[\"-p\", \"-S\", \"-1000\", \"-E\", \"1000\"]": {
+   "difference": "-",
+   "tmux": "line 001\nline 002\nline 003\nline 004\nline 005\nline 006\nline 007\nline 008\nline 009\nline 010\nline 011\nline 012\nline 013\nline 014\nline 015\nline 016\nline 017\nline 018\nline 019\nline 020\nline 021\nline 022\nline 023\nline 024\nline 025\nline 026\nline 027\nline 028\nline 029\nline 030\nline 031\nline 032\nline 033\nline 034\nline 035\nline 036\nline 037\nline 038\nline 039\nline 040\nline 041\nline 042\nline 043\nline 044\nline 045\nline 046\nline 047\nline 048\nline 049\nline 050\nline 051\nline 052\nline 053\nline 054\nline 055\nline 056\nline 057\nline 058\nline 059\nline 060\nline 061\nline 062\nline 063\nline 064\nline 065\nline 066\nline 067\nline 068\nline 069\nline 070\nline 071\nline 072\nline 073\nline 074\nline 075\nline 076\nline 077\nline 078\nline 079\nline 080\nline 081\nline 082\nline 083\nline 084\nline 085\nline 086\nline 087\nline 088\nline 089\nline 090\nline 091\nline 092\nline 093\nline 094\nline 095\nline 096\nline 097\nline 098\nline 099\nline 100\n\n",
+   "warren": "line 001\nline 002\nline 003\nline 004\nline 005\nline 006\nline 007\nline 008\nline 009\nline 010\nline 011\nline 012\nline 013\nline 014\nline 015\nline 016\nline 017\nline 018\nline 019\nline 020\nline 021\nline 022\nline 023\nline 024\nline 025\nline 026\nline 027\nline 028\nline 029\nline 030\nline 031\nline 032\nline 033\nline 034\nline 035\nline 036\nline 037\nline 038\nline 039\nline 040\nline 041\nline 042\nline 043\nline 044\nline 045\nline 046\nline 047\nline 048\nline 049\nline 050\nline 051\nline 052\nline 053\nline 054\nline 055\nline 056\nline 057\nline 058\nline 059\nline 060\nline 061\nline 062\nline 063\nline 064\nline 065\nline 066\nline 067\nline 068\nline 069\nline 070\nline 071\nline 072\nline 073\nline 074\nline 075\nline 076\nline 077\nline 078\nline 079\nline 080\nline 081\nline 082\nline 083\nline 084\nline 085\nline 086\nline 087\nline 088\nline 089\nline 090\nline 091\nline 092\nline 093\nline 094\nline 095\nline 096\nline 097\nline 098\nline 099\nline 100\n\n"
+  },
+  "[\"-p\", \"-S\", \"-3\"]": {
+   "difference": "-",
+   "tmux": "line 075\nline 076\nline 077\nline 078\nline 079\nline 080\nline 081\nline 082\nline 083\nline 084\nline 085\nline 086\nline 087\nline 088\nline 089\nline 090\nline 091\nline 092\nline 093\nline 094\nline 095\nline 096\nline 097\nline 098\nline 099\nline 100\n\n",
+   "warren": "line 075\nline 076\nline 077\nline 078\nline 079\nline 080\nline 081\nline 082\nline 083\nline 084\nline 085\nline 086\nline 087\nline 088\nline 089\nline 090\nline 091\nline 092\nline 093\nline 094\nline 095\nline 096\nline 097\nline 098\nline 099\nline 100\n\n"
+  },
+  "[\"-p\", \"-S\", \"-5\", \"-E\", \"-10\"]": {
+   "difference": "-",
+   "tmux": "line 068\nline 069\nline 070\nline 071\nline 072\nline 073\n",
+   "warren": "line 068\nline 069\nline 070\nline 071\nline 072\nline 073\n"
+  },
+  "[\"-p\", \"-S\", \"-50\", \"-E\", \"-1\"]": {
+   "difference": "-",
+   "tmux": "line 028\nline 029\nline 030\nline 031\nline 032\nline 033\nline 034\nline 035\nline 036\nline 037\nline 038\nline 039\nline 040\nline 041\nline 042\nline 043\nline 044\nline 045\nline 046\nline 047\nline 048\nline 049\nline 050\nline 051\nline 052\nline 053\nline 054\nline 055\nline 056\nline 057\nline 058\nline 059\nline 060\nline 061\nline 062\nline 063\nline 064\nline 065\nline 066\nline 067\nline 068\nline 069\nline 070\nline 071\nline 072\nline 073\nline 074\nline 075\nline 076\nline 077\n",
+   "warren": "line 028\nline 029\nline 030\nline 031\nline 032\nline 033\nline 034\nline 035\nline 036\nline 037\nline 038\nline 039\nline 040\nline 041\nline 042\nline 043\nline 044\nline 045\nline 046\nline 047\nline 048\nline 049\nline 050\nline 051\nline 052\nline 053\nline 054\nline 055\nline 056\nline 057\nline 058\nline 059\nline 060\nline 061\nline 062\nline 063\nline 064\nline 065\nline 066\nline 067\nline 068\nline 069\nline 070\nline 071\nline 072\nline 073\nline 074\nline 075\nline 076\nline 077\n"
+  },
+  "[\"-p\", \"-S\", \"-77\", \"-E\", \"-77\"]": {
+   "difference": "-",
+   "tmux": "line 001\n",
+   "warren": "line 001\n"
+  },
+  "[\"-p\", \"-S\", \"-78\", \"-E\", \"-78\"]": {
+   "difference": "-",
+   "tmux": "line 001\n",
+   "warren": "line 001\n"
+  },
+  "[\"-p\", \"-S\", \"0\", \"-E\", \"0\"]": {
+   "difference": "-",
+   "tmux": "line 078\n",
+   "warren": "line 078\n"
+  },
+  "[\"-p\", \"-S\", \"5\", \"-E\", \"2\"]": {
+   "difference": "-",
+   "tmux": "line 080\nline 081\nline 082\nline 083\n",
+   "warren": "line 080\nline 081\nline 082\nline 083\n"
+  },
+  "[\"-p\"]": {
+   "difference": "-",
+   "tmux": "line 078\nline 079\nline 080\nline 081\nline 082\nline 083\nline 084\nline 085\nline 086\nline 087\nline 088\nline 089\nline 090\nline 091\nline 092\nline 093\nline 094\nline 095\nline 096\nline 097\nline 098\nline 099\nline 100\n\n",
+   "warren": "line 078\nline 079\nline 080\nline 081\nline 082\nline 083\nline 084\nline 085\nline 086\nline 087\nline 088\nline 089\nline 090\nline 091\nline 092\nline 093\nline 094\nline 095\nline 096\nline 097\nline 098\nline 099\nline 100\n\n"
+  }
+ },
+ "join": {
+  "[\"-p\", \"-S\", \"-\", \"-J\"]": {
+   "difference": "-",
+   "tmux": "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\ntail   \n01234567890123456789012345678901234567890123456789012345678901234567890123456789\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  yy   \nrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr\nwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\u65e5\u672c\nerase     z\nend\n\n\n\n\n\n\n\n\n\n\n\n",
+   "warren": "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\ntail   \n01234567890123456789012345678901234567890123456789012345678901234567890123456789\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  yy   \nrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr\nwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\u65e5\u672c\nerase     z\nend\n\n\n\n\n\n\n\n\n\n\n\n"
+  },
+  "[\"-p\"]": {
+   "difference": "-",
+   "tmux": "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\nABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\nABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\ntail\n01234567890123456789012345678901234567890123456789012345678901234567890123456789\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nyy\nrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr\nrrrrrrrrrr\nwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\n\u65e5\u672c\nerase     z\nend\n\n\n\n\n\n\n\n\n\n\n\n",
+   "warren": "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\nABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\nABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\ntail\n01234567890123456789012345678901234567890123456789012345678901234567890123456789\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nyy\nrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr\nrrrrrrrrrr\nwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\n\u65e5\u672c\nerase     z\nend\n\n\n\n\n\n\n\n\n\n\n\n"
+  },
+  "[\"-pJ\"]": {
+   "difference": "-",
+   "tmux": "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\ntail   \n01234567890123456789012345678901234567890123456789012345678901234567890123456789\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  yy   \nrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr\nwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\u65e5\u672c\nerase     z\nend\n\n\n\n\n\n\n\n\n\n\n\n",
+   "warren": "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\ntail   \n01234567890123456789012345678901234567890123456789012345678901234567890123456789\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  yy   \nrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr\nwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\u65e5\u672c\nerase     z\nend\n\n\n\n\n\n\n\n\n\n\n\n"
+  },
+  "[\"-pe\"]": {
+   "difference": "-",
+   "tmux": "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\nABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\nABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\ntail\n01234567890123456789012345678901234567890123456789012345678901234567890123456789\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nyy\n\u001b[31mrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr\nrrrrrrrrrr\u001b[39m\nwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\n\u65e5\u672c\nerase     z\nend\n\n\n\n\n\n\n\n\n\n\n\n",
+   "warren": "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\nABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\nABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\ntail\n01234567890123456789012345678901234567890123456789012345678901234567890123456789\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\nyy\n\u001b[31mrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr\nrrrrrrrrrr\u001b[39m\nwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\n\u65e5\u672c\nerase     z\nend\n\n\n\n\n\n\n\n\n\n\n\n"
+  },
+  "[\"-peJ\"]": {
+   "difference": "-",
+   "tmux": "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\ntail   \n01234567890123456789012345678901234567890123456789012345678901234567890123456789\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  yy   \n\u001b[31mrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr\n\u001b[39mwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\u65e5\u672c\nerase     z\nend\n\n\n\n\n\n\n\n\n\n\n\n",
+   "warren": "ABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJABCDEFGHIJ\ntail   \n01234567890123456789012345678901234567890123456789012345678901234567890123456789\nxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  yy   \n\u001b[31mrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr\n\u001b[39mwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww\u65e5\u672c\nerase     z\nend\n\n\n\n\n\n\n\n\n\n\n\n"
+  }
+ },
+ "sgr-end": {
+  "[\"-p\"]": {
+   "difference": "-",
+   "tmux": "red plain\ngreen\nX\ninv dim-it-strike\nrgb bright\n\u65e5\u672c\n\ndouble blink hidden\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+   "warren": "red plain\ngreen\nX\ninv dim-it-strike\nrgb bright\n\u65e5\u672c\n\ndouble blink hidden\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+  },
+  "[\"-pe\"]": {
+   "difference": "-",
+   "tmux": "\u001b[31mred\u001b[39m plain\n\u001b[42mgreen\n\u001b[1;4m\u001b[38;5;200m\u001b[48;2;1;2;3mX\u001b[0m\n\u001b[7minv\u001b[0m \u001b[2;3;9mdim-it-strike\u001b[0m\n\u001b[38;2;10;20;30mrgb\u001b[39m \u001b[95mbright\u001b[39m\n\u001b[4m\u65e5\u672c\u001b[0m\n\u001b[44m          \u001b[49m\n\u001b[4:2mdouble\u001b[0m \u001b[5mblink\u001b[0m \u001b[8mhidden\u001b[0m\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+   "warren": "\u001b[31mred\u001b[39m plain\n\u001b[42mgreen\n\u001b[1;4m\u001b[38;5;200m\u001b[48;2;1;2;3mX\u001b[0m\n\u001b[7minv\u001b[0m \u001b[2;3;9mdim-it-strike\u001b[0m\n\u001b[38;2;10;20;30mrgb\u001b[39m \u001b[95mbright\u001b[39m\n\u001b[4m\u65e5\u672c\u001b[0m\n\u001b[44m          \u001b[49m\n\u001b[4:2mdouble\u001b[0m \u001b[5mblink\u001b[0m \u001b[8mhidden\u001b[0m\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+  },
+  "[\"-peJ\"]": {
+   "difference": "-",
+   "tmux": "\u001b[31mred\u001b[39m plain\n\u001b[42mgreen\n\u001b[1;4m\u001b[38;5;200m\u001b[48;2;1;2;3mX\n\u001b[0;7minv\u001b[0m \u001b[2;3;9mdim-it-strike\n\u001b[0m\u001b[38;2;10;20;30mrgb\u001b[39m \u001b[95mbright\n\u001b[4m\u001b[39m\u65e5\u672c\n\u001b[0m\u001b[44m          \n\u001b[4:2m\u001b[49mdouble\u001b[0m \u001b[5mblink\u001b[0m \u001b[8mhidden\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+   "warren": "\u001b[31mred\u001b[39m plain\n\u001b[42mgreen\n\u001b[1;4m\u001b[38;5;200m\u001b[48;2;1;2;3mX\n\u001b[0;7minv\u001b[0m \u001b[2;3;9mdim-it-strike\n\u001b[0m\u001b[38;2;10;20;30mrgb\u001b[39m \u001b[95mbright\n\u001b[4m\u001b[39m\u65e5\u672c\n\u001b[0m\u001b[44m          \n\u001b[4:2m\u001b[49mdouble\u001b[0m \u001b[5mblink\u001b[0m \u001b[8mhidden\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"
+  }
+ }
+}
