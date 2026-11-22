@@ -1,0 +1,8 @@
+# A take for the command client's verbs: ids, targets, the shared verb table
+# and list --json. The recorder runs on the host beside the engine
+# (verbs-step.sh names the environment it reads), with --preflight
+# 'bash tests/vt/rig/verbs-step.sh preflight': the whole Linux gate in the
+# pinned image, which runs the pure rows, the session rows and the CLI rows.
+floor 35
+rig verbs-step.sh sha256=769cc9fdb06f36f1cd13cb6cee27203785def133a5bdfe086a0362d511d4ef84
+step gate-linux tools=bash,python3 script=verbs-step.sh -- gate-linux

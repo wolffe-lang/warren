@@ -1,0 +1,5 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# hands a new session a freed id, so the ids row goes red by name.
+floor 15
+rig verbs-step.sh sha256=769cc9fdb06f36f1cd13cb6cee27203785def133a5bdfe086a0362d511d4ef84
+step ids-never-reused tools=bash,python3 script=verbs-step.sh -- plant

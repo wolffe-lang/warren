@@ -39,7 +39,9 @@ def main():
         (RIG, 'dch-tail.manifest', ['gate-linux', 'dch-tail-seeds']),
         (RIG, 'dch-tail-plant.manifest', ['dch-tail-plant-build', 'dch-tail-seeds-pass']),
         (RIG, 'container-limits.manifest', ['gate-linux', 'container-limits']),
-        (RIG, 'container-limits-plant.manifest', ['container-memory-cap'])):
+        (RIG, 'container-limits-plant.manifest', ['container-memory-cap']),
+        (RIG, 'verbs.manifest', ['gate-linux']),
+        (RIG, 'verbs-plant.manifest', ['ids-never-reused'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
@@ -51,6 +53,8 @@ def main():
     limits = (RIG / 'container-limits-step.sh').read_text()
     assert '. tools/container-run.sh' in limits and 'container_run "$engine" "$memory" "$image"' in limits
     assert 'exec bash tools/container-rows "$engine" "$limits" "$image"' in limits
+    verbs = (RIG / 'verbs-step.sh').read_text()
+    assert 'exec ../native/session-rows ../native/warren ids-never-reused' in verbs and '. tools/container-run.sh' in verbs
     plant = (RIG / 'w1-plant-step.sh').read_text()
     assert 'FAIL vt-scalar-value ' in plant and 'exit "$rc"' in plant
     assert '[ "$rc" -eq 134 ]' in plant
