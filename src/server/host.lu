@@ -1,0 +1,99 @@
+//! member: true
+//! The name this machine answers to in a pane's OSC 7 report (vt/osc7.lu),
+//! learnt once when the server starts. On Linux it is the kernel's
+//! /proc/sys/kernel/hostname; on any other host it is what /bin/hostname
+//! prints, run by that path with no shell, waited for at most
+//! HOST_NAME_WAIT_MS and read for at most 256 bytes. When neither answers
+//! the name is "", and panes take only the empty host and `localhost`.
+//! WARREN_HOST_NAME_PROGRAM names a stand-in run in place of either, for
+//! the rows that hold what happens when the program fails or never ends.
+use std.env
+use std.fs
+use std.os
+use std.process
+use std.time
+
+/// How long the server waits for the host-name program at start.
+pub const HOST_NAME_WAIT_MS: int = 1000
+
+/// The longest name kept (vt.HOST_BYTES less one).
+const HOST_NAME_MAX: int = 255
+
+fn now_ms() -> int {
+    time.monotonic_ns() / 1000000
+}
+
+// The first line of `bytes`, if it is a name: printable ASCII but space,
+// 1 to 255 bytes; else "".
+fn name_line(data: List[byte]) -> str {
+    var n = 0
+    while n < data.len && data[n] as int != 10 {
+        let v = data[n] as int
+        if v <= 32 || v >= 127 { return "" }
+        n += 1
+    }
+    if n == 0 || n > HOST_NAME_MAX { return "" }
+    str_from_utf8(data[0..n]) else ""
+}
+
+// Whether the child in `slot` has ended (and is reaped), looked for until
+// `deadline` (monotonic ms).
+fn ended_by(slot: int, deadline: int) -> bool {
+    var looking = true
+    while looking {
+        let c = process.poll() else { return false }
+        if c.changed && c.child.slot == slot { return true }
+        looking = now_ms() < deadline
+        if looking { time.sleep(time.millis(5)) }
+    }
+    false
+}
+
+/// What `program` prints on its first line, run with no arguments and no
+/// shell, its standard output a pipe read for at most 256 bytes; "" when it
+/// cannot start, prints no name, or has not ended within HOST_NAME_WAIT_MS
+/// (it is then killed and reaped).
+pub fn host_name_from(program: str) -> str {
+    let deadline = now_ms() + HOST_NAME_WAIT_MS
+    let p = process.pipe() else { return "" }
+    var from_child = p.read
+    var to_parent = p.write
+    var c = process.command(program)
+    process.set_stdout(mut c, to_parent)
+    var ch = process.start(c) else {
+        fs.close(take to_parent) else |_| {}
+        fs.close(take from_child) else |_| {}
+        return ""
+    }
+    fs.close(take to_parent) else |_| {}
+    fs.set_nonblock(mut from_child, true) else |_| {}
+    var got = List[byte]()
+    var open = true
+    while open && got.len <= HOST_NAME_MAX && now_ms() < deadline {
+        var nothing = false
+        let chunk = fs.read_chunk(mut from_child, HOST_NAME_MAX + 1 - got.len) else |e| {
+            if "{e}" == "eof" { open = false } else { nothing = true }
+            List[byte]()
+        }
+        for b in chunk { (mut got).push(b) }
+        if nothing { time.sleep(time.millis(5)) }
+    }
+    fs.close(take from_child) else |_| {}
+    if !ended_by(ch.slot, deadline) {
+        process.kill(mut ch) else |_| {}
+        let _k = process.wait_status(take ch) else 0
+        return ""
+    }
+    name_line(got)
+}
+
+/// The name this machine answers to, or "" (see the module's header).
+pub fn machine_name() -> str {
+    let stand_in = env.get("WARREN_HOST_NAME_PROGRAM") else ""
+    if stand_in.len > 0 { return host_name_from(stand_in) }
+    if os.name() == "linux" {
+        let text = fs.read_text("/proc/sys/kernel/hostname") else { return "" }
+        return name_line(text.bytes())
+    }
+    host_name_from("/bin/hostname")
+}
