@@ -326,6 +326,45 @@ fn test_title_queue() {
     assert(d.title_end < 0, "title-offsets-written")
 }
 
+// A REPLY payload whose output is `n` bytes of `x`.
+fn reply_of(n: int) -> List[byte] {
+    var p = List[byte]()
+    proto.put(mut p, 1, 4)
+    proto.put(mut p, 0, 1)
+    proto.put(mut p, n, 4)
+    var i = 0
+    while i < n {
+        (mut p).push(120 as byte)
+        i += 1
+    }
+    proto.put(mut p, 0, 4)
+    p
+}
+
+// A REPLY's wire is physical fragments of at most 1 MiB, MORE on all but
+// the last, that reassemble to the payload (warren#77); a payload past the
+// protocol's 8 MiB has none, and the server refuses it by name instead.
+fn test_reply_wire() {
+    let payload = reply_of(2 * 1048576 + 1000)
+    let wire = server.reply_wire(payload)
+    var at = 0
+    var parts = 0
+    var whole = List[byte]()
+    var flags = List[int]()
+    while at + 6 <= wire.len {
+        let n = (wire[at] as int) + (wire[at + 1] as int) * 256 + (wire[at + 2] as int) * 65536 + (wire[at + 3] as int) * 16777216
+        assert((wire[at + 4] as int) == 136 && n <= proto.PHYSICAL_MAX && at + 6 + n <= wire.len, "reply-wire-frame")
+        (mut flags).push(wire[at + 5] as int)
+        for b in wire[at + 6..at + 6 + n] { (mut whole).push(b) }
+        at = at + 6 + n
+        parts += 1
+    }
+    assert(parts == 3 && at == wire.len, "reply-wire-three-fragments")
+    assert(flags[0] == 1 && flags[1] == 1 && flags[2] == 0, "reply-wire-more-flags")
+    assert(whole.len == payload.len && whole[whole.len - 5] == payload[payload.len - 5], "reply-wire-reassembles")
+    assert(server.reply_wire(reply_of(proto.REPLY_MAX)).len == 0, "reply-wire-past-the-cap")
+}
+
 // ---- the client renderer under a seeded soak (native: the step budget of
 // `wolf test` is too small for it) ----
 
@@ -448,6 +487,7 @@ fn main() -> int {
     test_seeded_soak()
     test_event_queue()
     test_title_queue()
+    test_reply_wire()
     test_render_soak()
     measure(80, 24)
     measure(320, 90)
