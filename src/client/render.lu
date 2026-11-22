@@ -19,6 +19,11 @@ pub struct Policy {
     shape: bool,
 }
 
+/// Whether the console policy applies, from `TERM` and `WARREN_RENDER`.
+pub fn console_chosen(term: str, render: str) -> bool {
+    render == "console"
+}
+
 /// The documented policies: a terminal emulator by its TERM and
 /// COLORTERM, and PAX's console (sixteen colours, one cell a code point,
 /// no marks, nothing it would not answer).
