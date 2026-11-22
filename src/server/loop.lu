@@ -1103,6 +1103,12 @@ fn do_action_in(mut s: Server, index: int, si: int, action: int, arg: int) -> in
         if index >= 0 { terminal(mut s, index, 135, 1, "detached") }
         return DONE
     }
+    if action == config.A_KILL_SESSION {
+        // Every pane's program hangs up and every member is told the
+        // session ended; the last session's end ends the server.
+        end_session(mut s, si)
+        return DONE
+    }
     if action == config.A_SEND_PREFIX {
         if from >= 0 { queue_to(mut s, from, key_bytes(s.panes[from].screen, 4, 0, 32)) }
         return DONE
