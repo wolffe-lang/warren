@@ -27,12 +27,20 @@ Rows:
                        kill-session-ends, split-in-dir; tmux prints a new
                        pane's id only with -P and runs a command through
                        sh -c, warren always prints it and runs argv as given)
+  tmux-send-keys       every row of tests/session/send-keys.table, sent with
+                       send-keys to a raw-mode reader in the row's mode,
+                       reaches it as the table's tmux column (warren:
+                       send-keys-bytes, to the warren column)
+  tmux-capture         each case of tests/session/capture-cases, captured
+                       with each flag set of tests/session/capture-goldens.json,
+                       equals the golden's tmux text (warren: capture-cases)
 
 Each client is a pty of the suite's own. Nothing is signalled: clients are
 detached by tmux's own command and the server is ended with kill-server.
 """
 import argparse
 import fcntl
+import json
 import os
 from pathlib import Path
 import pty
@@ -53,7 +61,7 @@ class Tmux:
     def __init__(self, out, name):
         self.socket = str(out / (name + '.sock'))
         self.env = {'PATH': os.environ['PATH'], 'HOME': str(out), 'LC_ALL': 'C.UTF-8',
-                    'TERM': 'xterm-256color', 'TMUX_TMPDIR': str(out)}
+                    'TERM': 'xterm-256color', 'TMUX_TMPDIR': str(out), 'SHELL': '/bin/sh'}
         self.clients = []
 
     def run(self, *args, check=True):
@@ -349,6 +357,108 @@ def row_session_verbs(out):
     print('PASS tmux-session-verbs (warren: kill-session-ends, split-in-dir)')
     return 0
 
+SESSION = Path(__file__).resolve().parents[2] / 'tests' / 'session'
+
+READER = r"""
+import os, sys, tty
+log, mode = sys.argv[1], sys.argv[2]
+tty.setraw(0)
+if mode in ("cursor", "keypad"):
+    os.write(1, b"\x1b[?1h")
+if mode == "keypad":
+    os.write(1, b"\x1b=")
+out = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+with open(log + ".ready", "w") as f:
+    f.write("ready\n")
+while True:
+    try:
+        b = os.read(0, 65536)
+    except OSError:
+        break
+    if not b:
+        break
+    os.write(out, b)
+"""
+
+
+def log_size(path):
+    try:
+        return path.stat().st_size
+    except OSError:
+        return 0
+
+
+def row_send_keys(out):
+    reader = out / 'key-reader.py'
+    reader.write_text(READER)
+    sessions, logs, seen = {}, {}, {}
+    fails = []
+    try:
+        for mode in ('normal', 'cursor', 'keypad'):
+            t = Tmux(out, 'keys-' + mode)
+            log = out / ('keys-' + mode + '.log')
+            t.run('new-session', '-d', '-x', '80', '-y', '24', 'exec python3 -I %s %s %s' % (reader, log, mode))
+            end = time.monotonic() + 10
+            while not Path(str(log) + '.ready').exists() and time.monotonic() < end:
+                time.sleep(0.05)
+            time.sleep(0.3)
+            sessions[mode], logs[mode], seen[mode] = t, log, 0
+        for line in (SESSION / 'send-keys.table').read_text(encoding='utf-8').splitlines():
+            if not line or line.startswith('#'):
+                continue
+            mode, args, tmux_hex, _warren, _why = line.split('\t')
+            rc = sessions[mode].run('send-keys', '-t', '0', *json.loads(args), check=False)
+            want = len(tmux_hex) // 2
+            end = time.monotonic() + 2.0
+            while log_size(logs[mode]) < seen[mode] + want and time.monotonic() < end:
+                time.sleep(0.01)
+            if want == 0:
+                time.sleep(0.15)
+            with open(logs[mode], 'rb') as f:
+                f.seek(seen[mode])
+                got = f.read(max(want, 0) or 64)
+            got = got[:want] if want else got
+            if got.hex() != tmux_hex:
+                fails.append('%s %s: read %s, the table %s' % (mode, args, got.hex(), tmux_hex))
+                break
+            seen[mode] += want
+        time.sleep(0.2)
+        for mode, log in logs.items():
+            if log_size(log) != seen[mode]:
+                fails.append('%s: the reader read %d bytes, the table %d' % (mode, log_size(log), seen[mode]))
+    finally:
+        for t in sessions.values():
+            t.close()
+    for f in fails:
+        print('FAIL tmux-send-keys ' + f)
+    if not fails:
+        print('PASS tmux-send-keys (%s)' % ' '.join('%s=%d' % kv for kv in sorted(seen.items())))
+    return 1 if fails else 0
+
+
+def row_capture(out):
+    goldens = json.loads((SESSION / 'capture-goldens.json').read_text(encoding='utf-8'))
+    fails, taken = [], 0
+    for case, flag_sets in sorted(goldens.items()):
+        t = Tmux(out, 'cap-' + case)
+        try:
+            t.run('new-session', '-d', '-x', '80', '-y', '24',
+                  'cat %s; exec sleep 600' % (SESSION / 'capture-cases' / (case + '.in')))
+            time.sleep(1.0)
+            for flags, entry in sorted(flag_sets.items()):
+                got = t.run('capture-pane', '-t', '0', *json.loads(flags))
+                taken += 1
+                if got != entry['tmux']:
+                    fails.append('%s %s: %r, the golden %r' % (case, flags, got[:200], entry['tmux'][:200]))
+        finally:
+            t.close()
+    for f in fails:
+        print('FAIL tmux-capture ' + f)
+    if not fails:
+        print('PASS tmux-capture (%d captures)' % taken)
+    return 1 if fails else 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--cases', type=Path, required=True)
@@ -373,6 +483,8 @@ def main():
     failed += row_kill_pane(args.out)
     failed += row_missing_target(args.out)
     failed += row_session_verbs(args.out)
+    failed += row_send_keys(args.out)
+    failed += row_capture(args.out)
     return 1 if failed else 0
 
 
