@@ -256,7 +256,7 @@ fn verbs(mut t: Tally) {
     why = either(why, usage("split-right -t a -t b", "usage: -t given twice"))
     why = either(why, either(usage("kill-server -t work", "usage: kill-server takes no target"), usage("kill-server now", "usage: kill-server")))
     why = either(why, either(usage("ls -t work", "usage: ls takes no target"), usage("list", "usage: list --json")))
-    why = either(why, either(usage("list --yaml", "usage: list --json"), usage("new-session a b", "usage: new-session [NAME]")))
+    why = either(why, either(usage("list --yaml", "usage: list --json"), usage("new-session a b", "usage: new-session [-c DIR] [NAME]")))
     why = either(why, usage("bogus -t work", "unknown command: bogus"))
     row(mut t, "verbs-usage", why)
     why = ""

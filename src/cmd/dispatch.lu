@@ -54,10 +54,12 @@ fn is_command_verb(v: str) -> bool {
     false
 }
 
-/// Read a COMMAND's arguments, the verb first: `VERB [-t TARGET]
-/// [ARGUMENT...]`, `-t` anywhere after the verb, at most once. The command
-/// line's verbs are read by the command line's own parser, so a verb and
-/// its `:` line are one reading; the server's verbs take no target.
+/// Read a COMMAND's arguments, the verb first: `VERB [-t TARGET] [-c DIR]
+/// [ARGUMENT...] [-- CMD [ARG...]]`, `-t` and `-c` anywhere after the verb,
+/// each at most once; every word after `--` is the program's. `-c` and `--`
+/// go with the verbs that make a pane (`new-session` takes `-c` alone). The
+/// command line's verbs are read by the command line's own parser, so a verb
+/// and its `:` line are one reading; the server's verbs take no target.
 pub fn parse_verb(argv: List[str]) -> Verb {
     if argv.len == 0 { return usage_error("usage: warren <verb> [-t TARGET] [ARGUMENT...]") }
     let v = argv[0]
@@ -65,19 +67,42 @@ pub fn parse_verb(argv: List[str]) -> Verb {
     if !server_verb && !is_command_verb(v) { return usage_error("unknown command: " + v) }
     var target = ""
     var targeted = false
+    var dir = ""
+    var has_dir = false
+    var program = List[str]()
+    var dashed = false
     var rest = List[str]()
     var i = 1
     while i < argv.len {
-        if argv[i] == "-t" {
+        if argv[i] == "--" {
+            if i + 1 >= argv.len { return usage_error("usage: -- needs a command") }
+            var j = i + 1
+            while j < argv.len {
+                (mut program).push(argv[j])
+                j += 1
+            }
+            dashed = true
+            i = argv.len
+        } else if argv[i] == "-t" {
             if targeted { return usage_error("usage: -t given twice") }
             if i + 1 >= argv.len { return usage_error("usage: -t needs a target") }
             target = argv[i + 1]
             targeted = true
             i += 2
+        } else if argv[i] == "-c" {
+            if has_dir { return usage_error("usage: -c given twice") }
+            if i + 1 >= argv.len { return usage_error("usage: -c needs a directory") }
+            dir = argv[i + 1]
+            has_dir = true
+            i += 2
         } else {
             (mut rest).push(argv[i])
             i += 1
         }
+    }
+    if has_dir || dashed {
+        if !makes_a_pane(v) { return usage_error("usage: {v} makes no pane: -c and -- go with split-right, split-down, new-tab and new-session") }
+        if dashed && v == "new-session" { return usage_error("usage: new-session takes no command") }
     }
     if server_verb {
         if targeted { return usage_error("usage: {v} takes no target") }
@@ -90,10 +115,12 @@ pub fn parse_verb(argv: List[str]) -> Verb {
             return verb_of(VERB_LIST_SESSIONS, "", "")
         }
         if v == "new-session" {
-            if rest.len > 1 { return usage_error("usage: new-session [NAME]") }
+            if rest.len > 1 { return usage_error("usage: new-session [-c DIR] [NAME]") }
             let name = if rest.len == 1 then rest[0] else ""
             var n = verb_of(VERB_NEW_SESSION, "", name)
             n.named = rest.len == 1
+            n.dir = dir
+            n.has_dir = has_dir
             return n
         }
         if rest.len != 1 || rest[0] != "--json" { return usage_error("usage: list --json") }
@@ -103,8 +130,14 @@ pub fn parse_verb(argv: List[str]) -> Verb {
     for a in rest { line = line + " " + a }
     let c = config.command(line)
     if !c.ok { return usage_error(c.why) }
-    Verb { ok: true, kind: VERB_ACTION, target: target, command: c, name: "", named: false, dir: "", has_dir: false,
-        argv: List[str](), status: EXIT_DONE, why: "" }
+    Verb { ok: true, kind: VERB_ACTION, target: target, command: c, name: "", named: false, dir: dir, has_dir: has_dir,
+        argv: program, status: EXIT_DONE, why: "" }
+}
+
+// The verbs that make a pane, and so take `-c DIR` (and, but for
+// `new-session`, `-- CMD`).
+fn makes_a_pane(v: str) -> bool {
+    v == "split-right" || v == "split-down" || v == "new-tab" || v == "new-session"
 }
 
 /// Every verb the server answers: its own, then the command line's.
