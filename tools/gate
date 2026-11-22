@@ -106,6 +106,10 @@ mkdir -p target/native
 step resource-wrapper-build cc -std=c11 -O2 -Wall -Wextra -Werror tools/vt/measure_child.c -o "$root/target/native/measure-child"
 step resource-wrapper-rows python3 -I tests/vt/resource_wrapper_rows.py "$root/target/native/measure-child"
 step peak-bound-rows python3 -I tests/vt/peak_bound_rows.py "$root/target/native/measure-child"
+# One pane's resident cost (warren#67), each stage in a process of its own under measure-child, held to the
+# takes recorded for this host in tests/vt/ring-resident-takes.json; early, so a change that makes a pane dearer
+# stops the gate here.
+step ring-probe-build "$WOLF" build --deny-warnings src/ring_probe.lu -o "$root/target/native/ring-probe"
 step width-vector-build "$WOLF" build --deny-warnings src/vt_width_vector.lu -o "$root/target/native/vt-width-vector"
 step width-vector-native python3 -I tests/vt/width_vector_rows.py --out "$root/target/vt/native-widths.bin" "$root/target/native/vt-width-vector"
 step resource-smoke-build "$WOLF" build --deny-warnings src/vt_resource_test.lu -o "$root/target/native/resource-smoke"

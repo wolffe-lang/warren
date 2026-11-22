@@ -1,0 +1,91 @@
+//! member: false
+//! warren#67's probe: one stage of one pane's life in a process of its own,
+//! for measure-child to read the process's peak resident size. Where
+//! /proc/self/status exists (Linux) it also prints VmRSS and VmHWM after each
+//! step, so the current size is seen beside the peak.
+//!   ring-probe STAGE CAP
+//! STAGE is none (no emulator: the process's own floor), new (one 80x24 pane
+//! with a history ring of CAP bytes), resize (new, then 81x24 and back),
+//! screenful (new, then 24 lines of 80 characters) or filled (new, then lines
+//! until the ring has dropped its oldest record). CAP is 0 to 8 MiB.
+use std.env
+use std.fs
+use std.io
+use vt
+use server
+
+// A field of /proc/self/status in kB, or -1 where there is none.
+fn status_kb(field: str) -> int {
+    let text = fs.read_text("/proc/self/status") else { return 0 - 1 }
+    for line in text.lines() {
+        if line.starts_with(field) {
+            let parts = line.words()
+            if parts.len >= 2 { return parts[1].to_int() else 0 - 1 }
+        }
+    }
+    0 - 1
+}
+
+fn step(stage: str, cap: int, name: str, used: int, evicted: int) {
+    let rss = status_kb("VmRSS:")
+    let hwm = status_kb("VmHWM:")
+    io.write_line("RING-PROBE stage={stage} cap={cap} step={name} vmrss-kb={rss} vmhwm-kb={hwm} history-used={used} history-evicted={evicted}")
+}
+
+fn usage() -> int {
+    io.write_line("usage: ring-probe none|new|resize|screenful|filled CAP (0 to 8388608)")
+    2
+}
+
+// One line of 80 characters and its CR LF.
+fn line_bytes() -> List[byte] {
+    var b = List[byte]()
+    var i = 0
+    while i < 80 {
+        (mut b).push((48 + i % 10) as byte)
+        i += 1
+    }
+    (mut b).push(13 as byte)
+    (mut b).push(10 as byte)
+    b
+}
+
+fn main() -> int {
+    let args = env.args()
+    if args.len != 2 { return usage() }
+    let stage = args[0]
+    let cap = args[1].to_int() else 0 - 1
+    if cap < 0 || cap > 8388608 { return usage() }
+    if stage != "none" && stage != "new" && stage != "resize" && stage != "screenful" && stage != "filled" { return usage() }
+    if stage == "filled" && cap == 0 { return usage() }
+    io.write_line("RING-PROBE-PROJECTION history-bytes={server.HISTORY_BYTES} pane-bytes-80x24={server.pane_bytes(80, 24)}")
+    step(stage, cap, "start", 0, 0)
+    if stage == "none" { return 0 }
+    var pane = vt.new(80, 24, cap)
+    step(stage, cap, "new", pane.history.used, pane.history.evicted)
+    var rc = 0
+    if stage == "resize" {
+        if vt.resize(mut pane, 81, 24) != "" { rc = 1 }
+        if vt.resize(mut pane, 80, 24) != "" { rc = 1 }
+        step(stage, cap, "resize", pane.history.used, pane.history.evicted)
+    }
+    let line = line_bytes()
+    if stage == "screenful" {
+        var n = 0
+        while n < 24 {
+            region turn { vt.feed(mut pane, line) }
+            n += 1
+        }
+        step(stage, cap, "screenful", pane.history.used, pane.history.evicted)
+    }
+    if stage == "filled" {
+        var n = 0
+        while pane.history.evicted == 0 && n < 4000000 {
+            region turn { vt.feed(mut pane, line) }
+            n += 1
+        }
+        if pane.history.evicted == 0 { rc = 1 }
+        step(stage, cap, "filled", pane.history.used, pane.history.evicted)
+    }
+    rc
+}
