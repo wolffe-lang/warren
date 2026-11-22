@@ -40,6 +40,11 @@ except for the verbs whose purpose is to move them: `focus`, `focus-next`,
 -t work` splits `work`'s focused pane and keeps that pane focused, where tmux
 would focus the new one.
 
+`warren --version`, with no other argument, prints `warren` and the package
+version on one line and exits 0, before any verb is looked up and without a
+server. The version is the one `src/wolf.pkg` names; with any other argument
+`--version` is a usage error, status 2.
+
 ## Targets
 
 ```
