@@ -188,7 +188,9 @@ session_rows() (
     ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command
     split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus
     list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies
-    reply-projection reply-memory-refused)
+    reply-projection reply-memory-refused
+    send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes
+    capture-cases capture-register capture-full-ring capture-over-cap)
   if [ "$mode" = linux ]; then rows+=(pane-signals-and-handles threads rss-flat); fi
   rm -rf target/rows && mkdir -p target/rows && cd target/rows
   "$root/target/native/session-rows" "$root/target/native/warren" "${rows[@]}"
