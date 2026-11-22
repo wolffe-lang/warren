@@ -47,7 +47,8 @@ def main():
         (RIG, 'console-plant.manifest', ['console-term-linux']),
         (RIG, 'reply-plant.manifest', ['list-json-over-queue']),
         (RIG, 'send-keys-plant.manifest', ['send-keys-bytes']),
-        (RIG, 'ring-plant.manifest', ['ring-resident-new'])):
+        (RIG, 'ring-plant.manifest', ['ring-resident-new']),
+        (RIG, 'osc7-plant.manifest', ['pane-cwd-from-osc7'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
