@@ -2003,9 +2003,27 @@ fn row_pane_cwd_not_inherited(mut r: Rig) -> str {
     w
 }
 
+// Ask `capture-pane -p -t TARGET` until its text holds `text`, for at most
+// 5 s: "" when it did, else the last text captured.
+fn until_captured(r: Rig, target: str, text: str) -> str {
+    let until = now_ms() + 5000
+    var last = ""
+    while now_ms() < until {
+        let a = ask(r, "capture-pane -p -t " + target, "")
+        if a.status == 0 {
+            if a.out.contains(text) { return "" }
+            last = a.out
+        }
+        time.sleep(time.millis(100))
+    }
+    "{target} holds no '{text}': {last}"
+}
+
 // Where a new pane starts with no -c: a split in the directory of the pane
 // it splits (here, the one that pane reported), a new tab in the session's
-// start directory; -c overrides.
+// start directory; -c overrides. A new tab made by a command leaves an
+// attached client on the tab it was showing, so the new tab's pane is read
+// by capture-pane.
 fn row_split_starts_in_pane_cwd(mut r: Rig) -> str {
     let told = beside(r, "told")
     let other = beside(r, "other")
@@ -2025,10 +2043,12 @@ fn row_split_starts_in_pane_cwd(mut r: Rig) -> str {
     if !client.until_text(mut a, "CWD-%2={last_part(told)}", 5000) { return "the split did not start where its pane reported: " + client.screen_text(a) }
     let t = ask(r, "new-tab -t work", "")
     if t.status != 0 { return "new-tab: {t.status} '{t.err.trim()}'" }
-    if !client.until_text(mut a, "CWD-%3={last_part(here)}", 5000) { return "the new tab did not start in the session's directory: " + client.screen_text(a) }
+    let tab = until_captured(r, "p3", "CWD-%3={last_part(here)}")
+    if tab.len > 0 { return "the new tab did not start in the session's directory: " + tab }
     let c = ask(r, "split-right -t work -c " + other, "")
     if c.status != 0 { return "split-right -c: {c.status} '{c.err.trim()}'" }
-    if !client.until_text(mut a, "CWD-%4={last_part(other)}", 5000) { return "-c did not override: " + client.screen_text(a) }
+    let over = until_captured(r, "p4", "CWD-%4={last_part(other)}")
+    if over.len > 0 { return "-c did not override: " + over }
     client.hang_up(mut a)
     ""
 }
