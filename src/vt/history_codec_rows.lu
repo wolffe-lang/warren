@@ -73,10 +73,12 @@ fn test_history_codec_allocation() {
         feed(mut pane, "é中\u{301}\u{20d7}\u{1b}[31mZ".bytes())
         var history = new_history(128)
         var reader = new_history_reader()
-        let stable = budget.charged(frame)
+        var stable = 0
         var turn = 0
         while turn < 1024 {
             assert(history_encode_line(mut history, pane.primary, 8, 1, 1, turn, 0))
+            // The first record reserves the ring; none after it charges.
+            if turn == 0 { stable = budget.charged(frame) }
             let at = (history.tail - history.newest_length + 128) % 128
             history_reader_start(mut reader, history, at)
             var count = 0

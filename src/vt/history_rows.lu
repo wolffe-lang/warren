@@ -8,7 +8,7 @@ fn append_history_fixture(mut history: History, id: int, start_cell: int, body: 
     if at < 0 { return false }
     var i = 0
     for b in body {
-        history.bytes[(at + 24 + i) % history.bytes.len] = b
+        history.bytes[(at + 24 + i) % history.cap] = b
         i += 1
     }
     true
@@ -39,7 +39,7 @@ fn test_history_wrap_and_exact_eviction() {
     assert(history.used == 128 && history.records == 4 && history.evicted == 1, "history-exactly-one-eviction")
     assert(history.head == 32 && history.tail == 32)
     assert(history_get_word(history, history.head, 4, 4) == 0)
-    var at = (history.tail - history.newest_length + history.bytes.len) % history.bytes.len
+    var at = (history.tail - history.newest_length + history.cap) % history.cap
     id = 4
     while id >= 1 {
         assert(history_get_word(history, at, 8, 8) == id, "history-reverse-wrap")
@@ -60,8 +60,10 @@ fn test_history_flat_allocation() {
     region frame(cap: 1048576) {
         var history = new_history(128)
         let body = "abcdefgh".bytes()
+        // The first record reserves the ring; none after it charges.
+        assert(append_history_fixture(mut history, 0, 0, body))
         let stable = budget.charged(frame)
-        var id = 0
+        var id = 1
         while id < 1024 { assert(append_history_fixture(mut history, id, 0, body)); id += 1 }
         assert(history.used == 128 && history.records == 4)
         assert(history.evicted == 1020 && budget.charged(frame) == stable, "history-append-allocation")

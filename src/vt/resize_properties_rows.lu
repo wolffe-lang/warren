@@ -22,7 +22,7 @@ fn logical_text(pane: Vt) -> List[int] {
         last_id = id
         history_reader_start(mut reader, pane.history, at)
         while history_reader_next(mut reader, pane.history) { if reader.kind == 0 { (mut out).push(reader.value) } }
-        at = (at + history_get_word(pane.history, at, 0, 4)) % pane.history.bytes.len
+        at = (at + history_get_word(pane.history, at, 0, 4)) % pane.history.cap
         record += 1
     }
     var end = pane.cursor_row

@@ -5,7 +5,7 @@ use std.mem.budget
 
 fn test_primary_history_append() {
     var pane = vt.new(4, 2, 4096)
-    assert(pane.history.bytes.len == 4096 && pane.history.used == 0)
+    assert(pane.history.cap == 4096 && pane.history.bytes.len == 0 && pane.history.used == 0, "history-unwritten-ring-holds-nothing")
     vt.feed(mut pane, "a\r\nb\r\nc".bytes())
     assert(pane.history.records == 1 && pane.history.used == 37, "history-feed-primary-scroll")
     assert(pane.history.bytes[36] == 97 as byte && pane.history.bytes[8] == 0 as byte)
