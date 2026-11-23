@@ -36,19 +36,25 @@ take's wobble is not.
 
 The bound of a row is read from the takes recorded for this host in
 tests/vt/ring-resident-takes.json: the same number from the recorded takes,
-plus a margin that is the largest of three times the recorded takes' spread,
-5% of the largest recorded peak of that stage, or one allocation granule
-(256 KiB on Linux, 16 KiB on macOS). A `resize` row above cap 0 is held to at
-least the bound of `resize` at cap 0: a first resize costs the same at every
-cap, and whether a cap's takes show that cost is the allocator's (on Linux and
-macOS 15 it hides under the peak the ring's creation set; on macOS 26 it does
-not, warren#88), so allocator reuse can lower a reading but cannot set its
-bound. The rule checks itself where a ring is made, on the room between a
-bound and its takes' number: a `new` row's room must be under one cap, so one
-more cap-sized buffer at the peak fails; a `filled` row's too, since a filled
-ring is one cap and a second copy of it must fail; another difference row's
-room must be under two caps, so a step that made the ring again fails. A room past that fails by
-name as too loose. A host
+plus a margin that is the largest of three times the recorded spread, 5% of
+the largest recorded peak of that stage, or one allocation granule
+(256 KiB on Linux, 16 KiB on macOS). The recorded spread is how far the
+number a row holds moves from run to run: where the takes hold two runs of
+three or more (takes 1 to 3, 4 to 6, ...), the spread of each run's least
+peak less its least base, the number the gate compares; where they hold one
+run, the spread of its single takes. On Linux single takes move by up to
+0.9 MB where the least of three moves by 0.1 to 0.5 MB, and three times the
+single-take spread would hide one more cap. A `resize` row above cap 0 is
+held to at least the bound of `resize` at cap 0: a first resize costs the same
+at every cap, and whether a cap's takes show that cost is the allocator's (on
+Linux and macOS 15 it hides under the peak the ring's creation set; on macOS
+26 it does not, warren#88), so allocator reuse can lower a reading but cannot
+set its bound. The rule checks itself where a ring is made, on the room
+between a bound and its takes' number: a `new` row's room must be under one
+cap, so one more cap-sized buffer at the peak fails; a `filled` row's too,
+since a filled ring is one cap and a second copy of it must fail; another
+difference row's room must be under two caps, so a step that made the ring
+again fails. A room past that fails by name as too loose. A host
 with no recorded takes fails by name. A cap a host does not hold (macOS at
 8 MiB, whose allocator's peak there is bimodal) is measured, printed and named
 in a NOTE with its takes, and holds nothing. Each verdict names its row: `ring-resident-STAGE`
@@ -177,13 +183,24 @@ def bases_of(increments, peaks):
     return [p - i for p, i in zip(peaks, increments)]
 
 
+def recorded_spread(increments, peaks):
+    """How far a row's number moves between runs of three takes: with two or
+    more recorded runs, the spread of each run's held number (its least peak
+    less its least base, as the gate holds it); with one, of its single
+    takes."""
+    runs = [held_increment(peaks[i:i + 3], bases_of(increments[i:i + 3], peaks[i:i + 3]))
+            for i in range(0, len(increments) - 2, 3)]
+    if len(runs) >= 2:
+        return max(runs) - min(runs)
+    return max(increments) - min(increments)
+
+
 def bound(increments, peaks, granule):
     """The bound and its margin: the recorded takes' number, plus the
-    largest of three times their spread, 5% of their largest peak, or a
-    granule."""
+    largest of three times their recorded spread, 5% of their largest peak,
+    or a granule."""
     top = held_increment(peaks, bases_of(increments, peaks))
-    spread = max(increments) - min(increments)
-    margin = max(3 * spread, max(peaks) // 20, granule)
+    margin = max(3 * recorded_spread(increments, peaks), max(peaks) // 20, granule)
     return top + margin, margin
 
 
@@ -197,8 +214,7 @@ def panes_bound(each, page, increments, peaks, granule):
     """A panes row's bound: what is written, two pages a ring that holds a
     record, and the margin rule over the recorded takes."""
     written, rings = written_pages(each, page)
-    spread = max(increments) - min(increments)
-    margin = max(3 * spread, max(peaks) // 20, granule)
+    margin = max(3 * recorded_spread(increments, peaks), max(peaks) // 20, granule)
     return written + rings * RING_PAGES * page + margin, margin, written, rings
 
 
