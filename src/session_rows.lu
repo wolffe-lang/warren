@@ -2003,6 +2003,56 @@ fn row_pane_cwd_not_inherited(mut r: Rig) -> str {
     w
 }
 
+// The `title` of pane `id` in a listing (titles here are plain ASCII, so the
+// JSON string is the title), or "<none>" when the listing has no such pane.
+fn listed_title(json: str, id: str) -> str {
+    let at = json.find("{{\"id\":\"{id}\",") else { return "<none>" }
+    let rest = json[at..json.len]
+    let t = rest.find("\"title\":\"") else { return "<none>" }
+    let after = rest[t + 9..rest.len]
+    let e = after.find("\",\"cwd\":\"") else { return "<none>" }
+    after[0..e]
+}
+
+// Ask for the listing until pane `id`'s title is `want`, for at most 5 s: ""
+// when it was, else what was listed.
+fn until_title(r: Rig, id: str, want: str) -> str {
+    let until = now_ms() + 5000
+    var last = ""
+    while now_ms() < until {
+        let l = ask(r, "list --json", "")
+        if l.status == 0 {
+            last = listed_title(l.out, id)
+            if last == want { return "" }
+        }
+        time.sleep(time.millis(100))
+    }
+    "pane {id} listed title '{last}', not '{want}'"
+}
+
+// A window title is the program's: a pane made in the slot of one that set a
+// title starts with none, as a pane in a new slot does (warren#84).
+fn row_pane_title_not_inherited(mut r: Rig) -> str {
+    let script = beside(r, "title.sh")
+    fs.write_text(script, "if [ \"$WARREN_PANE\" = %1 ]; then printf '\\033]2;the-last-title\\007'; fi; printf 'READY-%s\\n' \"$WARREN_PANE\"; exec /bin/sh\n") else |e| { return "the script: {e}" }
+    let why = start_server(mut r, "/bin/sh " + script)
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "READY-%1", 5000) { return "the pane printed nothing: " + client.screen_text(a) }
+    let first = until_title(r, "p1", "the-last-title")
+    if first.len > 0 { return "the first pane's title: " + first }
+    let s = ask(r, "split-right -t work", "")
+    if s.status != 0 { return "split-right: {s.status} '{s.err.trim()}'" }
+    let c = ask(r, "close-pane -t p1", "")
+    if c.status != 0 { return "close-pane: {c.status} '{c.err.trim()}'" }
+    let t = ask(r, "split-right -t p2", "")
+    if t.status != 0 || t.out != "p3\n" { return "split-right made '{t.out.trim()}' ({t.status} '{t.err.trim()}')" }
+    if !client.until_text(mut a, "READY-%3", 5000) { return "the third pane printed nothing: " + client.screen_text(a) }
+    let w = until_title(r, "p3", "")
+    client.hang_up(mut a)
+    w
+}
+
 // Ask `capture-pane -p -J -t TARGET` (rows joined at a soft wrap, so a line
 // a narrow pane wrapped is read whole) until its text holds `text`, for at
 // most 5 s: "" when it did, else the last text captured.
@@ -3104,6 +3154,7 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "pane-cwd-from-proc" { why = row_pane_cwd_from_proc(mut r) }
     else if name == "pane-cwd-start" { why = row_pane_cwd_start(mut r) }
     else if name == "pane-cwd-not-inherited" { why = row_pane_cwd_not_inherited(mut r) }
+    else if name == "pane-title-not-inherited" { why = row_pane_title_not_inherited(mut r) }
     else if name == "split-starts-in-pane-cwd" { why = row_split_starts_in_pane_cwd(mut r) }
     else if name == "split-reported-missing" { why = row_split_reported_missing(mut r) }
     else if name == "split-reported-file" { why = row_split_reported_file(mut r) }
@@ -3140,7 +3191,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails".split(" ") {
         (mut x).push(n)
     }
     x
