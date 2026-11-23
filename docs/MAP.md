@@ -7,7 +7,7 @@
 | W2 | server, client, protocol v1; one pane; detach and attach | codec, server, terminal client, lifecycle (new, attach, detach, second client, the server outliving its client); session and client rows; PAX console logout waits on PAX |
 | W3 | split tree, tabs, modes, the hint bar, configuration v1 | pure layout module (tabs, split tree, geometry, operations) with golden and property rows; panes and tabs in the server, the compositor's borders and focus mark, the bar's two lines (session, tabs with their marks, mode and clock; hints, prompts and messages), modes per client from the key table, the split end to end through the real client (`keys_test`, `pane_rows`, `client_rows`, SERVER.md §8); configuration planned |
 | W4 | mouse, scrollback, copy mode, search, OSC 52 | pane focus and tab-label clicks with SGR/legacy reports, captured border dragging and all-motion transport, wheel and key scrollback per client, drag selection copied on release, register paste, OSC 52 export of copies and warren.toml's gate on programs' writes, search in scroll mode |
-| W5 | command socket, CLI verbs, layout files, save and restore | in progress: ids, targets, the verb table, `list --json` |
+| W5 | command socket, CLI verbs, layout files, save and restore | in progress: ids, targets, the verb table, `list --json`, `source` |
 | W6 | static on the PAX image; rows in PAX's own suites | planned |
 
 The parser, the grid, the protocol codec, the layout module, the server with
@@ -57,7 +57,7 @@ width/resource/platform evidence remain separate pending measurements.
 | `src/server` | no | W2, W3 | server: runtime directory, start lock, one wait a turn, admission limits; panes and tabs, the compositor, which reads only the rows and columns each pane's emulator changed, frame pacing (`session_rows`, `pane_rows`, `compose_rows`, `compose_damage_test`, `compose_corpus_rows`, `pacing_test` native, checked and lupin; docs/SERVER.md) |
 | `src/client` | no | W2 | input parser, renderer, terminal handling, attach loop, `new` (`client_input_test`, `client_render_test`, `client_rows`; docs/CLIENT.md) |
 | `src/cmd` | no | W1/W5 | bounded raw/file/stdin and recording-replay `vt-dump`; ids and their one spelling, targets resolved over a snapshot, the verb table read by the command line's parser, `list --json` schema 1, all pure (`cmd_rows_test` native and lupin; [CLI](CLI.md)); layouts, `source` and persistence planned |
-| `src/config` | no | W3 | the key table: modes, the default bindings, each key's step, the hint line, the key list and the command line's verbs, all pure (`keys_test` native, checked and lupin); the configuration file planned |
+| `src/config` | no | W3 | the key table: modes, the default bindings, each key's step, the hint line, the key list and the command line's verbs, all pure (`keys_test` native, checked and lupin); warren.toml's settings (`config_test`), read again by `source`; layout files planned |
 
 ## Three kinds of row
 
@@ -124,7 +124,10 @@ client that made it and only when it takes OSC 52 writes, a program's write
 kept back by default and passed with `[clipboard] programs = true` to OSC 52
 clients only, a refused warren.toml named on the hint line with its setting
 not applied, and the terminal client writing OSC 52 for a copy, and none at the
-console. `config_test` holds the settings parser (defaults, comments, both
+console. `source-*` in `pane_rows` hold `source` read live from the socket,
+from `warren source FILE` and at the command line: a refused file named by
+line with every setting kept, a missing FILE refused, no file the defaults,
+and the start's refusal no longer told once a file is read. `config_test` holds the settings parser (defaults, comments, both
 values, and each refusal by line and reason) and `client_clipboard_test` the
 OSC 52 sequence, on native, explicit checked and lupin.
 

@@ -3,8 +3,7 @@
 warren reads one file, `warren.toml`, when its server starts:
 `$XDG_CONFIG_HOME/warren/warren.toml` when `XDG_CONFIG_HOME` is set and not
 empty, otherwise `~/.config/warren/warren.toml`. With no file every setting
-has its default. A running server keeps the settings it started with; stop it
-(`warren kill-server`) and start it again to read the file again.
+has its default. A running server reads the file again on `source` (below).
 
 The file is a strict subset of TOML. A line is blank, a comment (`#` to the end
 of the line, also after a value), a table header such as `[clipboard]`, or
@@ -15,6 +14,21 @@ or key given twice, or a header without its `]`. A refused file changes no
 setting, and every client that attaches is told why on its hint line, for
 example `warren.toml line 3: unknown table [keys]`. A file that cannot be read
 is refused the same way.
+
+## Reading the file again: `source`
+
+`warren source` reads `warren.toml` again by the rules above, and its settings
+replace the server's at once. With no file there, every setting returns to its
+default, as at the server's start. `warren source FILE` reads FILE instead,
+a relative name from the directory `warren` runs in; a FILE that cannot be
+read is refused. The command line has the same verb, `:source [FILE]`, which
+reads a relative FILE from the directory of the focused pane.
+
+A file that is refused changes no setting, and the answer names it by line:
+`warren: source: warren.toml line 3: unknown table [keys]`, exit status 1, or
+the same words on the hint line of the client that typed `:source`. Once a
+file is read, clients that attach later are no longer told of a refusal from
+the server's start.
 
 ## `[clipboard]`
 
