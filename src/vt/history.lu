@@ -13,9 +13,11 @@ pub struct History {
 
 fn new_history(cap: int) -> History {
     assert(cap >= 0)
-    // The ring holds no bytes until its first record (history_extend), so a
-    // pane with no history costs none of its cap.
-    History { bytes: List[byte](), cap: cap, head: 0, tail: 0, used: 0, records: 0, newest_length: 0, evicted: 0 }
+    // Plant: the ring made whole, written in full, when the pane is made.
+    var data = List[byte]()
+    (mut data).reserve(cap)
+    while data.len < cap { (mut data).push(0 as byte) }
+    History { bytes: data, cap: cap, head: 0, tail: 0, used: 0, records: 0, newest_length: 0, evicted: 0 }
 }
 
 /// Grow the bytes the ring holds to cover every position before `end`, at
