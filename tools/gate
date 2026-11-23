@@ -244,12 +244,13 @@ step session-rows session_rows
 # cell for cell.
 pane_rows() (
   # Every row in the pane rows' own default list, then the pane-count refusal
-  # (32 panes, not in that list) and, on Linux, the rows that read /proc.
+  # (32 panes, not in that list) and, on Linux, the rows that read /proc (the
+  # resident size at 1, 8 and 32 tabs among them).
   rm -rf target/prows && mkdir -p target/prows && cd target/prows
   rc=0
   "$root/target/native/pane-rows" "$root/target/native/warren" || rc=1
   rows=(pane-limit)
-  if [ "$mode" = linux ]; then rows+=(split-close-cycles pane-cost); fi
+  if [ "$mode" = linux ]; then rows+=(split-close-cycles pane-cost pane-cost-tabs); fi
   "$root/target/native/pane-rows" "$root/target/native/warren" "${rows[@]}" || rc=1
   exit "$rc"
 )
