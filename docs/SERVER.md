@@ -84,6 +84,11 @@ the projection, six times the cap and the screens and 1 MiB (13.2 MiB at
 80x24), is deliberately above that by 1.76 times; the `ring-resident-rows`
 step measures each stage on each host, holds it to the takes recorded in
 `tests/vt/ring-resident-takes.json` and holds the projection at or above it.
+A resize row above cap 0 is held to at least the resize row's bound at cap 0:
+the first resize costs the same at every cap, and whether a cap's peak shows
+that cost is the allocator's, so an allocator that hides it can lower a
+reading but does not set the bound, and macOS 26, whose allocator does not
+hide it, holds against the takes recorded on macOS 15, whose allocator did.
 Each row holds the least of its takes on both sides of its subtraction: a host
 may peak a few pages higher in one take (hosted macOS runners did, by 8 to 11
 pages, in one take of three now and then), and that is not the pane's cost.
