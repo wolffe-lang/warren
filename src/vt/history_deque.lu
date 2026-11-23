@@ -3,24 +3,24 @@
 
 fn history_newest_at(history: History) -> int {
     assert(history.records > 0)
-    (history.tail - history.newest_length + history.bytes.len) % history.bytes.len
+    (history.tail - history.newest_length + history.cap) % history.cap
 }
 
 fn history_copy_front(mut destination: History, source: History, at: int) -> bool {
     let length = history_get_word(source, at, 0, 4)
     assert(length >= 24 && length <= source.used)
-    if length > destination.bytes.len - destination.used { return false }
+    if length > destination.cap - destination.used { return false }
     let was_empty = destination.records == 0
     let old_head = destination.head
-    let head = (old_head - length + destination.bytes.len) % destination.bytes.len
+    let head = (old_head - length + destination.cap) % destination.cap
     var i = 0
     while i < length {
-        destination.bytes[(head + i) % destination.bytes.len] = source.bytes[(at + i) % source.bytes.len]
+        destination.bytes[(head + i) % destination.cap] = source.bytes[(at + i) % source.cap]
         i += 1
     }
     history_put_word(mut destination, head, 4, 4, 0)
     if was_empty {
-        destination.tail = (head + length) % destination.bytes.len
+        destination.tail = (head + length) % destination.cap
         destination.newest_length = length
     } else { history_put_word(mut destination, old_head, 4, 4, length) }
     destination.head = head
@@ -39,7 +39,7 @@ fn history_copy_back(mut destination: History, source: History, at: int) -> bool
     if target < 0 { return false }
     var i = 24
     while i < length {
-        destination.bytes[(target + i) % destination.bytes.len] = source.bytes[(at + i) % source.bytes.len]
+        destination.bytes[(target + i) % destination.cap] = source.bytes[(at + i) % source.cap]
         i += 1
     }
     true
@@ -66,9 +66,9 @@ fn ensure_history_capacity(mut history: History, needed: int) {
     // The configured history cap plus peak screen encoding bounds this
     // cache. Geometric growth retains old arena buffers and counts them.
     assert(needed >= 0, "reflow-cache-bound")
-    if needed <= history.bytes.len { return }
+    if needed <= history.cap { return }
     // The first allocation is exact; later growth doubles.
-    var capacity: int = if history.bytes.len < 1 { needed } else { history.bytes.len }
+    var capacity: int = if history.cap < 1 { needed } else { history.cap }
     while capacity < needed {
         if capacity > 4611686018427387903 { capacity = needed }
         else { capacity *= 2 }
@@ -83,10 +83,10 @@ fn ensure_history_capacity(mut history: History, needed: int) {
             let length = history_get_word(history, from, 0, 4)
             var i = 0
             while i < length {
-                next[to + i] = history.bytes[(from + i) % history.bytes.len]
+                next[to + i] = history.bytes[(from + i) % history.cap]
                 i += 1
             }
-            from = (from + length) % history.bytes.len
+            from = (from + length) % history.cap
             to += length
             record += 1
         }
@@ -95,6 +95,7 @@ fn ensure_history_capacity(mut history: History, needed: int) {
         // construction is reclaimed, abandoned older capacities are not.
         history.bytes = copy next
     }
+    history.cap = capacity
     history.head = 0
     history.tail = history.used
 }

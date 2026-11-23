@@ -4,8 +4,10 @@
 /// The retained encoded history ring. Header lengths include every encoded
 /// byte. Head/tail are byte positions; previous lengths support reverse reads.
 /// Reader and row-address state are kept separately from this framing value.
+/// `cap` is the ring's size: every position is taken modulo it, and records
+/// are evicted only to keep `used` within it.
 pub struct History {
-    bytes: List[byte], head: int, tail: int, used: int,
+    bytes: List[byte], cap: int, head: int, tail: int, used: int,
     records: int, newest_length: int, evicted: int,
 }
 
@@ -18,17 +20,17 @@ fn new_history(cap: int) -> History {
         let zeroes = "\u{0}".repeat(cap)
         zeroes.bytes()
     }
-    History { bytes: data, head: 0, tail: 0, used: 0, records: 0, newest_length: 0, evicted: 0 }
+    History { bytes: data, cap: cap, head: 0, tail: 0, used: 0, records: 0, newest_length: 0, evicted: 0 }
 }
 
 fn history_get_word(history: History, at: int, offset: int, width: int) -> int {
-    assert(at >= 0 && at < history.bytes.len && offset >= 0 && offset + width <= 24)
+    assert(at >= 0 && at < history.cap && offset >= 0 && offset + width <= 24)
     assert(width == 4 || width == 8)
     var value: int = 0
     var factor: int = 1
     var i = 0
     while i < width {
-        value += (history.bytes[(at + offset + i) % history.bytes.len] as int) * factor
+        value += (history.bytes[(at + offset + i) % history.cap] as int) * factor
         if i + 1 < width { factor *= 256 }
         i += 1
     }
@@ -41,7 +43,7 @@ fn history_put_word(mut history: History, at: int, offset: int, width: int, valu
     var remaining = value
     var i = 0
     while i < width {
-        history.bytes[(at + offset + i) % history.bytes.len] = (remaining % 256) as byte
+        history.bytes[(at + offset + i) % history.cap] = (remaining % 256) as byte
         remaining = remaining / 256
         i += 1
     }
@@ -64,7 +66,7 @@ fn history_evict_oldest(mut history: History) {
     assert(history.records > 0)
     let length = history_get_word(history, history.head, 0, 4)
     assert(length >= 24 && length <= history.used)
-    history.head = (history.head + length) % history.bytes.len
+    history.head = (history.head + length) % history.cap
     history.used -= length
     history.records -= 1
     history_count_evicted(mut history, 1)
@@ -74,7 +76,7 @@ fn history_evict_oldest(mut history: History) {
 
 fn history_reserve(mut history: History, id: int, start_cell: int, body_length: int) -> int {
     assert(id >= 0 && start_cell >= 0 && start_cell <= 4294967295 && body_length >= 0)
-    if history.bytes.len < 24 || body_length > history.bytes.len - 24 || body_length > 4294967271 {
+    if history.cap < 24 || body_length > history.cap - 24 || body_length > 4294967271 {
         // Keeping older text behind an unstorable newer record would leave a
         // hole instead of a retained suffix. Drop that older prefix as well.
         history_count_evicted(mut history, history.records + 1)
@@ -82,7 +84,7 @@ fn history_reserve(mut history: History, id: int, start_cell: int, body_length: 
         return 0 - 1
     }
     let length = body_length + 24
-    while history.used > history.bytes.len - length { history_evict_oldest(mut history) }
+    while history.used > history.cap - length { history_evict_oldest(mut history) }
     let at = history.tail
     if history.records == 0 { history.head = at }
     history_put_word(mut history, at, 0, 4, length)
@@ -90,7 +92,7 @@ fn history_reserve(mut history: History, id: int, start_cell: int, body_length: 
     history_put_word(mut history, at, 8, 8, id)
     history_put_word(mut history, at, 16, 4, start_cell)
     history_put_word(mut history, at, 20, 4, 0)
-    history.tail = (at + length) % history.bytes.len
+    history.tail = (at + length) % history.cap
     history.used += length
     history.records += 1
     history.newest_length = length
@@ -100,9 +102,9 @@ fn history_reserve(mut history: History, id: int, start_cell: int, body_length: 
 }
 
 fn history_previous(history: History, at: int) -> int {
-    assert(history.records > 0 && at >= 0 && at < history.bytes.len)
+    assert(history.records > 0 && at >= 0 && at < history.cap)
     if at == history.head { return 0 - 1 }
     let previous = history_get_word(history, at, 4, 4)
     assert(previous >= 24 && previous <= history.used)
-    (at - previous + history.bytes.len) % history.bytes.len
+    (at - previous + history.cap) % history.cap
 }
