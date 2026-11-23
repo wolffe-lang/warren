@@ -51,7 +51,8 @@ def main():
         (RIG, 'ring-plant.manifest', ['ring-resident-new']),
         (RIG, 'osc7-plant.manifest', ['pane-cwd-from-osc7']),
         (RIG, 'source-plant.manifest', ['source-applies-live']),
-        (RIG, 'slot-title-plant.manifest', ['pane-title-not-inherited'])):
+        (RIG, 'slot-title-plant.manifest', ['pane-title-not-inherited']),
+        (RIG, 'ring-growth-plant.manifest', ['ring-resident-panes'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
