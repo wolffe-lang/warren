@@ -68,12 +68,35 @@ fn test_clear_and_lifetime_ids() {
     assert(disabled.history.used == 0 && disabled.history.records == 0 && disabled.history.evicted > 0)
 }
 
+// What a byte list reserved to `size` and pushed full charges, on this engine.
+fn full_list_charge(size: int) -> int {
+    var got = 0
+    region bare(cap: 1048576) {
+        var b = List[byte]()
+        let before = budget.charged(bare)
+        (mut b).reserve(size)
+        var i = 0
+        while i < size { (mut b).push(0 as byte); i += 1 }
+        got = budget.charged(bare) - before
+    }
+    got
+}
+
+// A ring charges at most a full list of its cap while it first fills, and
+// nothing once it has wrapped.
 fn test_history_feed_charge() {
+    let full = full_list_charge(4096)
     region frame(cap: 1048576) {
         var pane = vt.new(8, 2, 4096)
         let data = "\r\nabcdef".bytes()
-        let stable = budget.charged(frame)
+        let start = budget.charged(frame)
         var i = 0
+        while pane.history.evicted == 0 && i < 4096 { vt.feed(mut pane, data); i += 1 }
+        assert(pane.history.evicted > 0, "history-feed-ring-wrapped")
+        let ring = budget.charged(frame) - start
+        assert(ring <= full, "history-feed-ring-within-one-cap")
+        let stable = budget.charged(frame)
+        i = 0
         while i < 1024 { vt.feed(mut pane, data); i += 1 }
         assert(pane.history.records > 0 && pane.history.used <= 4096 && pane.history.evicted > 0)
         assert(budget.charged(frame) == stable, "history-feed-allocation")
