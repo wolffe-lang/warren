@@ -276,6 +276,24 @@ def self_test():
     check('filled-two-caps', 2375680 + cap > limit, 'bound %d holds %d' % (limit, 2375680 + cap))
     _, margin = bound([1600000, 2000000, 2400000], [4882432] * 3, 16384)
     check('filled-too-loose', too_loose('filled', cap, margin) is not None, 'margin %d passed' % margin)
+    # Nine Linux takes of `new` at the server's cap once a pane's ring costs
+    # nothing until it is written (the pinned image, at 7465ed6): single takes
+    # moved by 712,704 bytes, while the least of three, the number a row holds,
+    # moved by 196,608 from one run of three to the next. The row must still
+    # see one more cap at the peak, hold two later runs of three at the same
+    # head, and fail the same head with the ring made whole when the pane is
+    # made.
+    inc9 = [1196032, 1245184, 1642496, 1220608, 929792, 1474560, 1200128, 1519616, 1617920]
+    peaks9 = [3674112, 3915776, 4001792, 3715072, 3612672, 4026368, 3682304, 4177920, 4173824]
+    limit, margin = bound(inc9, peaks9, granule)
+    runs = [([1318912, 1331200, 1482752], [3813376, 3825664, 4014080]),
+            ([1327104, 1609728, 1277952], [3653632, 4014080, 3895296])]
+    later = [held_increment(peaks, bases_of(inc, peaks)) for inc, peaks in runs]
+    whole_inc, whole_peaks = [3657728, 3538944, 3559424], [6111232, 6242304, 6074368]
+    whole = held_increment(whole_peaks, bases_of(whole_inc, whole_peaks))
+    check('nine-take-noise', too_loose('new', cap, margin) is None and max(later) <= limit < whole,
+          'margin %d bound %d (%s); later runs %s, whole ring %d'
+          % (margin, limit, too_loose('new', cap, margin) or 'not too loose', later, whole))
     if not fails:
         print('PASS ring-resident-self-test')
     return not fails
