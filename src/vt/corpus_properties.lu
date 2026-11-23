@@ -35,7 +35,7 @@ fn logical_content(pane: Vt) -> List[int] {
         while history_reader_next(mut reader, pane.history) {
             if reader.kind == 0 { content_scalar(mut out, reader.value, reader.flags, reader.foreground, reader.background) }
         }
-        at = (at + history_get_word(pane.history, at, 0, 4)) % pane.history.bytes.len
+        at = (at + history_get_word(pane.history, at, 0, 4)) % pane.history.cap
         record += 1
     }
     var end = if pane.active_alternate && pane.saved_primary.valid { pane.saved_primary.row } else { pane.cursor_row }
