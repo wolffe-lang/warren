@@ -175,7 +175,7 @@ pub fn view_find(mut view: View, pane: Vt, needle: List[byte], older: bool, back
     view.find.done = false
     view.find.hit = false
     view.find.first = false
-    if pane.history.records > 0 && pane.history.bytes.len > 0 {
+    if pane.history.records > 0 && pane.history.cap > 0 {
         var at = pane.history.head
         var n = 0
         while n < pane.history.records && !view.find.done {
@@ -189,7 +189,7 @@ pub fn view_find(mut view: View, pane: Vt, needle: List[byte], older: bool, back
                     offset += w
                 }
             }
-            at = (at + history_get_word(pane.history, at, 0, 4)) % pane.history.bytes.len
+            at = (at + history_get_word(pane.history, at, 0, 4)) % pane.history.cap
             n += 1
         }
     }

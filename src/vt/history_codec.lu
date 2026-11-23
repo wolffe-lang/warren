@@ -36,7 +36,7 @@ fn history_scalar_bytes(cp: int) -> int {
 }
 
 fn history_encoded_byte(mut history: History, at: int, position: int, value: int) {
-    history.bytes[(at + position) % history.bytes.len] = value as byte
+    history.bytes[(at + position) % history.cap] = value as byte
 }
 
 fn history_encoded_scalar(mut history: History, at: int, position: int, cp: int) -> int {
@@ -227,7 +227,7 @@ fn history_encode_fragments(mut history: History, screen: Screen, cols: int,
 fn history_reader_start(mut reader: HistoryReader, history: History, at: int) {
     let length = history_get_word(history, at, 0, 4)
     assert(length >= 24 && length <= history.used)
-    reader.at = (at + 24) % history.bytes.len
+    reader.at = (at + 24) % history.cap
     reader.remaining = length - 24
     reader.run_left = 0
     reader.value = 0
@@ -236,7 +236,7 @@ fn history_reader_start(mut reader: HistoryReader, history: History, at: int) {
 fn history_reader_byte(mut reader: HistoryReader, history: History) -> int {
     assert(reader.remaining > 0 && reader.run_left > 0, "history-run-byte-count")
     let value = history.bytes[reader.at] as int
-    reader.at = (reader.at + 1) % history.bytes.len
+    reader.at = (reader.at + 1) % history.cap
     reader.remaining -= 1
     reader.run_left -= 1
     value
@@ -250,7 +250,7 @@ fn history_reader_next(mut reader: HistoryReader, history: History) -> bool {
         let length = history_get_word(history, run_at, 0, 4)
         let foreground = history_get_word(history, run_at, 4, 4)
         let background = history_get_word(history, run_at, 8, 4)
-        reader.at = (reader.at + 12) % history.bytes.len
+        reader.at = (reader.at + 12) % history.cap
         reader.remaining -= 12
         assert(length > 0 && length <= reader.remaining, "history-run-byte-count")
         reader.run_left = length

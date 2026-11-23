@@ -64,7 +64,7 @@ fn view_lay_line(mut view: View, history: History, start: int, last: int, cols: 
     while more {
         reflow_record(mut view.flow, history, at, mut view.reader, mut view.scratch, cols, first_row, last_row, emit)
         if at == last { more = false }
-        else { at = (at + history_get_word(history, at, 0, 4)) % history.bytes.len }
+        else { at = (at + history_get_word(history, at, 0, 4)) % history.cap }
     }
     view.flow.row
 }
@@ -73,7 +73,7 @@ fn view_lay_line(mut view: View, history: History, start: int, last: int, cols: 
 // Walks back from the newest line only as far as the window reaches. Returns
 // how many history rows lie at or below the window's top, at most `back`.
 fn view_history_rows(mut view: View, history: History, cols: int, rows: int, back: int) -> int {
-    if history.records == 0 || history.bytes.len == 0 { return 0 }
+    if history.records == 0 || history.cap == 0 { return 0 }
     var below = 0
     var at = history_newest_at(history)
     while at >= 0 && below < back {
@@ -141,7 +141,7 @@ pub fn fill_view(mut view: View, pane: Vt, back: int) -> int {
 /// line `id` at cell `offset` now is, or -1 when history no longer holds it
 /// (or the buffers do not hold the pane's size).
 pub fn view_back_of(mut view: View, pane: Vt, id: int, offset: int) -> int {
-    if id < 0 || pane.history.records == 0 || pane.history.bytes.len == 0 { return 0 - 1 }
+    if id < 0 || pane.history.records == 0 || pane.history.cap == 0 { return 0 - 1 }
     let cols = pane.cols
     if !view_fits(view, cols, pane.rows) { return 0 - 1 }
     var below = 0
