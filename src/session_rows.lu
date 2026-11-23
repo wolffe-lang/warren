@@ -2514,9 +2514,18 @@ fn row_rss_flat(mut r: Rig) -> str {
     if !client.until_line(mut f, "$", 5000) { return "no flood prompt" }
     let two_sessions = rss_kb(pid)
     print("MEASURE server-rss start-kb={at_start} one-session-80x24-kb={one_session} two-sessions-kb={two_sessions}")
-    let _i = client.input(f, "while :; do echo 0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopq; done\r")
+    // The flooding pane's ring fills as its history arrives, up to its cap:
+    // the flood first writes 30,000 lines (99 bytes of history each, about
+    // 2.97 MB, past the 2 MiB cap) and marks it, and the baseline waits for
+    // the mark, so what the keystrokes are held to is not the ring filling.
+    let full = beside(r, "flood.full")
+    fs.remove(full) else |_| {}
+    let line = "echo 0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopq"
+    let _i = client.input(f, "i=0; while [ $i -lt 30000 ]; do " + line + "; i=$((i+1)); done; : > " + full + "; while :; do " + line + "; done\r")
     let _d = client.send(f, 10, List[byte]())
     client.hang_up(mut f)
+    if !until_file(full, 60000) { return "the flood did not write its first 30,000 lines" }
+    time.sleep(time.millis(300))
     let warm = keystrokes(mut q, 1000, 0)
     if warm.len == 0 { return "warm-up keystrokes failed" }
     let before = rss_kb(pid)
