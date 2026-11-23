@@ -29,7 +29,6 @@ fn new_history(cap: int) -> History {
 fn history_extend(mut history: History, end: int) {
     let want = if end < history.cap { end } else { history.cap }
     if want <= history.bytes.len { return }
-    if history.bytes.len == 0 { (mut history.bytes).reserve(history.cap) }
     while history.bytes.len < want { (mut history.bytes).push(0 as byte) }
 }
 
