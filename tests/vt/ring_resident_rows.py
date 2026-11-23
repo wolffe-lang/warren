@@ -34,10 +34,16 @@ The bound of a row is read from the takes recorded for this host in
 tests/vt/ring-resident-takes.json: the same number from the recorded takes,
 plus a margin that is the largest of three times the recorded takes' spread,
 5% of the largest recorded peak of that stage, or one allocation granule
-(256 KiB on Linux, 16 KiB on macOS). The rule checks itself where a ring is made: a `new`
-row's margin must be under one cap, so one more cap-sized buffer at the peak
-fails; a difference row's margin must be under two caps, so a step that made
-the ring again fails. A margin past that fails by name as too loose. A host
+(256 KiB on Linux, 16 KiB on macOS). A `resize` row above cap 0 is held to at
+least the bound of `resize` at cap 0: a first resize costs the same at every
+cap, and whether a cap's takes show that cost is the allocator's (on Linux and
+macOS 15 it hides under the peak the ring's creation set; on macOS 26 it does
+not, warren#88), so allocator reuse can lower a reading but cannot set its
+bound. The rule checks itself where a ring is made, on the room between a
+bound and its takes' number: a `new` row's room must be under one cap, so one
+more cap-sized buffer at the peak fails; a difference row's room must be under
+two caps, so a step that made the ring again fails. A room past that fails by
+name as too loose. A host
 with no recorded takes fails by name. A cap a host does not hold (macOS at
 8 MiB, whose allocator's peak there is bimodal) is measured, printed and named
 in a NOTE with its takes, and holds nothing. Each verdict names its row: `ring-resident-STAGE`
@@ -142,20 +148,32 @@ def bound(increments, peaks, granule):
 
 def row_bound(pairs, stage, cap, granule):
     """A row's bound from the takes recorded for its host (`pairs`, as the
-    takes file keys them), and its room: how far the bound sits above the
-    recorded takes' own number."""
+    takes file keys them), its room (how far the bound sits above the
+    recorded takes' own number) and the cap-0 bound where that set it, else
+    None. A first resize costs the same at every cap, and whether a cap's
+    takes show that cost is the allocator's (warren#88): so a `resize` row
+    above cap 0 is held to at least the bound of `resize` at cap 0, and
+    allocator reuse can lower a reading but cannot set its bound."""
     takes = pairs[key(stage, cap)]
-    return bound(takes['increments'], takes['peaks'], granule)
+    limit, margin = bound(takes['increments'], takes['peaks'], granule)
+    own = limit - margin
+    base = pairs.get(key('resize', 0))
+    if stage == 'resize' and cap > 0 and base:
+        cap0, _ = bound(base['increments'], base['peaks'], granule)
+        if cap0 > limit:
+            return cap0, cap0 - own, cap0
+    return limit, margin, None
 
 
-def too_loose(stage, cap, margin):
-    """Why a margin cannot see what its row is for, or None."""
+def too_loose(stage, cap, room):
+    """Why a bound's room over its takes' number cannot see what its row is
+    for, or None."""
     if cap == 0:
         return None
-    if stage == 'new' and margin >= cap:
-        return 'margin %d is not under one cap (%d): one more cap-sized buffer at the peak would pass' % (margin, cap)
-    if stage != 'new' and margin >= 2 * cap:
-        return 'margin %d is not under two caps (%d): a step that made the ring again would pass' % (margin, 2 * cap)
+    if stage == 'new' and room >= cap:
+        return 'room %d is not under one cap (%d): one more cap-sized buffer at the peak would pass' % (room, cap)
+    if stage != 'new' and room >= 2 * cap:
+        return 'room %d is not under two caps (%d): a step that made the ring again would pass' % (room, 2 * cap)
     return None
 
 
@@ -205,7 +223,7 @@ def self_test():
     # row is held to at least its cap-0 bound.
     mac15 = {'resize 0': {'increments': [1966080] * 3, 'peaks': [3964928] * 3},
              'resize 2097152': {'increments': [344064] * 3, 'peaks': [8650752] * 3}}
-    limit, room = row_bound(mac15, 'resize', cap, 16384)
+    limit, room, _ = row_bound(mac15, 'resize', cap, 16384)
     got = held_increment([10551296] * 3, [8601600] * 3)
     check('resize-held-to-cap0', got <= limit and too_loose('resize', cap, room) is None,
           'held %d, bound %d, room %d' % (got, limit, room))
@@ -216,7 +234,7 @@ def self_test():
     # A cap-0 bound two caps or more above a row's own number is too loose, by name.
     wide = {'resize 0': {'increments': [4400000] * 3, 'peaks': [6400000] * 3},
             'resize 2097152': {'increments': [0] * 3, 'peaks': [8650752] * 3}}
-    _, room = row_bound(wide, 'resize', cap, 16384)
+    _, room, _ = row_bound(wide, 'resize', cap, 16384)
     check('cap0-too-loose', too_loose('resize', cap, room) is not None, 'room %d passed' % room)
     if not fails:
         print('PASS ring-resident-self-test')
@@ -287,8 +305,9 @@ def main():
             print('FAIL ring-resident-%s cap=%d: no recorded takes for host=%s' % (stage, cap, host))
             failed += 1
             continue
-        limit, margin = row_bound(recorded[host]['pairs'], stage, cap, granule)
-        loose = too_loose(stage, cap, margin)
+        limit, room, cap0 = row_bound(recorded[host]['pairs'], stage, cap, granule)
+        loose = too_loose(stage, cap, room)
+        held_to = '; held to resize cap 0\'s bound %d' % cap0 if cap0 is not None else ''
         peaks = held[name]['peaks']
         bases = bases_of(held[name]['increments'], peaks)
         worst = held_increment(peaks, bases)
@@ -302,12 +321,12 @@ def main():
             print('FAIL ring-resident-%s cap=%d: bound too loose: %s' % (stage, cap, loose))
             failed += 1
         elif worst > limit:
-            print('FAIL ring-resident-%s cap=%d increment=%d past bound=%d%s (%s); recorded %s, margin %d'
-                  % (stage, cap, worst, limit, ratio, held_from, takes['increments'], margin))
+            print('FAIL ring-resident-%s cap=%d increment=%d past bound=%d%s (%s); recorded %s, room %d%s'
+                  % (stage, cap, worst, limit, ratio, held_from, takes['increments'], room, held_to))
             failed += 1
         else:
-            print('PASS ring-resident-%s cap=%d increment=%d bound=%d%s (%s); margin %d'
-                  % (stage, cap, worst, limit, ratio, held_from, margin))
+            print('PASS ring-resident-%s cap=%d increment=%d bound=%d%s (%s); room %d%s'
+                  % (stage, cap, worst, limit, ratio, held_from, room, held_to))
     rows += 1
     if projection is None:
         print('FAIL ring-resident-projection: the probe printed none')
