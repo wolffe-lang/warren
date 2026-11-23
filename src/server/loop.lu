@@ -2678,7 +2678,7 @@ fn source_settings(mut s: Server, path: str, label: str) -> str {
         let at = if next.line > 0 then " line {next.line}" else ""
         return "{label}{at}: {next.why}"
     }
-    config.take_settings(mut s.settings, next)
+    config.take_settings(mut s.settings, config.default_settings())
     ""
 }
 
