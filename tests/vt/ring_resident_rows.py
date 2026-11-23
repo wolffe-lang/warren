@@ -140,6 +140,14 @@ def bound(increments, peaks, granule):
     return top + margin, margin
 
 
+def row_bound(pairs, stage, cap, granule):
+    """A row's bound from the takes recorded for its host (`pairs`, as the
+    takes file keys them), and its room: how far the bound sits above the
+    recorded takes' own number."""
+    takes = pairs[key(stage, cap)]
+    return bound(takes['increments'], takes['peaks'], granule)
+
+
 def too_loose(stage, cap, margin):
     """Why a margin cannot see what its row is for, or None."""
     if cap == 0:
@@ -260,7 +268,7 @@ def main():
             print('FAIL ring-resident-%s cap=%d: no recorded takes for host=%s' % (stage, cap, host))
             failed += 1
             continue
-        limit, margin = bound(takes['increments'], takes['peaks'], granule)
+        limit, margin = row_bound(recorded[host]['pairs'], stage, cap, granule)
         loose = too_loose(stage, cap, margin)
         peaks = held[name]['peaks']
         bases = bases_of(held[name]['increments'], peaks)
