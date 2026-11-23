@@ -70,8 +70,14 @@ malloc gives the first of the freed buffers back to the system, which raises
 its threshold for mapping large buffers, so the later ones come from its heap,
 and the one freed there stays resident: a made pane keeps two times its cap,
 the ring and that freed buffer, and with glibc's threshold pinned
-(`MALLOC_MMAP_THRESHOLD_`) it keeps one (wolf-lang#1175). A first resize costs
-nothing measurable over a made pane (warren#7's resize half). The first pane
+(`MALLOC_MMAP_THRESHOLD_`) it keeps one (wolf-lang#1175). A first resize has
+a cost of its own, the blocks it allocates, the same whatever the cap: 1.4
+to 1.9 MB on Linux and 1.97 MB on macOS, as measured at cap 0. Whether it
+shows in a pane's peak depends on the system's allocator. On Linux and macOS 15
+it is hidden under the peak the ring's creation set: at a 2 MiB cap the resize
+adds -0.5 to +0.2 MB on Linux and 0.34 MB on macOS 15. On macOS 26 the freed
+creation buffers stay resident and the resize's blocks land elsewhere, so it
+adds its whole cost, 1.95 MB (warren#88). The first pane
 made in a process also pays 1.3 to 1.6 MB once, the emulator's code and first
 allocations. So the first pane at the 2 MiB cap peaks at 7.5 to 7.9 MB, and
 the projection, six times the cap and the screens and 1 MiB (13.2 MiB at
