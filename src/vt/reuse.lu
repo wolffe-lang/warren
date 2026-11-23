@@ -1,0 +1,16 @@
+//! member: true
+//! A pane's emulator given to a new program in a reused slot: everything the
+//! last program left is gone, as in a pane made new, but the storage is kept
+//! (a slot is never dropped).
+
+/// Make the pane fresh for a new program at a size: a full reset (RIS, which
+/// also empties its history), the reported directory forgotten (a reset keeps
+/// it: it is the program's report, not screen state), a resize (none when
+/// the size is kept), and the answers and events still pending dropped.
+pub fn reuse(mut pane: Vt, cols: int, rows: int) {
+    feed(mut pane, "\u{1b}c".bytes())
+    forget_reported_dir(mut pane)
+    let _r = resize(mut pane, cols, rows)
+    let _a = take_answers(mut pane)
+    let _e = take_events(mut pane)
+}
