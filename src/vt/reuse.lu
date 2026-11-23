@@ -18,7 +18,6 @@ pub fn forget_title(mut pane: Vt) {
 pub fn reuse(mut pane: Vt, cols: int, rows: int) {
     feed(mut pane, "\u{1b}c".bytes())
     forget_reported_dir(mut pane)
-    forget_title(mut pane)
     let _r = resize(mut pane, cols, rows)
     let _a = take_answers(mut pane)
     let _e = take_events(mut pane)
