@@ -1,0 +1,146 @@
+//! member: false
+//! A reused slot's emulator (vt.reuse) holds nothing of the program before:
+//! after any stream, a reused pane and a pane made new at the same size and
+//! cap, fed the same probe, give the same dump, with no reported directory,
+//! the same history and the same events. Pure: natively (`wolf test`), under
+//! lupin and on the checked machine. tests/vt/reuse_fields.py holds that
+//! every field of `Vt` and `Pane` has its way of being reset named.
+use std.io
+use vt
+
+// A small pane keeps the row cheap on the checked machine and under lupin;
+// what a reuse resets does not depend on the size. The cap holds the history
+// case's lines.
+fn small_cols() -> int { 20 }
+fn small_rows() -> int { 6 }
+fn cap() -> int { 1024 }
+
+fn esc(text: str) -> str {
+    "\u{1b}" + text
+}
+
+// One stream of each kind of state a program can leave behind.
+fn dirty_names() -> List[str] {
+    ["title", "osc7", "alternate", "modes", "pen", "charsets", "tabs", "region", "saved-cursor", "history",
+        "open-osc", "open-dcs", "cursor-shape", "pending-wrap", "everything"]
+}
+
+fn history_lines() -> str {
+    var out = ""
+    var i = 0
+    while i < 12 {
+        out = out + "history line {i}\r\n"
+        i += 1
+    }
+    out
+}
+
+fn dirty(name: str) -> str {
+    if name == "title" { return esc("]2;the last program\u{7}") }
+    if name == "osc7" { return esc("]7;file:///tmp/the-last-program\u{7}") }
+    if name == "alternate" { return esc("[?1049h") + "on the alternate screen" }
+    if name == "modes" {
+        return esc("[?1h") + esc("=") + esc("[?1000h") + esc("[?1002h") + esc("[?1003h") + esc("[?1004h") +
+            esc("[?1006h") + esc("[?1007h") + esc("[?2004h") + esc("[?2026h") + esc("[4h") + esc("[20h") +
+            esc("[?7l") + esc("[?25l") + esc("[?6h") + esc("[?12h")
+    }
+    if name == "pen" { return esc("[1;4;7;31;44m") + "pen" }
+    if name == "charsets" { return esc("(0") + esc(")0") + "\u{e}" }
+    if name == "tabs" { return esc("[3g") + esc("[5G") + esc("H") + esc("[13G") + esc("H") }
+    if name == "region" { return esc("[2;4r") }
+    if name == "saved-cursor" { return esc("[3;5H") + esc("7") }
+    if name == "history" { return history_lines() }
+    if name == "open-osc" { return esc("]2;never ended") }
+    if name == "open-dcs" { return esc("P1$qm") }
+    if name == "cursor-shape" { return esc("[5 q") }
+    if name == "pending-wrap" {
+        var line = ""
+        var i = 0
+        while i < 20 { line = line + "w"; i += 1 }
+        return line
+    }
+    var all = ""
+    for n in dirty_names() {
+        if n != "everything" && n != "open-osc" && n != "open-dcs" { all = all + dirty(n) }
+    }
+    all + dirty("open-osc")
+}
+
+// After the reuse, the same bytes to both panes: the saved cursor restored,
+// text printed with the pen and charset in force, a tab, a line feed at the
+// scroll region's foot, the alternate screen entered, written and left.
+fn probe() -> str {
+    esc("8") + "aq" + "\t|" + esc("[4;1H") + "\n\n" + "b" + esc("[?1049h") + "c" + esc("[?1049l") + "d"
+}
+
+// "" when a pane left by `name` and reused at cols x rows reads as a new one.
+fn compare(name: str, cols: int, rows: int) -> str {
+    var used = vt.new(small_cols(), small_rows(), cap())
+    vt.feed(mut used, dirty(name).bytes())
+    let _ae = vt.take_answers(mut used)
+    vt.reuse(mut used, cols, rows)
+    if vt.reported_dir(used).len > 0 { return "{name}: the reported directory survived: {vt.reported_dir(used)}" }
+    if used.history.used != 0 { return "{name}: {used.history.used} history bytes survived" }
+    if vt.take_events(mut used).len != 0 { return "{name}: events survived the reuse" }
+    var fresh = vt.new(cols, rows, cap())
+    vt.feed(mut used, probe().bytes())
+    vt.feed(mut fresh, probe().bytes())
+    let a = vt.dump(used)
+    let b = vt.dump(fresh)
+    if a != b { return "{name}: the dumps differ at {first_line_apart(a, b)}" }
+    if used.history.used != fresh.history.used { return "{name}: history {used.history.used} bytes, a new pane's {fresh.history.used}" }
+    if vt.take_events(mut used).len != vt.take_events(mut fresh).len { return "{name}: the probe's events differ" }
+    if vt.take_answers(mut used).len != vt.take_answers(mut fresh).len { return "{name}: the probe's answers differ" }
+    ""
+}
+
+fn line_at(lines: List[str], i: int) -> str {
+    if i < lines.len { return lines[i] }
+    "(none)"
+}
+
+fn first_line_apart(a: str, b: str) -> str {
+    let x = a.split("\n")
+    let y = b.split("\n")
+    var i = 0
+    while i < x.len || i < y.len {
+        let l = line_at(x, i)
+        let m = line_at(y, i)
+        if l != m { return "line {i + 1}: reused `{l}`, new `{m}`" }
+        i += 1
+    }
+    "(no line)"
+}
+
+// vt-reuse-forgets-title: a title the last program set is gone, and no title
+// event is left for the server to pass on.
+fn test_reuse_forgets_title() {
+    var pane = vt.new(small_cols(), small_rows(), cap())
+    vt.feed(mut pane, dirty("title").bytes())
+    assert(pane.title_length > 0, "the title was set")
+    vt.reuse(mut pane, small_cols(), small_rows())
+    assert(pane.title_length == 0, "vt-reuse-forgets-title: the title survived the reuse")
+    assert(vt.take_events(mut pane).len == 0, "vt-reuse-forgets-title: an event survived the reuse")
+}
+
+// vt-reuse-equals-new: every kind of state at the same size, and all of it
+// at another size (the reuse's resize).
+fn test_reuse_equals_new() {
+    for name in dirty_names() {
+        let same = compare(name, small_cols(), small_rows())
+        assert(same.len == 0, "vt-reuse-equals-new " + same)
+    }
+}
+
+fn test_reuse_equals_new_resized() {
+    let other = compare("everything", 24, 8)
+    assert(other.len == 0, "vt-reuse-equals-new at 24x8 " + other)
+}
+
+fn main() -> int {
+    test_reuse_forgets_title()
+    test_reuse_equals_new()
+    test_reuse_equals_new_resized()
+    io.write_line("PASS vt-reuse rows=2")
+    0
+}
