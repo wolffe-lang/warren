@@ -28,7 +28,7 @@ fn test_history_deque() {
         assert(!history_copy_front(mut canonical, pane.history, pane.history.head), "resize-deque-full-is-inert")
         assert(canonical.used == 111 && canonical.evicted == 0)
         region growth_turn(cap: 65536) { ensure_history_capacity(mut canonical, 512) }
-        assert(canonical.bytes.len >= 512 && canonical.head == 0 && canonical.tail == 111, "resize-deque-capacity")
+        assert(canonical.cap >= 512 && canonical.bytes.len == canonical.cap && canonical.head == 0 && canonical.tail == 111, "resize-deque-capacity")
         assert(history_get_word(canonical, canonical.head, 8, 8) == 1)
         let stable = budget.charged(frame)
         var turn = 0
@@ -50,7 +50,7 @@ fn test_history_deque() {
             history_reader_start(mut reader, canonical, at)
             assert(history_reader_next(mut reader, canonical) && reader.value == 49 + id)
             assert(!history_reader_next(mut reader, canonical))
-            at = (at + history_get_word(canonical, at, 0, 4)) % canonical.bytes.len
+            at = (at + history_get_word(canonical, at, 0, 4)) % canonical.cap
             id += 1
         }
         assert(at == canonical.tail)
