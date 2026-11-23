@@ -50,7 +50,7 @@ fn main() -> int {
     for verb in cmd.verb_names() {
         if args[0] == verb { return client.command(args) }
     }
-    for later in "split close tab rename source".split(" ") {
+    for later in "split close tab rename".split(" ") {
         if args[0] == later {
             io.write_err_line("warren: {later} is not implemented in this version")
             return 2
