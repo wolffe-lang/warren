@@ -1,0 +1,79 @@
+# What a reuse of a pane slot does to every field of `Pane` and `Vt` (tests/vt/reuse_fields.py holds it).
+# A slot is never dropped: the next pane takes the first free slot (acquire_pane, which calls fresh_screen, which
+# calls vt.reuse), and spawn_pane_in and start_pane give it its new identity and program.
+#   STRUCT FIELD reset CHAIN      reset at the end of CHAIN (f1>f2>...: f1 calls f2 ..., the last names .FIELD)
+#   STRUCT FIELD kept -- WHY      keeps its value, rightly
+#   STRUCT FIELD counter -- WHY   only grows, and nothing reads it as the last program's
+# A full reset (RIS) is reached from vt.reuse by the bytes it feeds, through the parser to `ESC c`.
+alias ris reuse>feed>feed_byte>dispatch_grid_token>dispatch_escape>full_reset
+
+Pane live reset spawn_pane_in
+Pane id reset spawn_pane_in
+Pane session reset spawn_pane_in
+Pane session_gen reset spawn_pane_in
+Pane gen reset spawn_pane_in
+Pane master reset spawn_pane_in>start_pane
+Pane key reset spawn_pane_in
+Pane child reset spawn_pane_in>start_pane
+Pane pid reset spawn_pane_in>start_pane
+Pane child_live reset spawn_pane_in>start_pane
+Pane status reset spawn_pane_in>start_pane
+Pane ended reset spawn_pane_in>start_pane
+Pane screen reset acquire_pane>fresh_screen
+Pane input kept -- contents only: nothing reads past in_len, which start_pane resets
+Pane in_off reset spawn_pane_in>start_pane
+Pane in_len reset spawn_pane_in>start_pane
+Pane write_on reset spawn_pane_in>start_pane
+Pane last_output reset spawn_pane_in
+Pane sync_since reset acquire_pane>fresh_screen
+Pane read_turn counter -- the turn of the last read: the frame reads it only to count prompt frames, a trace statistic, and the new program's first read sets it
+Pane streaming reset spawn_pane_in>start_pane
+Pane read_peak reset spawn_pane_in>start_pane
+Pane damage reset spawn_pane_in
+Pane shown reset spawn_pane_in
+Pane at_col kept -- set when the pane is laid out shown (sync_sizes), and read only while shown, which spawn_pane_in clears
+Pane at_row kept -- set when the pane is laid out shown (sync_sizes), and read only while shown, which spawn_pane_in clears
+
+Vt cols reset reuse>resize
+Vt rows reset reuse>resize
+Vt primary reset @ris
+Vt alternate reset @ris
+Vt active_alternate reset @ris>alternate_state
+Vt cursor_row reset @ris
+Vt cursor_col reset @ris
+Vt cursor_shape reset @ris
+Vt pending_wrap reset @ris>soft_reset
+Vt region_top reset @ris>soft_reset
+Vt region_bottom reset @ris>soft_reset
+Vt tabs reset @ris
+Vt default_tabs reset @ris
+Vt pen reset @ris>soft_reset>reset_pen
+Vt modes reset @ris
+Vt parser reset @ris
+Vt title_storage kept -- contents only: nothing reads past title_length
+Vt title_length reset reuse>forget_title
+Vt cwd_storage kept -- contents only: nothing reads past cwd_length
+Vt cwd_length reset reuse>forget_reported_dir
+Vt local_host reset spawn_pane_in>set_local_host
+Vt local_host_length reset spawn_pane_in>set_local_host
+Vt mode_values reset @ris>change_mode_value
+Vt events reset reuse>take_events
+Vt scrollback_cap_bytes kept -- the server's one history cap, the same for every pane
+Vt answer_storage kept -- contents only: nothing reads past answer_length
+Vt answer_length reset @ris
+Vt saved_primary reset @ris
+Vt saved_alternate reset @ris
+Vt g0 reset @ris
+Vt g1 reset @ris
+Vt shifted reset @ris
+Vt last_printed reset @ris
+Vt last_mark1 reset @ris
+Vt last_mark2 reset @ris
+Vt combine_row reset @ris>clear_combine_anchor
+Vt combine_col reset @ris>clear_combine_anchor
+Vt wide_run reset reuse>feed>feed_byte
+Vt history reset @ris
+Vt line_coordinate reset @ris
+Vt resize_state reset reuse>feed
+Vt glyph_calls counter -- the scalars the per-glyph path wrote, read only by rows
+Vt tick counter -- damage ticks only grow, so a reused pane's cells are new to every client

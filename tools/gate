@@ -84,6 +84,8 @@ step checked-verdict-rows python3 -I tests/vt/checked_verdict_rows.py
 step observer-deadline-rows python3 -I tests/vt/observer_rows.py
 step display-retry-rows python3 -I tests/vt/display_retry_rows.py
 step display-reset-unit python3 -I tests/vt/display_reset_rows.py --unit
+# Every field of a pane slot (Pane, Vt) named with what a reuse does to it.
+step reuse-fields python3 -I tests/vt/reuse_fields.py
 step print-parse-rows python3 -I tests/vt/print_parse_rows.py
 step wide-pending-trace-rows python3 -I tests/vt/wide_pending_trace_rows.py
 step tier-planner python3 -I ci/tiers-test.py
