@@ -3,13 +3,22 @@
 //! last program left is gone, as in a pane made new, but the storage is kept
 //! (a slot is never dropped).
 
+/// Forget the window title, as for a new program in a reused pane (a reset
+/// keeps it: a reset inside a live pane is not the program's end). No event
+/// is raised: nothing was announced, and a new program starts with no title.
+pub fn forget_title(mut pane: Vt) {
+    pane.title_length = 0
+}
+
 /// Make the pane fresh for a new program at a size: a full reset (RIS, which
-/// also empties its history), the reported directory forgotten (a reset keeps
-/// it: it is the program's report, not screen state), a resize (none when
-/// the size is kept), and the answers and events still pending dropped.
+/// also empties its history), the reported directory and the title
+/// forgotten (a reset keeps both: they are the program's, not screen state),
+/// a resize (none when the size is kept), and the answers and events still
+/// pending dropped.
 pub fn reuse(mut pane: Vt, cols: int, rows: int) {
     feed(mut pane, "\u{1b}c".bytes())
     forget_reported_dir(mut pane)
+    forget_title(mut pane)
     let _r = resize(mut pane, cols, rows)
     let _a = take_answers(mut pane)
     let _e = take_events(mut pane)
