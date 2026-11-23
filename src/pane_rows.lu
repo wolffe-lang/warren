@@ -1996,6 +1996,47 @@ fn row_pane_cost(mut r: Rig) -> str {
     ""
 }
 
+// The server's resident size at 1, 8 and 32 panes, each a tab of its own
+// (80x22, /bin/cat, nothing written; hosts with /proc). A pane's ring costs
+// nothing until history is written, so each pane after the first costs no
+// more than the projection's screens and fixed buffers: `pane_bytes` less
+// its history part.
+fn row_pane_cost_tabs(mut r: Rig) -> str {
+    if !has_proc() { return "no /proc here" }
+    let why = start_server(mut r, "/bin/cat")
+    if why.len > 0 { return why }
+    let pid = server_pid(r)
+    var p = attach(r, 80, 24, "", 1) else |e| { return "dial-{e}" }
+    if !client.until_kind(mut p, 131, 5000) { return "no image" }
+    drain(mut p, 300)
+    time.sleep(time.millis(300))
+    let r1 = status_field(pid, "VmRSS")
+    var r8 = 0 - 1
+    var n = 1
+    while n < 32 {
+        let _c = prefix(p, 99)
+        n += 1
+        if !until_rect(mut p, "{n}", 1, 23, 80, 1, 5000) { return "tab {n} not listed: '" + cells(p.image, 23, 1, 80) + "'" }
+        if n == 8 {
+            drain(mut p, 300)
+            time.sleep(time.millis(300))
+            r8 = status_field(pid, "VmRSS")
+        }
+    }
+    drain(mut p, 300)
+    time.sleep(time.millis(300))
+    let r32 = status_field(pid, "VmRSS")
+    if r1 < 1 || r8 < 1 || r32 < 1 { return "no VmRSS for the server ({r1} {r8} {r32})" }
+    let per8 = (r8 - r1) / 7
+    let per32 = (r32 - r1) / 31
+    let bound = (server.pane_bytes(80, AREA) - 6 * server.HISTORY_BYTES) / 1024
+    print("MEASURE pane-cost-tabs server-rss-kb 1={r1} 8={r8} 32={r32} per-pane-kb 1-8={per8} 1-32={per32} bound-kb={bound} (80x{AREA} tabs, /bin/cat)")
+    let end = finish(mut r, mut p)
+    if end.len > 0 { return end }
+    if per32 > bound { return "{per32} kB a pane from 1 to 32 panes, past {bound} kB (the projection's screens and fixed buffers)" }
+    ""
+}
+
 // Encode independent outer-terminal bytes, parse them, then send mouse events.
 fn outer_mouse(p: client.Peer, legacy: bool, kind: int, col: int, row: int) -> bool {
     var raw = List[byte]()
@@ -3419,6 +3460,7 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "clock" { why = row_clock(mut r) }
     else if name == "clock-tick" { why = row_clock_tick(mut r) }
     else if name == "pane-cost" { why = row_pane_cost(mut r) }
+    else if name == "pane-cost-tabs" { why = row_pane_cost_tabs(mut r) }
     if r.started { let _s = stop_server(mut r) }
     why
 }
