@@ -157,11 +157,6 @@ def row_bound(pairs, stage, cap, granule):
     takes = pairs[key(stage, cap)]
     limit, margin = bound(takes['increments'], takes['peaks'], granule)
     own = limit - margin
-    base = pairs.get(key('resize', 0))
-    if stage == 'resize' and cap > 0 and base:
-        cap0, _ = bound(base['increments'], base['peaks'], granule)
-        if cap0 > limit:
-            return cap0, cap0 - own, cap0
     return limit, margin, None
 
 
