@@ -535,17 +535,21 @@ def osc7_pane(t, out, name, first, second, cwd):
 
 
 def row_osc7(out):
+    """Each case in a tmux server of its own, ended with kill-server: tmux
+    ends a server when its last session ends, so a case that reused the
+    server the case before it emptied could reach it while it was exiting
+    (`server exited unexpectedly` from new-session, seen on a hosted runner)."""
     (out / 'osc7-printer.py').write_text(OSC7_PRINTER)
     host = socket.gethostname().encode()
     base = b'file:///tmp/osc7-base'
-    t = Tmux(out, 'osc7')
     fails, rows = [], 0
-    try:
-        for line in (SESSION / 'osc7.table').read_text(encoding='utf-8').splitlines():
-            if not line or line.startswith('#'):
-                continue
-            case, payload, tmux_column, _warren, _why = line.split('\t')
-            name = 'c%d' % rows
+    for line in (SESSION / 'osc7.table').read_text(encoding='utf-8').splitlines():
+        if not line or line.startswith('#'):
+            continue
+        case, payload, tmux_column, _warren, _why = line.split('\t')
+        name = 'c%d' % rows
+        t = Tmux(out, 'osc7-' + name)
+        try:
             if osc7_pane(t, out, name, osc7(base), osc7_expand(payload, host), '/') is None:
                 fails.append('%s: the pane did not print' % case)
                 break
@@ -553,12 +557,12 @@ def row_osc7(out):
             want = base if tmux_column == 'kept' else (b'' if tmux_column == 'none' else osc7_expand(tmux_column, host))
             if got != want:
                 fails.append('%s: pane_path %r, the table %r' % (case, got[:80], want[:80]))
-            t.run('kill-session', '-t', name, check=False)
-            rows += 1
-    except (RuntimeError, subprocess.TimeoutExpired) as e:
-        fails.append(str(e))
-    finally:
-        t.close()
+        except (RuntimeError, subprocess.TimeoutExpired) as e:
+            fails.append('%s: %s' % (case, e))
+            break
+        finally:
+            t.close()
+        rows += 1
     for f in fails:
         print('FAIL tmux-osc7 ' + f)
     if not fails:
