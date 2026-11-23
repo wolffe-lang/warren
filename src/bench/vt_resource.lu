@@ -69,7 +69,7 @@ pub fn measure(bytes: int, history_cap: int) -> int {
             fed += count
             let ring = if pane.history.records > 0 || pane.history.evicted > 0 then reserved else 0
             assert(budget.charged(measured) == stable + ring, "vt-resource-bounded-feed")
-            assert(pane.history.used <= history_cap && pane.history.bytes.len <= history_cap, "vt-resource-history-cap")
+            assert(pane.history.cap == history_cap && pane.history.used <= history_cap && pane.history.bytes.len <= history_cap, "vt-resource-history-cap")
             if fed / 10000000 > report {
                 report = fed / 10000000
                 region progress { io.write_line("MEASURE vt-resource-progress bytes={fed} history-used={pane.history.used}") }
