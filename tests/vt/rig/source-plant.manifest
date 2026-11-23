@@ -1,0 +1,7 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# gives the server the default settings, not the file's, when `source` has
+# read one, so a program's clipboard write stays kept back and
+# source-applies-live goes red by name.
+floor 15
+rig pane-plant-step.sh sha256=6141f9840a334bf68698535c081073360116f9a86e7b9c77e10a86e4e36a64c0
+step source-applies-live tools=bash,python3 script=pane-plant-step.sh -- plant source-applies-live

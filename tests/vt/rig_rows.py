@@ -48,7 +48,8 @@ def main():
         (RIG, 'reply-plant.manifest', ['list-json-over-queue']),
         (RIG, 'send-keys-plant.manifest', ['send-keys-bytes']),
         (RIG, 'ring-plant.manifest', ['ring-resident-new']),
-        (RIG, 'osc7-plant.manifest', ['pane-cwd-from-osc7'])):
+        (RIG, 'osc7-plant.manifest', ['pane-cwd-from-osc7']),
+        (RIG, 'source-plant.manifest', ['source-applies-live'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
         assert steps == expected
@@ -73,6 +74,12 @@ def main():
     assert 'exec ../native/client-rows ../native/warren "$row"' in inner
     for mode in ('plant', 'client-plant', 'toolchain'):
         assert f'inside bash tests/vt/rig/verbs-inner.sh {mode}' in verbs, ('verbs-plant-toolchain', mode)
+    # The pane rows' plant step builds the pane rows inside the image by its
+    # own `inner` mode, root set before the toolchain is sourced.
+    pane = (RIG / 'pane-plant-step.sh').read_text()
+    assert 'bash tests/vt/rig/pane-plant-step.sh inner "${2:?}"' in pane, 'pane-plant-step: inner'
+    assert pane.index('root=$PWD') < pane.index('. tools/toolchain-env.sh'), 'pane-plant-step: root'
+    assert 'exec ../native/pane-rows ../native/warren "$row"' in pane, 'pane-plant-step: the row'
     # The ring rows' step generates the version member before it builds, as
     # the gate does: a bare build of a fresh clone has no package_version.
     ring = (RIG / 'ring-step.sh').read_text()
