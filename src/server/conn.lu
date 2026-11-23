@@ -26,8 +26,9 @@ use layout
 /// for its pane asks to grow to `view_cols` by `view_rows` between turns and
 /// is filled `view_retry` rows back on the next. A selection (`sel_state` 1
 /// pressed, 2 dragging) runs from window row `sel_row`, column `sel_col` to
-/// `sel_to_row`, `sel_to_col` in pane slot `sel_slot`; `sel_opened` says its
-/// drag opened the window. `search` is the last search's text, run toward
+/// `sel_to_row`, `sel_to_col` in pane slot `sel_slot`, which holds pane
+/// `sel_pane` while the selection lasts (a slot is reused; an id is not);
+/// `sel_opened` says its drag opened the window. `search` is the last search's text, run toward
 /// older rows when `search_older`; its match is the window's.
 pub struct Conn {
     live: bool,
@@ -89,6 +90,7 @@ pub struct Conn {
     view_retry: int,
     sel_state: int,
     sel_slot: int,
+    sel_pane: int,
     sel_row: int,
     sel_col: int,
     sel_to_row: int,
@@ -145,7 +147,7 @@ pub fn new_conn() -> Conn {
         drag: layout.no_border_hit(), drag_layout: 0 - 1,
         view: vt.new_view(), view_slot: 0 - 1, view_pane: 0 - 1, view_back: 0, view_wheel: false, view_id: 0 - 1, view_offset: 0,
         view_cols: 0, view_rows: 0, view_retry: 0 - 1,
-        sel_state: 0, sel_slot: 0 - 1, sel_row: 0, sel_col: 0, sel_to_row: 0, sel_to_col: 0, sel_opened: false,
+        sel_state: 0, sel_slot: 0 - 1, sel_pane: 0 - 1, sel_row: 0, sel_col: 0, sel_to_row: 0, sel_to_col: 0, sel_opened: false,
         search: List[byte](), search_older: false,
         hello: List[byte](), hello_len: 0, hello_ready: false,
         resize_ready: false, resize_cols: 0, resize_rows: 0, command_ready: false, command: List[byte](),
@@ -242,6 +244,7 @@ pub fn reset_conn(mut c: Conn, fd: int, id: int, now: int) {
     c.view_retry = 0 - 1
     c.sel_state = 0
     c.sel_slot = 0 - 1
+    c.sel_pane = 0 - 1
     c.sel_opened = false
     (mut c.search).reset()
     c.search_older = false
