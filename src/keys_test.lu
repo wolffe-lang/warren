@@ -332,6 +332,10 @@ fn test_the_command_line() {
     assert(!config.command("resize up 0").ok, "a count from 1")
     assert(!config.command("rename-tab").ok, "a rename needs a name")
     assert(!config.command("").ok, "empty")
+    let s0 = config.command("source")
+    assert(s0.ok && s0.text == "", "source with no file: warren.toml")
+    let s1 = config.command("source  my settings.toml ")
+    assert(s1.ok && s1.text == "my settings.toml", "source FILE: the rest of the line")
 }
 
 fn main() -> int {

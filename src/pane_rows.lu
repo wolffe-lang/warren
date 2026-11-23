@@ -2883,6 +2883,227 @@ fn row_config_refused(mut r: Rig) -> str {
     finish(mut r, mut a)
 }
 
+// ---------------- source: settings read again ----------------
+
+struct Answer { status: int, out: str, err: str }
+
+// One COMMAND on the row's server, its words given one by one, sent from
+// directory `cwd` and from no pane, as `warren <verb>` sends it.
+fn ask(r: Rig, words: List[str], cwd: str) -> Answer {
+    var p = client.dial(socket(r)) else |e| { return Answer { status: 0 - 1, out: "", err: "dial-{e}" } }
+    var none = List[str]()
+    let _h = client.send(p, 1, client.hello_payload(2, 0, 0, "", 0, "", none, none))
+    if !client.until_kind(mut p, 129, 2000) {
+        client.hang_up(mut p)
+        return Answer { status: 0 - 1, out: "", err: "no WELCOME" }
+    }
+    var b = List[byte]()
+    proto.put(mut b, 9, 4)
+    proto.put(mut b, words.len, 2)
+    for w in words { proto.put_text(mut b, w) }
+    proto.put_text(mut b, cwd)
+    proto.put_text(mut b, "")
+    let _c = client.send(p, 11, b)
+    let m = client.next(mut p, 3000)
+    client.hang_up(mut p)
+    if m.kind != 136 { return Answer { status: 0 - 1, out: "", err: "no REPLY ({m.kind})" } }
+    let out_len = le(m.body, 5, 4)
+    let err_len = le(m.body, 9 + out_len, 4)
+    Answer { status: m.body[4] as int, out: str_from_utf8(m.body[9..9 + out_len]) else "",
+        err: str_from_utf8(m.body[13 + out_len..13 + out_len + err_len]) else "" }
+}
+
+// `warren ARGS` run from the row's directory, as a shell runs it: its exit
+// status and what it wrote.
+fn run_warren(r: Rig, args: List[str]) -> Answer {
+    let out_path = out_file(r, "verb-out")
+    let err_path = out_file(r, "verb-err")
+    var c = process.command(r.warren)
+    for a in args { process.push_arg(mut c, a) }
+    let fo = fs.create(out_path) else |e| { return Answer { status: 0 - 1, out: "", err: "out-{e}" } }
+    let fe = fs.create(err_path) else |e| { return Answer { status: 0 - 1, out: "", err: "err-{e}" } }
+    process.set_stdout(mut c, fo)
+    process.set_stderr(mut c, fe)
+    let ch = process.start(c) else |e| { return Answer { status: 0 - 1, out: "", err: "start-{e}" } }
+    let st = process.wait_status(take ch) else 0 - 1
+    Answer { status: st, out: fs.read_text(out_path) else "", err: fs.read_text(err_path) else "" }
+}
+
+fn config_file(r: Rig) -> str {
+    out_file(r, "config") + "/warren/warren.toml"
+}
+
+// warren.toml rewritten in the row's configuration directory.
+fn write_config(r: Rig, text: str) -> bool {
+    fs.create_dir_all(out_file(r, "config") + "/warren") else |_| {}
+    fs.write_text(config_file(r), text) else { return false }
+    true
+}
+
+// The pane's program writes the clipboard, then prints `mark-N`; the
+// client's clipboard writes after it must come to `want`.
+fn clips_after_write(mut p: client.Peer, n: int, want: int) -> str {
+    let _o = client.input(p, "printf '\\033]52;c;aGVsbG8=\\007'; echo mark-$(({n}+0))\r")
+    if !until_rect(mut p, "mark-{n}", 1, 1, 80, AREA, 3000) { return "the program did not run ({n})" }
+    let until = now_ms() + 2000
+    while p.clips < want && now_ms() < until { let _k = client.step(mut p, 50) }
+    drain(mut p, 200)
+    if p.clips != want { return "after write {n}: {p.clips} clipboard writes, not {want}" }
+    if want > 0 && bytes_text(p.clipboard) != "hello" { return "the write: '" + bytes_text(p.clipboard) + "'" }
+    ""
+}
+
+fn answered(a: Answer, status: int, err: str) -> bool {
+    a.status == status && a.out == "" && a.err == err
+}
+
+// `source` reads warren.toml again and its settings apply at once: a
+// program's clipboard write that was kept from the client passes after it.
+fn row_source_applies_live(mut r: Rig) -> str {
+    let _c = config_dir(r, "")
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach_features(r, 8, 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let off = clips_after_write(mut a, 1, 0)
+    if off.len > 0 { return off }
+    if !write_config(r, "[clipboard]\nprograms = true\n") { return "write warren.toml" }
+    let s = ask(r, ["source"], here())
+    if !answered(s, 0, "") { return "source: {s.status} '{s.out}' '{s.err}'" }
+    let on = clips_after_write(mut a, 2, 1)
+    if on.len > 0 { return on }
+    finish(mut r, mut a)
+}
+
+// A warren.toml that does not parse is refused by `source`, by line and
+// reason, and every setting stays as it was.
+fn row_source_refused_keeps(mut r: Rig) -> str {
+    let _c = config_dir(r, "[clipboard]\nprograms = true\n")
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach_features(r, 8, 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let on = clips_after_write(mut a, 1, 1)
+    if on.len > 0 { return on }
+    if !write_config(r, "[clipboard]\nprograms = maybe\n") { return "write warren.toml" }
+    let s = ask(r, ["source"], here())
+    if !answered(s, 1, "warren: source: warren.toml line 2: programs takes true or false\n") {
+        return "source: {s.status} '{s.out}' '{s.err}'"
+    }
+    let kept = clips_after_write(mut a, 2, 2)
+    if kept.len > 0 { return kept }
+    finish(mut r, mut a)
+}
+
+// `warren source FILE` from a shell reads FILE, a relative name from the
+// directory it runs in, and its settings apply.
+fn row_source_named_file(mut r: Rig) -> str {
+    let _c = config_dir(r, "")
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach_features(r, 8, 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let off = clips_after_write(mut a, 1, 0)
+    if off.len > 0 { return off }
+    let name = r.dir + "-other.toml"
+    fs.write_text(name, "[clipboard]\nprograms = true\n") else { return "write {name}" }
+    let s = run_warren(r, ["source", name])
+    if !answered(s, 0, "") { return "warren source {name}: {s.status} '{s.out}' '{s.err}'" }
+    let on = clips_after_write(mut a, 2, 1)
+    if on.len > 0 { return on }
+    finish(mut r, mut a)
+}
+
+// A FILE that cannot be read is refused by name, and the settings stay.
+fn row_source_missing_file(mut r: Rig) -> str {
+    let _c = config_dir(r, "[clipboard]\nprograms = true\n")
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach_features(r, 8, 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let s = ask(r, ["source", "nowhere.toml"], here())
+    if s.status != 1 || s.out != "" || !s.err.starts_with("warren: source: nowhere.toml: cannot be read: ") {
+        return "source nowhere.toml: {s.status} '{s.out}' '{s.err}'"
+    }
+    let kept = clips_after_write(mut a, 1, 1)
+    if kept.len > 0 { return kept }
+    finish(mut r, mut a)
+}
+
+// With no warren.toml, `source` gives every setting its default, as a
+// server's start does.
+fn row_source_no_file_defaults(mut r: Rig) -> str {
+    let _c = config_dir(r, "[clipboard]\nprograms = true\n")
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach_features(r, 8, 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let on = clips_after_write(mut a, 1, 1)
+    if on.len > 0 { return on }
+    fs.remove(config_file(r)) else { return "remove warren.toml" }
+    let s = ask(r, ["source"], here())
+    if !answered(s, 0, "") { return "source: {s.status} '{s.out}' '{s.err}'" }
+    let off = clips_after_write(mut a, 2, 1)
+    if off.len > 0 { return off }
+    finish(mut r, mut a)
+}
+
+// A warren.toml refused when the server started is named to each client
+// that attaches; once `source` has read a good one, a client that attaches
+// is told nothing.
+fn row_source_clears_start_refusal(mut r: Rig) -> str {
+    let _c = config_dir(r, "[clipboard]\nprograms = true\n[keys]\n")
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach_features(r, 8, 1) else |e| { return "dial-{e}" }
+    if !until_hint(mut a, "warren.toml line 3: unknown table [keys]", 3000) {
+        return "no refusal at the first attach: '" + hint_of(a.image) + "'"
+    }
+    if !write_config(r, "[clipboard]\nprograms = true\n") { return "write warren.toml" }
+    let s = ask(r, ["source"], here())
+    if !answered(s, 0, "") { return "source: {s.status} '{s.out}' '{s.err}'" }
+    var b = attach_features(r, 8, 0) else |e| { return "second-{e}" }
+    if !client.until_kind(mut b, 131, 3000) { return "no frame for the second client" }
+    let until = now_ms() + 1000
+    while now_ms() < until {
+        if hint_of(b.image).contains("warren.toml") { return "the second client was told: '" + hint_of(b.image) + "'" }
+        let _k = client.step(mut b, 50)
+    }
+    client.hang_up(mut b)
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let on = clips_after_write(mut a, 1, 1)
+    if on.len > 0 { return on }
+    finish(mut r, mut a)
+}
+
+// `:source` at the command line: a refusal goes to the hint line of the
+// client that typed it, and a relative FILE is read from the focused
+// pane's directory.
+fn row_source_at_command_line(mut r: Rig) -> str {
+    let _c = config_dir(r, "")
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach_features(r, 8, 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    if !write_config(r, "[clipboard]\nprograms = 1\n") { return "write warren.toml" }
+    let _p = prefix(a, 58)
+    if !until_hint(mut a, " :", 3000) { return "no prompt: '" + hint_of(a.image) + "'" }
+    let _t = type_keys(a, "source")
+    let _e = enter(a)
+    if !until_hint(mut a, "warren.toml line 2: programs takes true or false", 3000) {
+        return "the refusal's hint: '" + hint_of(a.image) + "'"
+    }
+    let name = r.dir + "-line.toml"
+    fs.write_text(name, "[clipboard]\nprograms = true\n") else { return "write {name}" }
+    let _q = prefix(a, 58)
+    if !until_hint(mut a, " :", 3000) { return "no second prompt: '" + hint_of(a.image) + "'" }
+    let _u = type_keys(a, "source " + name)
+    let _f = enter(a)
+    let on = clips_after_write(mut a, 1, 1)
+    if on.len > 0 { return on }
+    finish(mut r, mut a)
+}
+
 // ---------------- search in scroll mode ----------------
 
 // Inverse cells in the pane area.
@@ -3090,6 +3311,13 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "clip-program-default" { why = row_clip_program_default(mut r) }
     else if name == "clip-program-config" { why = row_clip_program_config(mut r) }
     else if name == "config-refused" { why = row_config_refused(mut r) }
+    else if name == "source-applies-live" { why = row_source_applies_live(mut r) }
+    else if name == "source-refused-keeps" { why = row_source_refused_keeps(mut r) }
+    else if name == "source-named-file" { why = row_source_named_file(mut r) }
+    else if name == "source-missing-file" { why = row_source_missing_file(mut r) }
+    else if name == "source-no-file-defaults" { why = row_source_no_file_defaults(mut r) }
+    else if name == "source-clears-start-refusal" { why = row_source_clears_start_refusal(mut r) }
+    else if name == "source-at-command-line" { why = row_source_at_command_line(mut r) }
     else if name == "search-older" { why = row_search_older(mut r) }
     else if name == "search-repeat" { why = row_search_repeat(mut r) }
     else if name == "search-newer" { why = row_search_newer(mut r) }
@@ -3149,7 +3377,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-live-edit scroll-reporting-child scroll-two-clients scroll-alternate select-drag-sgr select-drag-legacy select-reporting-child select-origin-clamp select-two-clients select-in-scroll paste-bracketed clip-copy clip-program-default clip-program-config config-refused search-older search-repeat search-newer search-live search-wrapped search-not-found search-cancel mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay help-overlay-minute bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
+    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-live-edit scroll-reporting-child scroll-two-clients scroll-alternate select-drag-sgr select-drag-legacy select-reporting-child select-origin-clamp select-two-clients select-in-scroll paste-bracketed clip-copy clip-program-default clip-program-config config-refused source-applies-live source-refused-keeps source-named-file source-missing-file source-no-file-defaults source-clears-start-refusal source-at-command-line search-older search-repeat search-newer search-live search-wrapped search-not-found search-cancel mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay help-overlay-minute bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
         (mut x).push(n)
     }
     x
