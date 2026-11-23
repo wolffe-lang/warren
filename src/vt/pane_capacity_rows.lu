@@ -1,9 +1,39 @@
 //! member: false
 //! Native-only whole-pane default history witness, separate from screen rows.
+//! A pane's ring charges nothing until history is written: a pane at any cap
+//! charges what the same pane with no history does (measured first, so the
+//! equalities hold whatever its screens and fixed buffers cost), and its
+//! first line into history charges one reservation of the cap (a bare byte
+//! list's reserve).
 use std.mem.budget
 use std.io
 
+// What reserving `size` bytes charges an empty byte list, in a region of its own.
+fn reserve_charge(size: int) -> int {
+    var got = 0
+    region bare(cap: 16777216) {
+        var b = List[byte]()
+        let before = budget.charged(bare)
+        (mut b).reserve(size)
+        got = budget.charged(bare) - before
+    }
+    got
+}
+
+// What a pane of this size with no history charges, in a region of its own.
+fn no_history_charge(cols: int, rows: int) -> int {
+    var got = 0
+    region base(cap: 8388608) {
+        let before = budget.charged(base)
+        let _pane = new(cols, rows, 0)
+        got = budget.charged(base) - before
+    }
+    got
+}
+
 fn main() -> int {
+    let none_small = no_history_charge(80, 24)
+    let none_large = no_history_charge(320, 90)
     region frame(cap: 16777216) {
         let before = budget.charged(frame)
         let pane = new(80, 24, 8388608)
@@ -11,7 +41,7 @@ fn main() -> int {
         assert(pane.history.bytes.len == 8388608 && pane.history.used == 0)
         assert(pane.primary.cells.len == 1920 && pane.alternate.cells.len == 1920)
         assert(pane.primary.line_ids[0] == 0 && pane.primary.line_ids[23] == 23)
-        assert(retained == 8659072, "pane-native-default-history-budget")
+        assert(retained == none_small, "pane-native-default-history-budget")
         io.write_line("MEASURE pane-default cols=80 rows=24 history-cap=8388608 retained={retained}")
     }
     region small(cap: 1048576) {
@@ -25,7 +55,7 @@ fn main() -> int {
         let before = budget.charged(small_history)
         let pane = new(80, 24, 4096)
         let retained = budget.charged(small_history) - before
-        assert(pane.history.bytes.len == 4096 && retained == 274560, "pane-native-small-history-budget")
+        assert(retained == none_small, "pane-native-small-history-budget")
         io.write_line("MEASURE pane-default cols=80 rows=24 history-cap=4096 retained={retained}")
     }
     region large(cap: 8388608) {
@@ -39,8 +69,23 @@ fn main() -> int {
         let before = budget.charged(large_history)
         let pane = new(320, 90, 8388608)
         let retained = budget.charged(large_history) - before
-        assert(pane.history.bytes.len == 8388608 && retained == 12108528, "pane-native-large-default-history-budget")
+        assert(retained == none_large, "pane-native-large-default-history-budget")
         io.write_line("MEASURE pane-default cols=320 rows=90 history-cap=8388608 retained={retained}")
+    }
+    // The first line into history reserves the whole cap once, in the ring's
+    // own region, even when the feed runs in a turn's region of its own.
+    let reserved = reserve_charge(8388608)
+    region first_record(cap: 16777216) {
+        var pane = new(80, 24, 8388608)
+        let before = budget.charged(first_record)
+        var n = 0
+        while n < 25 {
+            region turn { feed(mut pane, "a\r\n".bytes()) }
+            n += 1
+        }
+        let grown = budget.charged(first_record) - before
+        io.write_line("MEASURE pane-first-record cols=80 rows=24 history-cap=8388608 history-records={pane.history.records} grown={grown} reserve={reserved}")
+        assert(pane.history.records == 2 && grown == reserved, "pane-native-first-record-reserves-the-cap")
     }
     // A first resize sizes its canonical window from the history the ring
     // holds, not from the ring's length: an 8 MiB ring that holds nothing yet

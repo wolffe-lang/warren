@@ -1,19 +1,40 @@
 //! member: false
 //! Native-only default-ring allocation witness; the interpreter uses the
 //! smaller history_ledger_rows entry rather than raising this cap.
+//! A ring charges nothing until its first record, then one reservation of
+//! its cap, measured here as a bare byte list's reserve, and nothing after.
 use std.mem.budget
 use std.io
 
+// What reserving `size` bytes charges an empty byte list, in a region of its own.
+fn reserve_charge(size: int) -> int {
+    var got = 0
+    region bare(cap: 16777216) {
+        var b = List[byte]()
+        let before = budget.charged(bare)
+        (mut b).reserve(size)
+        got = budget.charged(bare) - before
+    }
+    got
+}
+
 fn main() -> int {
+    let reserved = reserve_charge(8388608)
     region frame(cap: 33554432) {
-        let before = budget.charged(frame)
+        let first = budget.charged(frame)
+        let _none = new_history(0)
+        let empty = budget.charged(frame) - first
+        let second = budget.charged(frame)
         var history = new_history(8388608)
-        let retained = budget.charged(frame) - before
-        assert(history.bytes.len == 8388608)
-        assert(history.bytes[0] == 0 as byte && history.bytes[8388607] == 0 as byte)
-        assert(retained == 8388656, "history-native-default-retained-budget")
+        let made = budget.charged(frame) - second
+        assert(history.used == 0 && history.records == 0)
+        assert(made == empty, "history-native-creation-charges-no-ring")
+        let before_record = budget.charged(frame)
+        assert(history_reserve(mut history, 0, 0, 0) >= 0)
+        let record = budget.charged(frame) - before_record
+        assert(record == reserved, "history-native-first-record-reserves-the-cap")
         let stable = budget.charged(frame)
-        var id = 0
+        var id = 1
         while id < 1024 {
             let at = history_reserve(mut history, id, 0, 0)
             assert(at >= 0)
@@ -21,7 +42,7 @@ fn main() -> int {
         }
         assert(history.used == 24576 && history.records == 1024)
         assert(budget.charged(frame) == stable, "history-default-append-allocation")
-        io.write_line("MEASURE history-default capacity=8388608 retained={retained} append-turns=1024 feed-charge=0")
+        io.write_line("MEASURE history-default capacity=8388608 created={made} empty-ring={empty} first-record={record} reserve={reserved} append-turns=1024 feed-charge=0")
     }
     0
 }
