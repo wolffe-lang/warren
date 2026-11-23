@@ -57,7 +57,7 @@ width/resource/platform evidence remain separate pending measurements.
 | `src/server` | no | W2, W3 | server: runtime directory, start lock, one wait a turn, admission limits; panes and tabs, the compositor, which reads only the rows and columns each pane's emulator changed, frame pacing (`session_rows`, `pane_rows`, `compose_rows`, `compose_damage_test`, `compose_corpus_rows`, `pacing_test` native, checked and lupin; docs/SERVER.md) |
 | `src/client` | no | W2 | input parser, renderer, terminal handling, attach loop, `new` (`client_input_test`, `client_render_test`, `client_rows`; docs/CLIENT.md) |
 | `src/cmd` | no | W1/W5 | bounded raw/file/stdin and recording-replay `vt-dump`; ids and their one spelling, targets resolved over a snapshot, the verb table read by the command line's parser, `list --json` schema 1, all pure (`cmd_rows_test` native and lupin; [CLI](CLI.md)); layouts, `source` and persistence planned |
-| `src/config` | no | W3 | the key table: modes, the default bindings, each key's step, the hint line, the key list and the command line's verbs, all pure (`keys_test` native, checked and lupin); warren.toml's settings (`config_test`), read again by `source`; layout files planned |
+| `src/config` | no | W3 | the key table: modes, the default bindings, each key's step, the hint line, the key list and the command line's verbs, all pure (`keys_test` native, checked and lupin); warren.toml's settings (`config_test`), read again by `source`; a strict TOML subset (`toml.lu`) held case by case to Python's tomllib (`tests/config/toml.table`; `config_toml_test` native, checked and lupin); layout files planned |
 
 ## Three kinds of row
 
