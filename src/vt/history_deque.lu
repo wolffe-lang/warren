@@ -10,6 +10,9 @@ fn history_copy_front(mut destination: History, source: History, at: int) -> boo
     let length = history_get_word(source, at, 0, 4)
     assert(length >= 24 && length <= source.used)
     if length > destination.cap - destination.used { return false }
+    // A ring written from its front needs its whole storage: the canonical
+    // window's always is (ensure_history_capacity); any other is grown to it.
+    history_extend(mut destination, destination.cap)
     let was_empty = destination.records == 0
     let old_head = destination.head
     let head = (old_head - length + destination.cap) % destination.cap

@@ -13,14 +13,24 @@ pub struct History {
 
 fn new_history(cap: int) -> History {
     assert(cap >= 0)
-    // Repeat and materialize in a short-lived region, then deep-copy the
-    // byte buffer out. This avoids millions of interpreted push operations;
-    // no child-region allocation is retained or mistaken for the ring itself.
-    let data = copy region {
-        let zeroes = "\u{0}".repeat(cap)
-        zeroes.bytes()
-    }
-    History { bytes: data, cap: cap, head: 0, tail: 0, used: 0, records: 0, newest_length: 0, evicted: 0 }
+    // The ring holds no bytes until its first record (history_extend), so a
+    // pane with no history costs none of its cap.
+    History { bytes: List[byte](), cap: cap, head: 0, tail: 0, used: 0, records: 0, newest_length: 0, evicted: 0 }
+}
+
+/// Grow the bytes the ring holds to cover every position before `end`, at
+/// most its cap. The first time, the whole cap is reserved in place: one
+/// allocation in the ring's own region, which nothing touches until a record
+/// is written into it. Then each byte is pushed when a record first reaches
+/// it, so a ring is resident as far as history has ever reached and no
+/// further. A record that wraps needs the whole cap first. Reserving in place
+/// keeps the reservation whatever copied the empty ring before (a pushed
+/// pane is copied, and natively a copy of a list keeps only its length).
+fn history_extend(mut history: History, end: int) {
+    let want = if end < history.cap { end } else { history.cap }
+    if want <= history.bytes.len { return }
+    if history.bytes.len == 0 { (mut history.bytes).reserve(history.cap) }
+    while history.bytes.len < want { (mut history.bytes).push(0 as byte) }
 }
 
 fn history_get_word(history: History, at: int, offset: int, width: int) -> int {
@@ -86,6 +96,7 @@ fn history_reserve(mut history: History, id: int, start_cell: int, body_length: 
     let length = body_length + 24
     while history.used > history.cap - length { history_evict_oldest(mut history) }
     let at = history.tail
+    history_extend(mut history, at + length)
     if history.records == 0 { history.head = at }
     history_put_word(mut history, at, 0, 4, length)
     history_put_word(mut history, at, 4, 4, history.newest_length)
