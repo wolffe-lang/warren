@@ -1629,6 +1629,7 @@ fn leave_view(mut s: Server, index: int) {
     s.conns[index].view_retry = 0 - 1
     s.conns[index].sel_state = 0
     s.conns[index].sel_slot = 0 - 1
+    s.conns[index].sel_pane = 0 - 1
     s.conns[index].sel_opened = false
     vt.unmark_view(mut s.conns[index].view)
     vt.unfind_view(mut s.conns[index].view)
@@ -1761,6 +1762,7 @@ fn select_start(mut s: Server, index: int, hit: int, from: int, mods: int, col: 
     vt.unfind_view(mut s.conns[index].view)
     s.conns[index].sel_state = 1
     s.conns[index].sel_slot = hit
+    s.conns[index].sel_pane = s.panes[hit].id
     s.conns[index].sel_row = row - s.panes[hit].at_row + 1
     s.conns[index].sel_col = col - s.panes[hit].at_col + 1
     s.conns[index].sel_opened = false
@@ -1780,6 +1782,7 @@ fn select_end(mut s: Server, index: int) {
     let was = s.conns[index].sel_state
     s.conns[index].sel_state = 0
     s.conns[index].sel_slot = 0 - 1
+    s.conns[index].sel_pane = 0 - 1
     s.conns[index].sel_opened = false
     vt.unmark_view(mut s.conns[index].view)
     if opened && s.conns[index].mode == config.MODE_SCROLL { set_mode(mut s, index, config.MODE_NORMAL) }
@@ -1795,7 +1798,9 @@ fn select_gesture(mut s: Server, index: int, kind: int, button: int, col: int, r
     let state = s.conns[index].sel_state
     if state == 0 { return false }
     let k = s.conns[index].sel_slot
-    if kind == 0 || k < 0 || k >= s.panes.len || !s.panes[k].live {
+    // The slot must still hold the pane the press was in: a pane made in a
+    // freed slot is another pane, and its text was never selected.
+    if kind == 0 || k < 0 || k >= s.panes.len || !s.panes[k].live || s.panes[k].id != s.conns[index].sel_pane {
         select_end(mut s, index)
         return false
     }
