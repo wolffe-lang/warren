@@ -33,8 +33,9 @@ the same parser, so a verb and its `:` line always mean the same action:
 `split-right`, `split-down`, `focus-next`, `zoom`, `equalize`, `close-pane`,
 `new-tab`, `close-tab`, `next-tab`, `previous-tab`, `focus DIRECTION`,
 `resize DIRECTION [N]`, `select-tab N`, `rename-tab NAME`, `kill-session`,
-`rename-session NAME`, `detach` and `lock`. A command line verb takes
-`-t TARGET` anywhere after the verb, at most once.
+`rename-session NAME`, `detach`, `lock` and `source [FILE]`. A command line
+verb takes `-t TARGET` anywhere after the verb, at most once, except `source`,
+which takes none.
 
 - `kill-session` ends the target's session: every pane's program hangs up and
   every client attached to it is told the session ended. Ending the last
@@ -45,6 +46,9 @@ the same parser, so a verb and its `:` line always mean the same action:
 - `detach` sent from a shell detaches every client attached to the target's
   session; the session lives on. At the `:` line it detaches only the client
   that typed it.
+- `source [FILE]` reads `warren.toml` again, or FILE (relative to the
+  directory `warren` runs in), and applies its settings at once; a refused
+  file changes none and is named by line, status 1 (CONFIG.md).
 - `lock` acts on the client that typed it, so sent from a shell it is refused:
   `warren: lock: acts on an attached client`.
 
