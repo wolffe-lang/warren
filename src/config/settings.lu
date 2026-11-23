@@ -11,6 +11,16 @@ pub fn default_settings() -> Settings {
     Settings { ok: true, why: "", line: 0, clipboard_programs: false }
 }
 
+/// Take an accepted file's settings into `to`, field by field: by scalar
+/// stores alone, so that a server keeps settings read in one turn's scratch
+/// region. Every setting is copied here; `why` is read only while `ok` is
+/// false, so it is left as it was.
+pub fn take_settings(mut to: Settings, from: Settings) {
+    to.ok = true
+    to.line = 0
+    to.clipboard_programs = from.clipboard_programs
+}
+
 fn refuse(line: int, why: str) -> Settings {
     Settings { ok: false, why: why, line: line, clipboard_programs: false }
 }

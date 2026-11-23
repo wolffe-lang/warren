@@ -1466,6 +1466,10 @@ fn run_prompt(mut s: Server, index: int, was: int) {
         rename_session(mut s, index, s.conns[index].session, c.text)
         return
     }
+    if c.action == config.A_SOURCE {
+        source_from_line(mut s, index, c.text)
+        return
+    }
     act(mut s, index, c.action, c.arg, c.count)
 }
 
@@ -2395,6 +2399,18 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
         let a = v.command.action
         if a == config.A_LOCK {
             err = "warren: {verb}: acts on an attached client\n"
+        } else if a == config.A_SOURCE {
+            // A relative FILE is read from the directory the verb came from.
+            let file = v.command.text
+            let path = if file.len > 0 then command_dir(body, file) else ""
+            let label = if file.len > 0 then file else "warren.toml"
+            let refusal = source_settings(mut s, path, label)
+            if refusal.len > 0 {
+                err = "warren: {verb}: {refusal}\n"
+            } else {
+                status = 0
+                err = ""
+            }
         } else {
             let from = cmd.parse_id(pane_field_of(body))
             let caller = if from.kind == cmd.ID_PANE then from.n else 0
@@ -2631,11 +2647,18 @@ fn settings_path() -> str {
     home + "/.config/warren/warren.toml"
 }
 
-/// The settings warren.toml makes, read once when the server starts. No file
-/// is the defaults; a file that cannot be read or parsed is refused whole.
+/// The settings warren.toml makes, read when the server starts and on a
+/// `source` that names no file. No file is the defaults; a file that cannot
+/// be read or parsed is refused whole.
 fn load_settings() -> config.Settings {
     let path = settings_path()
     if path.len == 0 || !fs.exists(path) { return config.default_settings() }
+    read_settings(path)
+}
+
+// The settings the file at `path` makes, or its refusal: by line, or with
+// line 0 when the file cannot be read.
+fn read_settings(path: str) -> config.Settings {
     let text = fs.read_text(path) else |e| {
         var refused = config.default_settings()
         refused.ok = false
@@ -2643,6 +2666,39 @@ fn load_settings() -> config.Settings {
         return refused
     }
     config.parse_settings(text)
+}
+
+/// `source [FILE]`: the settings warren.toml makes, as at the server's start
+/// (`path` empty), or those the file at `path` makes, replace the server's
+/// at once. "" when they apply; else why not, the file named as `label`,
+/// and every setting stays as it was.
+fn source_settings(mut s: Server, path: str, label: str) -> str {
+    let next = if path.len == 0 then load_settings() else read_settings(path)
+    if !next.ok {
+        let at = if next.line > 0 then " line {next.line}" else ""
+        return "{label}{at}: {next.why}"
+    }
+    config.take_settings(mut s.settings, next)
+    ""
+}
+
+// `:source [FILE]` typed by client `index`: a relative FILE is read from the
+// directory of the pane its session has focused, and a refusal is told on
+// its hint line.
+fn source_from_line(mut s: Server, index: int, file: str) {
+    var path = file
+    if file.len > 0 && !file.starts_with("/") {
+        var base = "/"
+        let si = s.conns[index].session
+        if si >= 0 {
+            let k = focused_slot(s, si)
+            if k >= 0 { base = pane_dir(s, k).path }
+        }
+        if base.ends_with("/") { path = base + file } else { path = base + "/" + file }
+    }
+    let label = if file.len > 0 then file else "warren.toml"
+    let refusal = source_settings(mut s, path, label)
+    if refusal.len > 0 { tell(mut s, index, refusal) }
 }
 
 // ---- HELLO, after the frame that carried it ----
