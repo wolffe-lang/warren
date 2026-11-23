@@ -3104,6 +3104,53 @@ fn row_source_at_command_line(mut r: Rig) -> str {
     finish(mut r, mut a)
 }
 
+// ---------------- a selection's pane and its slot ----------------
+
+// Ask for the listing until pane `id` is gone from it, for at most 5 s.
+fn until_unlisted(r: Rig, id: str) -> bool {
+    let until = now_ms() + 5000
+    while now_ms() < until {
+        let l = ask(r, ["list", "--json"], here())
+        if l.status == 0 && !l.out.contains("\"id\":\"{id}\"") { return true }
+        time.sleep(time.millis(50))
+    }
+    false
+}
+
+// A selection names the pane it started in. When that pane ends and a new pane
+// takes its slot before the client's next mouse event, the drag ends there:
+// nothing is copied, for the new pane's text was never selected.
+fn row_select_ends_when_its_pane_goes(mut r: Rig) -> str {
+    let _c = config_dir(r, "")
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach_features(r, 8, 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let b = ask(r, ["split-right", "--", "/bin/sh", "-c", "echo GONE-PANE; read x"], here())
+    if b.status != 0 || b.out != "p2\n" { return "the first split: {b.status} '{b.out}' '{b.err}'" }
+    if !until_rect(mut a, "GONE-PANE", 41, 1, 40, AREA, 5000) { return "no second pane:\n" + client.screen_text(a) }
+    // A click focuses the second pane; a press there begins a selection.
+    let _f = mouse_click(a, false, 60, 10)
+    drain(mut a, 200)
+    let _p = outer_mouse(a, false, 0, 42, 1)
+    drain(mut a, 200)
+    // Its program ends, and a pane made from the shell takes its slot: no
+    // mouse event comes between.
+    let k = ask(r, ["send-keys", "-t", "p2", "Enter"], here())
+    if k.status != 0 { return "send-keys: {k.status} '{k.err}'" }
+    if !until_unlisted(r, "p2") { return "the second pane did not end" }
+    let n = ask(r, ["split-right", "-t", "p1", "--", "/bin/sh", "-c", "echo NEW-PANE-TEXT; read x"], here())
+    if n.status != 0 || n.out != "p3\n" { return "the second split: {n.status} '{n.out}' '{n.err}'" }
+    if !until_rect(mut a, "NEW-PANE-TEXT", 41, 1, 40, AREA, 5000) { return "no third pane:\n" + client.screen_text(a) }
+    // The drag goes on over the new pane, and releases.
+    let _m = outer_mouse(a, false, 2, 50, 1)
+    let _u = outer_mouse(a, false, 1, 52, 1)
+    drain(mut a, 300)
+    if a.clips != 0 { return "the drag copied the new pane's text: '" + bytes_text(a.clipboard) + "'" }
+    if hint_of(a.image).contains("copied") { return "the hint line: '" + hint_of(a.image) + "'" }
+    finish(mut r, mut a)
+}
+
 // ---------------- search in scroll mode ----------------
 
 // Inverse cells in the pane area.
@@ -3318,6 +3365,7 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "source-no-file-defaults" { why = row_source_no_file_defaults(mut r) }
     else if name == "source-clears-start-refusal" { why = row_source_clears_start_refusal(mut r) }
     else if name == "source-at-command-line" { why = row_source_at_command_line(mut r) }
+    else if name == "select-ends-when-its-pane-goes" { why = row_select_ends_when_its_pane_goes(mut r) }
     else if name == "search-older" { why = row_search_older(mut r) }
     else if name == "search-repeat" { why = row_search_repeat(mut r) }
     else if name == "search-newer" { why = row_search_newer(mut r) }
@@ -3377,7 +3425,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-live-edit scroll-reporting-child scroll-two-clients scroll-alternate select-drag-sgr select-drag-legacy select-reporting-child select-origin-clamp select-two-clients select-in-scroll paste-bracketed clip-copy clip-program-default clip-program-config config-refused source-applies-live source-refused-keeps source-named-file source-missing-file source-no-file-defaults source-clears-start-refusal source-at-command-line search-older search-repeat search-newer search-live search-wrapped search-not-found search-cancel mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay help-overlay-minute bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
+    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-live-edit scroll-reporting-child scroll-two-clients scroll-alternate select-drag-sgr select-drag-legacy select-reporting-child select-origin-clamp select-two-clients select-in-scroll paste-bracketed clip-copy clip-program-default clip-program-config config-refused source-applies-live source-refused-keeps source-named-file source-missing-file source-no-file-defaults source-clears-start-refusal source-at-command-line select-ends-when-its-pane-goes search-older search-repeat search-newer search-live search-wrapped search-not-found search-cancel mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay help-overlay-minute bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
         (mut x).push(n)
     }
     x
