@@ -353,14 +353,10 @@ pub fn start_pane(mut pane: Pane, session_name: str, sp: Spawn, argv: List[str],
     ""
 }
 
-/// Reset a reused emulator to a fresh pane of a size: a full reset (which
-/// also empties its history) and a resize (none when the size is kept).
+/// Make a reused slot's emulator a fresh pane of a size (vt.reuse: a full
+/// reset, the program's reports forgotten, a resize, nothing left pending).
 pub fn fresh_screen(mut pane: Pane, cols: int, rows: int) {
-    vt.feed(mut pane.screen, "\u{1b}c".bytes())
-    vt.forget_reported_dir(mut pane.screen)
-    let _r = vt.resize(mut pane.screen, cols, rows)
-    let _a = vt.take_answers(mut pane.screen)
-    let _e = vt.take_events(mut pane.screen)
+    vt.reuse(mut pane.screen, cols, rows)
     pane.sync_since = 0
 }
 
