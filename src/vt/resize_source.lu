@@ -36,7 +36,7 @@ fn run_resize_window(mut pane: Vt, cols: int, first: int, last: int, emit: bool)
     while record < record_count {
         reflow_record(mut pane.resize_state.flow, pane.resize_state.canonical, at,
             mut pane.resize_state.reader, mut pane.resize_state.output, cols, first, last, emit)
-        at = (at + history_get_word(pane.resize_state.canonical, at, 0, 4)) % pane.resize_state.canonical.bytes.len
+        at = (at + history_get_word(pane.resize_state.canonical, at, 0, 4)) % pane.resize_state.canonical.cap
         record += 1
     }
     if preserve_rows {
@@ -105,7 +105,7 @@ fn resize_record_cells(mut reader: HistoryReader, source: History, at: int) -> i
 
 fn append_resize_record(mut pane: Vt, at: int) {
     let length = history_get_word(pane.resize_state.canonical, at, 0, 4)
-    if length > pane.history.bytes.len - pane.history.used { pane.resize_state.lost = true }
+    if length > pane.history.cap - pane.history.used { pane.resize_state.lost = true }
     if !history_copy_back(mut pane.history, pane.resize_state.canonical, at) { pane.resize_state.lost = true }
 }
 
@@ -124,14 +124,14 @@ fn retain_resize_prefix(mut pane: Vt) {
             else {
                 let span = history_prefix_span(mut pane.resize_state.reader, pane.resize_state.canonical, at, offset - source_offset)
                 let body = span / 16777216
-                if body > 0 && body + 24 > pane.history.bytes.len - pane.history.used { pane.resize_state.lost = true }
+                if body > 0 && body + 24 > pane.history.cap - pane.history.used { pane.resize_state.lost = true }
                 let copied = history_copy_prefix(mut pane.history, pane.resize_state.canonical,
                     at, offset - source_offset, mut pane.resize_state.reader)
                 if body > 0 && copied == 0 { pane.resize_state.lost = true }
                 return
             }
         } else { append_resize_record(mut pane, at) }
-        at = (at + history_get_word(pane.resize_state.canonical, at, 0, 4)) % pane.resize_state.canonical.bytes.len
+        at = (at + history_get_word(pane.resize_state.canonical, at, 0, 4)) % pane.resize_state.canonical.cap
         record += 1
     }
     assert(false, "reflow-viewport-prefix")

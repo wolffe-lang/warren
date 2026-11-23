@@ -44,7 +44,7 @@ fn history_copy_prefix(mut destination: History, source: History, at: int,
     if target < 0 { return 0 }
     var i = 24
     while i < body_length + 24 {
-        destination.bytes[(target + i) % destination.bytes.len] = source.bytes[(at + i) % source.bytes.len]
+        destination.bytes[(target + i) % destination.cap] = source.bytes[(at + i) % source.cap]
         i += 1
     }
     history_put_word(mut destination, target, last_run, 4, body_length + 24 - last_run - 12)

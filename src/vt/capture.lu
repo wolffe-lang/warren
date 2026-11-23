@@ -127,11 +127,11 @@ fn capture_row(screen: Screen, cols: int, row: int, escapes: bool, join: bool, j
 fn capture_line_last(history: History, at: int, left: int) -> int {
     let id = history_get_word(history, at, 8, 8)
     var last = at
-    var next = (at + history_get_word(history, at, 0, 4)) % history.bytes.len
+    var next = (at + history_get_word(history, at, 0, 4)) % history.cap
     var k = 1
     while k < left && history_get_word(history, next, 8, 8) == id {
         last = next
-        next = (next + history_get_word(history, next, 0, 4)) % history.bytes.len
+        next = (next + history_get_word(history, next, 0, 4)) % history.cap
         k += 1
     }
     last
@@ -142,7 +142,7 @@ fn capture_line_records(history: History, at: int, last: int) -> int {
     var n = 1
     var r = at
     while r != last {
-        r = (r + history_get_word(history, r, 0, 4)) % history.bytes.len
+        r = (r + history_get_word(history, r, 0, 4)) % history.cap
         n += 1
     }
     n
@@ -162,7 +162,7 @@ pub fn capture_text(pane: Vt, first: int, last: int, escapes: bool, join: bool, 
     let rows = pane.rows
     var view = new_view()
     reserve_view(mut view, cols, rows)
-    let with_history = !pane.active_alternate && pane.history.records > 0 && pane.history.bytes.len > 0
+    let with_history = !pane.active_alternate && pane.history.records > 0 && pane.history.cap > 0
     // How many rows history holds at this width.
     var held = 0
     if with_history {
@@ -172,7 +172,7 @@ pub fn capture_text(pane: Vt, first: int, last: int, escapes: bool, join: bool, 
             let line_last = capture_line_last(pane.history, at, pane.history.records - k)
             held += view_lay_line(mut view, pane.history, at, line_last, cols, 1, 1, false)
             k += capture_line_records(pane.history, at, line_last)
-            at = (line_last + history_get_word(pane.history, line_last, 0, 4)) % pane.history.bytes.len
+            at = (line_last + history_get_word(pane.history, line_last, 0, 4)) % pane.history.cap
         }
     }
     let total = held + rows
@@ -230,7 +230,7 @@ pub fn capture_text(pane: Vt, first: int, last: int, escapes: bool, join: bool, 
                 }
             }
             index += n
-            at = (line_last + history_get_word(pane.history, line_last, 0, 4)) % pane.history.bytes.len
+            at = (line_last + history_get_word(pane.history, line_last, 0, 4)) % pane.history.cap
         }
     }
     // The live rows among a..b.
