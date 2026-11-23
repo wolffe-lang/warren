@@ -262,18 +262,25 @@ def main():
             continue
         limit, margin = bound(takes['increments'], takes['peaks'], granule)
         loose = too_loose(stage, cap, margin)
-        worst = held_increment(held[name]['peaks'], bases_of(held[name]['increments'], held[name]['peaks']))
+        peaks = held[name]['peaks']
+        bases = bases_of(held[name]['increments'], peaks)
+        worst = held_increment(peaks, bases)
         ratio = ' (ratio %.2fx, bound %.2fx)' % (worst / cap, limit / cap) if cap else ''
+        # The increment held is the least peak less the least base, which
+        # may come from different takes, so it need not be any one take's
+        # increment: the line prints both leasts and each take's increment.
+        held_from = 'least peak %d less least base %d; takes\' increments %s' % (min(peaks), min(bases),
+                                                                               held[name]['increments'])
         if loose:
             print('FAIL ring-resident-%s cap=%d: bound too loose: %s' % (stage, cap, loose))
             failed += 1
         elif worst > limit:
-            print('FAIL ring-resident-%s cap=%d increment=%d past bound=%d%s (least of takes %s); recorded %s, margin %d'
-                  % (stage, cap, worst, limit, ratio, held[name]['increments'], takes['increments'], margin))
+            print('FAIL ring-resident-%s cap=%d increment=%d past bound=%d%s (%s); recorded %s, margin %d'
+                  % (stage, cap, worst, limit, ratio, held_from, takes['increments'], margin))
             failed += 1
         else:
-            print('PASS ring-resident-%s cap=%d increment=%d bound=%d%s (least of takes %s); margin %d'
-                  % (stage, cap, worst, limit, ratio, held[name]['increments'], margin))
+            print('PASS ring-resident-%s cap=%d increment=%d bound=%d%s (%s); margin %d'
+                  % (stage, cap, worst, limit, ratio, held_from, margin))
     rows += 1
     if projection is None:
         print('FAIL ring-resident-projection: the probe printed none')
