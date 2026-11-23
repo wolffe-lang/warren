@@ -145,6 +145,8 @@ pub fn parse_verb(argv: List[str]) -> Verb {
         if rest.len != 1 || rest[0] != "--json" { return usage_error("usage: list --json") }
         return verb_of(VERB_LIST_JSON, "", "")
     }
+    // `source` reads settings for the whole server: no pane is its target.
+    if v == "source" && targeted { return usage_error("usage: source takes no target") }
     var line = v
     for a in rest { line = line + " " + a }
     let c = config.command(line)
