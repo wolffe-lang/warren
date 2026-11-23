@@ -269,6 +269,21 @@ fn verbs(mut t: Tally) {
         if !found { why = "{want} is not in the table" }
     }
     row(mut t, "verbs-table-names", why)
+    // `source [FILE]` is a command line verb that acts on no pane: it takes
+    // no target, and its FILE is the rest of the line.
+    why = ""
+    let s0 = verb("source")
+    if !s0.ok || s0.kind != cmd.VERB_ACTION || s0.command.text != "" { why = "source: {s0.ok} {s0.kind} '{s0.command.text}' {s0.why}" }
+    let s1 = verb("source my settings.toml")
+    if !s1.ok || s1.command.text != "my settings.toml" { why = "source my settings.toml: {s1.ok} '{s1.command.text}' {s1.why}" }
+    why = either(why, either(same("source"), same("source other.toml")))
+    why = either(why, usage("source -t work", "usage: source takes no target"))
+    var listed = false
+    for n in cmd.verb_names() {
+        if n == "source" { listed = true }
+    }
+    if !listed { why = either(why, "source is not in the table") }
+    row(mut t, "verbs-source", why)
 }
 
 // ---- the creating verbs and the session verbs ----
