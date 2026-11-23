@@ -36,6 +36,7 @@ def main():
         (RIG, 'paint-properties-plant.manifest', ['paint-properties-plant-build', 'painted-row-below-cursor-4397']),
         (RIG, 'history-ring.manifest', ['gate-linux']),
         (RIG, 'history-ring-plant.manifest', ['history-ring-plant-build', 'pane-first-resize-keeps-the-ring']),
+        (RIG, 'ring-cap0-plant.manifest', ['ring-resident-self-test']),
         (RIG, 'dch-tail.manifest', ['gate-linux', 'dch-tail-seeds']),
         (RIG, 'dch-tail-plant.manifest', ['dch-tail-plant-build', 'dch-tail-seeds-pass']),
         (RIG, 'container-limits.manifest', ['gate-linux', 'container-limits']),

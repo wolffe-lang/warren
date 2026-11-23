@@ -1,0 +1,6 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# gives a resize row its own bound again, not resize's cap-0 bound, so the ring
+# rule's self-test goes red by name before anything is measured.
+floor 15
+rig ring-step.sh sha256=7f07e951bf31af9147fd27b6486d0bc71133375011b0bb31dcfa991257df04cd
+step ring-resident-self-test tools=bash,python3 script=ring-step.sh -- plant
