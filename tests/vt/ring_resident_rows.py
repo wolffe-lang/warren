@@ -199,6 +199,25 @@ def self_test():
     limit, _ = bound([6750208, 6750208, 6750208], [8306688, 8306688, 8306688], 16384)
     got = held_increment([8306688 + cap] * 3, [1556480] * 3)
     check('every-take-cost', got > limit, 'held %d within bound %d' % (got, limit))
+    # macOS 26: the creation's freed buffers stay resident, so a first resize
+    # pays its whole cost at the 2 MiB cap as at cap 0 (warren#88). Against
+    # the macOS 15 takes, which hid most of it, that reading holds: a resize
+    # row is held to at least its cap-0 bound.
+    mac15 = {'resize 0': {'increments': [1966080] * 3, 'peaks': [3964928] * 3},
+             'resize 2097152': {'increments': [344064] * 3, 'peaks': [8650752] * 3}}
+    limit, room = row_bound(mac15, 'resize', cap, 16384)
+    got = held_increment([10551296] * 3, [8601600] * 3)
+    check('resize-held-to-cap0', got <= limit and too_loose('resize', cap, room) is None,
+          'held %d, bound %d, room %d' % (got, limit, room))
+    # The cap-0 bound does not pass a resize that made the ring again: two caps
+    # over the row's own number fails.
+    got = held_increment([8650752 + 2 * cap] * 3, [8306688] * 3)
+    check('resize-cap0-ring-again', got > limit, 'held %d within bound %d' % (got, limit))
+    # A cap-0 bound two caps or more above a row's own number is too loose, by name.
+    wide = {'resize 0': {'increments': [4400000] * 3, 'peaks': [6400000] * 3},
+            'resize 2097152': {'increments': [0] * 3, 'peaks': [8650752] * 3}}
+    _, room = row_bound(wide, 'resize', cap, 16384)
+    check('cap0-too-loose', too_loose('resize', cap, room) is not None, 'room %d passed' % room)
     if not fails:
         print('PASS ring-resident-self-test')
     return not fails
