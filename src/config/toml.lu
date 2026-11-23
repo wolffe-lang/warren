@@ -1,6 +1,22 @@
 //! member: true
 //! A strict subset of TOML 1.0, read by a pure parser into a tree of nodes.
-//! Not read yet: every text is refused.
+//! A line is blank, a comment (`#` to its end), a table header (`[a.b]`, or
+//! `[[a]]` for an element of an array of tables) or `key = value`, and ends
+//! with LF or CRLF. Keys are bare (letters, digits, `_` and `-`), and a
+//! header's may be dotted, with blanks around the dots. Values are basic
+//! strings (escapes `\b \t \n \f \r \" \\ \uXXXX \UXXXXXXXX`, scalar values
+//! only) and literal strings, each on its line; decimal integers of at most
+//! 18 digits, with a sign or not and no leading zero; `true` and `false`;
+//! and arrays of strings on one line, a trailing comma allowed. Tables keep
+//! TOML 1.0's rules: no table defined twice and no key given twice; a
+//! header names the last element of an array of tables it passes through;
+//! a super-table may be defined after its sub-tables.
+//!
+//! Valid TOML outside the subset is refused by line with its form named
+//! ("warren's TOML has no floats"), and so is text that is not TOML. Every
+//! text the subset takes, it reads as TOML 1.0 does: tests/config/toml.table
+//! holds warren to that, case by case, and each case to Python's tomllib.
+use std.sort
 
 /// A node kind: a table.
 pub const TOML_TABLE: int = 0
@@ -14,6 +30,15 @@ pub const TOML_INT: int = 3
 pub const TOML_BOOL: int = 4
 /// A node kind: an array of strings.
 pub const TOML_STRINGS: int = 5
+
+/// The most digits an integer may have: every 18-digit number fits a
+/// 64-bit integer.
+pub const TOML_DIGITS: int = 18
+
+/// The most nodes (tables and values) a text may make: a key is looked up
+/// among its table's others one by one, and a bound keeps the reading of
+/// any text short. A layout file makes a few hundred.
+pub const TOML_NODES: int = 1024
 
 /// One node: its kind, its key in its parent ("" for the root and for an
 /// element of an array of tables), its parent (-1 for the root), its
@@ -36,14 +61,526 @@ pub struct TomlNode {
 /// that refused it and `why`, with no nodes.
 pub struct Toml { ok: bool, line: int, why: str, nodes: List[TomlNode] }
 
-/// Read a text by the subset's rules.
-pub fn parse_toml(text: str) -> Toml {
-    let _unread = text
-    Toml { ok: false, line: 1, why: "not read yet", nodes: List[TomlNode]() }
+// The reader: the text's bytes, the current line's bytes from `pos` to
+// `end` (a CRLF's CR left out), its number, the document so far, the table
+// keys go into, and the value last read.
+struct Reader {
+    src: List[byte],
+    pos: int,
+    end: int,
+    line: int,
+    doc: Toml,
+    table: int,
+    kind: int,
+    text: str,
+    number: int,
+    strings: List[str],
 }
 
-/// The reading tests/config/toml.table writes for a text that was read.
+fn toml_refused(line: int, why: str) -> Toml {
+    Toml { ok: false, line: line, why: why, nodes: List[TomlNode]() }
+}
+
+fn add_node(mut d: Toml, kind: int, key: str, parent: int, line: int) -> int {
+    let n = d.nodes.len
+    (mut d.nodes).push(TomlNode { kind: kind, key: key, parent: parent, children: List[int](), text: "", number: 0,
+        strings: List[str](), line: line, defined: false })
+    if parent >= 0 { (mut d.nodes[parent].children).push(n) }
+    n
+}
+
+/// The child of node `parent` with this key, or -1.
+pub fn toml_child(d: Toml, parent: int, key: str) -> int {
+    for c in d.nodes[parent].children {
+        if d.nodes[c].key == key { return c }
+    }
+    0 - 1
+}
+
+// ---- the current line ----
+
+fn at(r: Reader) -> int {
+    if r.pos >= r.end { return 0 - 1 }
+    r.src[r.pos] as int
+}
+
+fn ahead(r: Reader, n: int) -> int {
+    if r.pos + n >= r.end { return 0 - 1 }
+    r.src[r.pos + n] as int
+}
+
+fn skip_blanks(mut r: Reader) {
+    while r.pos < r.end && (r.src[r.pos] as int == 32 || r.src[r.pos] as int == 9) { r.pos += 1 }
+}
+
+fn bare(c: int) -> bool {
+    (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || (c >= 48 && c <= 57) || c == 95 || c == 45
+}
+
+// A control character TOML refuses in strings and comments: all of C0 but
+// the tab, and DEL.
+fn control(c: int) -> bool {
+    (c >= 0 && c < 32 && c != 9) || c == 127
+}
+
+// The rest of the line after a `#`.
+fn comment(mut r: Reader) -> str {
+    while r.pos < r.end {
+        if control(r.src[r.pos] as int) { return "a control character in a comment" }
+        r.pos += 1
+    }
+    ""
+}
+
+// What may follow a header or a value: blanks, then a comment or nothing.
+fn line_end(mut r: Reader, what: str) -> str {
+    skip_blanks(mut r)
+    let c = at(r)
+    if c < 0 { return "" }
+    if c == 35 {
+        r.pos += 1
+        return comment(mut r)
+    }
+    "expected the end of the line after {what}"
+}
+
+fn bare_key(mut r: Reader) -> str {
+    let from = r.pos
+    while r.pos < r.end && bare(r.src[r.pos] as int) { r.pos += 1 }
+    str_from_utf8(r.src[from..r.pos]) else ""
+}
+
+// ---- headers ----
+
+fn dotted(keys: List[str], count: int) -> str {
+    var out = ""
+    var i = 0
+    while i < count {
+        if i > 0 { out = out + "." }
+        out = out + keys[i]
+        i += 1
+    }
+    out
+}
+
+// A header's keys up to its `]`.
+fn header_keys(mut r: Reader, mut keys: List[str]) -> str {
+    var more = true
+    while more {
+        skip_blanks(mut r)
+        let c = at(r)
+        if c == 34 || c == 39 { return "warren's TOML has no quoted keys" }
+        let k = bare_key(mut r)
+        if k.len == 0 { return "expected a key" }
+        (mut keys).push(k)
+        skip_blanks(mut r)
+        if at(r) == 46 { r.pos += 1 } else { more = false }
+    }
+    ""
+}
+
+struct Place { node: int, why: str }
+
+// From the root along every key but the last: a missing key makes a table
+// that no header has defined yet, an array of tables gives its last
+// element, and a value refuses.
+fn parent_of(mut r: Reader, keys: List[str]) -> Place {
+    var cur = 0
+    var i = 0
+    while i < keys.len - 1 {
+        var c = toml_child(r.doc, cur, keys[i])
+        if c < 0 {
+            c = add_node(mut r.doc, TOML_TABLE, keys[i], cur, r.line)
+        } else if r.doc.nodes[c].kind == TOML_TABLES {
+            c = r.doc.nodes[c].children[r.doc.nodes[c].children.len - 1]
+        } else if r.doc.nodes[c].kind != TOML_TABLE {
+            return Place { node: 0 - 1, why: "{dotted(keys, i + 1)} is a value, not a table" }
+        }
+        cur = c
+        i += 1
+    }
+    Place { node: cur, why: "" }
+}
+
+fn open_table(mut r: Reader, keys: List[str]) -> str {
+    let p = parent_of(mut r, keys)
+    if p.why.len > 0 { return p.why }
+    let name = dotted(keys, keys.len)
+    var c = toml_child(r.doc, p.node, keys[keys.len - 1])
+    if c < 0 {
+        c = add_node(mut r.doc, TOML_TABLE, keys[keys.len - 1], p.node, r.line)
+    } else if r.doc.nodes[c].kind == TOML_TABLES {
+        return "[{name}] names an array of tables"
+    } else if r.doc.nodes[c].kind != TOML_TABLE {
+        return "{name} is a value, not a table"
+    } else if r.doc.nodes[c].defined {
+        return "[{name}] is defined twice"
+    }
+    r.doc.nodes[c].defined = true
+    r.doc.nodes[c].line = r.line
+    r.table = c
+    ""
+}
+
+fn open_element(mut r: Reader, keys: List[str]) -> str {
+    let p = parent_of(mut r, keys)
+    if p.why.len > 0 { return p.why }
+    var c = toml_child(r.doc, p.node, keys[keys.len - 1])
+    if c < 0 {
+        c = add_node(mut r.doc, TOML_TABLES, keys[keys.len - 1], p.node, r.line)
+    } else if r.doc.nodes[c].kind != TOML_TABLES {
+        return "[[{dotted(keys, keys.len)}]] names something that is not an array of tables"
+    }
+    let e = add_node(mut r.doc, TOML_TABLE, "", c, r.line)
+    r.doc.nodes[e].defined = true
+    r.table = e
+    ""
+}
+
+fn header(mut r: Reader) -> str {
+    r.pos += 1
+    let element = at(r) == 91
+    if element { r.pos += 1 }
+    let closing = if element then "a header without its ]]" else "a header without its ]"
+    var keys = List[str]()
+    let why = header_keys(mut r, mut keys)
+    if why.len > 0 { return why }
+    if at(r) != 93 { return closing }
+    r.pos += 1
+    if element {
+        if at(r) != 93 { return closing }
+        r.pos += 1
+    }
+    let placed = if element then open_element(mut r, keys) else open_table(mut r, keys)
+    if placed.len > 0 { return placed }
+    line_end(mut r, "a header")
+}
+
+// ---- values ----
+
+fn hex_value(c: int) -> int {
+    if c >= 48 && c <= 57 { return c - 48 }
+    if c >= 65 && c <= 70 { return c - 55 }
+    if c >= 97 && c <= 102 { return c - 87 }
+    0 - 1
+}
+
+fn push_scalar(mut out: List[byte], cp: int) {
+    if cp < 128 {
+        (mut out).push(cp as byte)
+    } else if cp < 2048 {
+        (mut out).push((192 + cp / 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else if cp < 65536 {
+        (mut out).push((224 + cp / 4096) as byte)
+        (mut out).push((128 + (cp / 64) % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else {
+        (mut out).push((240 + cp / 262144) as byte)
+        (mut out).push((128 + (cp / 4096) % 64) as byte)
+        (mut out).push((128 + (cp / 64) % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    }
+}
+
+// A basic string's escape, its backslash at `pos`, appended to `out`.
+fn escape(mut r: Reader, mut out: List[byte]) -> str {
+    r.pos += 1
+    let c = at(r)
+    if c < 0 { return "a string without its closing quote" }
+    r.pos += 1
+    if c == 98 { (mut out).push(8 as byte); return "" }
+    if c == 116 { (mut out).push(9 as byte); return "" }
+    if c == 110 { (mut out).push(10 as byte); return "" }
+    if c == 102 { (mut out).push(12 as byte); return "" }
+    if c == 114 { (mut out).push(13 as byte); return "" }
+    if c == 34 { (mut out).push(34 as byte); return "" }
+    if c == 92 { (mut out).push(92 as byte); return "" }
+    if c != 117 && c != 85 { return "an unknown escape in a string" }
+    let digits = if c == 117 then 4 else 8
+    let short = if c == 117 then "a \\u escape needs 4 hex digits" else "a \\U escape needs 8 hex digits"
+    var v: int = 0
+    var i = 0
+    while i < digits {
+        let h = hex_value(at(r))
+        if h < 0 { return short }
+        v = v * 16 + h
+        r.pos += 1
+        i += 1
+    }
+    if v > 1114111 || (v >= 55296 && v <= 57343) { return "an escape that is not a Unicode scalar value" }
+    push_scalar(mut out, v)
+    ""
+}
+
+// A string on its line, its quote at `pos`: basic (`"`) or literal (`'`).
+fn string(mut r: Reader) -> str {
+    let quote = at(r)
+    if ahead(r, 1) == quote && ahead(r, 2) == quote { return "warren's TOML has no multi-line strings" }
+    r.pos += 1
+    var out = List[byte]()
+    while r.pos < r.end {
+        let c = r.src[r.pos] as int
+        if c == quote {
+            r.pos += 1
+            r.text = str_from_utf8(out) else ""
+            return ""
+        }
+        if control(c) { return "a control character in a string" }
+        if c == 92 && quote == 34 {
+            let why = escape(mut r, mut out)
+            if why.len > 0 { return why }
+        } else {
+            (mut out).push(r.src[r.pos])
+            r.pos += 1
+        }
+    }
+    "a string without its closing quote"
+}
+
+// An array of strings on its line, its `[` at `pos`.
+fn array(mut r: Reader) -> str {
+    r.pos += 1
+    var items = List[str]()
+    var closed = false
+    while !closed {
+        skip_blanks(mut r)
+        let c = at(r)
+        if c < 0 || c == 35 { return "warren's TOML has no arrays across lines" }
+        if c == 93 {
+            r.pos += 1
+            closed = true
+        } else {
+            if c == 44 { return "expected a string in an array" }
+            if c != 34 && c != 39 { return "warren's TOML has no arrays of other than strings" }
+            let why = string(mut r)
+            if why.len > 0 { return why }
+            (mut items).push(r.text)
+            skip_blanks(mut r)
+            let after = at(r)
+            if after == 44 {
+                r.pos += 1
+            } else if after == 93 {
+                r.pos += 1
+                closed = true
+            } else if after < 0 || after == 35 {
+                return "warren's TOML has no arrays across lines"
+            } else {
+                return "expected , or ] in an array"
+            }
+        }
+    }
+    r.strings = items
+    ""
+}
+
+// Whether the line holds `w` at `pos`, then a blank, a comment or its end.
+fn word(r: Reader, w: str) -> bool {
+    var i = 0
+    while i < w.len {
+        if ahead(r, i) != w.bytes()[i] as int { return false }
+        i += 1
+    }
+    let next = ahead(r, w.len)
+    next < 0 || next == 32 || next == 9 || next == 35
+}
+
+fn number_byte(c: int) -> bool {
+    bare(c) || c == 43 || c == 46 || c == 58
+}
+
+fn digits_only(s: str) -> bool {
+    for b in s.bytes() {
+        if (b as int) < 48 || (b as int) > 57 { return false }
+    }
+    s.len > 0
+}
+
+// A number's word: a decimal integer, or the form of TOML number it is.
+fn number(mut r: Reader) -> str {
+    let from = r.pos
+    while r.pos < r.end && number_byte(r.src[r.pos] as int) { r.pos += 1 }
+    let t = str_from_utf8(r.src[from..r.pos]) else ""
+    if t.len == 0 { return "a value warren cannot read" }
+    let first = t.bytes()[0] as int
+    let signed = first == 43 || first == 45
+    let body = if signed then t[1..t.len] else t
+    if body == "inf" || body == "nan" { return "warren's TOML has no floats" }
+    if body.len == 0 { return "a value warren cannot read" }
+    let lead = body.bytes()[0] as int
+    if lead < 48 || lead > 57 { return "a value warren cannot read" }
+    if body.starts_with("0x") || body.starts_with("0o") || body.starts_with("0b") {
+        return "warren's TOML has no hex, octal or binary integers"
+    }
+    if body.contains("e") || body.contains("E") { return "warren's TOML has no floats" }
+    if body.contains(":") || body.contains("-") { return "warren's TOML has no dates or times" }
+    if body.contains(".") { return "warren's TOML has no floats" }
+    if body.contains("_") { return "warren's TOML has no _ in integers" }
+    if !digits_only(body) { return "a value warren cannot read" }
+    if body.len > 1 && lead == 48 { return "an integer with a leading zero" }
+    if body.len > TOML_DIGITS { return "warren's TOML has no integers of more than {TOML_DIGITS} digits" }
+    var v: int = 0
+    for b in body.bytes() { v = v * 10 + ((b as int) - 48) }
+    r.number = if first == 45 then 0 - v else v
+    r.kind = TOML_INT
+    ""
+}
+
+fn value(mut r: Reader) -> str {
+    r.text = ""
+    r.number = 0
+    r.strings = List[str]()
+    let c = at(r)
+    if c < 0 || c == 35 { return "a value is missing" }
+    if c == 34 || c == 39 {
+        r.kind = TOML_STRING
+        return string(mut r)
+    }
+    if c == 91 {
+        r.kind = TOML_STRINGS
+        return array(mut r)
+    }
+    if c == 123 { return "warren's TOML has no inline tables" }
+    if word(r, "true") || word(r, "false") {
+        r.kind = TOML_BOOL
+        if c == 116 {
+            r.number = 1
+            r.pos += 4
+        } else {
+            r.pos += 5
+        }
+        return ""
+    }
+    number(mut r)
+}
+
+fn assignment(mut r: Reader) -> str {
+    let c = at(r)
+    if c == 34 || c == 39 { return "warren's TOML has no quoted keys" }
+    let key = bare_key(mut r)
+    if key.len == 0 { return "expected a key" }
+    skip_blanks(mut r)
+    if at(r) == 46 { return "warren's TOML has no dotted keys" }
+    if at(r) != 61 { return "expected = after the key" }
+    r.pos += 1
+    skip_blanks(mut r)
+    let why = value(mut r)
+    if why.len > 0 { return why }
+    if toml_child(r.doc, r.table, key) >= 0 { return "{key} is given twice" }
+    let n = add_node(mut r.doc, r.kind, key, r.table, r.line)
+    r.doc.nodes[n].text = r.text
+    r.doc.nodes[n].number = r.number
+    r.doc.nodes[n].strings = copy r.strings
+    line_end(mut r, "a value")
+}
+
+fn statement(mut r: Reader) -> str {
+    skip_blanks(mut r)
+    let c = at(r)
+    if c < 0 { return "" }
+    if c == 35 {
+        r.pos += 1
+        return comment(mut r)
+    }
+    if c == 91 { return header(mut r) }
+    assignment(mut r)
+}
+
+/// Read a text by the subset's rules: its tree, or the first line that
+/// refuses it and why.
+pub fn parse_toml(text: str) -> Toml {
+    var r = Reader { src: text.bytes(), pos: 0, end: 0, line: 0,
+        doc: Toml { ok: true, line: 0, why: "", nodes: List[TomlNode]() }, table: 0, kind: 0, text: "", number: 0,
+        strings: List[str]() }
+    let _root = add_node(mut r.doc, TOML_TABLE, "", 0 - 1, 0)
+    r.doc.nodes[0].defined = true
+    var start = 0
+    var more = true
+    while more {
+        r.line += 1
+        var nl = start
+        while nl < r.src.len && r.src[nl] as int != 10 { nl += 1 }
+        var end = nl
+        if nl < r.src.len && end > start && r.src[end - 1] as int == 13 { end -= 1 }
+        r.pos = start
+        r.end = end
+        let why = statement(mut r)
+        if why.len > 0 { return toml_refused(r.line, why) }
+        if r.doc.nodes.len > TOML_NODES { return toml_refused(r.line, "more than {TOML_NODES} tables and values") }
+        if nl >= r.src.len { more = false } else { start = nl + 1 }
+    }
+    r.doc
+}
+
+// ---- the reading ----
+
+fn hex_upper(n: int) -> byte {
+    let digits = "0123456789ABCDEF"
+    digits.bytes()[n]
+}
+
+fn quoted(s: str) -> str {
+    var out = List[byte]()
+    (mut out).push(34 as byte)
+    for b in s.bytes() {
+        let v = b as int
+        if v == 34 || v == 92 {
+            (mut out).push(92 as byte)
+            (mut out).push(b)
+        } else if v < 32 || v == 127 {
+            for x in "\\u00".bytes() { (mut out).push(x) }
+            (mut out).push(hex_upper(v / 16))
+            (mut out).push(hex_upper(v % 16))
+        } else {
+            (mut out).push(b)
+        }
+    }
+    (mut out).push(34 as byte)
+    str_from_utf8(out) else ""
+}
+
+fn read_node(d: Toml, i: int, path: str, mut lines: List[str]) {
+    let kind = d.nodes[i].kind
+    if kind == TOML_TABLE {
+        if d.nodes[i].children.len == 0 && path.len > 0 { (mut lines).push("{path} = {{}}") }
+        for c in d.nodes[i].children {
+            var sub = d.nodes[c].key
+            if path.len > 0 { sub = path + "." + d.nodes[c].key }
+            read_node(d, c, sub, mut lines)
+        }
+    } else if kind == TOML_TABLES {
+        var k = 0
+        for c in d.nodes[i].children {
+            read_node(d, c, "{path}[{k}]", mut lines)
+            k += 1
+        }
+    } else if kind == TOML_STRING {
+        (mut lines).push("{path} = {quoted(d.nodes[i].text)}")
+    } else if kind == TOML_INT {
+        (mut lines).push("{path} = {d.nodes[i].number}")
+    } else if kind == TOML_BOOL {
+        if d.nodes[i].number == 1 { (mut lines).push("{path} = true") } else { (mut lines).push("{path} = false") }
+    } else {
+        var items = ""
+        var k = 0
+        for s in d.nodes[i].strings {
+            if k > 0 { items = items + ", " }
+            items = items + quoted(s)
+            k += 1
+        }
+        (mut lines).push("{path} = [{items}]")
+    }
+}
+
+/// The reading tests/config/toml.table writes for a text that was read:
+/// one line a value, `PATH = VALUE`, sorted by bytes; an element of an
+/// array of tables as `PATH[N]`, an empty table as `PATH = {}`; a string in
+/// double quotes with `"` and `\` escaped and control characters as
+/// `\u00XX`. Empty for a refused text.
 pub fn toml_reading(d: Toml) -> List[str] {
-    let _unread = d
-    List[str]()
+    var lines = List[str]()
+    if !d.ok { return lines }
+    read_node(d, 0, "", mut lines)
+    sort.sort_strs(mut lines)
+    lines
 }
