@@ -2003,13 +2003,14 @@ fn row_pane_cwd_not_inherited(mut r: Rig) -> str {
     w
 }
 
-// Ask `capture-pane -p -t TARGET` until its text holds `text`, for at most
-// 5 s: "" when it did, else the last text captured.
+// Ask `capture-pane -p -J -t TARGET` (rows joined at a soft wrap, so a line
+// a narrow pane wrapped is read whole) until its text holds `text`, for at
+// most 5 s: "" when it did, else the last text captured.
 fn until_captured(r: Rig, target: str, text: str) -> str {
     let until = now_ms() + 5000
     var last = ""
     while now_ms() < until {
-        let a = ask(r, "capture-pane -p -t " + target, "")
+        let a = ask(r, "capture-pane -p -J -t " + target, "")
         if a.status == 0 {
             if a.out.contains(text) { return "" }
             last = a.out
