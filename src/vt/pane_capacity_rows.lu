@@ -38,7 +38,7 @@ fn main() -> int {
         let before = budget.charged(frame)
         let pane = new(80, 24, 8388608)
         let retained = budget.charged(frame) - before
-        assert(pane.history.bytes.len == 8388608 && pane.history.used == 0)
+        assert(pane.history.cap == 8388608 && pane.history.bytes.len == 0 && pane.history.used == 0)
         assert(pane.primary.cells.len == 1920 && pane.alternate.cells.len == 1920)
         assert(pane.primary.line_ids[0] == 0 && pane.primary.line_ids[23] == 23)
         assert(retained == none_small, "pane-native-default-history-budget")
