@@ -101,6 +101,20 @@ session and its client, and 6 MB more for a second (`MEASURE server-rss`); it
 stays flat over 10,000 keystrokes beside a flooding pane and over 200 splits
 and closes (pane slots are reused, never dropped).
 
+A reused slot keeps nothing of the pane before it. The next pane takes the
+first free slot. Its emulator is reset as a new one (`vt.reuse`): a full
+reset, the window title and the reported directory forgotten (a reset inside
+a live pane keeps both, as they are the program's), a resize, and nothing left
+pending. Its identity, program and queue are set anew when it is spawned. A
+drag selection names its pane by id, and ends when its slot holds another
+pane. Only counters carry over: the emulator's damage ticks, the scalars its
+per-glyph path wrote (read by rows), and the turn of the pane's last read
+(`read_turn`, read only to count prompt frames, and set by the new program's
+first read). `tests/vt/reuse-fields.table` names what a reuse does to every
+field of `Pane` and `Vt`, and a field added without a line there fails the
+`reuse-fields` step by name. `vt-reuse-equals-new` holds a reused pane to a new
+one after every kind of stream.
+
 **On PAX**, a server takes three of the machine's 64 thread slots (its main
 thread and two the runtime starts for signals and children; measured under
 QEMU), and every wolf program inside a pane takes two (pax#354 is the

@@ -51,7 +51,7 @@ width/resource/platform evidence remain separate pending measurements.
 
 | Module | Pure | Milestone | Measured today |
 |---|---|---|---|
-| `src/vt` | yes | W1 | pure screen/history/reflow, bounded events/answers, native/lupin operation rows and complete frozen corpus comparisons with named policies; printable ASCII runs written without the per-byte parser, held equal to it over seeded streams in random chunks (`vt_fast_test` native, checked and lupin) |
+| `src/vt` | yes | W1 | pure screen/history/reflow, bounded events/answers, native/lupin operation rows and complete frozen corpus comparisons with named policies; printable ASCII runs written without the per-byte parser, held equal to it over seeded streams in random chunks (`vt_fast_test` native, checked and lupin); a reused slot's emulator held to a new one after every kind of stream (`vt_reuse_test` native, checked and lupin), and every field of `Pane` and `Vt` named with what a reuse does to it (`reuse-fields`) |
 | `src/proto` | yes | W2 | bounded framing, payload validation, encode, assembly and ACK model (`protocol_rows`, `protocol_fuzz`) |
 | `src/layout` | yes | W3 | tabs and split trees, geometry (`rects`, `borders`, `pane_at`), every operation with named refusals, the canonical dump ([LAYOUT](LAYOUT.md)); 59 hand-written goldens and seeded properties at five sizes (`layout_native`, `layout_slice` on the checked machine and lupin, `layout_test`) |
 | `src/server` | no | W2, W3 | server: runtime directory, start lock, one wait a turn, admission limits; panes and tabs, the compositor, which reads only the rows and columns each pane's emulator changed, frame pacing (`session_rows`, `pane_rows`, `compose_rows`, `compose_damage_test`, `compose_corpus_rows`, `pacing_test` native, checked and lupin; docs/SERVER.md) |
@@ -112,7 +112,8 @@ Selection rows (`select-*`, `paste-bracketed` in `pane_rows`) hold a drag's
 snapshot, its inverse highlight and copy on release in both outer encodings, a
 plain click that copies nothing, prefix `]` pasting the register, a program
 that asked for reports (plain drags its own, Shift drags selecting), the far
-end clamped to the origin pane, two clients (the highlight one's own, the
+end clamped to the origin pane, a drag whose pane ends copying nothing from the
+pane that takes its slot, two clients (the highlight one's own, the
 register the session's), selecting history rows while looking back, and one
 bracket pair when the program asked for bracketed paste. `vt_view_test` holds
 the selected text: reading order either way round, soft-wrap joins, trailing

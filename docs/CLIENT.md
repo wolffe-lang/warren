@@ -136,6 +136,8 @@ a pane on its primary screen, it opens this client's scroll mode there
 (SERVER.md §8). On the alternate screen without reports it does nothing. A
 left drag in such a pane (or a Shift drag in one that asked for reports)
 selects text for this client; release copies it into the session's register.
+A drag whose pane ends before its release copies nothing, even when a new pane
+has taken that pane's place.
 
 The client tells the server (HELLO feature bit 3) that its terminal takes OSC
 52 clipboard writes, except under the console policy (below), which never
