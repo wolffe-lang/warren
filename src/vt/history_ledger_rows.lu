@@ -1,27 +1,49 @@
 //! member: false
 //! Interpreter-only ring ledger: configured capacity is smaller, cap unchanged.
+//! A ring charges nothing until its first record, then one reservation of
+//! its cap, measured here as a bare byte list's reserve, and nothing after.
 use std.mem.budget
 use std.io
 
+// What reserving `size` bytes charges an empty byte list, in a region of its own.
+fn reserve_charge(size: int) -> int {
+    var got = 0
+    region bare(cap: 4194304) {
+        var b = List[byte]()
+        let before = budget.charged(bare)
+        (mut b).reserve(size)
+        got = budget.charged(bare) - before
+    }
+    got
+}
+
 fn main() -> int {
+    let reserved_small = reserve_charge(4096)
+    let reserved = reserve_charge(1048576)
     region frame(cap: 33554432) {
         let first = budget.charged(frame)
-        let small = new_history(4096)
-        let small_charge = budget.charged(frame) - first
-        assert(small.bytes.len == 4096)
+        let _none = new_history(0)
+        let empty = budget.charged(frame) - first
         let second = budget.charged(frame)
+        var small = new_history(4096)
+        let small_charge = budget.charged(frame) - second
+        let third = budget.charged(frame)
         var history = new_history(1048576)
-        let large_charge = budget.charged(frame) - second
-        assert(history.bytes.len == 1048576)
-        assert(large_charge - small_charge == 16 * (1048576 - 4096), "history-ledger-byte-formula")
-        let overhead = small_charge - 16 * 4096
-        assert(overhead == 176, "history-ledger-fixed-overhead")
+        let large_charge = budget.charged(frame) - third
+        assert(small_charge == empty && large_charge == empty, "history-ledger-creation-charges-no-ring")
+        let before_small = budget.charged(frame)
+        assert(history_reserve(mut small, 0, 0, 0) >= 0)
+        let small_record = budget.charged(frame) - before_small
+        let before_record = budget.charged(frame)
+        assert(history_reserve(mut history, 0, 0, 0) >= 0)
+        let record = budget.charged(frame) - before_record
+        assert(small_record == reserved_small && record == reserved, "history-ledger-first-record-reserves-the-cap")
         let stable = budget.charged(frame)
-        var id = 0
+        var id = 1
         while id < 1024 { assert(history_reserve(mut history, id, 0, 0) >= 0); id += 1 }
         assert(history.used == 24576 && history.records == 1024)
         assert(budget.charged(frame) == stable, "history-small-interpreter-feed-allocation")
-        io.write_line("MEASURE history-interpreter capacity=1048576 retained={large_charge} bytes-per-slot=16 fixed-overhead={overhead} append-turns=1024 feed-charge=0")
+        io.write_line("MEASURE history-interpreter capacity=1048576 created={large_charge} empty-ring={empty} first-record={record} reserve={reserved} small-first-record={small_record} append-turns=1024 feed-charge=0")
     }
     0
 }
