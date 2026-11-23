@@ -76,7 +76,7 @@ fn repair_primary_lineage(mut pane: Vt) {
 
 fn retain_primary_row(mut pane: Vt, row: int) {
     prime_primary_coordinate(mut pane, row)
-    if pane.history.bytes.len == 0 {
+    if pane.history.cap == 0 {
         history_count_evicted(mut pane.history, 1)
         advance_screen_coordinate(mut pane.line_coordinate, pane.primary, pane.cols, row)
     } else {
