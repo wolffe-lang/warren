@@ -119,6 +119,7 @@ step vt-fast-build "$WOLF" build --deny-warnings src/vt_fast_test.lu -o "$root/t
 step vt-fast-native "$root/target/native/vt-fast" 12
 step checked-vt python3 -I tests/vt/checked_rows.py "$WOLF"
 step checked-keys python3 -I tests/vt/checked_rows.py --out "$root/target/checked-keys" --label checked-keys "$WOLF" keys_test
+step checked-toml python3 -I tests/vt/checked_rows.py --out "$root/target/checked-toml" --label checked-toml "$WOLF" config_toml_test
 step checked-pacing python3 -I tests/vt/checked_rows.py --out "$root/target/checked-pacing" --label checked-pacing "$WOLF" pacing_test
 step build "$WOLF" build --deny-warnings src/warren.lu -o "$root/target/native/warren"
 step version-flag python3 -I tests/vt/version_flag.py "$root/target/native/warren"
@@ -154,6 +155,10 @@ step send-keys-table-native "$root/target/native/send-keys-table"
 step osc7-table python3 -I tests/session/osc7_table.py
 step osc7-table-build "$WOLF" build --deny-warnings src/osc7_table_test.lu -o "$root/target/native/osc7-table"
 step osc7-table-native "$root/target/native/osc7-table"
+step toml-table-build "$WOLF" build --deny-warnings src/toml_table_test.lu -o "$root/target/native/toml-table"
+step toml-table-native "$root/target/native/toml-table"
+step toml-table-lupin "$LUPIN" run src/toml_table_test.lu
+step toml-subset-lupin "$LUPIN" run src/config_toml_test.lu
 step pacing-lupin "$LUPIN" run src/pacing_test.lu
 step client-input-lupin "$LUPIN" run src/client_input_test.lu
 step client-keyboard-lupin "$LUPIN" run src/client_keyboard_test.lu

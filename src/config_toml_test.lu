@@ -1,0 +1,78 @@
+//! member: false
+//! warren's TOML subset by a few cases of each kind, with no file to read:
+//! natively (`wolf test`), under lupin and on the checked machine. The whole
+//! table is tests/config/toml.table (src/toml_table_test.lu).
+use std.io
+use config
+
+fn reads(text: str, want: List[str]) -> bool {
+    let d = config.parse_toml(text)
+    if !d.ok { return false }
+    let got = config.toml_reading(d)
+    if got.len != want.len { return false }
+    var i = 0
+    while i < got.len {
+        if got[i] != want[i] { return false }
+        i += 1
+    }
+    true
+}
+
+fn refuses(text: str, line: int, why: str) -> bool {
+    let d = config.parse_toml(text)
+    !d.ok && d.line == line && d.why == why
+}
+
+fn test_values() {
+    assert(reads("", List[str]()), "an empty text reads as nothing")
+    assert(reads("# a comment\n\n  \n", List[str]()), "comments and blank lines")
+    assert(reads("n = -17\nt = true\n", ["n = -17", "t = true"]), "an integer and a boolean")
+    assert(reads("s = \"a\\tb\\u00e9\\\"\"\n", ["s = \"a\\u0009bé\\\"\""]), "a basic string's escapes")
+    assert(reads("p = 'C:\\x'\n", ["p = \"C:\\\\x\""]), "a literal string keeps its backslash")
+    assert(reads("a = [\"x\", 'y', ]\nb = []\n", ["a = [\"x\", \"y\"]", "b = []"]), "arrays of strings")
+    assert(reads("a = 1\r\nb = 2", ["a = 1", "b = 2"]), "CRLF and no final newline")
+}
+
+fn test_tables() {
+    assert(reads("[a.b]\nx = 1\n[a]\ny = 2\n", ["a.b.x = 1", "a.y = 2"]), "a super-table after its sub-table")
+    assert(reads("[[t]]\nn = 1\n[t.r]\n[[t]]\n", ["t[0].n = 1", "t[0].r = {{}}", "t[1] = {{}}"]), "arrays of tables")
+    assert(reads("[ a . b ]\n", ["a.b = {{}}"]), "blanks around a header's dots")
+}
+
+fn test_refusals() {
+    assert(refuses("a = 1\na = 2\n", 2, "a is given twice"), "a key given twice")
+    assert(refuses("[t]\n[t]\n", 2, "[t] is defined twice"), "a table defined twice")
+    assert(refuses("[[a]]\n[a]\n", 2, "[a] names an array of tables"), "a table over an array of tables")
+    assert(refuses("a = 1\n[a.b]\n", 2, "a is a value, not a table"), "a header through a value")
+    assert(refuses("ok = 1\n\nbad =\n", 3, "a value is missing"), "the line is counted")
+    assert(refuses("a = \"x\u{1}\"\n", 1, "a control character in a string"), "a control byte in a string")
+    assert(refuses("a = \"\\uD800\"\n", 1, "an escape that is not a Unicode scalar value"), "a surrogate")
+    assert(refuses("a = 012\n", 1, "an integer with a leading zero"), "a leading zero")
+    assert(refuses("a = 1.5\n", 1, "warren's TOML has no floats"), "a float")
+    assert(refuses("a = 1979-05-27\n", 1, "warren's TOML has no dates or times"), "a date")
+    assert(refuses("a.b = 1\n", 1, "warren's TOML has no dotted keys"), "a dotted key")
+    assert(refuses("a = [1]\n", 1, "warren's TOML has no arrays of other than strings"), "an array of integers")
+    assert(refuses("a = [\n]\n", 1, "warren's TOML has no arrays across lines"), "an array across lines")
+    assert(refuses("n = 1234567890123456789\n", 1, "warren's TOML has no integers of more than 18 digits"), "19 digits")
+}
+
+fn test_the_node_bound() {
+    var text = ""
+    var i = 1
+    while i < 1024 {
+        text = text + "k{i} = 1\n"
+        i += 1
+    }
+    let d = config.parse_toml(text)
+    assert(d.ok && d.nodes.len == 1024, "1,023 keys and the root are inside the bound")
+    assert(refuses(text + "k1024 = 1\n", 1024, "more than 1024 tables and values"), "one more is refused at its line")
+}
+
+fn main() -> int {
+    test_values()
+    test_tables()
+    test_refusals()
+    test_the_node_bound()
+    io.write_line("PASS toml-subset")
+    0
+}

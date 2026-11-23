@@ -1,0 +1,49 @@
+//! member: true
+//! A strict subset of TOML 1.0, read by a pure parser into a tree of nodes.
+//! Not read yet: every text is refused.
+
+/// A node kind: a table.
+pub const TOML_TABLE: int = 0
+/// A node kind: an array of tables, its children the element tables.
+pub const TOML_TABLES: int = 1
+/// A node kind: a string.
+pub const TOML_STRING: int = 2
+/// A node kind: an integer.
+pub const TOML_INT: int = 3
+/// A node kind: `true` or `false`, held as 1 or 0.
+pub const TOML_BOOL: int = 4
+/// A node kind: an array of strings.
+pub const TOML_STRINGS: int = 5
+
+/// One node: its kind, its key in its parent ("" for the root and for an
+/// element of an array of tables), its parent (-1 for the root), its
+/// children in the order they were made, its value (`text`, `number`,
+/// `strings`), the line that made it, and for a table whether a header of
+/// its own defined it.
+pub struct TomlNode {
+    kind: int,
+    key: str,
+    parent: int,
+    children: List[int],
+    text: str,
+    number: int,
+    strings: List[str],
+    line: int,
+    defined: bool,
+}
+
+/// A text read: `ok` and its nodes, the root table first; or the `line`
+/// that refused it and `why`, with no nodes.
+pub struct Toml { ok: bool, line: int, why: str, nodes: List[TomlNode] }
+
+/// Read a text by the subset's rules.
+pub fn parse_toml(text: str) -> Toml {
+    let _unread = text
+    Toml { ok: false, line: 1, why: "not read yet", nodes: List[TomlNode]() }
+}
+
+/// The reading tests/config/toml.table writes for a text that was read.
+pub fn toml_reading(d: Toml) -> List[str] {
+    let _unread = d
+    List[str]()
+}
