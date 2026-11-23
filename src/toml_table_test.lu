@@ -1,0 +1,187 @@
+//! member: false
+//! Every case of tests/config/toml.table, read by warren's TOML subset,
+//! gives the case's column: its reading (the `=` lines) or its refusal
+//! (`! LINE REASON`). tests/config/toml_table.py holds the same cases to
+//! Python's tomllib. A program, natively and under lupin:
+//! `PASS toml-subset-table cases=N`, or a FAIL line for each case that
+//! differs; exit 1 then.
+use std.fs
+use config
+
+// The cases the table holds, so that one that goes missing is seen.
+fn table_cases() -> int { 125 }
+
+fn hex_value(c: int) -> int {
+    if c >= 48 && c <= 57 { return c - 48 }
+    if c >= 65 && c <= 70 { return c - 55 }
+    if c >= 97 && c <= 102 { return c - 87 }
+    0 - 1
+}
+
+fn push_scalar(mut out: List[byte], cp: int) {
+    if cp < 128 {
+        (mut out).push(cp as byte)
+    } else if cp < 2048 {
+        (mut out).push((192 + cp / 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else if cp < 65536 {
+        (mut out).push((224 + cp / 4096) as byte)
+        (mut out).push((128 + (cp / 64) % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    } else {
+        (mut out).push((240 + cp / 262144) as byte)
+        (mut out).push((128 + (cp / 4096) % 64) as byte)
+        (mut out).push((128 + (cp / 64) % 64) as byte)
+        (mut out).push((128 + cp % 64) as byte)
+    }
+}
+
+// A token's scalar: `tab`, `cr` or `u+HEX` (one to six hex digits); -1 for
+// any other text, which stands as written.
+fn token_scalar(token: str) -> int {
+    if token == "tab" { return 9 }
+    if token == "cr" { return 13 }
+    if !token.starts_with("u+") || token.len < 3 || token.len > 8 { return 0 - 1 }
+    var v: int = 0
+    var i = 2
+    while i < token.len {
+        let h = hex_value(token.bytes()[i] as int)
+        if h < 0 { return 0 - 1 }
+        v = v * 16 + h
+        i += 1
+    }
+    v
+}
+
+// A document line's text, its tokens expanded.
+fn expand(text: str) -> List[byte] {
+    var out = List[byte]()
+    var i = 0
+    while i < text.len {
+        let c = text.bytes()[i] as int
+        var done = false
+        if c == 123 {
+            var j = i + 1
+            while j < text.len && text.bytes()[j] as int != 125 { j += 1 }
+            if j < text.len {
+                let cp = token_scalar(text[i + 1..j])
+                if cp >= 0 {
+                    push_scalar(mut out, cp)
+                    i = j + 1
+                    done = true
+                }
+            }
+        }
+        if !done {
+            (mut out).push(text.bytes()[i])
+            i += 1
+        }
+    }
+    out
+}
+
+struct Case {
+    name: str,
+    noeol: bool,
+    text: List[byte],
+    lines: int,
+    reading: List[str],
+    refusal: str,
+    refused: bool,
+}
+
+fn new_case(name: str, noeol: bool) -> Case {
+    Case { name: name, noeol: noeol, text: List[byte](), lines: 0, reading: List[str](), refusal: "", refused: false }
+}
+
+// What warren makes of the case: "" when it is the case's column, else why not.
+fn judge(c: Case) -> str {
+    var text = copy c.text
+    if c.lines > 0 && !c.noeol { (mut text).push(10 as byte) }
+    let source = str_from_utf8(text) else { return "the case's text is not UTF-8" }
+    let d = config.parse_toml(source)
+    if c.refused {
+        if d.ok { return "warren read it, the table refuses it: {c.refusal}" }
+        let got = "{d.line} {d.why}"
+        if got != c.refusal { return "warren refused it at {got}, the table at {c.refusal}" }
+        return ""
+    }
+    if !d.ok { return "warren refused it at {d.line} {d.why}, the table reads it" }
+    let got = config.toml_reading(d)
+    if got.len != c.reading.len { return "warren reads {got.len} lines, the table {c.reading.len}: {first_difference(got, c.reading)}" }
+    let why = first_difference(got, c.reading)
+    if why.len > 0 { return why }
+    ""
+}
+
+// The list's i'th line, or "(none)" past its end.
+fn line_or_none(xs: List[str], i: int) -> str {
+    if i < xs.len { return xs[i] }
+    "(none)"
+}
+
+// After a line's two-byte marker (`> `, `= `, `! `): the rest, "" for none.
+fn after_marker(line: str) -> str {
+    if line.len > 2 { return line[2..line.len] }
+    ""
+}
+
+fn first_difference(got: List[str], want: List[str]) -> str {
+    var i = 0
+    while i < got.len || i < want.len {
+        let g = line_or_none(got, i)
+        let w = line_or_none(want, i)
+        if g != w { return "line {i + 1}: warren `{g}`, the table `{w}`" }
+        i += 1
+    }
+    ""
+}
+
+fn main() -> int {
+    let table = fs.read_text("tests/config/toml.table") else {
+        print("FAIL toml-subset-table the table did not read")
+        return 1
+    }
+    var cases = 0
+    var failed = 0
+    var open = false
+    var c = new_case("", false)
+    for line in table.split("\n") {
+        if line.starts_with("case ") {
+            if open {
+                let why = judge(c)
+                if why.len > 0 { print("FAIL toml-subset-table {c.name}: {why}"); failed += 1 }
+                cases += 1
+            }
+            let w = line.split(" ")
+            var noeol = false
+            for flag in w { if flag == "noeol" { noeol = true } }
+            c = new_case(line_or_none(w, 1), noeol)
+            open = true
+        } else if line == ">" || line.starts_with("> ") {
+            if c.lines > 0 { (mut c.text).push(10 as byte) }
+            for b in expand(after_marker(line)) { (mut c.text).push(b) }
+            c.lines += 1
+        } else if line.starts_with("= ") {
+            (mut c.reading).push(after_marker(line))
+        } else if line.starts_with("! ") {
+            c.refusal = after_marker(line)
+            c.refused = true
+        }
+    }
+    if open {
+        let why = judge(c)
+        if why.len > 0 { print("FAIL toml-subset-table {c.name}: {why}"); failed += 1 }
+        cases += 1
+    }
+    if cases != table_cases() {
+        print("FAIL toml-subset-table {cases} cases, not {table_cases()}")
+        return 1
+    }
+    if failed > 0 {
+        print("TOML-SUBSET-TABLE cases={cases} failed={failed}")
+        return 1
+    }
+    print("PASS toml-subset-table cases={cases}")
+    0
+}
