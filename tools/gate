@@ -272,6 +272,9 @@ step fuzz-streams python3 -I tools/corpus/fuzz.py --digests 32 2048 --dir "$work
 step oracle-fuzz python3 -I tools/oracle/run.py digests "$work/fuzz" --out "$work/fuzz-out" --manifest tests/corpus/fuzz-screens.sha256
 step oracle-corpus python3 -I tools/oracle/run.py digests tests/corpus --out "$work/corpus-out" --manifest tests/corpus/recording-screens.sha256
 step tmux-rows python3 -I tools/session/tmux_rows.py --cases "$work/cases" --expected tests/vt/expected --out "$root/target/tmux"
+# warren's TOML subset against the image's Python tomllib (TOML 1.0), case by
+# case; warren's side of the same table runs on every host.
+step toml-table-oracle python3 -I tests/config/toml_table.py
 # A wide scalar that cannot fit in the last column with autowrap off, against
 # the reference live (warren#28), natively and under lupin.
 step wide-pending-rows-native python3 -I tests/vt/wide_pending_rows.py "$root/target/native/warren"

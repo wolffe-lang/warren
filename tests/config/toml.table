@@ -1,0 +1,582 @@
+# warren's TOML subset (src/config/toml.lu), case by case. src/toml_table_test.lu holds warren to each case;
+# tests/config/toml_table.py holds each case to Python's tomllib, TOML 1.0 (the pinned image's python3 3.12).
+#
+# `case NAME CATEGORY [FLAG...]` starts a case. CATEGORY is accepted (tomllib and warren read it alike),
+# not-toml (both refuse it) or outside (valid TOML that warren refuses, the form named). FLAGs: noeol (no
+# newline after the last line), tomllib-line=N (tomllib refuses at line N, warren at the refusal's line; tomllib's
+# `at end of document` is the line after the last newline).
+# `> TEXT` is a line of the case's file; in TEXT, {tab} is a tab, {cr} a carriage return and {u+HEX} that
+# scalar, and any other `{` is itself. `= PATH = VALUE` is a line of the reading: one line a value, sorted by
+# bytes, an array of tables' elements as PATH[N], an empty table as {}, strings in double quotes with `"` and
+# `\` escaped and controls as \u00XX. `! LINE REASON` is warren's refusal.
+
+# ---- accepted ----
+case empty accepted
+
+case blanks-and-comments accepted
+> # a comment
+>
+>     # indented
+> {tab}# after a tab
+> {tab}
+>
+
+case comment-tab-and-unicode accepted
+> # a tab{tab}and é and 日本
+
+case root-string accepted
+> name = "main"
+= name = "main"
+
+case root-integer accepted
+> n = 42
+= n = 42
+
+case negative-integer accepted
+> n = -17
+= n = -17
+
+case plus-integer accepted
+> n = +5
+= n = 5
+
+case zeros accepted
+> a = 0
+> b = -0
+> c = +0
+= a = 0
+= b = 0
+= c = 0
+
+case integer-18-digits accepted
+> n = 999999999999999999
+> m = -999999999999999999
+= m = -999999999999999999
+= n = 999999999999999999
+
+case booleans accepted
+> t = true
+> f = false
+= f = false
+= t = true
+
+case basic-escapes accepted
+> s = "a\tb\nc\\d\"e\bf\fg\rh"
+= s = "a\u0009b\u000Ac\\d\"e\u0008f\u000Cg\u000Dh"
+
+case unicode-escapes accepted
+> s = "\u00e9\U0001F600\u4E2D\u00E9"
+= s = "é😀中é"
+
+case nul-and-del-escapes accepted
+> s = "a\u0000b\u007f"
+= s = "a\u0000b\u007F"
+
+case raw-tab-in-strings accepted
+> s = "a{tab}b"
+> t = 'c{tab}d'
+= s = "a\u0009b"
+= t = "c\u0009d"
+
+case raw-utf8 accepted
+> s = "日本 é"
+= s = "日本 é"
+
+case literal-string accepted
+> p = 'C:\temp\new'
+= p = "C:\\temp\\new"
+
+case literal-with-double-quotes accepted
+> p = 'say "hi"'
+= p = "say \"hi\""
+
+case empty-strings accepted
+> a = ""
+> b = ''
+= a = ""
+= b = ""
+
+case hash-in-string accepted
+> s = "a # b" # a comment
+= s = "a # b"
+
+case array accepted
+> a = ["x", 'y', "z\n"]
+= a = ["x", "y", "z\u000A"]
+
+case empty-arrays accepted
+> a = []
+> b = [ ]
+= a = []
+= b = []
+
+case array-trailing-comma accepted
+> a = ["x", ]
+= a = ["x"]
+
+case array-spacing accepted
+> a = [  "x"  ,"y"]
+= a = ["x", "y"]
+
+case table accepted
+> [clipboard]
+> programs = true
+= clipboard.programs = true
+
+case header-spacing accepted
+> [ a . b ]
+> k = 1
+= a.b.k = 1
+
+case empty-tables accepted
+> [a]
+> [b.c]
+= a = {}
+= b.c = {}
+
+case super-table-after-sub-table accepted
+> [a.b]
+> x = 1
+> [a]
+> y = 2
+= a.b.x = 1
+= a.y = 2
+
+case deep-table accepted
+> [w.x.y.z]
+> k = "v"
+= w.x.y.z.k = "v"
+
+case array-of-tables accepted
+> [[tab]]
+> name = "one"
+> [[tab]]
+> name = "two"
+= tab[0].name = "one"
+= tab[1].name = "two"
+
+case table-in-last-element accepted
+> [[tab]]
+> [tab.root]
+> split = "cols"
+> [[tab]]
+> [tab.root]
+> split = "rows"
+= tab[0].root.split = "cols"
+= tab[1].root.split = "rows"
+
+case empty-element accepted
+> [[tab]]
+= tab[0] = {}
+
+case nested-arrays-of-tables accepted
+> [[a]]
+> [[a.b]]
+> x = 1
+> [[a.b]]
+> x = 2
+= a[0].b[0].x = 1
+= a[0].b[1].x = 2
+
+case crlf accepted
+> a = 1{cr}
+> [t]{cr}
+> b = "x" # c{cr}
+= a = 1
+= t.b = "x"
+
+case no-final-newline accepted noeol
+> a = 1
+= a = 1
+
+case comment-after-header accepted
+> [t] # a comment
+> k = 1
+= t.k = 1
+
+case key-characters accepted
+> A-b_9 = 1
+= A-b_9 = 1
+
+case digit-key accepted
+> 1 = "one"
+= 1 = "one"
+
+case blanks-around-equals accepted
+> a{tab}={tab}1{tab}
+> b=2
+= a = 1
+= b = 2
+
+case keys-named-like-values accepted
+> true = "t"
+> inf = 1
+= inf = 1
+= true = "t"
+
+case comment-holding-quotes accepted
+> # "not a string" 'nor this' [nor] = this
+
+# ---- not TOML: both refuse ----
+case no-equals not-toml
+> a 1
+! 1 expected = after the key
+
+case no-value not-toml
+> a =
+! 1 a value is missing
+
+case no-value-before-comment not-toml
+> a = # x
+! 1 a value is missing
+
+case bare-word not-toml
+> a = yes
+! 1 a value warren cannot read
+
+case word-after-true not-toml
+> a = truex
+! 1 a value warren cannot read
+
+case unterminated-basic not-toml
+> a = "x
+! 1 a string without its closing quote
+
+case unterminated-literal not-toml tomllib-line=2
+> a = 'x
+! 1 a string without its closing quote
+
+case backslash-at-line-end not-toml tomllib-line=2
+> a = "x\
+! 1 a string without its closing quote
+
+case control-in-string not-toml
+> a = "x{u+1}y"
+! 1 a control character in a string
+
+case del-in-string not-toml
+> a = "x{u+7F}"
+! 1 a control character in a string
+
+case cr-in-string not-toml
+> a = "x{cr}y"
+! 1 a control character in a string
+
+case escape-byte-in-literal not-toml
+> a = 'x{u+1B}'
+! 1 a control character in a string
+
+case control-in-comment not-toml
+> # x{u+7}
+! 1 a control character in a comment
+
+case lone-cr not-toml
+> a = 1{cr}{cr}
+! 1 expected the end of the line after a value
+
+case unknown-escape not-toml
+> a = "\q"
+! 1 an unknown escape in a string
+
+case escape-e not-toml
+> a = "\e"
+! 1 an unknown escape in a string
+
+case escape-x not-toml
+> a = "\x41"
+! 1 an unknown escape in a string
+
+case short-u not-toml
+> a = "\u12"
+! 1 a \u escape needs 4 hex digits
+
+case short-big-u not-toml
+> a = "\U0001F60"
+! 1 a \U escape needs 8 hex digits
+
+case surrogate not-toml
+> a = "\uD800"
+! 1 an escape that is not a Unicode scalar value
+
+case past-the-last-scalar not-toml
+> a = "\U00110000"
+! 1 an escape that is not a Unicode scalar value
+
+case leading-zero not-toml
+> a = 012
+! 1 an integer with a leading zero
+
+case negative-leading-zero not-toml
+> a = -01
+! 1 an integer with a leading zero
+
+case sign-alone not-toml
+> a = +
+! 1 a value warren cannot read
+
+case two-signs not-toml
+> a = --1
+! 1 a value warren cannot read
+
+case digits-then-letters not-toml
+> a = 12ab
+! 1 a value warren cannot read
+
+case two-values not-toml
+> a = 1 2
+! 1 expected the end of the line after a value
+
+case comma-after-value not-toml
+> a = "x",
+! 1 expected the end of the line after a value
+
+case junk-after-header not-toml
+> [a] b
+! 1 expected the end of the line after a header
+
+case header-without-bracket not-toml
+> [a
+! 1 a header without its ]
+
+case array-header-without-brackets not-toml
+> [[a]
+! 1 a header without its ]]
+
+case empty-header not-toml
+> []
+! 1 expected a key
+
+case header-trailing-dot not-toml
+> [a.]
+! 1 expected a key
+
+case split-double-bracket not-toml
+> [ [a]]
+! 1 expected a key
+
+case no-key not-toml
+> = 1
+! 1 expected a key
+
+case byte-order-mark not-toml
+> {u+FEFF}a = 1
+! 1 expected a key
+
+case key-given-twice not-toml
+> a = 1
+> a = 2
+! 2 a is given twice
+
+case table-defined-twice not-toml
+> [t]
+> [t]
+! 2 [t] is defined twice
+
+case table-again-after-sub-table not-toml
+> [a]
+> [a.b]
+> [a]
+! 3 [a] is defined twice
+
+case table-over-value not-toml
+> a = 1
+> [a]
+! 2 a is a value, not a table
+
+case header-through-value not-toml
+> [t]
+> v = "x"
+> [t.v.w]
+! 3 t.v is a value, not a table
+
+case key-over-table not-toml
+> [a.b]
+> [a]
+> b = 1
+! 3 b is given twice
+
+case table-then-array-of-tables not-toml
+> [a]
+> [[a]]
+! 2 [[a]] names something that is not an array of tables
+
+case implicit-table-then-array not-toml
+> [a.b]
+> [[a]]
+! 2 [[a]] names something that is not an array of tables
+
+case array-of-tables-then-table not-toml
+> [[a]]
+> [a]
+! 2 [a] names an array of tables
+
+case static-array-then-array-of-tables not-toml
+> a = ["x"]
+> [[a]]
+! 2 [[a]] names something that is not an array of tables
+
+case array-without-comma not-toml
+> a = ["x" "y"]
+! 1 expected , or ] in an array
+
+case array-two-commas not-toml
+> a = ["x",,"y"]
+! 1 expected a string in an array
+
+case array-only-comma not-toml
+> a = [,]
+! 1 expected a string in an array
+
+case error-line-counted not-toml
+> ok = 1
+>
+> bad =
+! 3 a value is missing
+
+case crlf-line-counted not-toml
+> a = 1{cr}
+> b ={cr}
+! 2 a value is missing
+
+case invalid-hex not-toml
+> a = 0xG
+! 1 warren's TOML has no hex, octal or binary integers
+
+case invalid-float not-toml
+> a = 1.
+! 1 warren's TOML has no floats
+
+case unterminated-multi-line-string not-toml tomllib-line=2
+> s = """x
+! 1 warren's TOML has no multi-line strings
+
+case unterminated-multi-line-array not-toml tomllib-line=3
+> a = [
+> "x"
+! 1 warren's TOML has no arrays across lines
+
+# ---- outside: valid TOML that warren refuses, the form named ----
+case float outside
+> a = 1.5
+! 1 warren's TOML has no floats
+
+case float-exponent outside
+> a = 1e6
+! 1 warren's TOML has no floats
+
+case float-negative-exponent outside
+> a = -2E-3
+! 1 warren's TOML has no floats
+
+case float-inf outside
+> a = inf
+! 1 warren's TOML has no floats
+
+case float-nan outside
+> a = -nan
+! 1 warren's TOML has no floats
+
+case date outside
+> d = 1979-05-27
+! 1 warren's TOML has no dates or times
+
+case date-time outside
+> d = 1979-05-27T07:32:00Z
+! 1 warren's TOML has no dates or times
+
+case date-time-space outside
+> d = 1979-05-27 07:32:00
+! 1 warren's TOML has no dates or times
+
+case time outside
+> t = 07:32:00
+! 1 warren's TOML has no dates or times
+
+case hex outside
+> h = 0xDEAD
+! 1 warren's TOML has no hex, octal or binary integers
+
+case octal outside
+> o = 0o755
+! 1 warren's TOML has no hex, octal or binary integers
+
+case binary outside
+> b = 0b1010
+! 1 warren's TOML has no hex, octal or binary integers
+
+case underscore outside
+> n = 1_000
+! 1 warren's TOML has no _ in integers
+
+case nineteen-digits outside
+> n = 1234567890123456789
+! 1 warren's TOML has no integers of more than 18 digits
+
+case inline-table outside
+> t = {a = 1}
+! 1 warren's TOML has no inline tables
+
+case empty-inline-table outside
+> t = {}
+! 1 warren's TOML has no inline tables
+
+case multi-line-basic outside
+> s = """x"""
+! 1 warren's TOML has no multi-line strings
+
+case multi-line-literal outside
+> s = '''x'''
+! 1 warren's TOML has no multi-line strings
+
+case multi-line-across-lines outside
+> s = """
+> x
+> """
+! 1 warren's TOML has no multi-line strings
+
+case quoted-key outside
+> "a b" = 1
+! 1 warren's TOML has no quoted keys
+
+case literal-quoted-key outside
+> 'a' = 1
+! 1 warren's TOML has no quoted keys
+
+case quoted-header-key outside
+> ["a b"]
+! 1 warren's TOML has no quoted keys
+
+case dotted-key outside
+> a.b = 1
+! 1 warren's TOML has no dotted keys
+
+case dotted-key-spaced outside
+> a . b = 1
+! 1 warren's TOML has no dotted keys
+
+case array-of-integers outside
+> a = [1, 2]
+! 1 warren's TOML has no arrays of other than strings
+
+case array-mixed outside
+> a = ["x", 1]
+! 1 warren's TOML has no arrays of other than strings
+
+case array-nested outside
+> a = [["x"]]
+! 1 warren's TOML has no arrays of other than strings
+
+case array-of-booleans outside
+> a = [true]
+! 1 warren's TOML has no arrays of other than strings
+
+case array-across-lines outside
+> a = [
+>   "x",
+> ]
+! 1 warren's TOML has no arrays across lines
+
+case array-comment-across-lines outside
+> a = ["x", # a comment
+> ]
+! 1 warren's TOML has no arrays across lines
