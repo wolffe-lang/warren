@@ -217,11 +217,13 @@ order.
 - `cwd` is the pane's working directory, and `cwd_source` where it was learnt.
   `osc7` means the directory the pane's program last reported with OSC 7
   ([TERM](TERM.md)). `proc` means the directory `/proc` names for its program,
-  on Linux, while the program runs. `start` means its session's start
-  directory, used when neither of the others is available. A reported or
-  read path is used only while it names a directory that exists, so a shell
-  whose directory was removed is listed at `start`. On macOS and PAX there is
-  no `proc`.
+  on Linux, while the program runs. `start` means the directory its program
+  started in (`-c DIR`, a layout file leaf's `cwd`, or the directory of the
+  pane it was split from), or its session's start directory once that one is
+  gone, used when neither of the others is available. A reported or read
+  path is used only while it names a directory that exists, so a shell whose
+  directory was removed is listed at `start`. On macOS and PAX there is no
+  `proc`.
 - Strings are written as they are in UTF-8, with a quote and a backslash
   escaped and every byte below 0x20, and 0x7f, as `\u00XX`.
 - A tab's `name` is empty until it is renamed.
