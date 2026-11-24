@@ -54,7 +54,13 @@ between a bound and its takes' number: a `new` row's room must be under one
 cap, so one more cap-sized buffer at the peak fails; a `filled` row's too,
 since a filled ring is one cap and a second copy of it must fail; another
 difference row's room must be under two caps, so a step that made the ring
-again fails. A room past that fails by name as too loose. A host
+again fails. A room past that fails by name as too loose. On Linux the `new`
+row at 2 MiB is the thinnest that passes: its room is 20,480 bytes under one
+cap, from six runs whose held numbers range over 0.69 MB, so a plant that
+makes the ring whole when a pane is made is red there by a little or not at
+all, run by run. That plant's red by name at `ring-resident-new` rests on the
+8 MiB row, where it is red by 7.3 to 7.6 MB; the 2 MiB case is not its
+witness. A host
 with no recorded takes fails by name. A cap a host does not hold (macOS at
 8 MiB, whose allocator's peak there is bimodal) is measured, printed and named
 in a NOTE with its takes, and holds nothing. Each verdict names its row: `ring-resident-STAGE`
