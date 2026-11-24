@@ -59,11 +59,13 @@ fn main() -> int {
     cmd.usage()
 }
 
-// `new [-d] [-s NAME]`, its flags in any order, each at most once.
+// `new [-d] [-s NAME] [-l LAYOUT]`, its flags in any order, each at most once.
 fn new_verb(args: List[str]) -> int {
     var detached = false
     var name = ""
     var named = false
+    var layout_word = ""
+    var laid = false
     var i = 1
     while i < args.len {
         if args[i] == "-d" && !detached {
@@ -71,6 +73,10 @@ fn new_verb(args: List[str]) -> int {
         } else if args[i] == "-s" && !named && i + 1 < args.len {
             name = args[i + 1]
             named = true
+            i += 1
+        } else if args[i] == "-l" && !laid && i + 1 < args.len {
+            layout_word = args[i + 1]
+            laid = true
             i += 1
         } else {
             return cmd.usage()
@@ -81,7 +87,11 @@ fn new_verb(args: List[str]) -> int {
         io.write_err_line("warren: new: a session name may not be empty")
         return 2
     }
-    client.new_session(name, detached)
+    if laid && layout_word.len == 0 {
+        io.write_err_line("warren: new: a layout name may not be empty")
+        return 2
+    }
+    client.new_session(name, detached, layout_word)
 }
 
 // The modules and the milestone each belongs to.
