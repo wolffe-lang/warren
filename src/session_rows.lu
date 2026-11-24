@@ -1922,6 +1922,13 @@ fn moved_listing(moved: str) -> str {
     (env.cwd() else "/") + "|start"
 }
 
+// The directory and source a pane started in `dir` (its program reporting
+// nothing) is listed at: /proc on Linux, else where it started.
+fn started_listing(dir: str) -> str {
+    if os.name() == "linux" { return resolved(dir) + "|proc" }
+    dir + "|start"
+}
+
 // The plant's row: a pane's program reports, by OSC 7, a directory it did
 // not start in, and the listing names that directory, learnt from `osc7`.
 fn row_pane_cwd_from_osc7(mut r: Rig) -> str {
@@ -1978,6 +1985,32 @@ fn row_pane_cwd_start(mut r: Rig) -> str {
     ""
 }
 
+// A pane started in a directory of its own (`split-right -c DIR`, its program
+// the shell, which reports nothing) is listed in DIR: learnt from /proc on
+// Linux, and from where it started (`start`) where the host has no /proc.
+// `layout save` writes DIR as its leaf's `cwd`.
+fn row_pane_start_dir_kept(mut r: Rig) -> str {
+    let dir = layout_home(r)
+    let place = beside(r, "place")
+    fs.create_dir_all(place) else |e| { return "mkdir: {e}" }
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    let s = ask(r, "split-right -t work -c " + place, "")
+    if s.status != 0 || s.out != "p2\n" { return "split-right -c: {s.status} '{s.out.trim()}' '{s.err.trim()}'" }
+    let want = started_listing(place)
+    let w = until_cwd(r, "p2", want)
+    if w.len > 0 { return w }
+    let saved = ask(r, "layout save -t work kept", "")
+    client.hang_up(mut a)
+    if saved.status != 0 { return "layout save: {saved.status} '{saved.err.trim()}'" }
+    let text = fs.read_text(dir + "/kept.toml") else |e| { return "the saved file did not read: {e}" }
+    let leaf = "[tab.root.second]\ncwd = \"" + want.split("|")[0] + "\"\n"
+    if !text.contains(leaf) { return "the save does not give p2's directory: " + text }
+    ""
+}
+
 // A pane made in a slot another pane left does not inherit that pane's
 // report: pane 1 reports, is closed, and pane 3 takes its slot.
 fn row_pane_cwd_not_inherited(mut r: Rig) -> str {
@@ -2000,7 +2033,7 @@ fn row_pane_cwd_not_inherited(mut r: Rig) -> str {
     let t = ask(r, "split-right -t p2 -c " + other, "")
     if t.status != 0 || t.out != "p3\n" { return "split-right made '{t.out.trim()}' ({t.status} '{t.err.trim()}')" }
     if !client.until_text(mut a, "READY-%3", 5000) { return "the third pane printed nothing: " + client.screen_text(a) }
-    let w = until_cwd(r, "p3", moved_listing(other))
+    let w = until_cwd(r, "p3", started_listing(other))
     client.hang_up(mut a)
     w
 }
@@ -2071,7 +2104,8 @@ fn layout_home(r: Rig) -> str {
 fn saved_leaf(json: str, id: str, words: List[str]) -> config.LeafFile {
     let place = listed_cwd(json, id).split("|")
     var cwd = ""
-    if place.len == 2 && place[1] != "start" { cwd = place[0] }
+    let session_dir = env.cwd() else "/"
+    if place.len == 2 && (place[1] != "start" || place[0] != session_dir) { cwd = place[0] }
     config.LeafFile { cwd: cwd, command: copy words, line: 0 }
 }
 
@@ -3624,6 +3658,7 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "pane-cwd-start" { why = row_pane_cwd_start(mut r) }
     else if name == "pane-cwd-not-inherited" { why = row_pane_cwd_not_inherited(mut r) }
     else if name == "pane-title-not-inherited" { why = row_pane_title_not_inherited(mut r) }
+    else if name == "pane-start-dir-kept" { why = row_pane_start_dir_kept(mut r) }
     else if name == "layout-save-writes-file" { why = row_layout_save_writes_file(mut r) }
     else if name == "layout-load-adds-tabs" { why = row_layout_load_adds_tabs(mut r) }
     else if name == "layout-refused-changes-nothing" { why = row_layout_refused_changes_nothing(mut r) }
@@ -3672,7 +3707,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file layout-load-adds-tabs layout-refused-changes-nothing layout-program-missing layout-too-many-panes layout-too-small layout-unknown-name layout-relative-cwd layout-path-save-load layout-save-bound new-l-makes-session layout-save-load-round-trip".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited pane-start-dir-kept split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file layout-load-adds-tabs layout-refused-changes-nothing layout-program-missing layout-too-many-panes layout-too-small layout-unknown-name layout-relative-cwd layout-path-save-load layout-save-bound new-l-makes-session layout-save-load-round-trip".split(" ") {
         (mut x).push(n)
     }
     x
