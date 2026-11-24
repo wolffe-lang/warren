@@ -37,7 +37,7 @@ the emulator surface the server reads.
 | Limit | Value | What happens past it |
 |---|---|---|
 | sessions | 16 | REFUSE resource-limit (7) |
-| panes in a session, across its tabs | 32 | the split or new tab is refused, named on the client's hint line |
+| panes in a session, across its tabs | 32 | the split, new tab or layout load is refused, named on the client's hint line or on standard error |
 | connections, every phase | 32 | the listener leaves the readiness set; dials wait in the backlog |
 | connections before HELLO | 4 | the same |
 | history per pane | 2 MiB | the oldest lines go |
@@ -45,7 +45,9 @@ the emulator surface the server reads.
 
 The projection counts every pane slot at its measured cost (six times its
 history cap, both screens at its size, 1 MiB of fixed buffers; a free slot
-keeps its emulator and is counted too) and each connection (one physical
+keeps its emulator and is counted too) and the program words it was started
+with (`-- CMD` or a layout file's `command`, each word and a NUL; none for
+the shell), and each connection (one physical
 frame's receive buffer, a paste assembly, the 256 KiB event queue, a 4 KiB
 allowance for two fixed tab-hit maps, and, when attached, one worst-case image,
 a 64-byte-a-cell shadow of what its client holds, its scroll window and that
