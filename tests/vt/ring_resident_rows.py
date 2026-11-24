@@ -43,13 +43,15 @@ number a row holds moves from run to run: where the takes hold two runs of
 three or more (takes 1 to 3, 4 to 6, ...), the spread of each run's least
 peak less its least base, the number the gate compares; where they hold one
 run, the spread of its single takes. On Linux single takes move by up to
-0.9 MB where the least of three moves by 0.1 to 0.5 MB, and three times the
+0.9 MB where, within one hold, the least of three moves by 0.1 to 0.5 MB
+(between two holds an hour apart, by up to 0.7 MB), and three times the
 single-take spread would hide one more cap. A `resize` row above cap 0 is
 held to at least the bound of `resize` at cap 0: a first resize costs the same
-at every cap, and whether a cap's takes show that cost is the allocator's (on
-Linux and macOS 15 it hides under the peak the ring's creation set; on macOS
-26 it does not, warren#88), so allocator reuse can lower a reading but cannot
-set its bound. The rule checks itself where a ring is made, on the room
+at every cap, and whether a cap's takes show that cost is the allocator's
+(while the ring was made whole when a pane was made, on Linux and macOS 15 it
+hid under the peak the ring's creation set; on macOS 26 it did not,
+warren#88), so allocator reuse can lower a reading but cannot set its
+bound. The rule checks itself where a ring is made, on the room
 between a bound and its takes' number: a `new` row's room must be under one
 cap, so one more cap-sized buffer at the peak fails; a `filled` row's too,
 since a filled ring is one cap and a second copy of it must fail; another
