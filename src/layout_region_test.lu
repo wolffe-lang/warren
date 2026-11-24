@@ -102,3 +102,32 @@ fn test_layout_close_of_a_tabs_last_pane_inside_a_region() {
     assert(churn() == 500, "churn")
     assert(layout.dump(l) == "layout tabs=1 active=1 next=3\ntab 1 focus=1 zoomed=0 order=1 name=\"a\"\n  pane 1\n", "after")
 }
+
+fn test_layout_add_tree_inside_a_region() {
+    var l = layout.new(1, "a") else |_| {
+        assert(false, "new")
+        return
+    }
+    let k = 5
+    region turn {
+        // The shape, the panes and the name are all the region's.
+        var shape = List[layout.ShapeNode]()
+        (mut shape).push(layout.ShapeNode { kind: layout.SPLIT, axis: layout.ROWS, share: 2500 })
+        (mut shape).push(layout.ShapeNode { kind: layout.LEAF, axis: layout.COLS, share: 0 })
+        (mut shape).push(layout.ShapeNode { kind: layout.LEAF, axis: layout.COLS, share: 0 })
+        var panes = List[int]()
+        (mut panes).push(2)
+        (mut panes).push(3)
+        let id = layout.add_tree(mut l, shape, panes, "loaded-{k}", 2, true) else |_| { 0 }
+        assert(id == 2, "add_tree id")
+    }
+    assert(churn() == 500, "churn")
+    let want = "layout tabs=2 active=1 next=3\n" +
+        "tab 1 focus=1 zoomed=0 order=1 name=\"a\"\n" +
+        "  pane 1\n" +
+        "tab 2 focus=3 zoomed=1 order=3,2 name=\"loaded-5\"\n" +
+        "  split rows share=2500\n" +
+        "    pane 2\n" +
+        "    pane 3\n"
+    assert(layout.dump(l) == want, "after add_tree in a region")
+}
