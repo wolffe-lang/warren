@@ -2,8 +2,8 @@
 # makes a new pane's history ring cost more than the history it holds (a
 # second copy kept alive, or the ring made whole when the pane is made), so a
 # new pane's resident cost goes red by name. The red rests on the 8 MiB row
-# (7.3 to 7.6 MB past its bound on Linux): the 2 MiB row's room is 20,480
-# bytes under one cap there, too near to be this plant's witness.
+# (7.0 to 7.6 MB past its bound on Linux, as measured): the 2 MiB row's room
+# is 20,480 bytes under one cap there, too near to be this plant's witness.
 floor 15
 rig ring-step.sh sha256=7f07e951bf31af9147fd27b6486d0bc71133375011b0bb31dcfa991257df04cd
 step ring-resident-new tools=bash,python3 script=ring-step.sh -- plant
