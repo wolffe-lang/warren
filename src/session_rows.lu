@@ -2396,6 +2396,123 @@ fn row_layout_save_bound(mut r: Rig) -> str {
     ""
 }
 
+// The warren client run as a program: its words, no terminal (standard
+// input /dev/null), from this directory; its status and its output.
+fn run_client(r: Rig, words: List[str]) -> Answer {
+    let out_path = beside(r, "client-out")
+    let err_path = beside(r, "client-err")
+    let null = fs.open_mode("/dev/null", 2) else { return Answer { status: 0 - 1, out: "", err: "/dev/null" } }
+    var c = process.command(r.warren)
+    for w in words { process.push_arg(mut c, w) }
+    let fo = fs.create(out_path) else |e| { return Answer { status: 0 - 1, out: "", err: "out-{e}" } }
+    let fe = fs.create(err_path) else |e| { return Answer { status: 0 - 1, out: "", err: "err-{e}" } }
+    process.set_stdin(mut c, null)
+    process.set_stdout(mut c, fo)
+    process.set_stderr(mut c, fe)
+    let ch = process.start(c) else |e| { return Answer { status: 0 - 1, out: "", err: "start-{e}" } }
+    let st = process.wait_status(take ch) else 0 - 1
+    Answer { status: st, out: fs.read_text(out_path) else "", err: fs.read_text(err_path) else "" }
+}
+
+// Session `name` of a listing in words, tab by tab in order: each tab's
+// name, its focused pane's index, its zoom, then each pane's rect and cwd
+// (with `cwds`); "" when the listing has no such session.
+fn session_words(text: str, name: str, cwds: bool) -> str {
+    let all = json.parse(text) else { return "" }
+    let sessions = json.get(all, "sessions") else { return "" }
+    for x in json.as_arr(sessions) else List[json.Value]() {
+        let n = json.get(x, "name") else { continue }
+        if (json.as_str(n) else "") != name { continue }
+        var out = ""
+        let active = json.as_str(json.get(x, "active_tab") else json.null()) else ""
+        let tabs = json.get(x, "tabs") else { return "" }
+        for t in json.as_arr(tabs) else List[json.Value]() {
+            let id = json.as_str(json.get(t, "id") else json.null()) else ""
+            let tname = json.as_str(json.get(t, "name") else json.null()) else ""
+            let focus = json.as_str(json.get(t, "focus") else json.null()) else ""
+            let zoomed = json.as_bool(json.get(t, "zoomed") else json.null()) else false
+            var focus_index = 0
+            var panes = ""
+            let ps = json.get(t, "panes") else { return "" }
+            for q in json.as_arr(ps) else List[json.Value]() {
+                let pid = json.as_str(json.get(q, "id") else json.null()) else ""
+                let index = json.as_int(json.get(q, "index") else json.null()) else 0
+                if pid == focus { focus_index = index }
+                let col = json.as_int(json.get(q, "col") else json.null()) else 0
+                let row = json.as_int(json.get(q, "row") else json.null()) else 0
+                let cs = json.as_int(json.get(q, "cols") else json.null()) else 0
+                let rs = json.as_int(json.get(q, "rows") else json.null()) else 0
+                panes = panes + " pane {index} at {col},{row} {cs}x{rs}"
+                if cwds { panes = panes + " cwd " + (json.as_str(json.get(q, "cwd") else json.null()) else "") }
+            }
+            var is_active = ""
+            if id == active { is_active = " active" }
+            out = out + "| tab '{tname}' focus {focus_index} zoomed {zoomed}{is_active}:{panes} "
+        }
+        return out
+    }
+    ""
+}
+
+// The client's `new -d -l NAME -s SESSION` makes a session from a layout
+// file and prints the session's name; its tabs, focus, zoom, shares and
+// active tab are the file's.
+fn row_new_l_makes_session(mut r: Rig) -> str {
+    let dir = layout_home(r)
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    let w = layout_file(dir, "proj", "version = 1\nactive = 2\n[[tab]]\nname = \"edit\"\nfocus = 2\n[tab.root]\nsplit = \"rows\"\nshare = 3000\n[tab.root.first]\n[tab.root.second]\n[[tab]]\nname = \"logs\"\nzoomed = true\n[tab.root]\nsplit = \"cols\"\n[tab.root.first]\n[tab.root.second]\n")
+    if w.len > 0 { return w }
+    let n = run_client(r, line_words("new -d -l proj -s copy"))
+    if n.status != 0 || n.out != "copy\n" { return "new -d -l proj -s copy: {n.status} '{n.out.trim()}' '{n.err.trim()}'" }
+    let l = listed(r)
+    if l.status != 0 { return l.err }
+    let got = session_words(l.out, "copy", false)
+    let want = "| tab 'edit' focus 2 zoomed false: pane 1 at 1,1 80x6 pane 2 at 1,8 80x15 | tab 'logs' focus 1 zoomed true active: pane 1 at 1,1 80x22 pane 2 at 0,0 0x0 "
+    if got != want { return "session copy is\n{got}\nnot\n{want}" }
+    ""
+}
+
+// A session of 2 tabs and 4 panes (one started with `-- CMD`, one with
+// `-c DIR`, one tab zoomed, one renamed) saved, then made again with
+// `new -d -l NAME -s copy`: tab by tab and in tree order, the names, rects,
+// focus, zoom, active tab and each pane's directory are the same, and the
+// command runs again.
+fn row_layout_save_load_round_trip(mut r: Rig) -> str {
+    let dir = layout_home(r)
+    let away = beside(r, "away")
+    fs.create_dir_all(away) else |e| { return "{away}: {e}" }
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    var words = line_words("split-right -t work -- /bin/sh -c")
+    (mut words).push("echo RT-MARK; exec /bin/sh")
+    let s = ask_words(r, words, "")
+    if s.status != 0 { return "split-right: {s.status} '{s.err.trim()}'" }
+    // The second tab is split and zoomed by naming its panes, so the first
+    // tab's split is drawn and its rects show the axis.
+    for line in ["rename-tab -t t1 first", "new-tab -t work -c " + away, "split-down -t p3", "zoom -t p4"] {
+        let x = ask(r, line, "")
+        if x.status != 0 { return "{line}: {x.status} '{x.err.trim()}'" }
+    }
+    let saved = ask(r, "layout save -t work rt", "")
+    if saved.status != 0 { return "layout save: {saved.status} '{saved.err.trim()}'" }
+    let n = run_client(r, line_words("new -d -l rt -s copy"))
+    if n.status != 0 || n.out != "copy\n" { return "new -d -l rt -s copy: {n.status} '{n.out.trim()}' '{n.err.trim()}'" }
+    let l = listed(r)
+    if l.status != 0 { return l.err }
+    let was = session_words(l.out, "work", true)
+    let now = session_words(l.out, "copy", true)
+    if was.len == 0 || now != was { return "the copy differs:\nwork {was}\ncopy {now}" }
+    // Tab one holds p1 and p2 in tree order: the copy's second pane, p6, runs
+    // p2's program.
+    let marked = until_captured(r, "p6", "RT-MARK")
+    if marked.len > 0 { return "the command did not run again: " + marked }
+    client.hang_up(mut a)
+    ""
+}
+
 // Ask `capture-pane -p -J -t TARGET` (rows joined at a soft wrap, so a line
 // a narrow pane wrapped is read whole) until its text holds `text`, for at
 // most 5 s: "" when it did, else the last text captured.
@@ -3508,6 +3625,8 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "layout-relative-cwd" { why = row_layout_relative_cwd(mut r) }
     else if name == "layout-path-save-load" { why = row_layout_path_save_load(mut r) }
     else if name == "layout-save-bound" { why = row_layout_save_bound(mut r) }
+    else if name == "new-l-makes-session" { why = row_new_l_makes_session(mut r) }
+    else if name == "layout-save-load-round-trip" { why = row_layout_save_load_round_trip(mut r) }
     else if name == "split-starts-in-pane-cwd" { why = row_split_starts_in_pane_cwd(mut r) }
     else if name == "split-reported-missing" { why = row_split_reported_missing(mut r) }
     else if name == "split-reported-file" { why = row_split_reported_file(mut r) }
@@ -3544,7 +3663,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file layout-load-adds-tabs layout-refused-changes-nothing layout-program-missing layout-too-many-panes layout-too-small layout-unknown-name layout-relative-cwd layout-path-save-load layout-save-bound".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file layout-load-adds-tabs layout-refused-changes-nothing layout-program-missing layout-too-many-panes layout-too-small layout-unknown-name layout-relative-cwd layout-path-save-load layout-save-bound new-l-makes-session layout-save-load-round-trip".split(" ") {
         (mut x).push(n)
     }
     x
