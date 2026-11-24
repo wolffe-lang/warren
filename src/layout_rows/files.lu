@@ -1,0 +1,225 @@
+//! member: true
+//! The layout file round trip (`layout-file-round-trip`): after each seeded
+//! sequence of the layout property generator, the layout and generated leaf
+//! data (cwds and commands from a hostile alphabet) are written as a layout
+//! file, read, and rebuilt with fresh pane ids. Each tab's shape, name,
+//! focused leaf and zoom, the active tab and every leaf's data must come
+//! back, and writing the reading must give the same bytes. A layout of more
+//! leaves than a file holds must be refused at its 33rd leaf instead.
+
+use layout
+use config
+
+/// A word from the hostile alphabet: empty, path-like, quotes, backslashes,
+/// controls, DEL, line breaks, U+2028, an astral scalar and TOML's own
+/// punctuation.
+fn hostile_word(mut g: Rng) -> str {
+    let r = roll(mut g, 12)
+    if r == 0 { return "" }
+    if r == 1 { return "/" }
+    if r == 2 { return "~" }
+    if r == 3 { return "~/src" }
+    if r == 4 { return "rel/dir" }
+    if r == 5 { return "two words" }
+    if r == 6 { return "q\"uote" }
+    if r == 7 { return "back\\slash" }
+    if r == 8 { return "ctl\u{1}\u{1f}\u{7f}" }
+    if r == 9 { return "tab\tnl\ncr\r" }
+    if r == 10 { return "\u{2028}\u{1d11e}\u{e9}" }
+    "#hash = [x], 'y'"
+}
+
+/// A leaf's data: a cwd ("" for none) and 0 to 3 words (none for the shell).
+fn file_leaf(mut g: Rng) -> config.LeafFile {
+    let cwd = hostile_word(mut g)
+    var words = List[str]()
+    let n = roll(mut g, 4)
+    var i = 0
+    while i < n {
+        (mut words).push(hostile_word(mut g))
+        i += 1
+    }
+    config.LeafFile { cwd: cwd, command: words }
+}
+
+/// The layout as a layout file, each leaf's data drawn from `g`.
+fn file_of(l: layout.Layout, mut g: Rng) -> config.LayoutFile {
+    var tabs = List[config.TabFile]()
+    var active = 1
+    var i = 0
+    while i < l.tabs.len {
+        let t = copy l.tabs[i]
+        if t.id == l.active { active = i + 1 }
+        let ps = layout.panes(l, t.id)
+        var focus = 1
+        var leaves = List[config.LeafFile]()
+        var k = 0
+        while k < ps.len {
+            if ps[k] == t.focus { focus = k + 1 }
+            (mut leaves).push(file_leaf(mut g))
+            k += 1
+        }
+        let name = str_from_utf8(t.name) else ""
+        (mut tabs).push(config.TabFile { name: name, named: true, focus: focus, zoomed: t.zoomed,
+            shape: layout.shape_of(l, t.id), leaves: leaves })
+        i += 1
+    }
+    config.LayoutFile { ok: true, line: 0, why: "", active: active, tabs: tabs }
+}
+
+/// A layout file in words, every field, lengths before strings.
+fn file_words(f: config.LayoutFile) -> str {
+    var out = "ok={f.ok} active={f.active} tabs={f.tabs.len}"
+    for t in f.tabs {
+        out = out + " | name={t.name.len}:{t.name} named={t.named} focus={t.focus} zoomed={t.zoomed} shape="
+        for n in t.shape { out = out + "{n.kind}.{n.axis}.{n.share}," }
+        for l in t.leaves {
+            out = out + " leaf={l.cwd.len}:{l.cwd} words={l.command.len}"
+            for w in l.command { out = out + ":{w.len}:{w}" }
+        }
+    }
+    out
+}
+
+fn file_leaf_count(f: config.LayoutFile) -> int {
+    var n = 0
+    for t in f.tabs { n += t.leaves.len }
+    n
+}
+
+/// Rebuild a read file with fresh pane ids from 1000: `from_tree` for the
+/// first tab, `add_tree` for the rest, then its active tab.
+fn rebuilt(f: config.LayoutFile) -> layout.Layout ! {rebuild_refused} {
+    var next = 1000
+    var l = layout.new(1, "unused") else |_| { return rebuild_refused }
+    var i = 0
+    while i < f.tabs.len {
+        let t = copy f.tabs[i]
+        var ps = List[int]()
+        var k = 0
+        while k < t.leaves.len {
+            (mut ps).push(next)
+            next += 1
+            k += 1
+        }
+        if i == 0 {
+            l = layout.from_tree(t.shape, ps, t.name, t.focus, t.zoomed) else |_| { return rebuild_refused }
+        } else {
+            let _id = layout.add_tree(mut l, t.shape, ps, t.name, t.focus, t.zoomed) else |_| {
+                return rebuild_refused
+            }
+        }
+        i += 1
+    }
+    layout.select_tab(mut l, f.active) else |_| { return rebuild_refused }
+    l
+}
+
+/// The round trip for one layout; "" or what broke.
+fn round_trip(l: layout.Layout, mut g: Rng) -> str {
+    let f = file_of(l, mut g)
+    let text = config.write_layout(f)
+    let back = config.read_layout(text)
+    if file_leaf_count(f) > config.LAYOUT_LEAVES {
+        if back.ok { return "a layout of {file_leaf_count(f)} leaves was read back" }
+        if !back.why.starts_with("a 33rd leaf") { return "a layout of {file_leaf_count(f)} leaves refused: {back.why}" }
+        return ""
+    }
+    if !back.ok { return "the written file is refused at {back.line}: {back.why}" }
+    if file_words(back) != file_words(f) { return "it reads back as {file_words(back)}, written from {file_words(f)}" }
+    if config.write_layout(back) != text { return "writing the reading gives other bytes" }
+    let m = rebuilt(back) else |e| { return "the reading did not rebuild: {e}" }
+    if m.tabs.len != l.tabs.len { return "rebuilt {m.tabs.len} tabs of {l.tabs.len}" }
+    var i = 0
+    while i < l.tabs.len {
+        let want = layout.shape_of(l, l.tabs[i].id)
+        let got = layout.shape_of(m, m.tabs[i].id)
+        if shape_words(got) != shape_words(want) { return "tab {i + 1} rebuilt as {shape_words(got)}, not {shape_words(want)}" }
+        if !same_bytes(m.tabs[i].name, l.tabs[i].name) { return "tab {i + 1}'s name changed" }
+        if m.tabs[i].zoomed != l.tabs[i].zoomed { return "tab {i + 1}'s zoom changed" }
+        let fp = layout.panes(m, m.tabs[i].id)
+        if fp[f.tabs[i].focus - 1] != m.tabs[i].focus { return "tab {i + 1}'s focus is not its leaf {f.tabs[i].focus}" }
+        if (m.tabs[i].id == m.active) != (l.tabs[i].id == l.active) { return "tab {i + 1}'s being active changed" }
+        i += 1
+    }
+    ""
+}
+
+/// What one size's round trips came to.
+struct FileTally {
+    checks: int,
+    over: int,
+    fails: int,
+}
+
+/// The layout after sequence `seq` at size `index`: the generator's 50
+/// operations from the properties' seed.
+fn sequence_layout(index: int, seq: int) -> layout.Layout ! {new_refused} {
+    var g = Rng { state: 1 + index * 100003 + seq * 7919 }
+    var l = layout.new(1, "t") else |_| { return new_refused }
+    var fresh = 2
+    var step = 0
+    while step < 50 {
+        let x = apply(mut l, mut g, fresh, size_cols(index), size_rows(index))
+        if x.kind == 0 || x.kind == 9 { fresh += 1 }
+        step += 1
+    }
+    l
+}
+
+fn leaf_seed(index: int, seq: int) -> int { 7 + seq * 104729 + index * 15485863 }
+
+fn layout_leaves(l: layout.Layout) -> int {
+    var n = 0
+    for tab in l.tabs { n += layout.panes(l, tab.id).len }
+    n
+}
+
+/// One sequence at a size: the generator's operations, then the round trip.
+fn file_sequence(index: int, seq: int, mut t: FileTally) {
+    let l = sequence_layout(index, seq) else |_| {
+        t.fails += 1
+        print("FAIL layout-file-round-trip size={size_cols(index)}x{size_rows(index)} sequence={seq}: new refused")
+        return
+    }
+    var leaf_g = Rng { state: leaf_seed(index, seq) }
+    let why = round_trip(l, mut leaf_g)
+    t.checks += 1
+    if layout_leaves(l) > config.LAYOUT_LEAVES { t.over += 1 }
+    if why != "" {
+        t.fails += 1
+        if t.fails <= 5 {
+            print("FAIL layout-file-round-trip size={size_cols(index)}x{size_rows(index)} sequence={seq}: {why}")
+        }
+    }
+}
+
+/// The file the round trip writes for sequence `seq` at size `index`, for
+/// tests/config/layout_files.py; "" for a layout past the file's bound.
+pub fn file_sample(index: int, seq: int) -> str {
+    let l = sequence_layout(index, seq) else |_| { return "" }
+    if layout_leaves(l) > config.LAYOUT_LEAVES { return "" }
+    var g = Rng { state: leaf_seed(index, seq) }
+    config.write_layout(file_of(l, mut g))
+}
+
+/// Sequences `first` .. `first + count - 1` at size `index`, seeded as the
+/// layout properties are, each sequence's layout round-tripped. Answers 1
+/// when a round trip failed, else 0.
+pub fn file_round_trips(index: int, first: int, count: int) -> int {
+    var t = FileTally { checks: 0, over: 0, fails: 0 }
+    var seq = first
+    while seq < first + count {
+        region turn {
+            file_sequence(index, seq, mut t)
+        }
+        seq += 1
+    }
+    let span = "size={size_cols(index)}x{size_rows(index)} sequences={first}..{first + count - 1}"
+    if t.fails > 0 {
+        print("FAIL layout-file-round-trip {span} failures={t.fails} checks={t.checks}")
+        return 1
+    }
+    print("PASS layout-file-round-trip {span} checks={t.checks} over-the-bound={t.over}")
+    0
+}
