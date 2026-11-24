@@ -144,9 +144,9 @@ fn lay_node(d: Toml, n: int, mut r: LayReading) -> bool {
         return lay_refuse(mut r, sline, "split is {lay_kind(d.nodes[split].kind)}, not a string")
     }
     let word = d.nodes[split].text
-    var axis = layout.COLS
+    var axis = layout.ROWS
     if word == "rows" {
-        axis = layout.ROWS
+        axis = layout.COLS
     } else if word != "cols" {
         return lay_refuse(mut r, sline, "split is {lay_shown(word)}, not \"cols\" or \"rows\"")
     }
