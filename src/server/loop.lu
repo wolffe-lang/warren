@@ -1477,6 +1477,10 @@ fn run_prompt(mut s: Server, index: int, was: int) {
         source_from_line(mut s, index, c.text)
         return
     }
+    if c.action == config.A_LAYOUT_SAVE {
+        layout_save_from_line(mut s, index, c.text)
+        return
+    }
     act(mut s, index, c.action, c.arg, c.count)
 }
 
@@ -2429,6 +2433,17 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
             let r = cmd.resolve(snapshot(s), v.target, caller)
             if !r.ok {
                 err = if v.target.len > 0 then "warren: {verb}: {r.why}: {v.target}\n" else "warren: {verb}: {r.why}\n"
+            } else if a == config.A_LAYOUT_SAVE {
+                // A relative path is read from the directory the verb came from.
+                let from = cwd_field_of(body)
+                let saved = save_layout(s, session_with_id(s, r.session), v.command.text, if from.len > 0 then from else "/")
+                if saved.why.len > 0 {
+                    err = "warren: layout save: {saved.why}\n"
+                } else {
+                    status = 0
+                    out = saved.path + "\n"
+                    err = ""
+                }
             } else if a == config.A_DETACH {
                 // From a shell there is no client of its own to detach: every
                 // client attached to the target's session is.
@@ -2711,6 +2726,132 @@ fn source_from_line(mut s: Server, index: int, file: str) {
     let label = if file.len > 0 then file else "warren.toml"
     let refusal = source_settings(mut s, path, label)
     if refusal.len > 0 { tell(mut s, index, refusal) }
+}
+
+// ---- layout files ----
+
+// `$XDG_CONFIG_HOME/warren/layouts`, or `~/.config/warren/layouts`; "" when
+// neither is set.
+fn layouts_dir() -> str {
+    let xdg = env.get("XDG_CONFIG_HOME") else ""
+    if xdg.len > 0 { return xdg + "/warren/layouts" }
+    let home = env.get("HOME") else ""
+    if home.len == 0 { return "" }
+    home + "/.config/warren/layouts"
+}
+
+/// Where a layout file is, or why the word names none: a word holding `/`
+/// is a file path, read from `base` when relative; any other is a NAME,
+/// the file NAME.toml in the layouts directory.
+struct LayoutPlace { path: str, named: bool, why: str }
+
+fn layout_place(word: str, base: str) -> LayoutPlace {
+    for b in word.bytes() {
+        let v = b as int
+        if v < 32 || v == 127 { return LayoutPlace { path: "", named: false, why: "a layout name may not hold a control byte" } }
+    }
+    if word.contains("/") {
+        if word.starts_with("/") { return LayoutPlace { path: word, named: false, why: "" } }
+        let from = if base.len > 0 then base else "/"
+        let joined = if from.ends_with("/") then from + word else from + "/" + word
+        return LayoutPlace { path: joined, named: false, why: "" }
+    }
+    if word.starts_with(".") { return LayoutPlace { path: "", named: true, why: "a layout name may not start with '.'" } }
+    let dir = layouts_dir()
+    if dir.len == 0 { return LayoutPlace { path: "", named: true, why: "no layouts directory: neither XDG_CONFIG_HOME nor HOME is set" } }
+    LayoutPlace { path: dir + "/" + word + ".toml", named: true, why: "" }
+}
+
+/// Session `si` as a layout file: every tab in order, its name, focused
+/// leaf, zoom and shape; each leaf's directory when warren learnt one (OSC 7
+/// or /proc, not the session's start directory) and its program's words as
+/// it was started with them (none for the shell); the active tab.
+fn layout_file_of(s: Server, si: int) -> config.LayoutFile {
+    let l = copy s.sessions[si].layout
+    var tabs = List[config.TabFile]()
+    var active = 1
+    var i = 0
+    while i < l.tabs.len {
+        let t = copy l.tabs[i]
+        if t.id == l.active { active = i + 1 }
+        let ps = layout.panes(l, t.id)
+        var focus = 1
+        var leaves = List[config.LeafFile]()
+        var j = 0
+        while j < ps.len {
+            if ps[j] == t.focus { focus = j + 1 }
+            let k = slot_of(s, ps[j])
+            var cwd = ""
+            var words = List[str]()
+            if k >= 0 {
+                let dir = pane_dir(s, k)
+                if dir.source != "start" { cwd = dir.path }
+                words = argv_words(s.panes[k])
+            }
+            (mut leaves).push(config.LeafFile { cwd: cwd, command: words })
+            j += 1
+        }
+        let name = str_from_utf8(t.name) else ""
+        (mut tabs).push(config.TabFile { name: name, named: true, focus: focus, zoomed: t.zoomed,
+            shape: layout.shape_of(l, t.id), leaves: leaves })
+        i += 1
+    }
+    config.LayoutFile { ok: true, line: 0, why: "", active: active, tabs: tabs }
+}
+
+/// What a save came to: the file's path, or why nothing was written.
+struct Saved { path: str, why: str }
+
+/// `layout save NAME`: session `si`'s layout file, written to the place the
+/// word names (`base` is where a relative path is read from). The text
+/// goes to PATH.tmp, made exclusively at 0600 (a stale one removed first),
+/// synced and closed, then renamed over PATH; a NAME's directory is made at
+/// 0700 when it is missing. Nothing is written when the text is past the
+/// file bound or the destination is a directory.
+fn save_layout(s: Server, si: int, word: str, base: str) -> Saved {
+    let place = layout_place(word, base)
+    if place.why.len > 0 { return Saved { path: "", why: place.why } }
+    let text = config.write_layout(layout_file_of(s, si))
+    if text.len > config.LAYOUT_BYTES {
+        return Saved { path: "", why: "the layout's text is {text.len} bytes, past {config.LAYOUT_BYTES}; nothing was written" }
+    }
+    let path = place.path
+    if place.named {
+        let dir = layouts_dir()
+        if !is_directory(dir) {
+            let parent = fs.parent(dir) else ""
+            if parent.len > 0 && !is_directory(parent) {
+                fs.create_dir_all(parent) else |e| { return Saved { path: "", why: "{parent} cannot be made: {e}" } }
+            }
+            fs.create_dir_mode(dir, 448) else |e| { return Saved { path: "", why: "{dir} cannot be made: {e}" } }
+        }
+    }
+    if is_directory(path) { return Saved { path: "", why: "{path} is a directory" } }
+    let tmp = path + ".tmp"
+    if fs.exists(tmp) { fs.remove(tmp) else |_| {} }
+    var f = fs.create_new_with_mode(tmp, 384) else |e| { return Saved { path: "", why: "{tmp} cannot be made: {e}" } }
+    var failed = ""
+    fs.write(mut f, text) else |e| { failed = "{tmp} cannot be written: {e}" }
+    if failed.len == 0 { fs.sync(mut f) else |e| { failed = "{tmp} cannot be synced: {e}" } }
+    fs.close(take f) else |e| { if failed.len == 0 { failed = "{tmp} cannot be closed: {e}" } }
+    if failed.len == 0 { fs.move_file(tmp, path) else |e| { failed = "{tmp} cannot be renamed to {path}: {e}" } }
+    if failed.len > 0 {
+        fs.remove(tmp) else |_| {}
+        return Saved { path: "", why: failed }
+    }
+    Saved { path: path, why: "" }
+}
+
+// `:layout save NAME` typed by client `index`: a relative path is read from
+// the directory of the pane its session has focused, and the file's path
+// (or why nothing was written) is told on its hint line.
+fn layout_save_from_line(mut s: Server, index: int, word: str) {
+    let si = s.conns[index].session
+    if si < 0 { return }
+    let k = focused_slot(s, si)
+    let base = if k >= 0 then pane_dir(s, k).path else cwd_of(s.sessions[si])
+    let saved = save_layout(s, si, word, base)
+    if saved.why.len > 0 { tell(mut s, index, "layout save: {saved.why}") } else { tell(mut s, index, saved.path) }
 }
 
 // ---- HELLO, after the frame that carried it ----
