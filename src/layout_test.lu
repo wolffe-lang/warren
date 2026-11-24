@@ -1,12 +1,17 @@
 //! member: false
-//! The layout module in the ordinary `wolf test` gate: every golden, and
-//! four property sequences with the constructed grids at each size, one
-//! test a size so that each fits the checked machine's step budget.
+//! The layout module in the ordinary `wolf test` gate: every golden, the
+//! arena-free form's rows, and four property sequences with the
+//! constructed grids at each size, one test a size so that each fits the
+//! checked machine's step budget.
 
 use layout_rows
 
 fn test_layout_goldens() {
     assert(layout_rows.goldens() == 0)
+}
+
+fn test_layout_shape_add_tree() {
+    assert(layout_rows.shape_rows() == 0)
 }
 
 fn test_layout_properties_20x6() {

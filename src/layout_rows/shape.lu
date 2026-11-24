@@ -1,0 +1,226 @@
+//! member: true
+//! The arena-free form's rows (`layout-shape-add-tree`): a tab's shape read
+//! back from the tab `add_tree` built from it, that tab's panes, focus,
+//! zoom and name, and every refusal leaving the layout as it was.
+
+use layout
+
+fn shape_leaf() -> layout.ShapeNode {
+    layout.ShapeNode { kind: layout.LEAF, axis: layout.COLS, share: 0 }
+}
+
+fn shape_split(axis: int, share: int) -> layout.ShapeNode {
+    layout.ShapeNode { kind: layout.SPLIT, axis: axis, share: share }
+}
+
+/// A shape in words, for a FAIL line: `L` a leaf, `C:SHARE` or `R:SHARE` a
+/// split along COLS or ROWS, anything else `?K:A:S`.
+fn shape_words(s: List[layout.ShapeNode]) -> str {
+    var out = ""
+    var i = 0
+    while i < s.len {
+        var word = "?{s[i].kind}:{s[i].axis}:{s[i].share}"
+        if s[i].kind == layout.LEAF && s[i].axis == layout.COLS && s[i].share == 0 { word = "L" }
+        if s[i].kind == layout.SPLIT && s[i].axis == layout.COLS { word = "C:{s[i].share}" }
+        if s[i].kind == layout.SPLIT && s[i].axis == layout.ROWS { word = "R:{s[i].share}" }
+        if i > 0 { out = out + " " }
+        out = out + word
+        i += 1
+    }
+    out
+}
+
+fn same_shape(a: List[layout.ShapeNode], b: List[layout.ShapeNode]) -> bool {
+    shape_words(a) == shape_words(b)
+}
+
+fn shape_ints(xs: List[int]) -> str {
+    var out = ""
+    var i = 0
+    while i < xs.len {
+        if i > 0 { out = out + "," }
+        out = out + "{xs[i]}"
+        i += 1
+    }
+    out
+}
+
+/// Three panes in tab 1 at 80x24: a COLS split moved 7 cells off its half
+/// (share 5823) and a ROWS split under its second child.
+fn shape_base() -> layout.Layout ! {base_refused} {
+    var l = layout.new(1, "base") else |_| { return base_refused }
+    layout.split(mut l, 1, 1, layout.COLS, 2, true, 80, 24) else |_| { return base_refused }
+    layout.split(mut l, 1, 2, layout.ROWS, 3, true, 80, 24) else |_| { return base_refused }
+    let _grew = layout.resize(mut l, 1, layout.RIGHT, 7, 80, 24) else |_| { return base_refused }
+    l
+}
+
+fn shape_list(a: int, b: int) -> List[int] {
+    var out = List[int]()
+    (mut out).push(a)
+    (mut out).push(b)
+    out
+}
+
+/// Build `shape` with `panes` in a copy of the base layout, and hold what
+/// the new tab is; answers "" or what broke.
+fn shape_build_case(shape: List[layout.ShapeNode], panes: List[int], focus_leaf: int, zoomed: bool) -> str {
+    var l = shape_base() else |e| { return "the base layout: {e}" }
+    let next = l.next_id
+    let id = layout.add_tree(mut l, shape, panes, "loaded", focus_leaf, zoomed) else |e| {
+        return "refused {e} for {shape_words(shape)} panes {shape_ints(panes)}"
+    }
+    if id != next { return "tab id {id}, not the next id {next}" }
+    if l.active != 1 { return "the active tab became {l.active}" }
+    if l.next_id != next + 1 { return "next tab id {l.next_id}, not {next + 1}" }
+    let back = layout.shape_of(l, id)
+    if !same_shape(back, shape) { return "shape read back {shape_words(back)}, built from {shape_words(shape)}" }
+    let got = layout.panes(l, id)
+    if shape_ints(got) != shape_ints(panes) { return "panes {shape_ints(got)} in tree order, not {shape_ints(panes)}" }
+    let t = copy l.tabs[l.tabs.len - 1]
+    if t.focus != panes[focus_leaf - 1] { return "focus {t.focus}, not leaf {focus_leaf}'s pane {panes[focus_leaf - 1]}" }
+    if t.zoomed != zoomed { return "zoomed {t.zoomed}, not {zoomed}" }
+    let tab_name = str_from_utf8(t.name) else ""
+    if tab_name != "loaded" { return "the tab's name is '{tab_name}', not 'loaded'" }
+    var order = List[int]()
+    (mut order).push(panes[focus_leaf - 1])
+    for p in panes {
+        if p != panes[focus_leaf - 1] { (mut order).push(p) }
+    }
+    if shape_ints(t.focus_order) != shape_ints(order) {
+        return "focus order {shape_ints(t.focus_order)}, not {shape_ints(order)}"
+    }
+    let broke = structure(l)
+    if broke != "" { return "the layout breaks invariant 2: {broke}" }
+    let base = shape_base() else |e| { return "the base layout: {e}" }
+    let tab1 = layout.shape_of(base, 1)
+    let kept = layout.shape_of(l, 1)
+    if !same_shape(tab1, kept) { return "tab 1 changed: {shape_words(kept)}, was {shape_words(tab1)}" }
+    ""
+}
+
+/// `add_tree` must refuse with `want` and leave the layout as it was, its
+/// next tab id unspent.
+fn shape_refusal_case(shape: List[layout.ShapeNode], panes: List[int], focus_leaf: int, want: str) -> str {
+    var l = shape_base() else |e| { return "the base layout: {e}" }
+    let before = layout.dump(l)
+    let next = l.next_id
+    let id = layout.add_tree(mut l, shape, panes, "refused", focus_leaf, false) else |e| {
+        if "{e}" != want { return "refused {e}, not {want}" }
+        if layout.dump(l) != before { return "refused {e} but changed the layout" }
+        if l.next_id != next { return "refused {e} but spent a tab id" }
+        return ""
+    }
+    "built tab {id}, not refused {want}"
+}
+
+fn shape_report(name: str, broke: str, mut failed: int) {
+    if broke == "" { return }
+    print("FAIL layout-shape-add-tree {name}: {broke}")
+    failed += 1
+}
+
+/// The rows; answers how many failed.
+pub fn shape_rows() -> int {
+    var failed = 0
+    var cases = 0
+    // The base tab's own shape, read and rebuilt.
+    let base = shape_base() else |e| {
+        print("FAIL layout-shape-add-tree base: {e}")
+        return 1
+    }
+    let own = layout.shape_of(base, 1)
+    cases += 1
+    if shape_words(own) != "C:5823 L R:5000 L L" {
+        print("FAIL layout-shape-add-tree read: tab 1 reads '{shape_words(own)}', not 'C:5823 L R:5000 L L'")
+        failed += 1
+    }
+    var three = List[int]()
+    (mut three).push(10)
+    (mut three).push(11)
+    (mut three).push(12)
+    cases += 1
+    shape_report("rebuild", shape_build_case(own, three, 2, true), mut failed)
+    var one = List[layout.ShapeNode]()
+    (mut one).push(shape_leaf())
+    var single = List[int]()
+    (mut single).push(20)
+    cases += 1
+    shape_report("one-leaf", shape_build_case(one, single, 1, false), mut failed)
+    // A deeper tree: R:1 (C:9999 L L) (R:3000 L (C:5000 L L)).
+    var deep = List[layout.ShapeNode]()
+    (mut deep).push(shape_split(layout.ROWS, 1))
+    (mut deep).push(shape_split(layout.COLS, 9999))
+    (mut deep).push(shape_leaf())
+    (mut deep).push(shape_leaf())
+    (mut deep).push(shape_split(layout.ROWS, 3000))
+    (mut deep).push(shape_leaf())
+    (mut deep).push(shape_split(layout.COLS, 5000))
+    (mut deep).push(shape_leaf())
+    (mut deep).push(shape_leaf())
+    var five = List[int]()
+    var p = 30
+    while p < 35 {
+        (mut five).push(p)
+        p += 1
+    }
+    cases += 1
+    shape_report("deep", shape_build_case(deep, five, 5, false), mut failed)
+
+    // Refusals, in the order add_tree checks them.
+    let two = shape_list(40, 41)
+    let empty = List[layout.ShapeNode]()
+    cases += 1
+    shape_report("refuse-empty", shape_refusal_case(empty, two, 1, "bad_shape"), mut failed)
+    var lone_split = List[layout.ShapeNode]()
+    (mut lone_split).push(shape_split(layout.COLS, 5000))
+    (mut lone_split).push(shape_leaf())
+    cases += 1
+    shape_report("refuse-half-split", shape_refusal_case(lone_split, two, 1, "bad_shape"), mut failed)
+    var trailing = List[layout.ShapeNode]()
+    (mut trailing).push(shape_leaf())
+    (mut trailing).push(shape_leaf())
+    cases += 1
+    shape_report("refuse-trailing", shape_refusal_case(trailing, two, 1, "bad_shape"), mut failed)
+    var share_low = List[layout.ShapeNode]()
+    (mut share_low).push(shape_split(layout.COLS, 0))
+    (mut share_low).push(shape_leaf())
+    (mut share_low).push(shape_leaf())
+    cases += 1
+    shape_report("refuse-share-0", shape_refusal_case(share_low, two, 1, "bad_shape"), mut failed)
+    var share_high = List[layout.ShapeNode]()
+    (mut share_high).push(shape_split(layout.COLS, 10000))
+    (mut share_high).push(shape_leaf())
+    (mut share_high).push(shape_leaf())
+    cases += 1
+    shape_report("refuse-share-10000", shape_refusal_case(share_high, two, 1, "bad_shape"), mut failed)
+    var axis = List[layout.ShapeNode]()
+    (mut axis).push(shape_split(2, 5000))
+    (mut axis).push(shape_leaf())
+    (mut axis).push(shape_leaf())
+    cases += 1
+    shape_report("refuse-axis", shape_refusal_case(axis, two, 1, "bad_shape"), mut failed)
+    var odd_leaf = List[layout.ShapeNode]()
+    (mut odd_leaf).push(layout.ShapeNode { kind: layout.LEAF, axis: layout.COLS, share: 7 })
+    cases += 1
+    shape_report("refuse-leaf-share", shape_refusal_case(odd_leaf, single, 1, "bad_shape"), mut failed)
+    var pair = List[layout.ShapeNode]()
+    (mut pair).push(shape_split(layout.COLS, 5000))
+    (mut pair).push(shape_leaf())
+    (mut pair).push(shape_leaf())
+    cases += 1
+    shape_report("refuse-pane-count", shape_refusal_case(pair, three, 1, "bad_shape"), mut failed)
+    cases += 1
+    shape_report("refuse-pane-zero", shape_refusal_case(pair, shape_list(0, 41), 1, "bad_id"), mut failed)
+    cases += 1
+    shape_report("refuse-pane-twice", shape_refusal_case(pair, shape_list(42, 42), 1, "duplicate_id"), mut failed)
+    cases += 1
+    shape_report("refuse-pane-live", shape_refusal_case(pair, shape_list(43, 2), 1, "duplicate_id"), mut failed)
+    cases += 1
+    shape_report("refuse-focus-0", shape_refusal_case(pair, two, 0, "bad_focus"), mut failed)
+    cases += 1
+    shape_report("refuse-focus-3", shape_refusal_case(pair, two, 3, "bad_focus"), mut failed)
+    if failed == 0 { print("PASS layout-shape-add-tree cases={cases}") }
+    print("LAYOUT-SHAPE cases={cases} failed={failed}")
+    failed
+}
