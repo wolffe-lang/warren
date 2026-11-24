@@ -336,7 +336,7 @@ and closes its tabs; their ids stay spent.
 |---|---|---|
 | goldens | 59 operation scripts, each with the expected `dump_at` and every refusal, resize answer and `pane_at` query, computed by hand from this file | `src/layout_rows/goldens.lu` |
 | properties | seeded random sequences of 50 operations at 20x6, 80x24, 81x25, 320x90 and 512x512, the invariants below held after every operation, and grids of every shape up to 4x4 built at each size | `src/layout_rows/properties.lu` |
-| regions | every operation applied inside a region to a layout that outlives it, read back after the region's arena is reused | `src/layout_region_test.lu` |
+| regions | every operation applied inside a region to a layout that outlives it, `add_tree` with a shape, panes and name all the region's among them, read back after the region's arena is reused | `src/layout_region_test.lu` |
 | `toml-subset-table` | warren's TOML subset case by case: each reading, or the refusal's line and form, held to Python's tomllib on Linux | `tests/config/toml.table` |
 | `layout-file-refusals` | every schema refusal of a layout file, each text valid TOML to tomllib, by line and reason | `tests/config/layout.table` |
 | `layout-file-goldens` | three layouts written byte for byte as `tests/config/layout/*.toml`, each read back to its layout | `src/layout_golden_test.lu` |
