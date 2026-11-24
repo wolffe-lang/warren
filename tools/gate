@@ -162,6 +162,9 @@ step toml-table-build "$WOLF" build --deny-warnings src/toml_table_test.lu -o "$
 step toml-table-native "$root/target/native/toml-table"
 step toml-table-lupin "$LUPIN" run src/toml_table_test.lu
 step toml-subset-lupin "$LUPIN" run src/config_toml_test.lu
+step layout-table-build "$WOLF" build --deny-warnings src/layout_table_test.lu -o "$root/target/native/layout-table"
+step layout-table-native "$root/target/native/layout-table"
+step layout-table-lupin "$LUPIN" run src/layout_table_test.lu
 step pacing-lupin "$LUPIN" run src/pacing_test.lu
 step client-input-lupin "$LUPIN" run src/client_input_test.lu
 step client-keyboard-lupin "$LUPIN" run src/client_keyboard_test.lu
@@ -280,6 +283,8 @@ step tmux-rows python3 -I tools/session/tmux_rows.py --cases "$work/cases" --exp
 # warren's TOML subset against the image's Python tomllib (TOML 1.0), case by
 # case; warren's side of the same table runs on every host.
 step toml-table-oracle python3 -I tests/config/toml_table.py
+# Every layout file the layout table refuses is valid TOML to tomllib.
+step layout-table-oracle python3 -I tests/config/layout_table.py
 # A wide scalar that cannot fit in the last column with autowrap off, against
 # the reference live (warren#28), natively and under lupin.
 step wide-pending-rows-native python3 -I tests/vt/wide_pending_rows.py "$root/target/native/warren"
