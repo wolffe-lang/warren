@@ -10,10 +10,11 @@ pub const MAX_PANES: int = 32
 pub const MAX_CONNECTIONS: int = 32
 /// Connections accepted and not yet past HELLO, held at once.
 pub const MAX_PENDING: int = 4
-/// Scrollback history bytes retained per pane. 2 MiB while the emulator
-/// makes its whole ring when a pane is made (warren#67): measured on Linux,
-/// that peaks at three times this and keeps two times this resident
-/// (docs/SERVER.md, the `ring-resident-rows` step).
+/// Scrollback history bytes retained per pane. The emulator reserves its
+/// ring at this size at the pane's first line into history and writes it as
+/// history arrives, so a pane is resident only as far as its history has
+/// reached and a filled ring costs one of this (warren#67; docs/SERVER.md,
+/// the `ring-resident-rows` step).
 pub const HISTORY_BYTES: int = 2097152
 /// Projected server memory past which a new connection or session is
 /// refused with REFUSE resource-limit (7).
@@ -25,11 +26,12 @@ pub const WIRE_CELL_BYTES: int = 34
 
 /// Projected bytes of a pane: its history ring six times over, both screens
 /// and 1 MiB for its fixed buffers. This is deliberately above the measured
-/// cost, not the cost: on Linux the first pane made at the 2 MiB cap peaks
-/// at 7.5 to 7.9 MB (the ring three times over while it is made, the screens,
-/// and 1.3 to 1.6 MB the first pane in a process pays once), and this
-/// projection, 13.2 MiB at 80x24, is above that by 1.76 times. The
-/// `ring-resident-rows` step holds it at or above the measurement.
+/// cost, not the cost: it counts every pane's ring filled, and on Linux a
+/// filled ring at the 2 MiB cap over an empty process measures 3.7 to
+/// 3.9 MB, which this projection, 13.2 MiB at 80x24, is above by 3.5 to
+/// 3.7 times. The `ring-resident-rows` step holds it at or above the
+/// measurement, and the `pane-cost-tabs` row holds a pane's cost from 1 to
+/// 32 tabs under its screens and fixed buffers.
 pub fn pane_bytes(cols: int, rows: int) -> int {
     6 * HISTORY_BYTES + 2 * cols * rows * CELL_BYTES + 1048576
 }
