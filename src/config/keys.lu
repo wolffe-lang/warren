@@ -120,6 +120,12 @@ pub const A_RENAME_SESSION: int = 36
 /// Read warren.toml again, or the file the command's text names
 /// (`source [FILE]`), and apply its settings; a refused file changes none.
 pub const A_SOURCE: int = 37
+/// Write the target session's layout to a layout file (`layout save NAME`):
+/// NAME under the layouts directory, or a word holding `/` as a file path.
+pub const A_LAYOUT_SAVE: int = 38
+/// Open a layout file's tabs in the target session (`layout load NAME`),
+/// NAME read as `layout save` reads it.
+pub const A_LAYOUT_LOAD: int = 39
 
 const SHIFT: int = 1
 const ALT: int = 2
@@ -546,6 +552,8 @@ fn verb(action: int, arg: int) -> str {
     if action == A_RENAME_SESSION { return "rename-session" }
     if action == A_KILL_SESSION { return "kill-session" }
     if action == A_SOURCE { return "source" }
+    if action == A_LAYOUT_SAVE { return "layout save" }
+    if action == A_LAYOUT_LOAD { return "layout load" }
     if action == A_LOCK { return "lock" }
     if action == A_SEND_PREFIX { return "send the prefix" }
     if action == A_CONFIRM { return verb(arg, 0) + " (asks)" }

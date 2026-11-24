@@ -284,6 +284,28 @@ fn verbs(mut t: Tally) {
     }
     if !listed { why = either(why, "source is not in the table") }
     row(mut t, "verbs-source", why)
+    // `layout save|load NAME` acts on the target's session; NAME is the rest
+    // of the line, a word holding `/` a file path.
+    why = ""
+    let l0 = verb("layout save -t work dev")
+    if !l0.ok || l0.kind != cmd.VERB_ACTION || l0.command.action != config.A_LAYOUT_SAVE || l0.command.text != "dev" ||
+        l0.target != "work" {
+        why = "layout save -t work dev: {l0.ok} {l0.kind} {l0.command.action} '{l0.command.text}' '{l0.target}' {l0.why}"
+    }
+    let l1 = verb("layout load ./dev.toml")
+    if !l1.ok || l1.command.action != config.A_LAYOUT_LOAD || l1.command.text != "./dev.toml" {
+        why = either(why, "layout load ./dev.toml: {l1.ok} {l1.command.action} '{l1.command.text}' {l1.why}")
+    }
+    why = either(why, either(same("layout save my layout"), same("layout load dev")))
+    why = either(why, either(usage("layout", "usage: layout save|load NAME"), usage("layout save", "usage: layout save|load NAME")))
+    why = either(why, usage("layout keep dev", "usage: layout save|load NAME"))
+    why = either(why, usage("layout save -c /tmp dev", "usage: layout makes no pane: -c and -- go with split-right, split-down, new-tab and new-session"))
+    var laid = false
+    for n in cmd.verb_names() {
+        if n == "layout" { laid = true }
+    }
+    if !laid { why = either(why, "layout is not in the table") }
+    row(mut t, "verbs-layout", why)
 }
 
 // ---- the creating verbs and the session verbs ----
