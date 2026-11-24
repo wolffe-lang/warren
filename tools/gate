@@ -168,6 +168,10 @@ step layout-table-lupin "$LUPIN" run src/layout_table_test.lu
 step layout-golden-build "$WOLF" build --deny-warnings src/layout_golden_test.lu -o "$root/target/native/layout-golden"
 step layout-golden-native "$root/target/native/layout-golden"
 step layout-golden-lupin "$LUPIN" run src/layout_golden_test.lu
+step layout-file-rows-build "$WOLF" build --deny-warnings src/layout_file_rows.lu -o "$root/target/native/layout-file-rows"
+step layout-file-round-trip "$root/target/native/layout-file-rows"
+step layout-file-round-trip-lupin "$LUPIN" run src/layout_file_rows.lu 1 0 2
+step layout-files-sample "$root/target/native/layout-file-rows" --sample "$root/target/layout-files"
 step pacing-lupin "$LUPIN" run src/pacing_test.lu
 step client-input-lupin "$LUPIN" run src/client_input_test.lu
 step client-keyboard-lupin "$LUPIN" run src/client_keyboard_test.lu
@@ -288,6 +292,8 @@ step tmux-rows python3 -I tools/session/tmux_rows.py --cases "$work/cases" --exp
 step toml-table-oracle python3 -I tests/config/toml_table.py
 # Every layout file the layout table refuses is valid TOML to tomllib.
 step layout-table-oracle python3 -I tests/config/layout_table.py
+# The round trip's first 512 layout files, read by tomllib as warren reads them.
+step layout-files-tomllib python3 -I tests/config/layout_files.py "$root/target/layout-files"
 # A wide scalar that cannot fit in the last column with autowrap off, against
 # the reference live (warren#28), natively and under lupin.
 step wide-pending-rows-native python3 -I tests/vt/wide_pending_rows.py "$root/target/native/warren"
