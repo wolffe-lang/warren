@@ -82,6 +82,7 @@ unzoomed geometry.
 | operation | effect | refusals, in order |
 |---|---|---|
 | `new(pane, name)` | a layout of one tab (id 1) with one pane | `bad_id` |
+| `from_tree(shape, panes, name, focus_leaf, zoomed)` | a layout of one tab (id 1, active) built as `add_tree` builds a tab (below); a one-leaf shape makes the layout `new` makes | as `add_tree` |
 | `split(tab, pane, axis, new_pane, after, cols, rows)` | the pane's leaf becomes a split at share 5000 along `axis`, the new pane second if `after`, first otherwise; focus moves to the new pane | `bad_id`, `no_pane` (also for an unknown tab), `duplicate_id`, `too_small` (the pane is hidden, or its extent along the axis is below `2m + 1`) |
 | `close(pane)` | the pane's parent split is replaced by the sibling subtree; if the pane had focus, focus goes to the most recently focused survivor; a tab's last pane closes the tab | `no_pane`, `session_empty` (the last pane of the last tab: the server ends the session instead) |
 | `focus(tab, direction, cols, rows)` | focus moves to the neighbour in that direction (below) | `no_tab`, `no_neighbour` |
@@ -217,12 +218,13 @@ hold. The layout files of a later milestone build on this form.
 `shape_of(layout, tab)` is a tab's tree without its arena or its panes: one
 node a line of the dump, in the same preorder, each a leaf or a split with
 its axis and share (empty for an unknown tab). `add_tree` builds a tab from
-a shape and its panes in tree order. Every shape it takes reads back the
-same, `shape_of(add_tree(s)) == s`, and it checks the whole shape, the panes
-and the focus before it makes anything, so a refusal leaves the layout as it
-was and spends no tab id. A leaf's axis and share are always `cols` and 0;
-a split's axis is `cols` or `rows` and its share in 1..9999. The layout
-files are written and read through this form.
+a shape and its panes in tree order, and `from_tree` a layout of that one
+tab. Every shape they take reads back the same,
+`shape_of(add_tree(s)) == s`, and each checks the whole shape, the panes and
+the focus before it makes anything, so a refusal leaves the layout as it was
+and spends no tab id. A leaf's axis and share are always `cols` and 0; a
+split's axis is `cols` or `rows` and its share in 1..9999. The layout files
+are written and read through this form.
 
 ## Rows
 
@@ -231,7 +233,7 @@ files are written and read through this form.
 | goldens | 59 operation scripts, each with the expected `dump_at` and every refusal, resize answer and `pane_at` query, computed by hand from this file | `src/layout_rows/goldens.lu` |
 | properties | seeded random sequences of 50 operations at 20x6, 80x24, 81x25, 320x90 and 512x512, the invariants below held after every operation, and grids of every shape up to 4x4 built at each size | `src/layout_rows/properties.lu` |
 | regions | every operation applied inside a region to a layout that outlives it, read back after the region's arena is reused | `src/layout_region_test.lu` |
-| `layout-shape-add-tree` | a tab's shape read back from the tab `add_tree` builds from it, with that tab's panes, focus, focus order, zoom and name, and each refusal leaving the layout's dump and next tab id as they were | `src/layout_rows/shape.lu` |
+| `layout-shape-add-tree` | a tab's shape read back from the tab `add_tree` builds from it, with that tab's panes, focus, focus order, zoom and name, and each refusal leaving the layout's dump and next tab id as they were; the same for the layout `from_tree` makes, whose one-leaf tree is `new`'s layout | `src/layout_rows/shape.lu` |
 
 The entries: `src/layout_native.lu` runs every golden and 2000 sequences at
 each size, and the arena-free form's rows; `src/layout_slice.lu` runs the
