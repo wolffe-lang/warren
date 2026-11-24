@@ -150,3 +150,18 @@ pub fn add_tree(
     (mut l.tabs).push(copy t)
     id
 }
+
+/// A layout of one tab (id 1, active) built from a shape and its panes as
+/// `add_tree` builds a tab, beside `new`; the same refusals.
+pub fn from_tree(
+    shape: List[ShapeNode],
+    panes: List[int],
+    name: str,
+    focus_leaf: int,
+    zoomed: bool,
+) -> Layout ! ShapeRefusal {
+    // Nothing is built yet: every tree is refused.
+    let _unused = shape.len + panes.len + name.len + focus_leaf
+    let _zoomed = zoomed
+    bad_shape
+}
