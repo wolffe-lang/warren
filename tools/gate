@@ -219,7 +219,8 @@ session_rows() (
     send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes
     capture-cases capture-register capture-full-ring capture-over-cap
     pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited split-starts-in-pane-cwd split-reported-missing
-    split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails)
+    split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file
+    layout-save-bound)
   if [ "$mode" = linux ]; then rows+=(pane-signals-and-handles threads rss-flat pane-cwd-from-proc); fi
   rm -rf target/rows && mkdir -p target/rows && cd target/rows
   "$root/target/native/session-rows" "$root/target/native/warren" "${rows[@]}"
