@@ -4,7 +4,7 @@
 session, starting the server (detached, in a session of its own, its standard
 streams on `/dev/null`) and the session when there are none. `warren attach
 [-t NAME]` attaches to a session that exists and is refused when it does not.
-`warren new [-d] [-s NAME]` makes a session and attaches to it. `warren
+`warren new [-d] [-s NAME] [-l LAYOUT]` makes a session and attaches to it. `warren
 kill-server` and `warren list-sessions` ask a running server over the command
 role. Later verbs (`detach`, `split`, `tab`, ...) fail by name.
 
@@ -16,7 +16,9 @@ the session and returns (at 80x24 when there is no terminal, or at `COLUMNS` by
 `LINES` when both are set: see "The window's size" below). Without `-s` the
 server names it with the lowest positive number not in use. A name in use is
 refused, and so are an empty name and one holding `/` or a control byte; names
-are compared as bytes.
+are compared as bytes. With `-l LAYOUT` the session is a layout file's: its
+tabs, panes, focus, zoom and active tab (`new-session -l`, LAYOUT.md); a
+relative path is read from this directory.
 
 Several clients may attach to one session. The pane takes the smallest
 columns and, separately, the smallest rows of the clients attached. When a
