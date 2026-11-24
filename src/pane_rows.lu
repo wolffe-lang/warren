@@ -3104,6 +3104,41 @@ fn row_source_at_command_line(mut r: Rig) -> str {
     finish(mut r, mut a)
 }
 
+// `:layout save NAME` typed at the command line writes the session's
+// layout and puts the file's path on the client's hint line; `:layout load
+// NAME` opens the file's tab and makes it active, as `:new-tab` does.
+fn row_layout_at_command_line(mut r: Rig) -> str {
+    let cfg = config_dir(r, "")
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach_features(r, 8, 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt" }
+    let _p = prefix(a, 58)
+    if !until_hint(mut a, " :", 3000) { return "no prompt: '" + hint_of(a.image) + "'" }
+    let _t = type_keys(a, "layout save cl")
+    let _e = enter(a)
+    let path = cfg + "/warren/layouts/cl.toml"
+    // The hint line holds the path's first 80 columns.
+    var shown = path
+    if shown.len > 80 { shown = shown[0..80] }
+    if !until_hint(mut a, shown, 3000) { return "the save's hint: '" + hint_of(a.image) + "', not '{shown}'" }
+    if !fs.exists(path) { return "no file at {path}" }
+    let _q = prefix(a, 58)
+    if !until_hint(mut a, " :", 3000) { return "no second prompt: '" + hint_of(a.image) + "'" }
+    let _u = type_keys(a, "layout load cl")
+    let _f = enter(a)
+    let until = now_ms() + 5000
+    var listing = ""
+    while now_ms() < until {
+        let l = ask(r, ["list", "--json"], here())
+        listing = l.out
+        if listing.contains("\"active_tab\":\"t2\"") { break }
+        let _k = client.step(mut a, 100)
+    }
+    if !listing.contains("\"active_tab\":\"t2\"") { return "the loaded tab is not active: {listing}" }
+    finish(mut r, mut a)
+}
+
 // ---------------- a selection's pane and its slot ----------------
 
 // Ask for the listing until pane `id` is gone from it, for at most 5 s.
@@ -3365,6 +3400,7 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "source-no-file-defaults" { why = row_source_no_file_defaults(mut r) }
     else if name == "source-clears-start-refusal" { why = row_source_clears_start_refusal(mut r) }
     else if name == "source-at-command-line" { why = row_source_at_command_line(mut r) }
+    else if name == "layout-at-command-line" { why = row_layout_at_command_line(mut r) }
     else if name == "select-ends-when-its-pane-goes" { why = row_select_ends_when_its_pane_goes(mut r) }
     else if name == "search-older" { why = row_search_older(mut r) }
     else if name == "search-repeat" { why = row_search_repeat(mut r) }
@@ -3425,7 +3461,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-live-edit scroll-reporting-child scroll-two-clients scroll-alternate select-drag-sgr select-drag-legacy select-reporting-child select-origin-clamp select-two-clients select-in-scroll paste-bracketed clip-copy clip-program-default clip-program-config config-refused source-applies-live source-refused-keeps source-named-file source-missing-file source-no-file-defaults source-clears-start-refusal source-at-command-line select-ends-when-its-pane-goes search-older search-repeat search-newer search-live search-wrapped search-not-found search-cancel mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay help-overlay-minute bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
+    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-live-edit scroll-reporting-child scroll-two-clients scroll-alternate select-drag-sgr select-drag-legacy select-reporting-child select-origin-clamp select-two-clients select-in-scroll paste-bracketed clip-copy clip-program-default clip-program-config config-refused source-applies-live source-refused-keeps source-named-file source-missing-file source-no-file-defaults source-clears-start-refusal source-at-command-line layout-at-command-line select-ends-when-its-pane-goes search-older search-repeat search-newer search-live search-wrapped search-not-found search-cancel mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay help-overlay-minute bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
         (mut x).push(n)
     }
     x
