@@ -404,7 +404,7 @@ fn pending_conns(s: Server) -> int {
 fn projected(s: Server, extra: int) -> int {
     var total = extra
     for p in s.panes {
-        total += pane_bytes(p.screen.cols, p.screen.rows)
+        total += pane_bytes(p.screen.cols, p.screen.rows) + p.argv.len
     }
     for c in s.conns {
         let kept = retained_bytes(c)
@@ -607,6 +607,13 @@ fn spawn_pane_in(mut s: Server, si: int, k: int, id: int, cols: int, rows: int, 
     s.panes[k].damage = s.panes[k].damage + 1
     s.panes[k].shown = false
     s.panes[k].sync_since = 0
+    // The words as given, in the slot's own bytes (a turn's region may not
+    // leave a str in the server).
+    (mut s.panes[k].argv).reset()
+    for w in argv {
+        for b in w.bytes() { (mut s.panes[k].argv).push(b) }
+        (mut s.panes[k].argv).push(0 as byte)
+    }
     let _named = vt.set_local_host(mut s.panes[k].screen, s.host_name)
     let sp = Spawn { cols: cols, rows: rows, cwd: if dir.len > 0 then dir else cwd_of(s.sessions[si]),
         names: copy s.sessions[si].env_names, values: copy s.sessions[si].env_values, pane_id: id }
@@ -1122,7 +1129,7 @@ fn act_split_in(mut s: Server, index: int, si: int, axis: int, dir: str, argv: L
         tell(mut s, index, "too small to split")
         return DONE
     }
-    if !pane_fits(s, nc, nr, 0) {
+    if !pane_fits(s, nc, nr, argv_bytes(argv)) {
         tell(mut s, index, "split refused: memory budget")
         return DONE
     }
@@ -1158,7 +1165,7 @@ fn act_new_tab_in(mut s: Server, index: int, si: int, dir: str, argv: List[str])
         tell(mut s, index, "new tab refused: {MAX_PANES} panes a session")
         return DONE
     }
-    if !pane_fits(s, cols, area, 0) {
+    if !pane_fits(s, cols, area, argv_bytes(argv)) {
         tell(mut s, index, "new tab refused: memory budget")
         return DONE
     }
