@@ -2155,7 +2155,8 @@ fn row_layout_save_writes_file(mut r: Rig) -> str {
     var tabs = List[config.TabFile]()
     // A split made from outside keeps the session's focus on the pane it split.
     (mut tabs).push(config.TabFile { name: "", named: true, focus: 1, zoomed: false, shape: shape, leaves: leaves })
-    let want = config.write_layout(config.LayoutFile { ok: true, line: 0, why: "", active: 1, tabs: tabs })
+    let want = config.write_layout(config.LayoutFile { ok: true, line: 0, why: "", active: 1, tabs: tabs,
+        session: config.no_session() })
     if text != want { return "the file is not the writer's text for the session:\n{text}--- the writer's ---\n{want}" }
     client.hang_up(mut a)
     ""

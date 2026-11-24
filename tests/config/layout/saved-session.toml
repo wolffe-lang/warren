@@ -1,0 +1,24 @@
+# warren layout
+version = 1
+active = 1
+
+[session]
+name = "my \"work\""
+cwd = "/home/me/src"
+cols = 120
+rows = 40
+
+[[tab]]
+name = "main"
+focus = 2
+zoomed = false
+
+[tab.root]
+split = "cols"
+share = 5000
+
+[tab.root.first]
+
+[tab.root.second]
+cwd = "/home/me/src/warren"
+command = ["make", "watch"]

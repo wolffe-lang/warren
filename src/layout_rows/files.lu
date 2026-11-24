@@ -42,6 +42,25 @@ fn file_leaf(mut g: Rng) -> config.LeafFile {
     config.LeafFile { cwd: cwd, command: words, line: 0 }
 }
 
+/// A session's table, or none (one file in two): a name from the hostile
+/// alphabet that a session may hold (no `/`, no control byte, not empty), an
+/// absolute start directory, and a size of at most 512 by 512.
+fn file_session(mut g: Rng) -> config.SessionFile {
+    if roll(mut g, 2) == 0 { return config.no_session() }
+    var name = "work"
+    let r = roll(mut g, 7)
+    if r == 1 { name = "two words" }
+    if r == 2 { name = "q\"uote" }
+    if r == 3 { name = "back\\slash" }
+    if r == 4 { name = "\u{2028}\u{1d11e}\u{e9}" }
+    if r == 5 { name = "#hash = [x], 'y'" }
+    if r == 6 { name = "~" }
+    let cwd = "/" + hostile_word(mut g)
+    let cols = 1 + roll(mut g, 512)
+    let rows = 1 + roll(mut g, 512)
+    config.SessionFile { saved: true, name: name, cwd: cwd, cols: cols, rows: rows, line: 0 }
+}
+
 /// The layout as a layout file, each leaf's data drawn from `g`.
 fn file_of(l: layout.Layout, mut g: Rng) -> config.LayoutFile {
     var tabs = List[config.TabFile]()
@@ -64,12 +83,16 @@ fn file_of(l: layout.Layout, mut g: Rng) -> config.LayoutFile {
             shape: layout.shape_of(l, t.id), leaves: leaves })
         i += 1
     }
-    config.LayoutFile { ok: true, line: 0, why: "", active: active, tabs: tabs }
+    config.LayoutFile { ok: true, line: 0, why: "", active: active, tabs: tabs, session: file_session(mut g) }
 }
 
 /// A layout file in words, every field, lengths before strings.
 fn file_words(f: config.LayoutFile) -> str {
     var out = "ok={f.ok} active={f.active} tabs={f.tabs.len}"
+    if f.session.saved {
+        out = out + " session={f.session.name.len}:{f.session.name} cwd={f.session.cwd.len}:{f.session.cwd}"
+        out = out + " size={f.session.cols}x{f.session.rows}"
+    }
     for t in f.tabs {
         out = out + " | name={t.name.len}:{t.name} named={t.named} focus={t.focus} zoomed={t.zoomed} shape="
         for n in t.shape { out = out + "{n.kind}.{n.axis}.{n.share}," }

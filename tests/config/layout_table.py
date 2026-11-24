@@ -13,7 +13,7 @@ import sys
 import tomllib
 from pathlib import Path
 
-CASES = 46
+CASES = 62
 REFUSAL = re.compile(r'^(\d+) \S')
 
 

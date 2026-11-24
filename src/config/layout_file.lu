@@ -33,18 +33,37 @@ pub struct TabFile {
     leaves: List[LeafFile],
 }
 
-/// A layout file read: `ok`, the active tab from 1 and the tabs; or the
-/// `line` that refused it and `why`, with no tabs.
+/// A saved session's own table (`[session]`): its name, its start
+/// directory, its size, and the line of the table. `saved` is false for a
+/// layout file without one.
+pub struct SessionFile {
+    saved: bool,
+    name: str,
+    cwd: str,
+    cols: int,
+    rows: int,
+    line: int,
+}
+
+/// No `[session]` table.
+pub fn no_session() -> SessionFile {
+    SessionFile { saved: false, name: "", cwd: "", cols: 0, rows: 0, line: 0 }
+}
+
+/// A layout file read: `ok`, the active tab from 1, the tabs, and the
+/// session's table when it has one; or the `line` that refused it and `why`,
+/// with no tabs.
 pub struct LayoutFile {
     ok: bool,
     line: int,
     why: str,
     active: int,
     tabs: List[TabFile],
+    session: SessionFile,
 }
 
 fn lay_refused(line: int, why: str) -> LayoutFile {
-    LayoutFile { ok: false, line: line, why: why, active: 0, tabs: List[TabFile]() }
+    LayoutFile { ok: false, line: line, why: why, active: 0, tabs: List[TabFile](), session: no_session() }
 }
 
 /// A TOML node's kind in words, for a refusal.
@@ -271,7 +290,7 @@ pub fn read_layout(text: str) -> LayoutFile {
             return lay_refused(line, "active {active}: the file has {lay_count(tabs.len, "tab", "tabs")}")
         }
     }
-    LayoutFile { ok: true, line: 0, why: "", active: active, tabs: tabs }
+    LayoutFile { ok: true, line: 0, why: "", active: active, tabs: tabs, session: no_session() }
 }
 
 /// A layout file's canonical text: the header comment, `version` and
