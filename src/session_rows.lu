@@ -2127,6 +2127,14 @@ fn row_layout_save_writes_file(mut r: Rig) -> str {
     ""
 }
 
+// A layout file written in the row's layouts directory as NAME.toml.
+fn layout_file(dir: str, name: str, text: str) -> str {
+    fs.create_dir_all(dir) else |_| {}
+    let path = dir + "/" + name + ".toml"
+    fs.write_text(path, text) else |e| { return "{path}: {e}" }
+    ""
+}
+
 // One COMMAND sent from directory `cwd` (and from no pane), its words given
 // one by one.
 fn ask_in(r: Rig, words: List[str], cwd: str) -> Answer {
@@ -2159,6 +2167,198 @@ fn line_words(line: str) -> List[str] {
         if w.len > 0 { (mut out).push(w) }
     }
     out
+}
+
+// The pid listed for pane `id`, as written (a number or null), or "".
+fn listed_pid(json: str, id: str) -> str {
+    let at = json.find("{{\"id\":\"{id}\",") else { return "" }
+    let rest = json[at..json.len]
+    let p = rest.find("\"pid\":") else { return "" }
+    let after = rest[p + 6..rest.len]
+    let e = after.find(",") else { return "" }
+    after[0..e]
+}
+
+// A refused load: status 1, `err` as given, nothing out, the listing
+// byte-equal before and after, and the next split taking the id it would
+// have had (`next`): no pane or tab id was spent.
+fn refused_load(r: Rig, line: str, err: str, next: str) -> str {
+    let before = listed(r)
+    if before.status != 0 { return before.err }
+    let l = ask(r, line, "")
+    if l.status != 1 || l.out != "" || l.err != err { return "{line}: {l.status} '{l.out.trim()}' '{l.err.trim()}', not '{err.trim()}'" }
+    let after = listed(r)
+    if after.status != 0 { return after.err }
+    if after.out != before.out { return "the listing changed:\n{before.out}\n{after.out}" }
+    let s = ask(r, "split-right -t work", "")
+    if s.status != 0 || s.out != next + "\n" { return "the next split made '{s.out.trim()}' ({s.status} '{s.err.trim()}'), not {next}" }
+    ""
+}
+
+// `layout load NAME` from a shell opens the file's tabs after the session's
+// and prints each new tab's id; the active tab, the focus and the first
+// pane's program stay.
+fn row_layout_load_adds_tabs(mut r: Rig) -> str {
+    let dir = layout_home(r)
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    let w = layout_file(dir, "two", "version = 1\n[[tab]]\nname = \"a\"\n[tab.root]\n[[tab]]\nname = \"b\"\nfocus = 2\n[tab.root]\nsplit = \"cols\"\n[tab.root.first]\n[tab.root.second]\n")
+    if w.len > 0 { return w }
+    let before = listed(r)
+    if before.status != 0 { return before.err }
+    let pid = listed_pid(before.out, "p1")
+    let l = ask(r, "layout load -t work two", "")
+    if l.status != 0 || l.out != "t2\nt3\n" { return "layout load: {l.status} '{l.out.trim()}' '{l.err.trim()}', not t2 and t3" }
+    let after = listed(r)
+    if after.status != 0 { return after.err }
+    if !after.out.contains("\"active_tab\":\"t1\"") { return "the active tab moved: {after.out}" }
+    if !after.out.contains("{{\"id\":\"t1\",\"name\":\"\",\"index\":1,\"focus\":\"p1\"") { return "t1's focus moved: {after.out}" }
+    if !after.out.contains("{{\"id\":\"t2\",\"name\":\"a\",\"index\":2,\"focus\":\"p2\"") { return "no tab a holding p2: {after.out}" }
+    if !after.out.contains("{{\"id\":\"t3\",\"name\":\"b\",\"index\":3,\"focus\":\"p4\"") { return "no tab b focused on its second leaf: {after.out}" }
+    if panes_in(after.out) != 4 { return "{panes_in(after.out)} panes, not 4" }
+    if pid.len == 0 || listed_pid(after.out, "p1") != pid { return "p1's program changed: pid {pid}, then {listed_pid(after.out, "p1")}" }
+    client.hang_up(mut a)
+    ""
+}
+
+// A load refused by a leaf's missing directory names its file and line,
+// and changes nothing: the listing is byte-equal and no id is spent.
+fn row_layout_refused_changes_nothing(mut r: Rig) -> str {
+    let dir = layout_home(r)
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    let w = layout_file(dir, "bad", "version = 1\n[[tab]]\n[tab.root]\nsplit = \"rows\"\n[tab.root.first]\n[tab.root.second]\ncwd = \"/no/such/dir/for/warren\"\n")
+    if w.len > 0 { return w }
+    let why2 = refused_load(r, "layout load -t work bad", "warren: layout load: bad line 6: no such directory: /no/such/dir/for/warren\n", "p2")
+    client.hang_up(mut a)
+    why2
+}
+
+// A leaf whose program is on no PATH is refused by line before anything is
+// made.
+fn row_layout_program_missing(mut r: Rig) -> str {
+    let dir = layout_home(r)
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    let w = layout_file(dir, "prog", "version = 1\n[[tab]]\n[tab.root]\ncommand = [\"no-such-program-for-warren\"]\n")
+    if w.len > 0 { return w }
+    let why2 = refused_load(r, "layout load -t work prog", "warren: layout load: prog line 3: no program named no-such-program-for-warren on PATH\n", "p2")
+    client.hang_up(mut a)
+    why2
+}
+
+// A file whose panes would take the session past its 32 is refused whole.
+fn row_layout_too_many_panes(mut r: Rig) -> str {
+    let dir = layout_home(r)
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    var text = "version = 1\n"
+    var i = 0
+    while i < 32 {
+        text = text + "[[tab]]\n[tab.root]\n"
+        i += 1
+    }
+    let w = layout_file(dir, "many", text)
+    if w.len > 0 { return w }
+    let why2 = refused_load(r, "layout load -t work many", "warren: layout load: many: its 32 panes and the session's 1 are past 32 a session\n", "p2")
+    client.hang_up(mut a)
+    why2
+}
+
+// A file some leaf of which would get no cell at the session's size is
+// refused whole, the size named.
+fn row_layout_too_small(mut r: Rig) -> str {
+    let dir = layout_home(r)
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 20, 6, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    var text = "version = 1\n[[tab]]\n"
+    var path = "tab.root"
+    var i = 0
+    while i < 7 {
+        text = text + "[{path}]\nsplit = \"cols\"\n[{path}.first]\n"
+        path = path + ".second"
+        i += 1
+    }
+    text = text + "[{path}]\n"
+    let w = layout_file(dir, "wide", text)
+    if w.len > 0 { return w }
+    let why2 = refused_load(r, "layout load -t work wide", "warren: layout load: wide: too small for this layout at 20x6\n", "p2")
+    client.hang_up(mut a)
+    why2
+}
+
+// A NAME with no file is refused by name, with the path it was looked for at.
+fn row_layout_unknown_name(mut r: Rig) -> str {
+    let dir = layout_home(r)
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    let why2 = refused_load(r, "layout load -t work nowhere", "warren: layout load: no layout named nowhere ({dir}/nowhere.toml)\n", "p2")
+    client.hang_up(mut a)
+    why2
+}
+
+// A leaf's relative `cwd` is read from the session's start directory, and
+// `~/...` from its HOME: each new pane's program starts there.
+fn row_layout_relative_cwd(mut r: Rig) -> str {
+    let dir = layout_home(r)
+    let start = env.cwd() else "/"
+    let home = env.get("HOME") else "/"
+    let sub = r.dir + "-sub"
+    fs.create_dir_all(start + "/" + sub) else |e| { return "{sub}: {e}" }
+    let away = r.dir + "-away"
+    fs.create_dir_all(home + "/" + away) else |e| { return "~/{away}: {e}" }
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    let shown = "command = [\"/bin/sh\", \"-c\", \"echo AT=$(pwd -P); exec /bin/sh\"]\n"
+    let w = layout_file(dir, "dirs", "version = 1\n[[tab]]\n[tab.root]\nsplit = \"rows\"\n[tab.root.first]\ncwd = \"{sub}\"\n" + shown + "[tab.root.second]\ncwd = \"~/{away}\"\n" + shown)
+    if w.len > 0 { return w }
+    let l = ask(r, "layout load -t work dirs", "")
+    if l.status != 0 || l.out != "t2\n" { return "layout load: {l.status} '{l.out.trim()}' '{l.err.trim()}'" }
+    let want_sub = resolved(start + "/" + sub)
+    let want_away = resolved(home + "/" + away)
+    let c1 = until_captured(r, "p2", "AT=" + want_sub)
+    if c1.len > 0 { return "the relative cwd: " + c1 }
+    let c2 = until_captured(r, "p3", "AT=" + want_away)
+    if c2.len > 0 { return "the ~/ cwd: " + c2 }
+    client.hang_up(mut a)
+    ""
+}
+
+// A word holding `/` is a file path, read from the directory the verb came
+// from: `layout save ./PATH` writes there, `layout load ./PATH` reads it.
+fn row_layout_path_save_load(mut r: Rig) -> str {
+    let dir = layout_home(r)
+    let here = env.cwd() else "/"
+    let proj = r.dir + "-proj"
+    fs.create_dir_all(here + "/" + proj) else |e| { return "{proj}: {e}" }
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    let file = "./{proj}/dev.toml"
+    let s = ask_in(r, line_words("layout save -t work " + file), here)
+    let path = here + "/" + file
+    if s.status != 0 || s.out != path + "\n" { return "layout save {file}: {s.status} '{s.out.trim()}' '{s.err.trim()}', not {path}" }
+    if !fs.exists(here + "/" + proj + "/dev.toml") { return "no file at {proj}/dev.toml" }
+    if fs.exists(dir) { return "the layouts directory was made for a path" }
+    let l = ask_in(r, line_words("layout load -t work " + file), here)
+    if l.status != 0 || l.out != "t2\n" { return "layout load {file}: {l.status} '{l.out.trim()}' '{l.err.trim()}'" }
+    client.hang_up(mut a)
+    ""
 }
 
 // A session whose layout's text would pass the file bound (its panes'
@@ -3299,6 +3499,14 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "pane-cwd-not-inherited" { why = row_pane_cwd_not_inherited(mut r) }
     else if name == "pane-title-not-inherited" { why = row_pane_title_not_inherited(mut r) }
     else if name == "layout-save-writes-file" { why = row_layout_save_writes_file(mut r) }
+    else if name == "layout-load-adds-tabs" { why = row_layout_load_adds_tabs(mut r) }
+    else if name == "layout-refused-changes-nothing" { why = row_layout_refused_changes_nothing(mut r) }
+    else if name == "layout-program-missing" { why = row_layout_program_missing(mut r) }
+    else if name == "layout-too-many-panes" { why = row_layout_too_many_panes(mut r) }
+    else if name == "layout-too-small" { why = row_layout_too_small(mut r) }
+    else if name == "layout-unknown-name" { why = row_layout_unknown_name(mut r) }
+    else if name == "layout-relative-cwd" { why = row_layout_relative_cwd(mut r) }
+    else if name == "layout-path-save-load" { why = row_layout_path_save_load(mut r) }
     else if name == "layout-save-bound" { why = row_layout_save_bound(mut r) }
     else if name == "split-starts-in-pane-cwd" { why = row_split_starts_in_pane_cwd(mut r) }
     else if name == "split-reported-missing" { why = row_split_reported_missing(mut r) }
@@ -3336,7 +3544,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file layout-save-bound".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file layout-load-adds-tabs layout-refused-changes-nothing layout-program-missing layout-too-many-panes layout-too-small layout-unknown-name layout-relative-cwd layout-path-save-load layout-save-bound".split(" ") {
         (mut x).push(n)
     }
     x
