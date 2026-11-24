@@ -69,7 +69,7 @@ resident only as far as its history has reached: a pane with no history yet
 costs what a pane with no ring does, and a filled ring costs one cap. The
 figures below are measured ranges, not bounds (the `ring-resident-rows` step
 holds the bounds). They come from the recorded takes (six runs of three on
-Linux, two on macOS) and, on Linux, two passes of the whole gate, at the
+Linux, two on macOS) and, on Linux, three passes of the whole gate, at the
 2 MiB cap:
 - A new pane costs 1.1 to 1.8 MB on Linux and 0.49 MB on macOS. That is
   what it costs at cap 0 within the runs' spread: its screens, and what the
@@ -114,8 +114,8 @@ cap and do not hold it.
 
 The cap stays 2 MiB a pane. A larger one would now cost only the panes whose
 history reaches it, but the projection would still count it six times over
-for every pane. Across two passes of the Linux gate with the 2 MiB cap
-(measured ranges, not bounds), a server's resident size is 5.0 to 6.0 MiB at
+for every pane. Across three passes of the Linux gate with the 2 MiB cap
+(measured ranges, not bounds), a server's resident size is 4.9 to 6.0 MiB at
 start, 8.1 to 8.4 MiB with one 80x24 session and its client, and 1.2 MiB
 more for a second (`MEASURE server-rss`).
 It stays flat over 10,000 keystrokes beside a flooding pane whose ring has
