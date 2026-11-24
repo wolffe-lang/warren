@@ -1621,6 +1621,11 @@ fn row_memory_bounded(warren: str) -> str {
 }
 
 fn run_row(warren: str, name: str) -> str {
+    // This row's own state directory (XDG_STATE_HOME), made empty: what one
+    // row's server saves is never restored by another's.
+    let state = (env.cwd() else ".") + "/st-" + name
+    fs.remove_dir_all(state) else |_| {}
+    env.set("XDG_STATE_HOME", state) else |_| {}
     if name == "detach-reattach" { return row_detach_reattach(warren) }
     if name == "server-stopping" { return row_server_stopping(warren) }
     if name == "too-small" { return row_too_small(warren) }

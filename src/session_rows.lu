@@ -2011,6 +2011,267 @@ fn row_pane_start_dir_kept(mut r: Rig) -> str {
     ""
 }
 
+// ---- saved sessions ----
+
+// This row's own state directory (XDG_STATE_HOME), made empty: what one row's
+// server saves is never restored by another's, and a row that restarts its
+// server keeps what it saved. Its configuration directory (XDG_CONFIG_HOME)
+// is its own too, empty until the row writes one, so no row reads another's
+// warren.toml.
+fn fresh_state(row: str) {
+    let dir = (env.cwd() else ".") + "/st-" + row
+    fs.remove_dir_all(dir) else |_| {}
+    env.set("XDG_STATE_HOME", dir) else |_| {}
+    let config = (env.cwd() else ".") + "/cf-" + row
+    fs.remove_dir_all(config) else |_| {}
+    env.set("XDG_CONFIG_HOME", config) else |_| {}
+}
+
+// Where a session named `name` is saved.
+fn state_file(name: str) -> str {
+    (env.get("XDG_STATE_HOME") else "") + "/warren/sessions/" + name + ".toml"
+}
+
+// A session's saved text: `layout save`'s text with the session's table
+// after `active` (plain-ASCII name and directory: no escapes).
+fn with_session_table(text: str, name: str, cwd: str, cols: int, rows: int) -> str {
+    let at = text.find("\n\n[[tab]]") else { return text }
+    let table = "\n[session]\nname = \"" + name + "\"\ncwd = \"" + cwd + "\"\ncols = {cols}\nrows = {rows}\n"
+    text[0..at + 1] + table + text[at + 1..text.len]
+}
+
+// Read `path` until it holds `want`, for at most `ms`.
+fn until_saved_text(path: str, want: str, ms: int) -> str {
+    let until = now_ms() + ms
+    var last = "<none>"
+    while now_ms() < until {
+        last = fs.read_text(path) else "<none>"
+        if last == want { return "" }
+        time.sleep(time.millis(50))
+    }
+    "{path} holds {last.len} bytes, not the {want.len} wanted: " + last
+}
+
+// Wait until `path` exists (`gone` false) or is gone (`gone` true), for at
+// most `ms`.
+fn until_present(path: str, gone: bool, ms: int) -> bool {
+    let until = now_ms() + ms
+    while now_ms() < until {
+        if fs.exists(path) != gone { return true }
+        time.sleep(time.millis(50))
+    }
+    fs.exists(path) != gone
+}
+
+// The leaves of a saved session's first tab, or -1 when it does not read.
+fn saved_leaves(path: str) -> int {
+    let text = fs.read_text(path) else { return 0 - 1 }
+    let f = config.read_layout(text)
+    if !f.ok || f.tabs.len == 0 { return 0 - 1 }
+    f.tabs[0].leaves.len
+}
+
+// A structural change is saved: after a split, the session's file is in the
+// state directory's `warren/sessions`, at 0600 in directories made at 0700,
+// with no temp file left, its text `layout save`'s with the session's table
+// (its name, start directory and size).
+fn row_saved_on_change(mut r: Rig) -> str {
+    let layouts = layout_home(r)
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    let s = ask(r, "split-right -t work", "")
+    if s.status != 0 { return "split-right: {s.status} '{s.err.trim()}'" }
+    let saved = ask(r, "layout save -t work cmp", "")
+    if saved.status != 0 { return "layout save: {saved.status} '{saved.err.trim()}'" }
+    let text = fs.read_text(layouts + "/cmp.toml") else |e| { return "the layout did not read: {e}" }
+    let want = with_session_table(text, "work", env.cwd() else "/", 80, 24)
+    let path = state_file("work")
+    let w = until_saved_text(path, want, 3000)
+    client.hang_up(mut a)
+    if w.len > 0 { return w }
+    let info = fs.stat(path) else |e| { return "stat: {e}" }
+    if info.mode % 512 != 384 { return "the file's mode is {info.mode % 512}, not 384 (0600)" }
+    let state = env.get("XDG_STATE_HOME") else ""
+    for d in [state + "/warren", state + "/warren/sessions"] {
+        let i = fs.stat(d) else |e| { return "stat {d}: {e}" }
+        if i.mode % 512 != 448 { return "{d}'s mode is {i.mode % 512}, not 448 (0700)" }
+    }
+    if fs.exists(path + ".tmp") { return "a temp file was left beside it" }
+    ""
+}
+
+// At most one write a second: thirty-one changes (a zoom turned on and off)
+// in about half a second, then a second and a half, give one to three
+// writes of the session in the server's trace, and the last change (zoomed)
+// is in the file.
+fn row_saved_once_a_second(mut r: Rig) -> str {
+    let trace = beside(r, "trace")
+    let why = start_traced(mut r, "/bin/sh", 60000, trace)
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    let s = ask(r, "split-right -t work", "")
+    if s.status != 0 { return "split-right: {s.status} '{s.err.trim()}'" }
+    if !until_present(state_file("work"), false, 3000) { return "the session was never saved" }
+    time.sleep(time.millis(1200))
+    let before = (fs.read_text(trace) else "").split("saved work").len
+    var i = 0
+    while i < 31 {
+        let z = ask(r, "zoom -t p1", "")
+        if z.status != 0 { return "zoom: {z.status} '{z.err.trim()}'" }
+        time.sleep(time.millis(15))
+        i += 1
+    }
+    time.sleep(time.millis(1500))
+    let writes = (fs.read_text(trace) else "").split("saved work").len - before
+    client.hang_up(mut a)
+    if writes < 1 || writes > 3 { return "{writes} writes of the session for 31 changes, not 1 to 3" }
+    let text = fs.read_text(state_file("work")) else |e| { return "the file did not read: {e}" }
+    if !text.contains("zoomed = true") { return "the file does not hold the last change (zoomed): " + text }
+    ""
+}
+
+// A stop writes every live session before any pane hangs up: a split made
+// inside the second after the last write is in the file after `kill-server`,
+// and three leaves are in it after TERM.
+fn row_saved_at_stop(mut r: Rig) -> str {
+    let trace = beside(r, "trace")
+    let why = start_traced(mut r, "/bin/sh", 60000, trace)
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    if !until_present(state_file("work"), false, 3000) {
+        let t = fs.read_text(trace) else ""
+        let from = if t.len > 1500 then t.len - 1500 else 0
+        return "the session was never saved; the trace ends: " + t[from..t.len]
+    }
+    time.sleep(time.millis(1200))
+    let s = ask(r, "split-right -t work", "")
+    if s.status != 0 { return "split-right: {s.status} '{s.err.trim()}'" }
+    client.hang_up(mut a)
+    let _k = stop_server(mut r)
+    let n = saved_leaves(state_file("work"))
+    if n != 2 { return "after kill-server the file has {n} leaves, not 2" }
+    let again = start_server(mut r, "/bin/sh")
+    if again.len > 0 { return again }
+    var b = attach(r, 80, 24, "next", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut b, "$", 5000) { return "no prompt: " + client.screen_text(b) }
+    if !until_present(state_file("next"), false, 3000) { return "the second session was never saved" }
+    time.sleep(time.millis(1200))
+    for verb in ["split-right -t next", "split-down -t next"] {
+        let v = ask(r, verb, "")
+        if v.status != 0 { return "{verb}: {v.status} '{v.err.trim()}'" }
+    }
+    client.hang_up(mut b)
+    var ch = process.Child { slot: r.server }
+    let pid = process.pid(ch) else |e| { return "pid: {e}" }
+    signal.send(pid, signal.terminate()) else |e| { return "TERM: {e}" }
+    let _st = process.wait_status(take ch) else 0 - 1
+    r.started = false
+    let m = saved_leaves(state_file("next"))
+    if m != 3 { return "after TERM the file has {m} leaves, not 3" }
+    ""
+}
+
+// A renamed session's file follows its name: the new name's file holds the
+// new name, and the old one is gone.
+fn row_saved_follows_rename(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    if !until_present(state_file("work"), false, 3000) { return "the session was never saved" }
+    let n = ask(r, "rename-session -t work other", "")
+    if n.status != 0 { return "rename-session: {n.status} '{n.err.trim()}'" }
+    let moved = until_present(state_file("other"), false, 3000)
+    let gone = until_present(state_file("work"), true, 3000)
+    client.hang_up(mut a)
+    if !moved { return "no file for the new name" }
+    if !gone { return "the old name's file is still there" }
+    let text = fs.read_text(state_file("other")) else |e| { return "the file did not read: {e}" }
+    if !text.contains("name = \"other\"") { return "the file does not name the session other: " + text }
+    ""
+}
+
+// A session that ends takes its file with it: by kill-session (the other
+// session's file stays), and by its last pane's exit.
+fn row_saved_removed_at_end(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    let n = ask(r, "new-session away", "")
+    if n.status != 0 { return "new-session: {n.status} '{n.err.trim()}'" }
+    if !until_present(state_file("away"), false, 3000) || !until_present(state_file("work"), false, 3000) {
+        return "the two sessions were never saved"
+    }
+    let k = ask(r, "kill-session -t away", "")
+    if k.status != 0 { return "kill-session: {k.status} '{k.err.trim()}'" }
+    if !until_present(state_file("away"), true, 3000) { return "kill-session left the session's file" }
+    if !fs.exists(state_file("work")) { return "kill-session of away took work's file" }
+    let x = ask(r, "send-keys -t work exit Enter", "")
+    if x.status != 0 { return "send-keys: {x.status} '{x.err.trim()}'" }
+    let gone = until_present(state_file("work"), true, 5000)
+    client.hang_up(mut a)
+    if !gone { return "the last pane's exit left the session's file" }
+    ""
+}
+
+// Every live session is written inside the stopping bound: sixteen sessions,
+// then kill-server, and the server is gone within STOPPING_MS with sixteen
+// files.
+fn row_stop_writes_in_bound(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    var i = 2
+    while i <= server.MAX_SESSIONS {
+        let n = ask(r, "new-session s{i}", "")
+        if n.status != 0 { return "new-session s{i}: {n.status} '{n.err.trim()}'" }
+        i += 1
+    }
+    client.hang_up(mut a)
+    let t0 = now_ms()
+    let _k = stop_server(mut r)
+    let took = now_ms() - t0
+    if took > server.STOPPING_MS { return "the stop took {took} ms, past {server.STOPPING_MS}" }
+    var missing = ""
+    if !fs.exists(state_file("work")) { missing = missing + " work" }
+    i = 2
+    while i <= server.MAX_SESSIONS {
+        if !fs.exists(state_file("s{i}")) { missing = missing + " s{i}" }
+        i += 1
+    }
+    if missing.len > 0 { return "no file for" + missing }
+    ""
+}
+
+// restore = false stops saving: a session saved while it is on, then
+// `source` of a file with restore = false, and a later split is never written
+// (the file stays as it was, one leaf).
+fn row_saved_off(mut r: Rig) -> str {
+    let _l = layout_home(r)
+    let conf = beside(r, "off.toml")
+    fs.write_text(conf, "restore = false\n") else |e| { return "the file: {e}" }
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    if !until_present(state_file("work"), false, 3000) { return "the session was never saved while restore was on" }
+    let src = ask(r, "source " + conf, "")
+    if src.status != 0 { return "source: {src.status} '{src.err.trim()}'" }
+    let s = ask(r, "split-right -t work", "")
+    if s.status != 0 { return "split-right: {s.status} '{s.err.trim()}'" }
+    time.sleep(time.millis(2000))
+    client.hang_up(mut a)
+    let n = saved_leaves(state_file("work"))
+    if n != 1 { return "with restore = false the file has {n} leaves, not the 1 saved before" }
+    ""
+}
+
 // A pane made in a slot another pane left does not inherit that pane's
 // report: pane 1 reports, is closed, and pane 3 takes its slot.
 fn row_pane_cwd_not_inherited(mut r: Rig) -> str {
@@ -3613,6 +3874,7 @@ fn row_prompt_frame_minute(mut r: Rig) -> str {
 
 fn run_row(warren: str, name: str) -> str {
     var r = rig(warren, name)
+    fresh_state(name)
     var why = "no such row"
     if name == "echo" { why = row_echo(mut r) }
     else if name == "split-every-byte" { why = row_split_every_byte(mut r) }
@@ -3660,6 +3922,13 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "pane-cwd-not-inherited" { why = row_pane_cwd_not_inherited(mut r) }
     else if name == "pane-title-not-inherited" { why = row_pane_title_not_inherited(mut r) }
     else if name == "pane-start-dir-kept" { why = row_pane_start_dir_kept(mut r) }
+    else if name == "saved-on-change" { why = row_saved_on_change(mut r) }
+    else if name == "saved-once-a-second" { why = row_saved_once_a_second(mut r) }
+    else if name == "saved-at-stop" { why = row_saved_at_stop(mut r) }
+    else if name == "saved-follows-rename" { why = row_saved_follows_rename(mut r) }
+    else if name == "saved-removed-at-end" { why = row_saved_removed_at_end(mut r) }
+    else if name == "stop-writes-in-bound" { why = row_stop_writes_in_bound(mut r) }
+    else if name == "saved-off" { why = row_saved_off(mut r) }
     else if name == "layout-save-writes-file" { why = row_layout_save_writes_file(mut r) }
     else if name == "layout-load-adds-tabs" { why = row_layout_load_adds_tabs(mut r) }
     else if name == "layout-refused-changes-nothing" { why = row_layout_refused_changes_nothing(mut r) }
@@ -3708,7 +3977,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited pane-start-dir-kept split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file layout-load-adds-tabs layout-refused-changes-nothing layout-program-missing layout-too-many-panes layout-too-small layout-unknown-name layout-relative-cwd layout-path-save-load layout-save-bound new-l-makes-session layout-save-load-round-trip".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited pane-start-dir-kept saved-on-change saved-once-a-second saved-at-stop saved-follows-rename saved-removed-at-end stop-writes-in-bound saved-off split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file layout-load-adds-tabs layout-refused-changes-nothing layout-program-missing layout-too-many-panes layout-too-small layout-unknown-name layout-relative-cwd layout-path-save-load layout-save-bound new-l-makes-session layout-save-load-round-trip".split(" ") {
         (mut x).push(n)
     }
     x
