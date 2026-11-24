@@ -96,6 +96,7 @@ unzoomed geometry.
 | `select_tab_id(tab)` | that tab becomes active | `no_tab` |
 | `next_tab()`, `previous_tab()` | the next or previous tab becomes active, wrapping | none |
 | `rename_tab(tab, name)` | the tab's name becomes `name` | `no_tab` |
+| `add_tree(shape, panes, name, focus_leaf, zoomed)` | a tab built from a shape (below), its leaves holding `panes` in tree order, appended last; it takes the next tab id, which it answers, and the active tab does not change; its focus is the `focus_leaf`th leaf, first in its focus order and the rest in tree order | `bad_shape` (not one whole tree with a leaf for each pane, or a node out of range), `bad_id`, `duplicate_id` (a pane given twice, or live), `bad_focus` |
 
 - **Regions.** The server applies operations inside its turn's region, so
   none keeps a value of its caller's region in the layout: a new tab is pushed
@@ -211,6 +212,18 @@ tab 1 focus=3 zoomed=0 order=3,2,1 name="main"
 Two layouts are equal exactly when their dumps are, whatever their arenas
 hold. The layout files of a later milestone build on this form.
 
+## The arena-free form
+
+`shape_of(layout, tab)` is a tab's tree without its arena or its panes: one
+node a line of the dump, in the same preorder, each a leaf or a split with
+its axis and share (empty for an unknown tab). `add_tree` builds a tab from
+a shape and its panes in tree order. Every shape it takes reads back the
+same, `shape_of(add_tree(s)) == s`, and it checks the whole shape, the panes
+and the focus before it makes anything, so a refusal leaves the layout as it
+was and spends no tab id. A leaf's axis and share are always `cols` and 0;
+a split's axis is `cols` or `rows` and its share in 1..9999. The layout
+files are written and read through this form.
+
 ## Rows
 
 | row | what it holds | where |
@@ -218,15 +231,17 @@ hold. The layout files of a later milestone build on this form.
 | goldens | 59 operation scripts, each with the expected `dump_at` and every refusal, resize answer and `pane_at` query, computed by hand from this file | `src/layout_rows/goldens.lu` |
 | properties | seeded random sequences of 50 operations at 20x6, 80x24, 81x25, 320x90 and 512x512, the invariants below held after every operation, and grids of every shape up to 4x4 built at each size | `src/layout_rows/properties.lu` |
 | regions | every operation applied inside a region to a layout that outlives it, read back after the region's arena is reused | `src/layout_region_test.lu` |
+| `layout-shape-add-tree` | a tab's shape read back from the tab `add_tree` builds from it, with that tab's panes, focus, focus order, zoom and name, and each refusal leaving the layout's dump and next tab id as they were | `src/layout_rows/shape.lu` |
 
-The entries: `src/layout_native.lu` runs every golden and 2000 sequences
-at each size; `src/layout_slice.lu` runs the goldens, or a slice of
-sequences at one size (`SIZE FIRST COUNT`, the same seeds), for the checked
-machine and the reference interpreter, whose step budgets hold a few dozen
-sequences a run (`tests/layout/rig/slices.py` sums 200 a size on the first
-and 50 on the second); `src/layout_test.lu` puts the goldens, and four
-sequences with the constructed grids at each size (one test a size, each
-inside the checked machine's budget), in the ordinary `wolf test` gate.
+The entries: `src/layout_native.lu` runs every golden and 2000 sequences at
+each size, and the arena-free form's rows; `src/layout_slice.lu` runs the
+goldens, or a slice of sequences at one size (`SIZE FIRST COUNT`, the same
+seeds), for the checked machine and the reference interpreter, whose step
+budgets hold a few dozen sequences a run (`tests/layout/rig/slices.py` sums
+200 a size on the first and 50 on the second); `src/layout_test.lu` puts the
+goldens, the arena-free form's rows, and four sequences with the constructed
+grids at each size (one test a size, each inside the checked machine's
+budget), in the ordinary `wolf test` gate.
 
 The invariants:
 
