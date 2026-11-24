@@ -39,7 +39,7 @@ fn file_leaf(mut g: Rng) -> config.LeafFile {
         (mut words).push(hostile_word(mut g))
         i += 1
     }
-    config.LeafFile { cwd: cwd, command: words }
+    config.LeafFile { cwd: cwd, command: words, line: 0 }
 }
 
 /// The layout as a layout file, each leaf's data drawn from `g`.

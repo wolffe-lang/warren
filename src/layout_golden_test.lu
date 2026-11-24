@@ -9,7 +9,7 @@ use config
 use layout
 
 fn leaf(cwd: str, words: List[str]) -> config.LeafFile {
-    config.LeafFile { cwd: cwd, command: copy words }
+    config.LeafFile { cwd: cwd, command: copy words, line: 0 }
 }
 
 fn no_words() -> List[str] { List[str]() }

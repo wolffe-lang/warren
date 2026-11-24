@@ -2072,7 +2072,7 @@ fn saved_leaf(json: str, id: str, words: List[str]) -> config.LeafFile {
     let place = listed_cwd(json, id).split("|")
     var cwd = ""
     if place.len == 2 && place[1] != "start" { cwd = place[0] }
-    config.LeafFile { cwd: cwd, command: copy words }
+    config.LeafFile { cwd: cwd, command: copy words, line: 0 }
 }
 
 fn shape_leaf() -> layout.ShapeNode { layout.ShapeNode { kind: layout.LEAF, axis: layout.COLS, share: 0 } }
