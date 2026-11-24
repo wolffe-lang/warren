@@ -41,10 +41,233 @@ pub struct LayoutFile {
     tabs: List[TabFile],
 }
 
+fn lay_refused(line: int, why: str) -> LayoutFile {
+    LayoutFile { ok: false, line: line, why: why, active: 0, tabs: List[TabFile]() }
+}
+
+/// A TOML node's kind in words, for a refusal.
+fn lay_kind(kind: int) -> str {
+    if kind == TOML_TABLE { return "a table" }
+    if kind == TOML_TABLES { return "an array of tables" }
+    if kind == TOML_STRING { return "a string" }
+    if kind == TOML_INT { return "an integer" }
+    if kind == TOML_BOOL { return "a boolean" }
+    "an array of strings"
+}
+
+/// `n` and the noun, singular for one.
+fn lay_count(n: int, one: str, many: str) -> str {
+    if n == 1 { return "1 {one}" }
+    "{n} {many}"
+}
+
+/// A string as a refusal shows it, in double quotes, with `"`, `\` and
+/// control characters escaped, so that no refusal carries a control byte.
+fn lay_shown(s: str) -> str {
+    var out = List[byte]()
+    (mut out).push(34 as byte)
+    for b in s.bytes() {
+        let c = b as int
+        if c == 34 || c == 92 {
+            (mut out).push(92 as byte)
+            (mut out).push(b)
+        } else if c < 32 || c == 127 {
+            for x in "\\u00".bytes() { (mut out).push(x) }
+            let hex = "0123456789ABCDEF".bytes()
+            (mut out).push(hex[c / 16])
+            (mut out).push(hex[c % 16])
+        } else {
+            (mut out).push(b)
+        }
+    }
+    (mut out).push(34 as byte)
+    str_from_utf8(out) else "\"?\""
+}
+
+/// What the reader has so far: the current tab's shape and leaves, the
+/// leaves across the file, and the refusal once there is one.
+struct LayReading {
+    shape: List[layout.ShapeNode],
+    leaves: List[LeafFile],
+    total: int,
+    line: int,
+    why: str,
+}
+
+fn lay_refuse(mut r: LayReading, line: int, why: str) -> bool {
+    r.line = line
+    r.why = why
+    false
+}
+
+/// Read node `n` of a tab's tree and its subtree, in preorder; false with
+/// the refusal set in `r` when it is refused.
+fn lay_node(d: Toml, n: int, mut r: LayReading) -> bool {
+    let at = d.nodes[n].line
+    let split = toml_child(d, n, "split")
+    if split < 0 {
+        r.total += 1
+        if r.total > LAYOUT_LEAVES {
+            return lay_refuse(mut r, at, "a {r.total}rd leaf: a layout holds at most {LAYOUT_LEAVES}")
+        }
+        var leaf = LeafFile { cwd: "", command: List[str]() }
+        for c in d.nodes[n].children {
+            let key = d.nodes[c].key
+            let line = d.nodes[c].line
+            let kind = d.nodes[c].kind
+            if key == "cwd" {
+                if kind != TOML_STRING { return lay_refuse(mut r, line, "cwd is {lay_kind(kind)}, not a string") }
+                if d.nodes[c].text == "" { return lay_refuse(mut r, line, "an empty cwd") }
+                leaf.cwd = d.nodes[c].text
+            } else if key == "command" {
+                if kind != TOML_STRINGS {
+                    return lay_refuse(mut r, line, "command is {lay_kind(kind)}, not an array of strings")
+                }
+                if d.nodes[c].strings.len == 0 { return lay_refuse(mut r, line, "an empty command") }
+                leaf.command = copy d.nodes[c].strings
+            } else if key == "share" {
+                return lay_refuse(mut r, line, "share on a leaf: only a split has one")
+            } else if key == "first" || key == "second" {
+                return lay_refuse(mut r, line, "{key} under a leaf: only a split has children")
+            } else {
+                return lay_refuse(mut r, line, "unknown key {key}")
+            }
+        }
+        (mut r.shape).push(layout.ShapeNode { kind: layout.LEAF, axis: layout.COLS, share: 0 })
+        (mut r.leaves).push(leaf)
+        return true
+    }
+    let sline = d.nodes[split].line
+    if d.nodes[split].kind != TOML_STRING {
+        return lay_refuse(mut r, sline, "split is {lay_kind(d.nodes[split].kind)}, not a string")
+    }
+    let word = d.nodes[split].text
+    var axis = layout.COLS
+    if word == "rows" {
+        axis = layout.ROWS
+    } else if word != "cols" {
+        return lay_refuse(mut r, sline, "split is {lay_shown(word)}, not \"cols\" or \"rows\"")
+    }
+    var share = layout.SHARE_HALF
+    for c in d.nodes[n].children {
+        let key = d.nodes[c].key
+        let line = d.nodes[c].line
+        if key == "share" {
+            if d.nodes[c].kind != TOML_INT {
+                return lay_refuse(mut r, line, "share is {lay_kind(d.nodes[c].kind)}, not an integer")
+            }
+            let v = d.nodes[c].number
+            if v < 1 || v > layout.SHARE_ONE - 1 {
+                return lay_refuse(mut r, line, "share {v}: a share is within 1 to 9999")
+            }
+            share = v
+        } else if key == "cwd" || key == "command" {
+            return lay_refuse(mut r, line, "{key} on a split: only a leaf has one")
+        } else if key != "split" && key != "first" && key != "second" {
+            return lay_refuse(mut r, line, "unknown key {key}")
+        }
+    }
+    (mut r.shape).push(layout.ShapeNode { kind: layout.SPLIT, axis: axis, share: share })
+    for side in "first second".split(" ") {
+        let child = toml_child(d, n, side)
+        if child < 0 { return lay_refuse(mut r, at, "a split without its {side}") }
+        if d.nodes[child].kind != TOML_TABLE {
+            return lay_refuse(mut r, d.nodes[child].line, "{side} is {lay_kind(d.nodes[child].kind)}, not a table")
+        }
+        if !lay_node(d, child, mut r) { return false }
+    }
+    true
+}
+
+/// Read tab element `e`: its keys, its tree and its focus; the tab, or the
+/// refusal set in `r`.
+fn lay_tab(d: Toml, e: int, mut r: LayReading, mut tabs: List[TabFile]) -> bool {
+    var tab = TabFile { name: "", named: false, focus: 1, zoomed: false, shape: List[layout.ShapeNode](),
+        leaves: List[LeafFile]() }
+    var focus_line = 0
+    for c in d.nodes[e].children {
+        let key = d.nodes[c].key
+        let line = d.nodes[c].line
+        let kind = d.nodes[c].kind
+        if key == "name" {
+            if kind != TOML_STRING { return lay_refuse(mut r, line, "name is {lay_kind(kind)}, not a string") }
+            tab.name = d.nodes[c].text
+            tab.named = true
+        } else if key == "zoomed" {
+            if kind != TOML_BOOL { return lay_refuse(mut r, line, "zoomed is {lay_kind(kind)}, not a boolean") }
+            tab.zoomed = d.nodes[c].number == 1
+        } else if key == "focus" {
+            if kind != TOML_INT { return lay_refuse(mut r, line, "focus is {lay_kind(kind)}, not an integer") }
+            if d.nodes[c].number < 1 {
+                return lay_refuse(mut r, line, "focus {d.nodes[c].number}: leaves count from 1")
+            }
+            tab.focus = d.nodes[c].number
+            focus_line = line
+        } else if key != "root" {
+            return lay_refuse(mut r, line, "unknown key {key}")
+        }
+    }
+    let root = toml_child(d, e, "root")
+    if root < 0 { return lay_refuse(mut r, d.nodes[e].line, "a tab without its root") }
+    if d.nodes[root].kind != TOML_TABLE {
+        return lay_refuse(mut r, d.nodes[root].line, "root is {lay_kind(d.nodes[root].kind)}, not a table")
+    }
+    r.shape = List[layout.ShapeNode]()
+    r.leaves = List[LeafFile]()
+    if !lay_node(d, root, mut r) { return false }
+    if tab.focus > r.leaves.len {
+        return lay_refuse(mut r, focus_line,
+            "focus {tab.focus}: the tab has {lay_count(r.leaves.len, "leaf", "leaves")}")
+    }
+    tab.shape = copy r.shape
+    tab.leaves = copy r.leaves
+    (mut tabs).push(copy tab)
+    true
+}
+
 /// Read a layout file's text: its tabs, or the first line that refuses it
-/// and why.
+/// and why. The TOML subset reads it first; then the top-level keys
+/// (`version`, unknown keys, `tab`), each tab in order, and `active`.
 pub fn read_layout(text: str) -> LayoutFile {
-    // Nothing is read yet.
-    let _unused = text.len
-    LayoutFile { ok: false, line: 0, why: "not read yet", active: 0, tabs: List[TabFile]() }
+    if text.len > LAYOUT_BYTES { return lay_refused(1, "a layout file holds at most {LAYOUT_BYTES} bytes") }
+    let d = parse_toml(text)
+    if !d.ok { return lay_refused(d.line, d.why) }
+    let v = toml_child(d, 0, "version")
+    if v < 0 { return lay_refused(1, "version is missing") }
+    if d.nodes[v].kind != TOML_INT {
+        return lay_refused(d.nodes[v].line, "version is {lay_kind(d.nodes[v].kind)}, not an integer")
+    }
+    if d.nodes[v].number != 1 {
+        return lay_refused(d.nodes[v].line, "version {d.nodes[v].number}: warren reads version 1")
+    }
+    for c in d.nodes[0].children {
+        let key = d.nodes[c].key
+        if key != "version" && key != "active" && key != "tab" {
+            return lay_refused(d.nodes[c].line, "unknown key {key}")
+        }
+    }
+    let t = toml_child(d, 0, "tab")
+    if t < 0 { return lay_refused(1, "no [[tab]]") }
+    if d.nodes[t].kind != TOML_TABLES {
+        return lay_refused(d.nodes[t].line, "tab is {lay_kind(d.nodes[t].kind)}, not an array of tables")
+    }
+    var r = LayReading { shape: List[layout.ShapeNode](), leaves: List[LeafFile](), total: 0, line: 0, why: "" }
+    var tabs = List[TabFile]()
+    for e in d.nodes[t].children {
+        if !lay_tab(d, e, mut r, mut tabs) { return lay_refused(r.line, r.why) }
+    }
+    var active = 1
+    let a = toml_child(d, 0, "active")
+    if a >= 0 {
+        let line = d.nodes[a].line
+        if d.nodes[a].kind != TOML_INT {
+            return lay_refused(line, "active is {lay_kind(d.nodes[a].kind)}, not an integer")
+        }
+        active = d.nodes[a].number
+        if active < 1 { return lay_refused(line, "active {active}: tabs count from 1") }
+        if active > tabs.len {
+            return lay_refused(line, "active {active}: the file has {lay_count(tabs.len, "tab", "tabs")}")
+        }
+    }
+    LayoutFile { ok: true, line: 0, why: "", active: active, tabs: tabs }
 }
