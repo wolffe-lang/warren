@@ -21,7 +21,7 @@ The server's own verbs take no target:
 |---|---|
 | `kill-server` | stops the server; every attached client is told |
 | `list-sessions`, `ls` | one line a session: `NAME: COLSxROWS (N attached)` |
-| `new-session [-c DIR] [NAME]` | makes a session (named by the lowest free number when no name is given) and prints its name; its first pane's program starts in DIR |
+| `new-session [-c DIR] [-l LAYOUT] [NAME]` | makes a session (named by the lowest free number when no name is given) and prints its name; its first pane's program starts in DIR; with `-l` its tabs, panes, focus, zoom and active tab are the layout file's (LAYOUT.md), and DIR is its start directory |
 | `list --json` | the server's sessions, tabs and panes as one JSON object (below) |
 
 Two verbs act on a pane but are not command line verbs (they print, or type
@@ -33,9 +33,9 @@ the same parser, so a verb and its `:` line always mean the same action:
 `split-right`, `split-down`, `focus-next`, `zoom`, `equalize`, `close-pane`,
 `new-tab`, `close-tab`, `next-tab`, `previous-tab`, `focus DIRECTION`,
 `resize DIRECTION [N]`, `select-tab N`, `rename-tab NAME`, `kill-session`,
-`rename-session NAME`, `detach`, `lock` and `source [FILE]`. A command line
-verb takes `-t TARGET` anywhere after the verb, at most once, except `source`,
-which takes none.
+`rename-session NAME`, `detach`, `lock`, `source [FILE]`, `layout save NAME`
+and `layout load NAME`. A command line verb takes `-t TARGET` anywhere after
+the verb, at most once, except `source`, which takes none.
 
 - `kill-session` ends the target's session: every pane's program hangs up and
   every client attached to it is told the session ended. Ending the last
@@ -51,6 +51,14 @@ which takes none.
   file changes none and is named by line, status 1 (CONFIG.md).
 - `lock` acts on the client that typed it, so sent from a shell it is refused:
   `warren: lock: acts on an attached client`.
+- `layout save NAME` writes the target's session as a layout file and prints
+  its path; `layout load NAME` opens a layout file's tabs after the target
+  session's and prints each new tab's id, one a line. NAME is a file in the
+  layouts directory (`~/.config/warren/layouts/NAME.toml`), or a word holding
+  `/` a file path, relative to the directory `warren` runs in. A refused load
+  changes nothing and names the file and line: `warren: layout load: dev line
+  6: no such directory: /srv/gone`, status 1. LAYOUT.md has the file and every
+  rule.
 
 ## Making panes: `-c DIR` and `-- CMD`
 
