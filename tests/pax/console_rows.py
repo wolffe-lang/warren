@@ -24,6 +24,10 @@ the screen: they are taken out before the replay.
   C5 `warren attach -t con`: the border and the earlier output drawn again; Ctrl-Space and d detach it again
   C6 `COLUMNS=160 LINES=50 warren new -s big` at a 0x0 window: the session at 160x50; Ctrl-Space and d detach it
   C7 `warren kill-server`: exit 0, and no warren process left (read from /proc)
+  C8 (before C7) `warren attach -t con`, then `warren split-down` typed in its pane: exit 0, and a horizontal
+     border the screen did not have before it
+  C9 (before C7) `warren capture-pane -p -t p2` typed in the same pane: exit 0, and the text holds what the other
+     pane printed in C3; then Ctrl-Space and d detach
 ROWS is a comma list (default all). Each row prints PASS or FAIL by name with the firmware and keyboard; the exit
 status is 0 only when every asked row passed. Run it from a directory of its own: WORK must not exist.
 """
@@ -42,7 +46,7 @@ ap.add_argument('iso', type=Path)
 ap.add_argument('work', type=Path)
 ap.add_argument('firmware', choices=['bios', 'uefi'])
 ap.add_argument('keyboard', choices=['usb', 'ps2'])
-ap.add_argument('rows', nargs='?', default='C0,C1,C2,C3,C4,C5,C6,C7')
+ap.add_argument('rows', nargs='?', default='C0,C1,C2,C3,C4,C5,C6,C7,C8,C9')
 args = ap.parse_args()
 ROWS = args.rows.split(',')
 FW, KBD = args.firmware, args.keyboard
@@ -200,6 +204,11 @@ def border_on(lines):
     return any('│' in line for line in lines)
 
 
+def across(lines):
+    """The rows that hold a horizontal border: a run of at least 20 of U+2500."""
+    return {i for i, line in enumerate(lines) if '─' * 20 in line}
+
+
 com = WORK / 'com1.sock'
 qmp_path = WORK / 'qmp.sock'
 argv = [str(args.pax / 'tools/qemu-run'), '--firmware', FW, '--accel', 'kvm', '--timeout', '1500',
@@ -298,6 +307,29 @@ try:
             f'COLUMNS=160 LINES=50 warren new -s big: listed {big[0] if big else "nothing"} (want {want}); '
             f'detached: {det3 is not None}')
     until_stream(r'[$#] $', 10, s8)
+    s81 = len(buf)
+    typed(b'warren attach -t con\r')
+    until_screen(r'C3-\d+-[RL]', 15)
+    pump(1)
+    before = across(screen())
+    typed(b'warren split-down; echo C8-st=$?-END\r')
+    st8 = until_screen(r'C8-st=(\d+)-END', 20)
+    pump(2)
+    added = across(screen()) - before
+    if 'C8' in ROWS:
+        row('C8', st8 is not None and st8[1] == '0' and len(added) > 0,
+            f'warren split-down typed in a pane: exit {st8[1] if st8 else "?"}; new horizontal border rows '
+            f'{sorted(added) or "none"}' + ('' if added else '; screen: ' + ' | '.join(line for line in screen() if line)[-400:]))
+    typed(b'c=$(warren capture-pane -p -t p2); s=$?; case "$c" in *C3-*-R*) r=has ;; *) r=not ;; esac; '
+          b'echo C9-st=$s-$r-END\r')
+    st9 = until_screen(r'C9-st=(\d+)-(has|not)-END', 20)
+    if 'C9' in ROWS:
+        row('C9', st9 is not None and st9[1] == '0' and st9[2] == 'has',
+            f'warren capture-pane -p -t p2 typed in a pane: exit {st9[1] if st9 else "?"}; the other pane\'s C3 line '
+            f'{"held" if st9 and st9[2] == "has" else "not held"}')
+    prefix_then('d')
+    until_stream(r'\[detached from con\]', 20, s81)
+    until_stream(r'[$#] $', 10, s81)
     s9 = len(buf)
     typed(b'warren kill-server; echo C7-k=$?\r')
     kk = until_stream(r'^C7-k=(\d+)$', 20, s9)
