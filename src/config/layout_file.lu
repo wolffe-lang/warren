@@ -169,7 +169,7 @@ fn lay_node(d: Toml, n: int, mut r: LayReading) -> bool {
             return lay_refuse(mut r, line, "unknown key {key}")
         }
     }
-    (mut r.shape).push(layout.ShapeNode { kind: layout.SPLIT, axis: axis, share: share })
+    (mut r.shape).push(layout.ShapeNode { kind: layout.SPLIT, axis: layout.COLS + layout.ROWS - axis, share: share })
     for side in "first second".split(" ") {
         let child = toml_child(d, n, side)
         if child < 0 { return lay_refuse(mut r, at, "a split without its {side}") }
