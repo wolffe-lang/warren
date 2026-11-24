@@ -21,7 +21,8 @@ fn pane(cols: int, rows: int) -> server.Pane {
     server.Pane { live: true, id: 1, session: 0, session_gen: 0, gen: 1, master: 0 - 1, key: 0 - 1, child: 0 - 1,
         pid: 0 - 1, child_live: false, status: 0 - 1, ended: false, screen: vt.new(cols, rows, 0),
         input: List[byte](), in_off: 0, in_len: 0, write_on: false, last_output: 0, sync_since: 0, read_turn: 0 - 1,
-        streaming: false, read_peak: 0, damage: 0, shown: true, at_col: 1, at_row: 1, argv: List[byte]() }
+        streaming: false, read_peak: 0, damage: 0, shown: true, at_col: 1, at_row: 1, argv: List[byte](),
+        start_dir: List[byte]() }
 }
 
 // One pane filling a session's tab area, the bar's two rows below it.

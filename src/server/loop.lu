@@ -404,7 +404,7 @@ fn pending_conns(s: Server) -> int {
 fn projected(s: Server, extra: int) -> int {
     var total = extra
     for p in s.panes {
-        total += pane_bytes(p.screen.cols, p.screen.rows) + p.argv.len
+        total += pane_bytes(p.screen.cols, p.screen.rows) + p.argv.len + p.start_dir.len
     }
     for c in s.conns {
         let kept = retained_bytes(c)
@@ -615,7 +615,10 @@ fn spawn_pane_in(mut s: Server, si: int, k: int, id: int, cols: int, rows: int, 
         (mut s.panes[k].argv).push(0 as byte)
     }
     let _named = vt.set_local_host(mut s.panes[k].screen, s.host_name)
-    let sp = Spawn { cols: cols, rows: rows, cwd: if dir.len > 0 then dir else cwd_of(s.sessions[si]),
+    let start = if dir.len > 0 then dir else cwd_of(s.sessions[si])
+    (mut s.panes[k].start_dir).reset()
+    for b in start.bytes() { (mut s.panes[k].start_dir).push(b) }
+    let sp = Spawn { cols: cols, rows: rows, cwd: start,
         names: copy s.sessions[si].env_names, values: copy s.sessions[si].env_values, pane_id: id }
     let program = if argv.len > 0 then argv else shell_argv()
     let why = start_pane(mut s.panes[k], name_of(s.sessions[si]), sp, program, s.inherited)
@@ -1129,14 +1132,14 @@ fn act_split_in(mut s: Server, index: int, si: int, axis: int, dir: str, argv: L
         tell(mut s, index, "too small to split")
         return DONE
     }
-    if !pane_fits(s, nc, nr, argv_bytes(argv)) {
+    let from = focused_slot(s, si)
+    let start = if dir.len > 0 then dir else new_pane_dir(s, si, from, true)
+    if !pane_fits(s, nc, nr, argv_bytes(argv) + start.len) {
         tell(mut s, index, "split refused: memory budget")
         return DONE
     }
     let k = acquire_pane(mut s, nc, nr)
     if k < 0 { return LATER }
-    let from = focused_slot(s, si)
-    let start = if dir.len > 0 then dir else new_pane_dir(s, si, from, true)
     s.next_pane = s.next_pane + 1
     layout.split(mut s.sessions[si].layout, tab, focus, axis, id, true, cols, area) else |_| {}
     let why = spawn_pane_in(mut s, si, k, id, nc, nr, start, argv)
@@ -1165,13 +1168,14 @@ fn act_new_tab_in(mut s: Server, index: int, si: int, dir: str, argv: List[str])
         tell(mut s, index, "new tab refused: {MAX_PANES} panes a session")
         return DONE
     }
-    if !pane_fits(s, cols, area, argv_bytes(argv)) {
+    let from = focused_slot(s, si)
+    let start = if dir.len > 0 then dir else new_pane_dir(s, si, from, false)
+    if !pane_fits(s, cols, area, argv_bytes(argv) + start.len) {
         tell(mut s, index, "new tab refused: memory budget")
         return DONE
     }
     let k = acquire_pane(mut s, cols, area)
     if k < 0 { return LATER }
-    let from = focused_slot(s, si)
     let id = s.next_pane
     s.next_pane = s.next_pane + 1
     // The layout hands out the server's next tab id, and the server takes
@@ -1179,7 +1183,6 @@ fn act_new_tab_in(mut s: Server, index: int, si: int, dir: str, argv: List[str])
     s.sessions[si].layout.next_id = s.next_tab
     let _t = layout.new_tab(mut s.sessions[si].layout, id, "") else |_| { 0 }
     s.next_tab = s.sessions[si].layout.next_id
-    let start = if dir.len > 0 then dir else new_pane_dir(s, si, from, false)
     let why = spawn_pane_in(mut s, si, k, id, cols, area, start, argv)
     if why.len > 0 {
         layout.close(mut s.sessions[si].layout, id) else |_| {}
@@ -2105,7 +2108,8 @@ struct PaneDir { path: str, source: str }
 
 // A pane's working directory: the directory its program last reported by
 // OSC 7 (`osc7`), else the one /proc names for its live program (`proc`,
-// where the host has it), else its session's start directory (`start`). A
+// where the host has it), else the directory its program started in
+// (`start`), or its session's start directory once that one is gone. A
 // reported or read path is taken only while it names a directory that
 // exists; a program reports what it likes.
 fn pane_dir(s: Server, k: int) -> PaneDir {
@@ -2116,6 +2120,8 @@ fn pane_dir(s: Server, k: int) -> PaneDir {
         let named = str_from_utf8(link) else ""
         if named.starts_with("/") && is_directory(named) { return PaneDir { path: named, source: "proc" } }
     }
+    let started = str_from_utf8(s.panes[k].start_dir) else ""
+    if started.len > 0 && is_directory(started) { return PaneDir { path: started, source: "start" } }
     PaneDir { path: cwd_of(s.sessions[s.panes[k].session]), source: "start" }
 }
 
@@ -2832,7 +2838,7 @@ fn layout_file_of(s: Server, si: int) -> config.LayoutFile {
             var words = List[str]()
             if k >= 0 {
                 let dir = pane_dir(s, k)
-                if dir.source != "start" { cwd = dir.path }
+                if dir.source != "start" || dir.path != cwd_of(s.sessions[si]) { cwd = dir.path }
                 words = argv_words(s.panes[k])
             }
             (mut leaves).push(config.LeafFile { cwd: cwd, command: words, line: 0 })
@@ -2996,10 +3002,10 @@ fn check_load(s: Server, f: config.LayoutFile, label: str, cols: int, rows: int,
             }
             if rc < 1 || rr < 1 { return "{label}: too small for this layout at {cols}x{rows}" }
             let leaf = copy t.leaves[i]
-            (mut out).push(LoadLeaf { dir: leaf_dir(leaf.cwd, start, home), words: copy leaf.command, cols: rc, rows: rr,
-                line: leaf.line })
+            let ld = leaf_dir(leaf.cwd, start, home)
+            (mut out).push(LoadLeaf { dir: ld, words: copy leaf.command, cols: rc, rows: rr, line: leaf.line })
             if made >= free { extra += pane_bytes(rc, rr) }
-            extra += argv_bytes(leaf.command)
+            extra += argv_bytes(leaf.command) + ld.len
             made += 1
             i += 1
         }
