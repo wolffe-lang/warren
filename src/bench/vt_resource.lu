@@ -40,8 +40,9 @@ fn no_history_charge() -> int {
 /// history. From then on the ring charges what this engine charges for one
 /// reservation of the cap and the bytes written into it: natively and under
 /// lupin the reservation and nothing for the bytes, on the checked machine
-/// nothing for the reservation and one for each byte pushed. No feed charges
-/// more.
+/// nothing for the reservation and one for each byte pushed.
+/// `[type.list.reserve]` makes the charge the tier's; it gives none for lupin
+/// (wolf-lang#1209). No feed charges more.
 #[allow(w0314)]
 pub fn measure(bytes: int, history_cap: int) -> int {
     assert(bytes > 0 && bytes <= 100000000 && history_cap > 0 && history_cap <= 8388608, "vt-resource-arguments")
