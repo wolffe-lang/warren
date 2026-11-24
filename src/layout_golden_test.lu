@@ -44,7 +44,7 @@ fn tab(name: str, focus: int, zoomed: bool, shape: List[layout.ShapeNode], leave
 }
 
 fn file(active: int, tabs: List[config.TabFile]) -> config.LayoutFile {
-    config.LayoutFile { ok: true, line: 0, why: "", active: active, tabs: copy tabs }
+    config.LayoutFile { ok: true, line: 0, why: "", active: active, tabs: copy tabs, session: config.no_session() }
 }
 
 fn one_pane() -> config.LayoutFile {
@@ -94,10 +94,33 @@ fn two_tabs() -> config.LayoutFile {
     file(2, tabs)
 }
 
+// A saved session: a split tab with a command in one pane, and the
+// session's table (a name with a quote and a space, its start directory,
+// its size).
+fn saved_session() -> config.LayoutFile {
+    var shape = List[layout.ShapeNode]()
+    (mut shape).push(split_node(layout.COLS, 5000))
+    (mut shape).push(leaf_node())
+    (mut shape).push(leaf_node())
+    var leaves = List[config.LeafFile]()
+    (mut leaves).push(leaf("", no_words()))
+    (mut leaves).push(leaf("/home/me/src/warren", words2("make", "watch")))
+    var tabs = List[config.TabFile]()
+    (mut tabs).push(tab("main", 2, false, shape, leaves))
+    var f = file(1, tabs)
+    f.session = config.SessionFile { saved: true, name: "my \"work\"", cwd: "/home/me/src", cols: 120, rows: 40,
+        line: 0 }
+    f
+}
+
 // A layout file in words, every field, for comparing a reading with the
 // layout a golden was written from.
 fn words_of(f: config.LayoutFile) -> str {
     var out = "ok={f.ok} active={f.active} tabs={f.tabs.len}"
+    if f.session.saved {
+        out = out + " session name={f.session.name.len}:{f.session.name} cwd={f.session.cwd.len}:{f.session.cwd}"
+        out = out + " size={f.session.cols}x{f.session.rows}"
+    }
     for t in f.tabs {
         out = out + " | tab name={t.name.len}:{t.name} named={t.named} focus={t.focus} zoomed={t.zoomed} shape="
         for n in t.shape { out = out + "{n.kind}.{n.axis}.{n.share}," }
@@ -138,11 +161,12 @@ fn judge(name: str, f: config.LayoutFile) -> str {
 fn main() -> int {
     var failed = 0
     var cases = 0
-    let names = "one-pane three-panes two-tabs".split(" ")
+    let names = "one-pane three-panes two-tabs saved-session".split(" ")
     for name in names {
         var f = one_pane()
         if name == "three-panes" { f = three_panes() }
         if name == "two-tabs" { f = two_tabs() }
+        if name == "saved-session" { f = saved_session() }
         let why = judge(name, f)
         cases += 1
         if why.len > 0 {

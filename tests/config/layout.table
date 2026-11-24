@@ -417,3 +417,173 @@ case second-tab-refused
 > focus = 9
 > [tab.root]
 ! 5 focus 9: the tab has 1 leaf
+
+# ---- a saved session's table ([session]) ----
+case session-not-table
+> version = 1
+> session = "work"
+> [[tab]]
+> [tab.root]
+! 2 session is a string, not a table
+
+case session-unknown-key
+> version = 1
+> [session]
+> name = "work"
+> cwd = "/home/me"
+> cols = 80
+> rows = 24
+> width = 3
+> [[tab]]
+> [tab.root]
+! 7 unknown key width
+
+case session-no-name
+> version = 1
+> [session]
+> cwd = "/home/me"
+> cols = 80
+> rows = 24
+> [[tab]]
+> [tab.root]
+! 2 session.name is missing
+
+case session-no-cwd
+> version = 1
+> [session]
+> name = "work"
+> cols = 80
+> rows = 24
+> [[tab]]
+> [tab.root]
+! 2 session.cwd is missing
+
+case session-no-cols
+> version = 1
+> [session]
+> name = "work"
+> cwd = "/home/me"
+> rows = 24
+> [[tab]]
+> [tab.root]
+! 2 session.cols is missing
+
+case session-no-rows
+> version = 1
+> [session]
+> name = "work"
+> cwd = "/home/me"
+> cols = 80
+> [[tab]]
+> [tab.root]
+! 2 session.rows is missing
+
+case session-name-integer
+> version = 1
+> [session]
+> name = 7
+> cwd = "/home/me"
+> cols = 80
+> rows = 24
+> [[tab]]
+> [tab.root]
+! 3 name is an integer, not a string
+
+case session-name-empty
+> version = 1
+> [session]
+> name = ""
+> cwd = "/home/me"
+> cols = 80
+> rows = 24
+> [[tab]]
+> [tab.root]
+! 3 a session name may not be empty
+
+case session-name-slash
+> version = 1
+> [session]
+> name = "a/b"
+> cwd = "/home/me"
+> cols = 80
+> rows = 24
+> [[tab]]
+> [tab.root]
+! 3 a session name may not hold '/'
+
+case session-name-control
+> version = 1
+> [session]
+> name = "a\u0001b"
+> cwd = "/home/me"
+> cols = 80
+> rows = 24
+> [[tab]]
+> [tab.root]
+! 3 a session name may not hold a control byte
+
+case session-cwd-integer
+> version = 1
+> [session]
+> name = "work"
+> cwd = 1
+> cols = 80
+> rows = 24
+> [[tab]]
+> [tab.root]
+! 4 cwd is an integer, not a string
+
+case session-cwd-relative
+> version = 1
+> [session]
+> name = "work"
+> cwd = "src"
+> cols = 80
+> rows = 24
+> [[tab]]
+> [tab.root]
+! 4 cwd "src": a session's cwd is an absolute path
+
+case session-cols-string
+> version = 1
+> [session]
+> name = "work"
+> cwd = "/home/me"
+> cols = "80"
+> rows = 24
+> [[tab]]
+> [tab.root]
+! 5 cols is a string, not an integer
+
+case session-cols-zero
+> version = 1
+> [session]
+> name = "work"
+> cwd = "/home/me"
+> cols = 0
+> rows = 24
+> [[tab]]
+> [tab.root]
+! 5 cols 0: a session is 1 to 65535 columns
+
+case session-rows-big
+> version = 1
+> [session]
+> name = "work"
+> cwd = "/home/me"
+> cols = 80
+> rows = 70000
+> [[tab]]
+> [tab.root]
+! 6 rows 70000: a session is 1 to 65535 rows
+
+case session-grid-over
+> version = 1
+> [session]
+> name = "work"
+> cwd = "/home/me"
+> cols = 1000
+> rows = 1000
+> [[tab]]
+> [tab.root]
+! 6 1000x1000: a session holds at most 262144 cells

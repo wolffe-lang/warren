@@ -9,7 +9,7 @@ use std.fs
 use config
 
 // The cases the table holds, so that one that goes missing is seen.
-fn table_cases() -> int { 46 }
+fn table_cases() -> int { 62 }
 
 struct Case {
     name: str,

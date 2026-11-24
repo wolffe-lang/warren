@@ -2849,7 +2849,7 @@ fn layout_file_of(s: Server, si: int) -> config.LayoutFile {
             shape: layout.shape_of(l, t.id), leaves: leaves })
         i += 1
     }
-    config.LayoutFile { ok: true, line: 0, why: "", active: active, tabs: tabs }
+    config.LayoutFile { ok: true, line: 0, why: "", active: active, tabs: tabs, session: config.no_session() }
 }
 
 /// What a save came to: the file's path, or why nothing was written.
@@ -2929,7 +2929,8 @@ struct LoadLeaf { dir: str, words: List[str], cols: int, rows: int, line: int }
 struct LoadFile { file: config.LayoutFile, label: str, why: str }
 
 fn read_load(word: str, base: str) -> LoadFile {
-    var none = config.LayoutFile { ok: false, line: 0, why: "", active: 0, tabs: List[config.TabFile]() }
+    var none = config.LayoutFile { ok: false, line: 0, why: "", active: 0, tabs: List[config.TabFile](),
+        session: config.no_session() }
     let place = layout_place(word, base)
     if place.why.len > 0 { return LoadFile { file: none, label: word, why: place.why } }
     if !fs.exists(place.path) {
