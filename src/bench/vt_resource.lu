@@ -5,13 +5,19 @@ use std.mem.budget
 use std.io
 
 // One implementation deliberately serves the small smoke and full native take.
-// What reserving `size` bytes charges an empty byte list, in a region of its own.
-fn reserve_charge(size: int) -> int {
+// What reserving `size` bytes and then pushing `pushes` bytes into that room
+// charges an empty byte list, in a region of its own.
+fn written_charge(size: int, pushes: int) -> int {
     var got = 0
     region bare(cap: 16777216) {
         var b = List[byte]()
         let before = budget.charged(bare)
         (mut b).reserve(size)
+        var i = 0
+        while i < pushes {
+            (mut b).push(0 as byte)
+            i += 1
+        }
         got = budget.charged(bare) - before
     }
     got
@@ -31,11 +37,18 @@ fn no_history_charge() -> int {
 /// Feed exactly `bytes` through a fixed-size chunk with `history_cap` retained
 /// bytes; report feed time and allocation, asserting the bounded-storage rows.
 /// A pane charges what one with no history does until its first line into
-/// history, which charges one reservation of the cap; no feed charges more.
+/// history. From then on the ring charges what this engine charges for one
+/// reservation of the cap and the bytes written into it: natively and under
+/// lupin the reservation and nothing for the bytes, on the checked machine
+/// nothing for the reservation and one for each byte pushed. No feed charges
+/// more.
 #[allow(w0314)]
 pub fn measure(bytes: int, history_cap: int) -> int {
     assert(bytes > 0 && bytes <= 100000000 && history_cap > 0 && history_cap <= 8388608, "vt-resource-arguments")
-    let reserved = reserve_charge(history_cap)
+    let reserved = written_charge(history_cap, 0)
+    let per_byte = written_charge(history_cap, 1) - reserved
+    let span = if history_cap < 4096 then history_cap else 4096
+    assert(written_charge(history_cap, span) == reserved + span * per_byte, "vt-resource-written-charge-linear")
     let none = no_history_charge()
     region measured(cap: 33554432) {
         let pattern = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\u{1b}[38;5;42m中a\u{301}\u{308}\u{1b}[0m\r\n".bytes()
@@ -67,7 +80,7 @@ pub fn measure(bytes: int, history_cap: int) -> int {
             }
             elapsed += os_clock_ns() - started
             fed += count
-            let ring = if pane.history.records > 0 || pane.history.evicted > 0 then reserved else 0
+            let ring = if pane.history.records > 0 || pane.history.evicted > 0 then reserved + per_byte * pane.history.bytes.len else 0
             assert(budget.charged(measured) == stable + ring, "vt-resource-bounded-feed")
             assert(pane.history.cap == history_cap && pane.history.used <= history_cap && pane.history.bytes.len <= history_cap, "vt-resource-history-cap")
             if fed / 10000000 > report {
@@ -79,7 +92,7 @@ pub fn measure(bytes: int, history_cap: int) -> int {
         assert(peak_turn <= chunk.len * 32 + 65536, "vt-resource-turn-charge-bound")
         if bytes == 100000000 { assert(pane.history.used > history_cap - 1024, "vt-resource-default-ring-filled") }
         let grown = budget.charged(measured) - stable
-        io.write_line("MEASURE vt-resource bytes={fed} history-cap={history_cap} history-used={pane.history.used} history-records={pane.history.records} pane-retained-charged={retained} outer-feed-charge={grown} peak-turn-charged={peak_turn} chunk-bytes={chunk.len} feed-nanoseconds={elapsed}")
+        io.write_line("MEASURE vt-resource bytes={fed} history-cap={history_cap} history-used={pane.history.used} history-records={pane.history.records} pane-retained-charged={retained} ring-reserve-charged={reserved} written-byte-charged={per_byte} outer-feed-charge={grown} peak-turn-charged={peak_turn} chunk-bytes={chunk.len} feed-nanoseconds={elapsed}")
         io.write_line("PASS vt-resource-bounded-feed")
     }
     0
