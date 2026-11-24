@@ -26,6 +26,8 @@ use std.str
 use std.term
 use std.time
 use client
+use config
+use layout
 use proto
 use server
 
@@ -2053,6 +2055,147 @@ fn row_pane_title_not_inherited(mut r: Rig) -> str {
     w
 }
 
+// ---------------- layout files ----------------
+
+// The row's layouts directory: XDG_CONFIG_HOME set beside the row before its
+// server starts, so no row reads or writes the user's.
+fn layout_home(r: Rig) -> str {
+    let dir = beside(r, "config")
+    fs.remove_dir_all(dir) else |_| {}
+    env.set("XDG_CONFIG_HOME", dir) else |_| {}
+    dir + "/warren/layouts"
+}
+
+// A leaf as `layout save` writes pane `id` of a listing: its directory when
+// the listing's source is not the session's start, and `words`.
+fn saved_leaf(json: str, id: str, words: List[str]) -> config.LeafFile {
+    let place = listed_cwd(json, id).split("|")
+    var cwd = ""
+    if place.len == 2 && place[1] != "start" { cwd = place[0] }
+    config.LeafFile { cwd: cwd, command: copy words }
+}
+
+fn shape_leaf() -> layout.ShapeNode { layout.ShapeNode { kind: layout.LEAF, axis: layout.COLS, share: 0 } }
+
+// `layout save NAME` writes the session's layout to NAME.toml in the layouts
+// directory, which it makes at 0700, the file at 0600 with no temp file left,
+// its text the pure writer's for the session (each leaf's directory as the
+// listing gives its source, the split pane's program words as given); it
+// prints the file's path.
+fn row_layout_save_writes_file(mut r: Rig) -> str {
+    let dir = layout_home(r)
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    var words = List[str]()
+    for w in "split-right -t work --".split(" ") { (mut words).push(w) }
+    var program = List[str]()
+    (mut program).push("/bin/sh")
+    (mut program).push("-c")
+    (mut program).push("echo LAYOUT-CMD; exec /bin/sh")
+    for w in program { (mut words).push(w) }
+    let s = ask_words(r, words, "")
+    if s.status != 0 || s.out != "p2\n" { return "split-right: {s.status} '{s.out.trim()}' '{s.err.trim()}'" }
+    if !client.until_text(mut a, "LAYOUT-CMD", 5000) { return "the command did not run: " + client.screen_text(a) }
+    let saved = ask(r, "layout save -t work dev", "")
+    let path = dir + "/dev.toml"
+    if saved.status != 0 || saved.out != path + "\n" {
+        return "layout save: {saved.status} '{saved.out.trim()}' '{saved.err.trim()}', not {path}"
+    }
+    let info = fs.stat(path) else |e| { return "no file at {path}: {e}" }
+    if info.mode % 512 != 384 { return "the file's mode is {info.mode % 512}, not 384 (0600)" }
+    let d = fs.stat(dir) else |e| { return "no directory {dir}: {e}" }
+    if d.mode % 512 != 448 { return "the directory's mode is {d.mode % 512}, not 448 (0700)" }
+    if fs.exists(path + ".tmp") { return "a temp file was left beside it" }
+    let text = fs.read_text(path) else |e| { return "{path} did not read: {e}" }
+    let l = listed(r)
+    if l.status != 0 { return l.err }
+    var shape = List[layout.ShapeNode]()
+    (mut shape).push(layout.ShapeNode { kind: layout.SPLIT, axis: layout.COLS, share: layout.SHARE_HALF })
+    (mut shape).push(shape_leaf())
+    (mut shape).push(shape_leaf())
+    var leaves = List[config.LeafFile]()
+    (mut leaves).push(saved_leaf(l.out, "p1", List[str]()))
+    (mut leaves).push(saved_leaf(l.out, "p2", program))
+    var tabs = List[config.TabFile]()
+    // A split made from outside keeps the session's focus on the pane it split.
+    (mut tabs).push(config.TabFile { name: "", named: true, focus: 1, zoomed: false, shape: shape, leaves: leaves })
+    let want = config.write_layout(config.LayoutFile { ok: true, line: 0, why: "", active: 1, tabs: tabs })
+    if text != want { return "the file is not the writer's text for the session:\n{text}--- the writer's ---\n{want}" }
+    client.hang_up(mut a)
+    ""
+}
+
+// One COMMAND sent from directory `cwd` (and from no pane), its words given
+// one by one.
+fn ask_in(r: Rig, words: List[str], cwd: str) -> Answer {
+    var p = client.dial(socket(r)) else |e| { return Answer { status: 0 - 1, out: "", err: "dial-{e}" } }
+    var none = List[str]()
+    let _h = client.send(p, 1, client.hello_payload(2, 0, 0, "", 0, "", none, none))
+    if !client.until_kind(mut p, 129, 2000) {
+        client.hang_up(mut p)
+        return Answer { status: 0 - 1, out: "", err: "no WELCOME" }
+    }
+    var b = List[byte]()
+    proto.put(mut b, 9, 4)
+    proto.put(mut b, words.len, 2)
+    for w in words { proto.put_text(mut b, w) }
+    proto.put_text(mut b, cwd)
+    proto.put_text(mut b, "")
+    let _c = client.send(p, 11, b)
+    let m = client.next(mut p, 3000)
+    client.hang_up(mut p)
+    if m.kind != 136 { return Answer { status: 0 - 1, out: "", err: "no REPLY ({m.kind})" } }
+    let out_len = le4(m.body, 5)
+    let err_len = le4(m.body, 9 + out_len)
+    Answer { status: m.body[4] as int, out: str_from_utf8(m.body[9..9 + out_len]) else "",
+        err: str_from_utf8(m.body[13 + out_len..13 + out_len + err_len]) else "" }
+}
+
+fn line_words(line: str) -> List[str] {
+    var out = List[str]()
+    for w in line.split(" ") {
+        if w.len > 0 { (mut out).push(w) }
+    }
+    out
+}
+
+// A session whose layout's text would pass the file bound (its panes'
+// program words) is refused by save, and nothing is written.
+fn row_layout_save_bound(mut r: Rig) -> str {
+    let dir = layout_home(r)
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    // 60,000-byte words: under the protocol's 65,535 bytes a string and every
+    // system's bound on one argument; ten a pane, two panes past 1 MiB.
+    var word = "x"
+    while word.len < 65536 { word = word + word }
+    word = word[0..60000]
+    var n = 0
+    while n < 2 {
+        var words = line_words("split-right -t work -- /bin/sh -c")
+        (mut words).push("exec /bin/sh")
+        var k = 0
+        while k < 10 {
+            (mut words).push(word)
+            k += 1
+        }
+        let sp = ask_words(r, words, "")
+        if sp.status != 0 { return "split {n + 1}: {sp.status} '{sp.err.trim()}'" }
+        n += 1
+    }
+    let s = ask(r, "layout save -t work big", "")
+    if s.status != 1 || s.out != "" || !s.err.starts_with("warren: layout save: the layout's text is ") || !s.err.ends_with(" past 1048576; nothing was written\n") {
+        return "layout save: {s.status} '{s.out.trim()}' '{s.err.trim()}'"
+    }
+    if fs.exists(dir + "/big.toml") || fs.exists(dir + "/big.toml.tmp") { return "a file was written" }
+    client.hang_up(mut a)
+    ""
+}
+
 // Ask `capture-pane -p -J -t TARGET` (rows joined at a soft wrap, so a line
 // a narrow pane wrapped is read whole) until its text holds `text`, for at
 // most 5 s: "" when it did, else the last text captured.
@@ -3155,6 +3298,8 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "pane-cwd-start" { why = row_pane_cwd_start(mut r) }
     else if name == "pane-cwd-not-inherited" { why = row_pane_cwd_not_inherited(mut r) }
     else if name == "pane-title-not-inherited" { why = row_pane_title_not_inherited(mut r) }
+    else if name == "layout-save-writes-file" { why = row_layout_save_writes_file(mut r) }
+    else if name == "layout-save-bound" { why = row_layout_save_bound(mut r) }
     else if name == "split-starts-in-pane-cwd" { why = row_split_starts_in_pane_cwd(mut r) }
     else if name == "split-reported-missing" { why = row_split_reported_missing(mut r) }
     else if name == "split-reported-file" { why = row_split_reported_file(mut r) }
@@ -3191,7 +3336,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file layout-save-bound".split(" ") {
         (mut x).push(n)
     }
     x
