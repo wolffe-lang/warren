@@ -2880,19 +2880,25 @@ fn save_layout(s: Server, si: int, word: str, base: str) -> Saved {
         }
     }
     if is_directory(path) { return Saved { path: "", why: "{path} is a directory" } }
+    let failed = write_private(path, text)
+    if failed.len > 0 { return Saved { path: "", why: failed } }
+    Saved { path: path, why: "" }
+}
+
+/// Write `text` to `path` whole or not at all: PATH.tmp made exclusively at
+/// 0600, written, synced and closed, then renamed over PATH. "" or why not;
+/// a failure leaves no temp file and PATH as it was.
+fn write_private(path: str, text: str) -> str {
     let tmp = path + ".tmp"
     if fs.exists(tmp) { fs.remove(tmp) else |_| {} }
-    var f = fs.create_new_with_mode(tmp, 384) else |e| { return Saved { path: "", why: "{tmp} cannot be made: {e}" } }
+    var f = fs.create_new_with_mode(tmp, 384) else |e| { return "{tmp} cannot be made: {e}" }
     var failed = ""
     fs.write(mut f, text) else |e| { failed = "{tmp} cannot be written: {e}" }
     if failed.len == 0 { fs.sync(mut f) else |e| { failed = "{tmp} cannot be synced: {e}" } }
     fs.close(take f) else |e| { if failed.len == 0 { failed = "{tmp} cannot be closed: {e}" } }
     if failed.len == 0 { fs.move_file(tmp, path) else |e| { failed = "{tmp} cannot be renamed to {path}: {e}" } }
-    if failed.len > 0 {
-        fs.remove(tmp) else |_| {}
-        return Saved { path: "", why: failed }
-    }
-    Saved { path: path, why: "" }
+    if failed.len > 0 { fs.remove(tmp) else |_| {} }
+    failed
 }
 
 // The value of `name` in an environment, or "".
