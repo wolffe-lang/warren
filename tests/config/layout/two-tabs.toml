@@ -1,0 +1,34 @@
+# warren layout
+version = 1
+active = 2
+
+[[tab]]
+name = "a\"b\\c\u0001d\u007Fe f𝄞"
+focus = 1
+zoomed = false
+
+[tab.root]
+command = ["printf", "%s\u000A", "tab\u0009here", "quote\"back\\slash"]
+
+[[tab]]
+name = "logs"
+focus = 2
+zoomed = true
+
+[tab.root]
+split = "rows"
+share = 2500
+
+[tab.root.first]
+cwd = "logs"
+command = ["tail", "-f", "app.log"]
+
+[tab.root.second]
+split = "cols"
+share = 7321
+
+[tab.root.second.first]
+cwd = "/var/log"
+
+[tab.root.second.second]
+cwd = "~"

@@ -1,0 +1,10 @@
+# warren layout
+version = 1
+active = 1
+
+[[tab]]
+name = ""
+focus = 1
+zoomed = false
+
+[tab.root]

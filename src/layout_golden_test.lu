@@ -1,0 +1,159 @@
+//! member: false
+//! The layout file goldens (`layout-file-goldens`): three layouts written
+//! by warren's writer are byte-equal to tests/config/layout/*.toml, each
+//! golden reads back to the layout it was written from, and writing that
+//! reading gives the same bytes. A program, natively and under lupin:
+//! `PASS layout-file-goldens cases=3`, or a FAIL line for each that differs.
+use std.fs
+use config
+use layout
+
+fn leaf(cwd: str, words: List[str]) -> config.LeafFile {
+    config.LeafFile { cwd: cwd, command: copy words }
+}
+
+fn no_words() -> List[str] { List[str]() }
+
+fn words2(a: str, b: str) -> List[str] {
+    var out = List[str]()
+    (mut out).push(a)
+    (mut out).push(b)
+    out
+}
+
+fn words3(a: str, b: str, c: str) -> List[str] {
+    var out = words2(a, b)
+    (mut out).push(c)
+    out
+}
+
+fn words4(a: str, b: str, c: str, d: str) -> List[str] {
+    var out = words3(a, b, c)
+    (mut out).push(d)
+    out
+}
+
+fn leaf_node() -> layout.ShapeNode { layout.ShapeNode { kind: layout.LEAF, axis: layout.COLS, share: 0 } }
+
+fn split_node(axis: int, share: int) -> layout.ShapeNode {
+    layout.ShapeNode { kind: layout.SPLIT, axis: axis, share: share }
+}
+
+fn tab(name: str, focus: int, zoomed: bool, shape: List[layout.ShapeNode], leaves: List[config.LeafFile]) -> config.TabFile {
+    config.TabFile { name: name, named: true, focus: focus, zoomed: zoomed, shape: copy shape, leaves: copy leaves }
+}
+
+fn file(active: int, tabs: List[config.TabFile]) -> config.LayoutFile {
+    config.LayoutFile { ok: true, line: 0, why: "", active: active, tabs: copy tabs }
+}
+
+fn one_pane() -> config.LayoutFile {
+    var shape = List[layout.ShapeNode]()
+    (mut shape).push(leaf_node())
+    var leaves = List[config.LeafFile]()
+    (mut leaves).push(leaf("", no_words()))
+    var tabs = List[config.TabFile]()
+    (mut tabs).push(tab("", 1, false, shape, leaves))
+    file(1, tabs)
+}
+
+fn three_panes() -> config.LayoutFile {
+    var shape = List[layout.ShapeNode]()
+    (mut shape).push(split_node(layout.COLS, 5000))
+    (mut shape).push(leaf_node())
+    (mut shape).push(split_node(layout.ROWS, 5000))
+    (mut shape).push(leaf_node())
+    (mut shape).push(leaf_node())
+    var leaves = List[config.LeafFile]()
+    (mut leaves).push(leaf("/home/me/src/warren", words2("vim", "notes.txt")))
+    (mut leaves).push(leaf("", no_words()))
+    (mut leaves).push(leaf("~/mail", no_words()))
+    var tabs = List[config.TabFile]()
+    (mut tabs).push(tab("main", 3, false, shape, leaves))
+    file(1, tabs)
+}
+
+fn two_tabs() -> config.LayoutFile {
+    var first = List[layout.ShapeNode]()
+    (mut first).push(leaf_node())
+    var first_leaves = List[config.LeafFile]()
+    (mut first_leaves).push(leaf("", words4("printf", "%s\n", "tab\there", "quote\"back\\slash")))
+    var second = List[layout.ShapeNode]()
+    (mut second).push(split_node(layout.ROWS, 2500))
+    (mut second).push(leaf_node())
+    (mut second).push(split_node(layout.COLS, 7321))
+    (mut second).push(leaf_node())
+    (mut second).push(leaf_node())
+    var second_leaves = List[config.LeafFile]()
+    (mut second_leaves).push(leaf("logs", words3("tail", "-f", "app.log")))
+    (mut second_leaves).push(leaf("/var/log", no_words()))
+    (mut second_leaves).push(leaf("~", no_words()))
+    var tabs = List[config.TabFile]()
+    (mut tabs).push(tab("a\"b\\c\u{1}d\u{7f}e\u{2028}f\u{1d11e}", 1, false, first, first_leaves))
+    (mut tabs).push(tab("logs", 2, true, second, second_leaves))
+    file(2, tabs)
+}
+
+// A layout file in words, every field, for comparing a reading with the
+// layout a golden was written from.
+fn words_of(f: config.LayoutFile) -> str {
+    var out = "ok={f.ok} active={f.active} tabs={f.tabs.len}"
+    for t in f.tabs {
+        out = out + " | tab name={t.name.len}:{t.name} named={t.named} focus={t.focus} zoomed={t.zoomed} shape="
+        for n in t.shape { out = out + "{n.kind}.{n.axis}.{n.share}," }
+        for l in t.leaves {
+            out = out + " leaf cwd={l.cwd.len}:{l.cwd} command={l.command.len}"
+            for w in l.command { out = out + ":{w.len}:{w}" }
+        }
+    }
+    out
+}
+
+fn first_difference(want: str, got: str) -> str {
+    let a = want.split("\n")
+    let b = got.split("\n")
+    var i = 0
+    while i < a.len || i < b.len {
+        var x = "<end>"
+        if i < a.len { x = a[i] }
+        var y = "<end>"
+        if i < b.len { y = b[i] }
+        if x != y { return "line {i + 1}: golden `{x}`, written `{y}`" }
+        i += 1
+    }
+    ""
+}
+
+fn judge(name: str, f: config.LayoutFile) -> str {
+    let golden = fs.read_text("tests/config/layout/{name}.toml") else { return "the golden did not read" }
+    let written = config.write_layout(f)
+    if written != golden { return "written differs from the golden at {first_difference(golden, written)}" }
+    let back = config.read_layout(golden)
+    if !back.ok { return "the golden is refused at {back.line}: {back.why}" }
+    if words_of(back) != words_of(f) { return "the golden reads back as {words_of(back)}, not {words_of(f)}" }
+    if config.write_layout(back) != golden { return "writing the golden's reading gives other bytes" }
+    ""
+}
+
+fn main() -> int {
+    var failed = 0
+    var cases = 0
+    let names = "one-pane three-panes two-tabs".split(" ")
+    for name in names {
+        var f = one_pane()
+        if name == "three-panes" { f = three_panes() }
+        if name == "two-tabs" { f = two_tabs() }
+        let why = judge(name, f)
+        cases += 1
+        if why.len > 0 {
+            print("FAIL layout-file-goldens {name}: {why}")
+            failed += 1
+        }
+    }
+    if failed > 0 {
+        print("LAYOUT-FILE-GOLDENS cases={cases} failed={failed}")
+        return 1
+    }
+    print("PASS layout-file-goldens cases={cases}")
+    0
+}

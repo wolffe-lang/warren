@@ -271,3 +271,12 @@ pub fn read_layout(text: str) -> LayoutFile {
     }
     LayoutFile { ok: true, line: 0, why: "", active: active, tabs: tabs }
 }
+
+/// A layout file's canonical text: the header comment, `version` and
+/// `active`, then each tab with its `name`, `focus` and `zoomed`, and its
+/// nodes in preorder, each header followed by its keys in a fixed order.
+pub fn write_layout(f: LayoutFile) -> str {
+    // Nothing is written yet.
+    let _unused = f.tabs.len
+    ""
+}
