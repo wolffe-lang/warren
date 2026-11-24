@@ -4,11 +4,13 @@
 //! and the defaults apply.
 
 /// What `warren.toml` sets. `ok` false names the refused `line` and `why`.
-pub struct Settings { ok: bool, why: str, line: int, clipboard_programs: bool }
+/// `restore` says whether sessions are saved and restored.
+pub struct Settings { ok: bool, why: str, line: int, clipboard_programs: bool, restore: bool }
 
-/// Every setting at its default: programs in panes cannot write the clipboard.
+/// Every setting at its default: programs in panes cannot write the
+/// clipboard, and sessions are saved and restored.
 pub fn default_settings() -> Settings {
-    Settings { ok: true, why: "", line: 0, clipboard_programs: false }
+    Settings { ok: true, why: "", line: 0, clipboard_programs: false, restore: true }
 }
 
 /// Take an accepted file's settings into `to`, field by field: by scalar
@@ -19,10 +21,11 @@ pub fn take_settings(mut to: Settings, from: Settings) {
     to.ok = true
     to.line = 0
     to.clipboard_programs = from.clipboard_programs
+    to.restore = from.restore
 }
 
 fn refuse(line: int, why: str) -> Settings {
-    Settings { ok: false, why: why, line: line, clipboard_programs: false }
+    Settings { ok: false, why: why, line: line, clipboard_programs: false, restore: true }
 }
 
 // A line without its comment (`#` to the end: values are bare words) and the

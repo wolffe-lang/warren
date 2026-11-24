@@ -21,6 +21,19 @@ fn test_clipboard_programs() {
     assert(spaced.ok && spaced.clipboard_programs, "spaces around names and no final newline")
 }
 
+fn test_restore() {
+    assert(config.default_settings().restore, "sessions are saved and restored by default")
+    let off = config.parse_settings("restore = false\n")
+    assert(off.ok && !off.restore, "restore = false, a top-level key")
+    let on = config.parse_settings("restore = true # the default\n[clipboard]\nprograms = true\n")
+    assert(on.ok && on.restore && on.clipboard_programs, "restore = true before a table")
+    assert(refused("restore = maybe\n", 1, "restore takes true or false"), "restore's bad value")
+    assert(refused("restore = false\nrestore = true\n", 2, "restore is set twice"), "restore twice")
+    assert(refused("[clipboard]\nrestore = false\n", 2, "unknown key restore in [clipboard]"), "restore in a table")
+    let bad = config.parse_settings("restore = false\nprograms = true\n")
+    assert(!bad.ok && bad.restore, "a refused file leaves restore at its default")
+}
+
 fn refused(text: str, line: int, why: str) -> bool {
     let s = config.parse_settings(text)
     !s.ok && s.line == line && s.why == why && !s.clipboard_programs
@@ -40,6 +53,7 @@ fn test_refusals() {
 fn main() -> int {
     test_defaults()
     test_clipboard_programs()
+    test_restore()
     test_refusals()
     print("PASS config-settings")
     0
