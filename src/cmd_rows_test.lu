@@ -256,7 +256,7 @@ fn verbs(mut t: Tally) {
     why = either(why, usage("split-right -t a -t b", "usage: -t given twice"))
     why = either(why, either(usage("kill-server -t work", "usage: kill-server takes no target"), usage("kill-server now", "usage: kill-server")))
     why = either(why, either(usage("ls -t work", "usage: ls takes no target"), usage("list", "usage: list --json")))
-    why = either(why, either(usage("list --yaml", "usage: list --json"), usage("new-session a b", "usage: new-session [-c DIR] [NAME]")))
+    why = either(why, either(usage("list --yaml", "usage: list --json"), usage("new-session a b", "usage: new-session [-c DIR] [-l LAYOUT] [NAME]")))
     why = either(why, usage("bogus -t work", "unknown command: bogus"))
     row(mut t, "verbs-usage", why)
     why = ""
@@ -306,6 +306,22 @@ fn verbs(mut t: Tally) {
     }
     if !laid { why = either(why, "layout is not in the table") }
     row(mut t, "verbs-layout", why)
+    // `new-session -l LAYOUT [NAME]` makes a session from a layout file; -l
+    // goes with new-session alone.
+    why = ""
+    let nl = verb("new-session -l dev work")
+    if !nl.ok || nl.kind != cmd.VERB_NEW_SESSION || nl.layout != "dev" || nl.name != "work" || !nl.named {
+        why = "new-session -l dev work: {nl.ok} {nl.kind} '{nl.layout}' '{nl.name}' {nl.named} {nl.why}"
+    }
+    let np = verb("new-session -c /tmp -l ./dev.toml")
+    if !np.ok || np.layout != "./dev.toml" || np.named || np.dir != "/tmp" {
+        why = either(why, "new-session -c /tmp -l ./dev.toml: {np.ok} '{np.layout}' {np.named} '{np.dir}' {np.why}")
+    }
+    let nn = verb("new-session work")
+    if !nn.ok || nn.layout != "" { why = either(why, "new-session work: layout '{nn.layout}'") }
+    why = either(why, either(usage("new-session -l", "usage: -l needs a layout"), usage("new-session -l a -l b", "usage: -l given twice")))
+    why = either(why, usage("split-right -l dev", "usage: -l goes with new-session"))
+    row(mut t, "verbs-new-session-layout", why)
 }
 
 // ---- the creating verbs and the session verbs ----
