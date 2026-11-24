@@ -3406,6 +3406,11 @@ fn row_search_cancel(mut r: Rig) -> str {
 }
 
 fn run_row(warren: str, name: str) -> str {
+    // This row's own state directory (XDG_STATE_HOME), made empty: what one
+    // row's server saves is never restored by another's.
+    let state = (env.cwd() else ".") + "/st-" + name
+    fs.remove_dir_all(state) else |_| {}
+    env.set("XDG_STATE_HOME", state) else |_| {}
     var r = rig(warren, name)
     var why = "no such row"
     if name == "split-sizes" { why = row_split_sizes(mut r) }
