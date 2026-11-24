@@ -55,6 +55,20 @@ fn shape_base() -> layout.Layout ! {base_refused} {
     l
 }
 
+fn shape_list1(a: int) -> List[int] {
+    var out = List[int]()
+    (mut out).push(a)
+    out
+}
+
+fn shape_list3(a: int, b: int, c: int) -> List[int] {
+    var out = List[int]()
+    (mut out).push(a)
+    (mut out).push(b)
+    (mut out).push(c)
+    out
+}
+
 fn shape_list(a: int, b: int) -> List[int] {
     var out = List[int]()
     (mut out).push(a)
@@ -112,6 +126,47 @@ fn shape_refusal_case(shape: List[layout.ShapeNode], panes: List[int], focus_lea
         return ""
     }
     "built tab {id}, not refused {want}"
+}
+
+/// `from_tree` must make a layout of one tab, id 1 and active, whose shape,
+/// panes, focus, focus order, zoom and name are the tree's.
+fn from_tree_case(shape: List[layout.ShapeNode], panes: List[int], focus_leaf: int, zoomed: bool) -> str {
+    let l = layout.from_tree(shape, panes, "first", focus_leaf, zoomed) else |e| {
+        return "refused {e} for {shape_words(shape)} panes {shape_ints(panes)}"
+    }
+    if l.tabs.len != 1 { return "{l.tabs.len} tabs, not 1" }
+    if l.tabs[0].id != 1 { return "the tab's id is {l.tabs[0].id}, not 1" }
+    if l.active != 1 || l.next_id != 2 { return "active {l.active} next {l.next_id}, not 1 and 2" }
+    let back = layout.shape_of(l, 1)
+    if !same_shape(back, shape) { return "shape read back {shape_words(back)}, built from {shape_words(shape)}" }
+    let got = layout.panes(l, 1)
+    if shape_ints(got) != shape_ints(panes) { return "panes {shape_ints(got)} in tree order, not {shape_ints(panes)}" }
+    let t = copy l.tabs[0]
+    if t.focus != panes[focus_leaf - 1] { return "focus {t.focus}, not leaf {focus_leaf}'s pane {panes[focus_leaf - 1]}" }
+    if t.zoomed != zoomed { return "zoomed {t.zoomed}, not {zoomed}" }
+    let tab_name = str_from_utf8(t.name) else ""
+    if tab_name != "first" { return "the tab's name is '{tab_name}', not 'first'" }
+    if t.focus_order[0] != t.focus { return "focus order {shape_ints(t.focus_order)} does not start at the focus" }
+    let broke = structure(l)
+    if broke != "" { return "the layout breaks invariant 2: {broke}" }
+    ""
+}
+
+/// A one-leaf tree makes the layout `new` makes.
+fn from_tree_one_leaf(one: List[layout.ShapeNode]) -> str {
+    let alone = layout.from_tree(one, shape_list1(5), "x", 1, false) else |e| { return "refused {e}" }
+    let made = layout.new(5, "x") else |e| { return "new refused {e}" }
+    if !same_layout(alone, made) { return "the layout differs from new's: {layout.dump(alone)}" }
+    ""
+}
+
+/// `from_tree` must refuse with `want`.
+fn from_tree_refusal_case(shape: List[layout.ShapeNode], panes: List[int], focus_leaf: int, want: str) -> str {
+    let l = layout.from_tree(shape, panes, "refused", focus_leaf, false) else |e| {
+        if "{e}" != want { return "refused {e}, not {want}" }
+        return ""
+    }
+    "made a layout of {l.tabs.len} tabs, not refused {want}"
 }
 
 fn shape_report(name: str, broke: str, mut failed: int) {
@@ -220,6 +275,25 @@ pub fn shape_rows() -> int {
     shape_report("refuse-focus-0", shape_refusal_case(pair, two, 0, "bad_focus"), mut failed)
     cases += 1
     shape_report("refuse-focus-3", shape_refusal_case(pair, two, 3, "bad_focus"), mut failed)
+
+    // from_tree: a layout of one tab, built as add_tree builds one.
+    cases += 1
+    shape_report("from-tree", from_tree_case(own, shape_list3(1, 2, 3), 3, false), mut failed)
+    cases += 1
+    shape_report("from-tree-deep", from_tree_case(deep, five, 1, true), mut failed)
+    cases += 1
+    shape_report("from-tree-one-leaf", from_tree_one_leaf(one), mut failed)
+    cases += 1
+    shape_report("from-tree-refuse-empty", from_tree_refusal_case(empty, two, 1, "bad_shape"), mut failed)
+    cases += 1
+    shape_report("from-tree-refuse-pane-count", from_tree_refusal_case(pair, three, 1, "bad_shape"), mut failed)
+    cases += 1
+    shape_report("from-tree-refuse-pane-zero", from_tree_refusal_case(pair, shape_list(0, 41), 1, "bad_id"), mut failed)
+    cases += 1
+    shape_report("from-tree-refuse-pane-twice", from_tree_refusal_case(pair, shape_list(42, 42), 1, "duplicate_id"),
+                 mut failed)
+    cases += 1
+    shape_report("from-tree-refuse-focus-3", from_tree_refusal_case(pair, two, 3, "bad_focus"), mut failed)
     if failed == 0 { print("PASS layout-shape-add-tree cases={cases}") }
     print("LAYOUT-SHAPE cases={cases} failed={failed}")
     failed
