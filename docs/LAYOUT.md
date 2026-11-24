@@ -289,10 +289,11 @@ cwd = "~/mail"
   `active`, then each tab with `name`, `focus` and `zoomed` always written,
   then its nodes in preorder, each header followed by its keys in a fixed
   order. A string escapes `"`, `\`, U+0000 to U+001F and U+007F, and nothing
-  else. A leaf gets `cwd` only when warren learnt its pane's directory (OSC 7
-  or /proc), so a pane at its session's start directory is written without one
-  and starts where the loading session starts; it gets `command` only when its
-  pane was started with one. Writing the reading of a written file gives the
+  else. A leaf gets `cwd` unless its pane is at its session's start directory
+  with nothing reported for it (no OSC 7, no /proc): such a pane is written
+  without one and starts where the loading session starts. A pane started in a
+  directory of its own keeps it, on every host. A leaf gets `command` only when
+  its pane was started with one. Writing the reading of a written file gives the
   same bytes.
 
 ### Where a layout file is
