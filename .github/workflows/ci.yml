@@ -5,7 +5,7 @@ on:
   push:
     branches: [trunk]
   schedule:
-    - cron: '23 5 * * *'
+    - cron: '23 16 * * *'
   workflow_dispatch:
     inputs:
       jobs:
