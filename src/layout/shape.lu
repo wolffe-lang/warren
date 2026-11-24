@@ -20,11 +20,78 @@ pub struct ShapeNode {
 /// (`duplicate_id`); the focus is not one of the leaves (`bad_focus`).
 pub error ShapeRefusal = {bad_shape, bad_id, duplicate_id, bad_focus}
 
+fn shape_walk(t: Tab, i: int, mut out: List[ShapeNode]) {
+    if t.nodes[i].kind == LEAF {
+        (mut out).push(ShapeNode { kind: LEAF, axis: COLS, share: 0 })
+        return
+    }
+    (mut out).push(ShapeNode { kind: SPLIT, axis: t.nodes[i].axis, share: t.nodes[i].share })
+    shape_walk(t, t.nodes[i].first, mut out)
+    shape_walk(t, t.nodes[i].second, mut out)
+}
+
 /// The tab's shape in preorder; empty for an unknown tab.
 pub fn shape_of(l: Layout, tab: int) -> List[ShapeNode] {
-    // Nothing is read yet.
-    let _unused = l.tabs.len + tab
-    List[ShapeNode]()
+    var out = List[ShapeNode]()
+    let ti = tab_index(l, tab)
+    if ti >= 0 { shape_walk(l.tabs[ti], l.tabs[ti].root, mut out) }
+    out
+}
+
+/// The index just past the subtree that starts at `i`, or -1 when the
+/// shape ends inside it or one of its nodes is out of range.
+fn shape_end(shape: List[ShapeNode], i: int) -> int {
+    if i >= shape.len { return -1 }
+    if shape[i].kind == LEAF {
+        if shape[i].axis != COLS || shape[i].share != 0 { return -1 }
+        return i + 1
+    }
+    if shape[i].kind != SPLIT { return -1 }
+    if shape[i].axis != COLS && shape[i].axis != ROWS { return -1 }
+    if shape[i].share < 1 || shape[i].share > SHARE_ONE - 1 { return -1 }
+    let first = shape_end(shape, i + 1)
+    if first < 0 { return -1 }
+    shape_end(shape, first)
+}
+
+/// Where `shape_build` is: the next shape node and the next pane.
+struct ShapeCursor {
+    node: int,
+    leaf: int,
+}
+
+/// Put the subtree at the cursor into the arena under `parent`; answers its
+/// slot.
+fn shape_build(mut t: Tab, shape: List[ShapeNode], panes: List[int], mut at: ShapeCursor, parent: int) -> int {
+    let i = at.node
+    at.node += 1
+    if shape[i].kind == LEAF {
+        let pane = panes[at.leaf]
+        at.leaf += 1
+        return alloc(mut t, take Node {
+            kind: LEAF,
+            pane: pane,
+            axis: COLS,
+            first: -1,
+            second: -1,
+            share: 0,
+            parent: parent,
+        })
+    }
+    let s = alloc(mut t, take Node {
+        kind: SPLIT,
+        pane: 0,
+        axis: shape[i].axis,
+        first: -1,
+        second: -1,
+        share: shape[i].share,
+        parent: parent,
+    })
+    let a = shape_build(mut t, shape, panes, mut at, s)
+    let b = shape_build(mut t, shape, panes, mut at, s)
+    t.nodes[s].first = a
+    t.nodes[s].second = b
+    s
 }
 
 /// A new last tab whose tree is `shape`, its leaves holding `panes` in tree
@@ -39,8 +106,47 @@ pub fn add_tree(
     focus_leaf: int,
     zoomed: bool,
 ) -> int ! ShapeRefusal {
-    // Nothing is built yet: every tree is refused, the layout as it was.
-    let _unused = shape.len + panes.len + name.len + focus_leaf
-    if zoomed { l.next_id = l.next_id }
-    bad_shape
+    if shape_end(shape, 0) != shape.len { return bad_shape }
+    var count = 0
+    var i = 0
+    while i < shape.len {
+        if shape[i].kind == LEAF { count += 1 }
+        i += 1
+    }
+    if panes.len != count { return bad_shape }
+    for p in panes {
+        if p < 1 { return bad_id }
+    }
+    i = 0
+    while i < panes.len {
+        if locate(l, panes[i]).tab >= 0 { return duplicate_id }
+        var j = 0
+        while j < i {
+            if panes[j] == panes[i] { return duplicate_id }
+            j += 1
+        }
+        i += 1
+    }
+    if focus_leaf < 1 || focus_leaf > count { return bad_focus }
+    let focus = panes[focus_leaf - 1]
+    var order = List[int]()
+    (mut order).push(focus)
+    for p in panes {
+        if p != focus { (mut order).push(p) }
+    }
+    var t = Tab {
+        id: l.next_id,
+        name: name_bytes(name),
+        nodes: List[Node](),
+        root: -1,
+        focus: focus,
+        zoomed: zoomed,
+        focus_order: order,
+    }
+    var at = ShapeCursor { node: 0, leaf: 0 }
+    t.root = shape_build(mut t, shape, panes, mut at, -1)
+    let id = l.next_id
+    l.next_id += 1
+    (mut l.tabs).push(copy t)
+    id
 }
