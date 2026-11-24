@@ -35,7 +35,8 @@ fn settings_line(raw: str) -> str {
     raw[0..at].trim()
 }
 
-/// Parse a configuration file's text: blank lines, `#` comments, the table
+/// Parse a configuration file's text: blank lines, `#` comments, the
+/// top-level key `restore = true` or `false` (before any table), the table
 /// `[clipboard]` and in it `programs = true` or `false`. Anything else, a
 /// table or key given twice included, refuses the whole file by line and
 /// reason, with every setting at its default.
@@ -44,6 +45,7 @@ pub fn parse_settings(text: str) -> Settings {
     var table = ""
     var clipboard_seen = false
     var programs_seen = false
+    var restore_seen = false
     var n = 0
     for raw in text.lines() {
         n += 1
@@ -60,9 +62,17 @@ pub fn parse_settings(text: str) -> Settings {
         }
         let eq = line.find("=") else 0 - 1
         if eq < 0 { return refuse(n, "expected key = value") }
-        if table.len == 0 { return refuse(n, "a key outside a table") }
         let key = line[0..eq].trim()
         let value = line[eq + 1..line.len].trim()
+        if table.len == 0 && key == "restore" {
+            if restore_seen { return refuse(n, "restore is set twice") }
+            if value == "true" { s.restore = true }
+            else if value == "false" { s.restore = false }
+            else { return refuse(n, "restore takes true or false") }
+            restore_seen = true
+            continue
+        }
+        if table.len == 0 { return refuse(n, "a key outside a table") }
         if key != "programs" { return refuse(n, "unknown key {key} in [{table}]") }
         if programs_seen { return refuse(n, "programs is set twice") }
         if value == "true" { s.clipboard_programs = true }
