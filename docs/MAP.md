@@ -76,7 +76,8 @@ width/resource/platform evidence remain separate pending measurements.
   presses every key under test on the emulated keyboard (the prefix Ctrl-Space,
   which the console types as NUL), on BIOS and UEFI with a USB and a PS/2
   keyboard; it reads the console's screen by replaying COM1's bytes through
-  warren's own emulator. It holds `new`, a split, focus, detach, attach and
+  warren's own emulator. It holds `new`, a split, focus, detach, attach, a
+  verb typed in a pane (`split-down`), `capture-pane` of another pane and
   `kill-server` at the console's 0x0 window (the documented 80x24) and at
   `COLUMNS` by `LINES`. Over an ssh session: the image's own checks. The image
   recipe is not in this repository.
