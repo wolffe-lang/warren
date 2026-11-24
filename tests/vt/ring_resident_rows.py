@@ -61,11 +61,11 @@ row at 2 MiB is the thinnest that passes: its room is 20,480 bytes under one
 cap, from six runs whose held numbers range over 0.69 MB, so a plant that
 makes the ring whole when a pane is made is red there by a little or not at
 all, run by run. That plant's red by name at `ring-resident-new` rests on the
-8 MiB row, where it is red by 7.3 to 7.6 MB; the 2 MiB case is not its
+8 MiB row, where it has been red by 7.0 to 7.6 MB; the 2 MiB case is not its
 witness. A host
 with no recorded takes fails by name. A cap a host does not hold (macOS at
-8 MiB, whose allocator's peak there is bimodal) is measured, printed and named
-in a NOTE with its takes, and holds nothing. Each verdict names its row: `ring-resident-STAGE`
+8 MiB, whose allocator's peak there was bimodal while the ring was made whole)
+is measured, printed and named in a NOTE with its takes, and holds nothing. Each verdict names its row: `ring-resident-STAGE`
 (new, resize, screenful, filled), `ring-resident-panes`, `ring-resident-projection`,
 `ring-resident-takes` and `ring-resident-probe`.
 
