@@ -710,7 +710,7 @@ fn plain_verbs() -> str {
 }
 
 fn argument_verbs() -> str {
-    "focus resize select-tab rename-tab rename-session source"
+    "focus resize select-tab rename-tab rename-session source layout"
 }
 
 /// Every verb of the command line, the ones without arguments first.
@@ -781,6 +781,22 @@ pub fn command(line: str) -> Command {
         var c = command_of(A_SOURCE, 0)
         c.text = rest_after_verb(line)
         return c
+    }
+    if v == "layout" {
+        // The NAME (or path) is the rest of the line after `save` or `load`.
+        let name = rest_after_verb(rest_after_verb(line))
+        if w.len < 3 || name.len == 0 { return refused("usage: layout save|load NAME") }
+        if w[1] == "save" {
+            var c = command_of(A_LAYOUT_SAVE, 0)
+            c.text = name
+            return c
+        }
+        if w[1] == "load" {
+            var c = command_of(A_LAYOUT_LOAD, 0)
+            c.text = name
+            return c
+        }
+        return refused("usage: layout save|load NAME")
     }
     refused("unknown command: " + v)
 }
