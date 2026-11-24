@@ -10,7 +10,8 @@ use layout
 
 /// A connection slot. `gen` changes at every reuse, so a readiness event
 /// taken for an earlier occupant is discarded. `pending` is a key's action
-/// waiting for a pane slot made between turns (its input waits behind it);
+/// waiting for a pane slot made between turns (its input waits behind it),
+/// `pending_text` the NAME of a `:layout load` waiting so;
 /// `message` shows on the client's hint line until `message_until`;
 /// `seen_*` say what its last image already holds (the layout and bar
 /// generations, and each pane slot's damage count); `sent_kind` and
@@ -110,6 +111,7 @@ pub struct Conn {
     stop_after: bool,
     pending: int,
     pending_arg: int,
+    pending_text: List[byte],
     message: List[byte],
     message_until: int,
     sent_kind: int,
@@ -151,7 +153,7 @@ pub fn new_conn() -> Conn {
         search: List[byte](), search_older: false,
         hello: List[byte](), hello_len: 0, hello_ready: false,
         resize_ready: false, resize_cols: 0, resize_rows: 0, command_ready: false, command: List[byte](),
-        command_len: 0, stop_after: false, pending: 0, pending_arg: 0, message: List[byte](), message_until: 0,
+        command_len: 0, stop_after: false, pending: 0, pending_arg: 0, pending_text: List[byte](), message: List[byte](), message_until: 0,
         sent_kind: 0, sent_code: 0, seen_layout: 0 - 1, seen_bar: 0 - 1, seen_damage: List[int](),
         writes: 0, written: 0, first_turn: 0,
     }
@@ -258,6 +260,7 @@ pub fn reset_conn(mut c: Conn, fd: int, id: int, now: int) {
     c.stop_after = false
     c.pending = 0
     c.pending_arg = 0
+    (mut c.pending_text).reset()
     (mut c.message).reset()
     c.message_until = 0
     c.sent_kind = 0
