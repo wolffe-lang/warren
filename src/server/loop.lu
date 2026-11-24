@@ -1260,6 +1260,10 @@ fn do_action_in(mut s: Server, index: int, si: int, action: int, arg: int) -> in
     let from = focused_slot(s, si)
     if action == config.A_SPLIT { return act_split(mut s, index, si, arg) }
     if action == config.A_NEW_TAB { return act_new_tab(mut s, index, si) }
+    if action == config.A_LAYOUT_LOAD && index >= 0 {
+        let word = str_from_utf8(s.conns[index].pending_text[0..s.conns[index].pending_text.len]) else ""
+        return layout_load_from_line(mut s, index, word)
+    }
     if action == config.A_DETACH {
         if index >= 0 { terminal(mut s, index, 135, 1, "detached") }
         return DONE
@@ -1479,6 +1483,13 @@ fn run_prompt(mut s: Server, index: int, was: int) {
     }
     if c.action == config.A_LAYOUT_SAVE {
         layout_save_from_line(mut s, index, c.text)
+        return
+    }
+    if c.action == config.A_LAYOUT_LOAD {
+        // The NAME waits in the connection's own bytes if slots must grow.
+        (mut s.conns[index].pending_text).reset()
+        for b in c.text.bytes() { (mut s.conns[index].pending_text).push(b) }
+        act(mut s, index, c.action, 0, 1)
         return
     }
     act(mut s, index, c.action, c.arg, c.count)
@@ -2433,6 +2444,29 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
             let r = cmd.resolve(snapshot(s), v.target, caller)
             if !r.ok {
                 err = if v.target.len > 0 then "warren: {verb}: {r.why}: {v.target}\n" else "warren: {verb}: {r.why}\n"
+            } else if a == config.A_LAYOUT_LOAD {
+                // A relative path is read from the directory the verb came from;
+                // the active tab and the focus stay.
+                let from = cwd_field_of(body)
+                let lf = read_load(v.command.text, if from.len > 0 then from else "/")
+                if lf.why.len > 0 {
+                    err = "warren: layout load: {lf.why}\n"
+                } else {
+                    s.hold_stop = true
+                    let done = load_tabs(mut s, session_with_id(s, r.session), lf.file, lf.label)
+                    s.hold_stop = false
+                    if done.later {
+                        command_later(mut s, index, body)
+                        return
+                    }
+                    if done.why.len > 0 {
+                        err = "warren: layout load: {done.why}\n"
+                    } else {
+                        status = 0
+                        err = ""
+                        for t in done.tabs { out = out + "t{t}\n" }
+                    }
+                }
             } else if a == config.A_LAYOUT_SAVE {
                 // A relative path is read from the directory the verb came from.
                 let from = cwd_field_of(body)
@@ -2840,6 +2874,226 @@ fn save_layout(s: Server, si: int, word: str, base: str) -> Saved {
         return Saved { path: "", why: failed }
     }
     Saved { path: path, why: "" }
+}
+
+// The value of `name` in an environment, or "".
+fn env_value(names: List[str], values: List[str], name: str) -> str {
+    var i = 0
+    while i < names.len {
+        if names[i] == name { return values[i] }
+        i += 1
+    }
+    ""
+}
+
+/// The directory a leaf's `cwd` names for a session whose start directory
+/// is `start` and whose HOME is `home`: none, the start directory; `~` and
+/// `~/...`, from HOME; an absolute path, itself; any other, read from the
+/// start directory. "" for `~` with no HOME.
+fn leaf_dir(cwd: str, start: str, home: str) -> str {
+    if cwd.len == 0 { return start }
+    if cwd == "~" || cwd.starts_with("~/") {
+        if home.len == 0 { return "" }
+        return home + cwd[1..cwd.len]
+    }
+    if cwd.starts_with("/") { return cwd }
+    if start.ends_with("/") { return start + cwd }
+    start + "/" + cwd
+}
+
+/// One leaf of a file being loaded, checked: where its program starts, its
+/// words, its pane's size in its tab (unzoomed), and its line.
+struct LoadLeaf { dir: str, words: List[str], cols: int, rows: int, line: int }
+
+/// A file read for a load, or why not: a NAME or path that names no file,
+/// one past the file bound, or one the reader refuses (by line).
+struct LoadFile { file: config.LayoutFile, label: str, why: str }
+
+fn read_load(word: str, base: str) -> LoadFile {
+    var none = config.LayoutFile { ok: false, line: 0, why: "", active: 0, tabs: List[config.TabFile]() }
+    let place = layout_place(word, base)
+    if place.why.len > 0 { return LoadFile { file: none, label: word, why: place.why } }
+    if !fs.exists(place.path) {
+        if place.named { return LoadFile { file: none, label: word, why: "no layout named {word} ({place.path})" } }
+        return LoadFile { file: none, label: word, why: "{word}: no such file" }
+    }
+    if is_directory(place.path) { return LoadFile { file: none, label: word, why: "{word}: a directory, not a layout file" } }
+    let size = fs.size(place.path) else 0
+    if size > config.LAYOUT_BYTES {
+        return LoadFile { file: none, label: word, why: "{word}: {size} bytes, past {config.LAYOUT_BYTES}" }
+    }
+    let text = fs.read_text(place.path) else |e| { return LoadFile { file: none, label: word, why: "{word}: cannot be read: {e}" } }
+    let f = config.read_layout(text)
+    if !f.ok { return LoadFile { file: none, label: word, why: "{word} line {f.line}: {f.why}" } }
+    LoadFile { file: f, label: word, why: "" }
+}
+
+/// Every check a load makes before anything is made, for a session of
+/// `cols` x `rows` whose start directory is `start` and environment
+/// `names`/`values`, holding `held` panes: each leaf's directory and program
+/// (by line), the session's pane cap, every leaf at least one cell at the
+/// session's size, and the memory budget for all the leaves together. ""
+/// or why; the leaves, in file order, in `out`.
+fn check_load(s: Server, f: config.LayoutFile, label: str, cols: int, rows: int, start: str, names: List[str],
+    values: List[str], held: int, mut out: List[LoadLeaf]) -> str {
+    let home = env_value(names, values, "HOME")
+    var count = 0
+    for t in f.tabs { count += t.leaves.len }
+    for t in f.tabs {
+        for leaf in t.leaves {
+            let dir = leaf_dir(leaf.cwd, start, home)
+            if dir.len == 0 { return "{label} line {leaf.line}: {leaf.cwd} names HOME, and the session has none" }
+            if !is_directory(dir) { return "{label} line {leaf.line}: no such directory: {dir}" }
+            if leaf.command.len > 0 {
+                let missing = program_problem(leaf.command[0], dir, names, values)
+                if missing.len > 0 { return "{label} line {leaf.line}: {missing}" }
+            }
+        }
+    }
+    if held + count > MAX_PANES {
+        return "{label}: its {count} panes and the session's {held} are past {MAX_PANES} a session"
+    }
+    // The trial: each tab built alone, unzoomed, at the tab area; a leaf
+    // with no cell is too small, and each leaf's size is its pane's.
+    let area = rows - BAR_LINES
+    var free = 0
+    for p in s.panes {
+        if !p.live { free += 1 }
+    }
+    var extra = 0
+    var made = 0
+    for t in f.tabs {
+        var ids = List[int]()
+        var i = 0
+        while i < t.leaves.len {
+            (mut ids).push(i + 1)
+            i += 1
+        }
+        let trial = layout.from_tree(t.shape, ids, "", 1, false) else |e| { return "{label}: the tree is refused: {e}" }
+        let rs = layout.rects(trial, trial.active, cols, area)
+        i = 0
+        while i < t.leaves.len {
+            var rc = 0
+            var rr = 0
+            for r in rs {
+                if r.pane == i + 1 {
+                    rc = r.cols
+                    rr = r.rows
+                }
+            }
+            if rc < 1 || rr < 1 { return "{label}: too small for this layout at {cols}x{rows}" }
+            let leaf = copy t.leaves[i]
+            (mut out).push(LoadLeaf { dir: leaf_dir(leaf.cwd, start, home), words: copy leaf.command, cols: rc, rows: rr,
+                line: leaf.line })
+            if made >= free { extra += pane_bytes(rc, rr) }
+            extra += argv_bytes(leaf.command)
+            made += 1
+            i += 1
+        }
+    }
+    if projected(s, extra) > s.budget { return "{label}: past the memory budget" }
+    ""
+}
+
+/// What a load came to: the new tabs' ids, or why nothing stays, or a wait
+/// for pane slots made between turns (`later`).
+struct Loaded { tabs: List[int], why: str, later: bool }
+
+/// The file's tabs after session `si`'s: every check first (check_load),
+/// then every slot held, then each leaf's program started. A spawn that
+/// fails ends the panes this load made and closes its tabs; their ids stay
+/// spent. The active tab and the focus do not change.
+fn load_tabs(mut s: Server, si: int, f: config.LayoutFile, label: str) -> Loaded {
+    var leaves = List[LoadLeaf]()
+    let why = check_load(s, f, label, s.sessions[si].cols, s.sessions[si].rows, cwd_of(s.sessions[si]),
+        s.sessions[si].env_names, s.sessions[si].env_values, pane_count(s, si), mut leaves)
+    if why.len > 0 { return Loaded { tabs: List[int](), why: why, later: false } }
+    var free = 0
+    for p in s.panes {
+        if !p.live { free += 1 }
+    }
+    if free < leaves.len {
+        // One slot more is made between turns; the command is asked again.
+        s.need_pane = true
+        s.want_cols = leaves[0].cols
+        s.want_rows = leaves[0].rows
+        return Loaded { tabs: List[int](), why: "", later: true }
+    }
+    var tabs = List[int]()
+    var slots = List[int]()
+    var n = 0
+    var failed = ""
+    for t in f.tabs {
+        if failed.len > 0 { break }
+        var ids = List[int]()
+        var i = 0
+        while i < t.leaves.len {
+            (mut ids).push(s.next_pane)
+            s.next_pane = s.next_pane + 1
+            i += 1
+        }
+        // The layout hands out the server's next tab id, and the server
+        // takes back the count it reached.
+        s.sessions[si].layout.next_id = s.next_tab
+        let tab = layout.add_tree(mut s.sessions[si].layout, t.shape, ids, t.name, t.focus, t.zoomed) else |e| {
+            failed = "{label}: the tree is refused: {e}"
+            0
+        }
+        s.next_tab = s.sessions[si].layout.next_id
+        if failed.len > 0 { break }
+        (mut tabs).push(tab)
+        i = 0
+        while i < ids.len && failed.len == 0 {
+            let leaf = copy leaves[n]
+            let k = acquire_pane(mut s, leaf.cols, leaf.rows)
+            if k < 0 {
+                failed = "{label}: no pane slot was free"
+            } else {
+                let started = spawn_pane_in(mut s, si, k, ids[i], leaf.cols, leaf.rows, leaf.dir, leaf.words)
+                if started.len > 0 {
+                    failed = "{label} line {leaf.line}: the program did not start: {started}"
+                } else {
+                    (mut slots).push(k)
+                }
+            }
+            n += 1
+            i += 1
+        }
+    }
+    if failed.len > 0 {
+        for k in slots { drop_pane(mut s, k) }
+        for tab in tabs { layout.close_tab(mut s.sessions[si].layout, tab) else |_| {} }
+        layout_changed(mut s, si)
+        return Loaded { tabs: List[int](), why: failed, later: false }
+    }
+    layout_changed(mut s, si)
+    Loaded { tabs: tabs, why: "", later: false }
+}
+
+// `:layout load NAME` typed by client `index`: as from a shell, a relative
+// path read from the focused pane's directory; the first new tab becomes
+// active, as `:new-tab`'s does, and a refusal is told on the hint line.
+fn layout_load_from_line(mut s: Server, index: int, word: str) -> int {
+    let si = s.conns[index].session
+    if si < 0 { return DONE }
+    let k = focused_slot(s, si)
+    let base = if k >= 0 then pane_dir(s, k).path else cwd_of(s.sessions[si])
+    let lf = read_load(word, base)
+    if lf.why.len > 0 {
+        tell(mut s, index, "layout load: {lf.why}")
+        return DONE
+    }
+    let from = focused_slot(s, si)
+    let done = load_tabs(mut s, si, lf.file, lf.label)
+    if done.later { return LATER }
+    if done.why.len > 0 {
+        tell(mut s, index, "layout load: {done.why}")
+        return DONE
+    }
+    layout.select_tab_id(mut s.sessions[si].layout, done.tabs[0]) else |_| {}
+    layout_changed(mut s, si)
+    focus_moved(mut s, si, from)
+    DONE
 }
 
 // `:layout save NAME` typed by client `index`: a relative path is read from
