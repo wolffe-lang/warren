@@ -165,6 +165,9 @@ step toml-subset-lupin "$LUPIN" run src/config_toml_test.lu
 step layout-table-build "$WOLF" build --deny-warnings src/layout_table_test.lu -o "$root/target/native/layout-table"
 step layout-table-native "$root/target/native/layout-table"
 step layout-table-lupin "$LUPIN" run src/layout_table_test.lu
+step layout-golden-build "$WOLF" build --deny-warnings src/layout_golden_test.lu -o "$root/target/native/layout-golden"
+step layout-golden-native "$root/target/native/layout-golden"
+step layout-golden-lupin "$LUPIN" run src/layout_golden_test.lu
 step pacing-lupin "$LUPIN" run src/pacing_test.lu
 step client-input-lupin "$LUPIN" run src/client_input_test.lu
 step client-keyboard-lupin "$LUPIN" run src/client_keyboard_test.lu

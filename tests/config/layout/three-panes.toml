@@ -1,0 +1,25 @@
+# warren layout
+version = 1
+active = 1
+
+[[tab]]
+name = "main"
+focus = 3
+zoomed = false
+
+[tab.root]
+split = "cols"
+share = 5000
+
+[tab.root.first]
+cwd = "/home/me/src/warren"
+command = ["vim", "notes.txt"]
+
+[tab.root.second]
+split = "rows"
+share = 5000
+
+[tab.root.second.first]
+
+[tab.root.second.second]
+cwd = "~/mail"
