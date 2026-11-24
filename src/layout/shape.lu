@@ -1,0 +1,46 @@
+//! member: true
+//! A tab's tree in an arena-free form, for the layout files: its shape, the
+//! splits and leaves in preorder. `shape_of` reads a tab's; `add_tree`
+//! builds a tab from one and its panes in tree order, so that
+//! `shape_of(add_tree(s)) == s` (docs/LAYOUT.md, The arena-free form).
+
+/// One node of a shape, in preorder: a leaf (`kind` LEAF, `axis` COLS,
+/// `share` 0), or a split (`kind` SPLIT) along `axis` whose first child
+/// takes `share` of it, followed by its first subtree's nodes and then its
+/// second's.
+pub struct ShapeNode {
+    kind: int,
+    axis: int,
+    share: int,
+}
+
+/// Why `add_tree` refused: the shape is not one whole tree with a leaf for
+/// each pane, or a node is out of range (`bad_shape`); a pane is below 1
+/// (`bad_id`); a pane is given twice or is already a live pane
+/// (`duplicate_id`); the focus is not one of the leaves (`bad_focus`).
+pub error ShapeRefusal = {bad_shape, bad_id, duplicate_id, bad_focus}
+
+/// The tab's shape in preorder; empty for an unknown tab.
+pub fn shape_of(l: Layout, tab: int) -> List[ShapeNode] {
+    // Nothing is read yet.
+    let _unused = l.tabs.len + tab
+    List[ShapeNode]()
+}
+
+/// A new last tab whose tree is `shape`, its leaves holding `panes` in tree
+/// order. It takes the next tab id, which it answers; its focus is the
+/// `focus_leaf`th leaf (from 1), first in its focus order and the rest in
+/// tree order. The active tab does not change.
+pub fn add_tree(
+    mut l: Layout,
+    shape: List[ShapeNode],
+    panes: List[int],
+    name: str,
+    focus_leaf: int,
+    zoomed: bool,
+) -> int ! ShapeRefusal {
+    // Nothing is built yet: every tree is refused, the layout as it was.
+    let _unused = shape.len + panes.len + name.len + focus_leaf
+    if zoomed { l.next_id = l.next_id }
+    bad_shape
+}

@@ -38,9 +38,10 @@ pub fn goldens() -> int {
     failed
 }
 
-/// The goldens and `count` property sequences per size; the exit status.
+/// The goldens, the arena-free form's rows and `count` property sequences
+/// per size; the exit status.
 pub fn all(count: int) -> int {
-    let bad = goldens() + properties(count)
+    let bad = goldens() + shape_rows() + properties(count)
     if bad > 0 { return 1 }
     0
 }
