@@ -37,7 +37,7 @@ pub const LINE_UNSET: int = 1125899906842625
 /// last lines (`start`, `end`: a line number, LINE_EDGE or LINE_UNSET).
 pub struct Verb { ok: bool, kind: int, target: str, command: config.Command, name: str, named: bool, dir: str, has_dir: bool,
     argv: List[str], status: int, why: str, keys: List[str], literal: bool, print: bool, escapes: bool, join: bool,
-    start: int, end: int }
+    start: int, end: int, layout: str }
 
 // The server's own verbs, besides the command line's (a function: the
 // reference interpreter does not resolve a method on a module constant).
@@ -48,13 +48,13 @@ fn server_verbs() -> str {
 fn usage_error(why: str) -> Verb {
     Verb { ok: false, kind: 0, target: "", command: config.command(""), name: "", named: false, dir: "", has_dir: false,
         argv: List[str](), status: EXIT_USAGE, why: why, keys: List[str](), literal: false, print: false, escapes: false,
-        join: false, start: LINE_UNSET, end: LINE_UNSET }
+        join: false, start: LINE_UNSET, end: LINE_UNSET, layout: "" }
 }
 
 fn verb_of(kind: int, target: str, name: str) -> Verb {
     Verb { ok: true, kind: kind, target: target, command: config.command(""), name: name, named: false, dir: "",
         has_dir: false, argv: List[str](), status: EXIT_DONE, why: "", keys: List[str](), literal: false, print: false,
-        escapes: false, join: false, start: LINE_UNSET, end: LINE_UNSET }
+        escapes: false, join: false, start: LINE_UNSET, end: LINE_UNSET, layout: "" }
 }
 
 fn is_server_verb(v: str) -> bool {
@@ -153,7 +153,7 @@ pub fn parse_verb(argv: List[str]) -> Verb {
     if !c.ok { return usage_error(c.why) }
     Verb { ok: true, kind: VERB_ACTION, target: target, command: c, name: "", named: false, dir: dir, has_dir: has_dir,
         argv: program, status: EXIT_DONE, why: "", keys: List[str](), literal: false, print: false, escapes: false,
-        join: false, start: LINE_UNSET, end: LINE_UNSET }
+        join: false, start: LINE_UNSET, end: LINE_UNSET, layout: "" }
 }
 
 // send-keys's flags that tmux has and this version does not.
