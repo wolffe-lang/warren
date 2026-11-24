@@ -11,6 +11,13 @@ pub const LAYOUT_LEAVES: int = 32
 /// The most bytes a layout file may hold.
 pub const LAYOUT_BYTES: int = 1048576
 
+/// The most columns or rows of a saved session's size: what the protocol
+/// carries (docs/PROTOCOL.md).
+pub const SESSION_SIDE: int = 65535
+
+/// The most cells a saved session's size holds: the protocol's grid bound.
+pub const SESSION_CELLS: int = 262144
+
 /// One leaf of a tab: the directory its pane starts in ("" for the
 /// session's start directory), its program's words (none for the
 /// configured shell), and the line of its table (0 for a leaf not read
@@ -246,9 +253,88 @@ fn lay_tab(d: Toml, e: int, mut r: LayReading, mut tabs: List[TabFile]) -> bool 
     true
 }
 
+/// Why a name is not one a session may hold, or "": the server's own rule
+/// (not empty, no `/`, no control byte), in its words.
+fn lay_name_problem(name: str) -> str {
+    if name.len == 0 { return "a session name may not be empty" }
+    for b in name.bytes() {
+        let v = b as int
+        if v == 47 { return "a session name may not hold '/'" }
+        if v < 32 || v == 127 { return "a session name may not hold a control byte" }
+    }
+    ""
+}
+
+/// A `[session]` table read: the session, or the line that refused it and
+/// why.
+struct LaySession {
+    session: SessionFile,
+    line: int,
+    why: str,
+}
+
+fn lay_session_refused(line: int, why: str) -> LaySession {
+    LaySession { session: no_session(), line: line, why: why }
+}
+
+/// Read the `[session]` table at node `n`: every key known; `name`, `cwd`,
+/// `cols` and `rows` each present (a missing one at the table's line), then
+/// each of its kind and range: a name a session may hold, an absolute cwd,
+/// each side 1 to SESSION_SIDE and at most SESSION_CELLS cells.
+fn lay_session(d: Toml, n: int) -> LaySession {
+    let at = d.nodes[n].line
+    for c in d.nodes[n].children {
+        let key = d.nodes[c].key
+        if key != "name" && key != "cwd" && key != "cols" && key != "rows" {
+            return lay_session_refused(d.nodes[c].line, "unknown key {key}")
+        }
+    }
+    let nm = toml_child(d, n, "name")
+    if nm < 0 { return lay_session_refused(at, "session.name is missing") }
+    let cw = toml_child(d, n, "cwd")
+    if cw < 0 { return lay_session_refused(at, "session.cwd is missing") }
+    let co = toml_child(d, n, "cols")
+    if co < 0 { return lay_session_refused(at, "session.cols is missing") }
+    let ro = toml_child(d, n, "rows")
+    if ro < 0 { return lay_session_refused(at, "session.rows is missing") }
+    if d.nodes[nm].kind != TOML_STRING {
+        return lay_session_refused(d.nodes[nm].line, "name is {lay_kind(d.nodes[nm].kind)}, not a string")
+    }
+    let name = d.nodes[nm].text
+    let problem = lay_name_problem(name)
+    if problem.len > 0 { return lay_session_refused(d.nodes[nm].line, problem) }
+    if d.nodes[cw].kind != TOML_STRING {
+        return lay_session_refused(d.nodes[cw].line, "cwd is {lay_kind(d.nodes[cw].kind)}, not a string")
+    }
+    let cwd = d.nodes[cw].text
+    if !cwd.starts_with("/") {
+        return lay_session_refused(d.nodes[cw].line, "cwd {lay_shown(cwd)}: a session's cwd is an absolute path")
+    }
+    if d.nodes[co].kind != TOML_INT {
+        return lay_session_refused(d.nodes[co].line, "cols is {lay_kind(d.nodes[co].kind)}, not an integer")
+    }
+    let cols = d.nodes[co].number
+    if cols < 1 || cols > SESSION_SIDE {
+        return lay_session_refused(d.nodes[co].line, "cols {cols}: a session is 1 to {SESSION_SIDE} columns")
+    }
+    if d.nodes[ro].kind != TOML_INT {
+        return lay_session_refused(d.nodes[ro].line, "rows is {lay_kind(d.nodes[ro].kind)}, not an integer")
+    }
+    let rows = d.nodes[ro].number
+    if rows < 1 || rows > SESSION_SIDE {
+        return lay_session_refused(d.nodes[ro].line, "rows {rows}: a session is 1 to {SESSION_SIDE} rows")
+    }
+    if cols * rows > SESSION_CELLS {
+        return lay_session_refused(d.nodes[ro].line, "{cols}x{rows}: a session holds at most {SESSION_CELLS} cells")
+    }
+    LaySession { session: SessionFile { saved: true, name: name, cwd: cwd, cols: cols, rows: rows, line: at }, line: 0,
+        why: "" }
+}
+
 /// Read a layout file's text: its tabs, or the first line that refuses it
 /// and why. The TOML subset reads it first; then the top-level keys
-/// (`version`, unknown keys, `tab`), each tab in order, and `active`.
+/// (`version`, unknown keys, `session`, `tab`), each tab in order, and
+/// `active`.
 pub fn read_layout(text: str) -> LayoutFile {
     if text.len > LAYOUT_BYTES { return lay_refused(1, "a layout file holds at most {LAYOUT_BYTES} bytes") }
     let d = parse_toml(text)
@@ -263,9 +349,19 @@ pub fn read_layout(text: str) -> LayoutFile {
     }
     for c in d.nodes[0].children {
         let key = d.nodes[c].key
-        if key != "version" && key != "active" && key != "tab" {
+        if key != "version" && key != "active" && key != "tab" && key != "session" {
             return lay_refused(d.nodes[c].line, "unknown key {key}")
         }
+    }
+    var session = no_session()
+    let sn = toml_child(d, 0, "session")
+    if sn >= 0 {
+        if d.nodes[sn].kind != TOML_TABLE {
+            return lay_refused(d.nodes[sn].line, "session is {lay_kind(d.nodes[sn].kind)}, not a table")
+        }
+        let got = lay_session(d, sn)
+        if got.why.len > 0 { return lay_refused(got.line, got.why) }
+        session = got.session
     }
     let t = toml_child(d, 0, "tab")
     if t < 0 { return lay_refused(1, "no [[tab]]") }
@@ -290,15 +386,23 @@ pub fn read_layout(text: str) -> LayoutFile {
             return lay_refused(line, "active {active}: the file has {lay_count(tabs.len, "tab", "tabs")}")
         }
     }
-    LayoutFile { ok: true, line: 0, why: "", active: active, tabs: tabs, session: no_session() }
+    LayoutFile { ok: true, line: 0, why: "", active: active, tabs: tabs, session: session }
 }
 
 /// A layout file's canonical text: the header comment, `version` and
-/// `active`, then each tab with its `name`, `focus` and `zoomed`, and its
+/// `active`, the session's table when it has one (`name`, `cwd`, `cols`,
+/// `rows`), then each tab with its `name`, `focus` and `zoomed`, and its
 /// nodes in preorder, each header followed by its keys in a fixed order.
 pub fn write_layout(f: LayoutFile) -> str {
     var out = List[byte]()
     lay_put(mut out, "# warren layout\nversion = 1\nactive = {f.active}\n")
+    if f.session.saved {
+        lay_put(mut out, "\n[session]\nname = ")
+        lay_string(mut out, f.session.name)
+        lay_put(mut out, "\ncwd = ")
+        lay_string(mut out, f.session.cwd)
+        lay_put(mut out, "\ncols = {f.session.cols}\nrows = {f.session.rows}\n")
+    }
     for t in f.tabs {
         lay_put(mut out, "\n[[tab]]\nname = ")
         lay_string(mut out, t.name)
