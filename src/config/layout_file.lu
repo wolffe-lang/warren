@@ -12,11 +12,13 @@ pub const LAYOUT_LEAVES: int = 32
 pub const LAYOUT_BYTES: int = 1048576
 
 /// One leaf of a tab: the directory its pane starts in ("" for the
-/// session's start directory) and its program's words (none for the
-/// configured shell).
+/// session's start directory), its program's words (none for the
+/// configured shell), and the line of its table (0 for a leaf not read
+/// from a file), which a load's refusals name.
 pub struct LeafFile {
     cwd: str,
     command: List[str],
+    line: int,
 }
 
 /// One tab: its name (`named` false when the file gives none), its focused
@@ -110,7 +112,7 @@ fn lay_node(d: Toml, n: int, mut r: LayReading) -> bool {
         if r.total > LAYOUT_LEAVES {
             return lay_refuse(mut r, at, "a {r.total}rd leaf: a layout holds at most {LAYOUT_LEAVES}")
         }
-        var leaf = LeafFile { cwd: "", command: List[str]() }
+        var leaf = LeafFile { cwd: "", command: List[str](), line: at }
         for c in d.nodes[n].children {
             let key = d.nodes[c].key
             let line = d.nodes[c].line
