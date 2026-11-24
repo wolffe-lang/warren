@@ -2341,7 +2341,20 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
         } else if cols < MIN_COLS || rows < MIN_ROWS {
             err = "warren: new-session: {cols}x{rows} is smaller than {MIN_COLS}x{MIN_ROWS}\n"
         } else {
-            let m = make_session(mut s, name, cols, rows, start, h.names, h.values, 0)
+            // With -l the session is the layout file's; a relative path is read
+            // from the directory the verb came from.
+            var m = Made { si: 0 - 1, code: 0, why: "", later: false }
+            if v.layout.len > 0 {
+                let from = cwd_field_of(body)
+                let lf = read_load(v.layout, if from.len > 0 then from else "/")
+                if lf.why.len > 0 {
+                    m = Made { si: 0 - 1, code: 6, why: lf.why, later: false }
+                } else {
+                    m = make_session_from(mut s, name, cols, rows, start, h.names, h.values, lf.file, lf.label)
+                }
+            } else {
+                m = make_session(mut s, name, cols, rows, start, h.names, h.values, 0)
+            }
             if m.later {
                 command_later(mut s, index, body)
                 return
@@ -3161,6 +3174,23 @@ fn make_session(mut s: Server, name: str, cols: int, rows: int, cwd: str, names:
     let id = s.next_pane
     let fresh = layout.new(id, "") else |_| { return Made { si: 0 - 1, code: 6, why: "no layout", later: false } }
     s.next_pane = s.next_pane + 1
+    begin_session(mut s, slot, name, cols, rows, cwd, names, values, fresh)
+    let why = spawn_pane(mut s, slot, k, id, cols, area)
+    if why.len > 0 {
+        return Made { si: 0 - 1, code: 6, why: "the pane's program did not start: {why}", later: false }
+    }
+    s.sessions[slot].live = true
+    sync_sizes(mut s, slot)
+    trace(s, "session {slot} created: {name}")
+    Made { si: slot, code: 0, why: "", later: false }
+}
+
+/// Session slot `slot` set up for a session of this name, size, start
+/// directory and environment, holding `fresh`'s tabs: the first takes the
+/// server's next tab id, and the layout hands out the ids after it. The
+/// session is not live yet; its panes are started after this.
+fn begin_session(mut s: Server, slot: int, name: str, cols: int, rows: int, cwd: str, names: List[str],
+    values: List[str], fresh: layout.Layout) {
     s.sessions[slot].generation = s.sessions[slot].generation + 1
     set_name(mut s.sessions[slot], name)
     s.sessions[slot].cols = cols
@@ -3181,7 +3211,7 @@ fn make_session(mut s: Server, name: str, cols: int, rows: int, cwd: str, names:
     (mut s.sessions[slot].mark_tab).reset()
     (mut s.sessions[slot].mark_bits).reset()
     (mut s.sessions[slot].register).reset()
-    i = 0
+    var i = 0
     while i < names.len {
         (mut s.sessions[slot].env_names).push(copy names[i])
         (mut s.sessions[slot].env_values).push(copy values[i])
@@ -3190,13 +3220,104 @@ fn make_session(mut s: Server, name: str, cols: int, rows: int, cwd: str, names:
     s.sessions[slot].layout_gen = s.sessions[slot].layout_gen + 1
     s.sessions[slot].chrome_gen = 0 - 1
     s.sessions[slot].last_output = now_ns()
-    let why = spawn_pane(mut s, slot, k, id, cols, area)
-    if why.len > 0 {
-        return Made { si: 0 - 1, code: 6, why: "the pane's program did not start: {why}", later: false }
+}
+
+/// `new-session -l`: a session made from a layout file. Every check is
+/// made first, for this session's size, start directory and environment
+/// (check_load), and every pane slot held, before anything is made; then
+/// its first tab is the file's first, the rest follow with `add_tree`, the
+/// file's active tab is active, and each leaf's program starts. A spawn
+/// that fails ends the panes this made, and no session stays.
+fn make_session_from(mut s: Server, name: str, cols: int, rows: int, cwd: str, names: List[str], values: List[str],
+    f: config.LayoutFile, label: str) -> Made {
+    let problem = name_problem(name)
+    if problem.len > 0 { return Made { si: 0 - 1, code: 6, why: problem, later: false } }
+    if s.stopping || live_sessions(s) >= MAX_SESSIONS { return Made { si: 0 - 1, code: 7, why: "resource limit", later: false } }
+    var leaves = List[LoadLeaf]()
+    let why = check_load(s, f, label, cols, rows, cwd, names, values, 0, mut leaves)
+    if why.len > 0 { return Made { si: 0 - 1, code: 6, why: why, later: false } }
+    var slot = 0 - 1
+    var i = 0
+    while i < s.sessions.len {
+        if !s.sessions[i].live && slot < 0 { slot = i }
+        i += 1
+    }
+    if slot < 0 {
+        s.need_slot = true
+        return Made { si: 0 - 1, code: 0, why: "", later: true }
+    }
+    var free = 0
+    for p in s.panes {
+        if !p.live { free += 1 }
+    }
+    if free < leaves.len {
+        s.need_pane = true
+        s.want_cols = leaves[0].cols
+        s.want_rows = leaves[0].rows
+        return Made { si: 0 - 1, code: 0, why: "", later: true }
+    }
+    // The layout: the first tab from its tree, then the rest after it.
+    var ids = List[List[int]]()
+    for t in f.tabs {
+        var these = List[int]()
+        var j = 0
+        while j < t.leaves.len {
+            (mut these).push(s.next_pane)
+            s.next_pane = s.next_pane + 1
+            j += 1
+        }
+        (mut ids).push(these)
+    }
+    let first = copy f.tabs[0]
+    let fresh = layout.from_tree(first.shape, ids[0], first.name, first.focus, first.zoomed) else |e| {
+        return Made { si: 0 - 1, code: 6, why: "{label}: the tree is refused: {e}", later: false }
+    }
+    begin_session(mut s, slot, name, cols, rows, cwd, names, values, fresh)
+    var failed = ""
+    i = 1
+    while i < f.tabs.len && failed.len == 0 {
+        let t = copy f.tabs[i]
+        s.sessions[slot].layout.next_id = s.next_tab
+        let _tab = layout.add_tree(mut s.sessions[slot].layout, t.shape, ids[i], t.name, t.focus, t.zoomed) else |e| {
+            failed = "{label}: the tree is refused: {e}"
+            0
+        }
+        s.next_tab = s.sessions[slot].layout.next_id
+        i += 1
+    }
+    if failed.len == 0 {
+        layout.select_tab(mut s.sessions[slot].layout, f.active) else |_| {}
+    }
+    var slots = List[int]()
+    var n = 0
+    i = 0
+    while i < f.tabs.len && failed.len == 0 {
+        var j = 0
+        while j < ids[i].len && failed.len == 0 {
+            let leaf = copy leaves[n]
+            let k = acquire_pane(mut s, leaf.cols, leaf.rows)
+            if k < 0 {
+                failed = "{label}: no pane slot was free"
+            } else {
+                let started = spawn_pane_in(mut s, slot, k, ids[i][j], leaf.cols, leaf.rows, leaf.dir, leaf.words)
+                if started.len > 0 {
+                    failed = "{label} line {leaf.line}: the program did not start: {started}"
+                } else {
+                    (mut slots).push(k)
+                }
+            }
+            n += 1
+            j += 1
+        }
+        i += 1
+    }
+    if failed.len > 0 {
+        for k in slots { drop_pane(mut s, k) }
+        return Made { si: 0 - 1, code: 6, why: failed, later: false }
     }
     s.sessions[slot].live = true
     sync_sizes(mut s, slot)
-    trace(s, "session {slot} created: {name}")
+    trace(s, "session {slot} created from {label}: {name}")
     Made { si: slot, code: 0, why: "", later: false }
 }
 
