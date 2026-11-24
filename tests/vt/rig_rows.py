@@ -37,6 +37,7 @@ def main():
         (RIG, 'history-ring.manifest', ['gate-linux']),
         (RIG, 'history-ring-plant.manifest', ['history-ring-plant-build', 'pane-first-resize-keeps-the-ring']),
         (RIG, 'ring-cap0-plant.manifest', ['ring-resident-self-test']),
+        (RIG, 'layout-axis-plant.manifest', ['layout-file-round-trip']),
         (RIG, 'dch-tail.manifest', ['gate-linux', 'dch-tail-seeds']),
         (RIG, 'dch-tail-plant.manifest', ['dch-tail-plant-build', 'dch-tail-seeds-pass']),
         (RIG, 'container-limits.manifest', ['gate-linux', 'container-limits']),
@@ -87,6 +88,11 @@ def main():
     ring = (RIG / 'ring-step.sh').read_text()
     assert '. tools/container-run.sh' in ring and 'bash tests/vt/rig/ring-step.sh rows' in ring
     assert ring.index('tools/vt/generate_version.py') < ring.index('"$WOLF" build'), 'ring-step: version before build'
+    # The layout file rows' step generates the version member before it
+    # builds, as the ring rows' does.
+    lay = (RIG / 'layout-step.sh').read_text()
+    assert '. tools/container-run.sh' in lay and 'bash tests/vt/rig/layout-step.sh rows' in lay
+    assert lay.index('tools/vt/generate_version.py') < lay.index('"$WOLF" build'), 'layout-step: version before build'
     plant = (RIG / 'w1-plant-step.sh').read_text()
     assert 'FAIL vt-scalar-value ' in plant and 'exit "$rc"' in plant
     assert '[ "$rc" -eq 134 ]' in plant

@@ -1,0 +1,6 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# reads a split's "cols" as rows and "rows" as cols, so a layout file reads
+# back with its axes swapped and layout-file-round-trip goes red by name.
+floor 15
+rig layout-step.sh sha256=f1bf2e64efa56b6755f0bf481a3d88ba23ebbc50b79556fcd867cfdae1cc40a3
+step layout-file-round-trip tools=bash,python3 script=layout-step.sh -- plant
