@@ -27,9 +27,9 @@ pub const WIRE_CELL_BYTES: int = 34
 /// Projected bytes of a pane: its history ring six times over, both screens
 /// and 1 MiB for its fixed buffers. This is deliberately above the measured
 /// cost, not the cost: it counts every pane's ring filled, and on Linux a
-/// filled ring at the 2 MiB cap over an empty process measures 3.7 to
-/// 3.9 MB, which this projection, 13.2 MiB at 80x24, is above by 3.5 to
-/// 3.7 times. The `ring-resident-rows` step holds it at or above the
+/// filled ring at the 2 MiB cap over an empty process has measured 3.7 to
+/// 4.1 MB, which this projection, 13.2 MiB at 80x24, is above by 3.4 to
+/// 3.7 times (measured ranges, not bounds). The `ring-resident-rows` step holds it at or above the
 /// measurement, and the `pane-cost-tabs` row holds a pane's cost from 1 to
 /// 32 tabs under its screens and fixed buffers.
 pub fn pane_bytes(cols: int, rows: int) -> int {
