@@ -94,18 +94,19 @@ fn shape_build(mut t: Tab, shape: List[ShapeNode], panes: List[int], mut at: Sha
     s
 }
 
-/// A new last tab whose tree is `shape`, its leaves holding `panes` in tree
-/// order. It takes the next tab id, which it answers; its focus is the
-/// `focus_leaf`th leaf (from 1), first in its focus order and the rest in
-/// tree order. The active tab does not change.
-pub fn add_tree(
-    mut l: Layout,
+/// A tab with this id whose tree is `shape`, its leaves holding `panes` in
+/// tree order, none of them live in `l`; checked whole before anything is
+/// made. Its focus is the `focus_leaf`th leaf (from 1), first in its focus
+/// order and the rest in tree order.
+fn tree_tab(
+    l: Layout,
+    id: int,
     shape: List[ShapeNode],
     panes: List[int],
     name: str,
     focus_leaf: int,
     zoomed: bool,
-) -> int ! ShapeRefusal {
+) -> Tab ! ShapeRefusal {
     if shape_end(shape, 0) != shape.len { return bad_shape }
     var count = 0
     var i = 0
@@ -135,7 +136,7 @@ pub fn add_tree(
         if p != focus { (mut order).push(p) }
     }
     var t = Tab {
-        id: l.next_id,
+        id: id,
         name: name_bytes(name),
         nodes: List[Node](),
         root: -1,
@@ -145,6 +146,22 @@ pub fn add_tree(
     }
     var at = ShapeCursor { node: 0, leaf: 0 }
     t.root = shape_build(mut t, shape, panes, mut at, -1)
+    t
+}
+
+/// A new last tab whose tree is `shape`, its leaves holding `panes` in tree
+/// order. It takes the next tab id, which it answers; its focus is the
+/// `focus_leaf`th leaf (from 1), first in its focus order and the rest in
+/// tree order. The active tab does not change.
+pub fn add_tree(
+    mut l: Layout,
+    shape: List[ShapeNode],
+    panes: List[int],
+    name: str,
+    focus_leaf: int,
+    zoomed: bool,
+) -> int ! ShapeRefusal {
+    let t = tree_tab(l, l.next_id, shape, panes, name, focus_leaf, zoomed)?
     let id = l.next_id
     l.next_id += 1
     (mut l.tabs).push(copy t)
@@ -160,8 +177,9 @@ pub fn from_tree(
     focus_leaf: int,
     zoomed: bool,
 ) -> Layout ! ShapeRefusal {
-    // Nothing is built yet: every tree is refused.
-    let _unused = shape.len + panes.len + name.len + focus_leaf
-    let _zoomed = zoomed
-    bad_shape
+    let none = Layout { tabs: List[Tab](), active: 0, next_id: 1 }
+    let t = tree_tab(none, 1, shape, panes, name, focus_leaf, zoomed)?
+    var tabs = List[Tab]()
+    (mut tabs).push(copy t)
+    Layout { tabs: tabs, active: 1, next_id: 2 }
 }
