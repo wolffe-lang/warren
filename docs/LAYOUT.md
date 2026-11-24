@@ -226,6 +226,110 @@ and spends no tab id. A leaf's axis and share are always `cols` and 0; a
 split's axis is `cols` or `rows` and its share in 1..9999. The layout files
 are written and read through this form.
 
+## Layout files
+
+A layout file is one session's tabs as TOML, written by `layout save` and
+read by `layout load` and `new-session -l` (CLI.md). It holds at most
+1,048,576 bytes and 32 leaves, across all its tabs.
+
+```toml
+# warren layout
+version = 1
+active = 1
+
+[[tab]]
+name = "main"
+focus = 3
+zoomed = false
+
+[tab.root]
+split = "cols"
+share = 5000
+
+[tab.root.first]
+cwd = "/home/me/src/warren"
+command = ["vim", "notes.txt"]
+
+[tab.root.second]
+split = "rows"
+share = 5000
+
+[tab.root.second.first]
+
+[tab.root.second.second]
+cwd = "~/mail"
+```
+
+- **The file.** `version = 1` is required. `active` is the active tab's index
+  from 1 (default 1). At least one `[[tab]]`.
+- **A tab** takes `name` (default empty, as a new tab's), `focus`, its
+  focused leaf's index from 1 in tree order (default 1), `zoomed` (default
+  false), and its tree under `root`.
+- **A node** is a split or a leaf. A split has `split = "cols"` or `"rows"`
+  (the dump's words), may set `share` (1 to 9999, the dump's unit; default
+  5000), and needs both tables `first` and `second`. A leaf is any node table
+  without `split`. It may set `cwd`: an absolute path, `~` or `~/...` (from
+  the session's HOME), or a path relative to the session's start directory.
+  It may set `command`, the program's words with no shell between, as `--
+  CMD` takes them. A leaf with no `cwd` starts in the session's start
+  directory, and one with no `command` runs the configured shell.
+- **The TOML.** warren's own strict subset of TOML 1.0 reads it
+  (`src/config/toml.lu`): bare keys, `[a.b]` and `[[tab]]` headers, one-line
+  basic and literal strings, decimal integers, booleans and one-line arrays of
+  strings, by TOML 1.0's table rules. Valid TOML outside the subset is
+  refused by line with its form named (`warren's TOML has no floats`), and
+  every file the subset reads, it reads as Python's tomllib does
+  (`tests/config/toml.table`).
+- **Refusals.** A file is refused whole, by line and reason: `dev line 7: cwd
+  is an integer, not a string`. A file-wide refusal (no `version`, no
+  `[[tab]]`) is at line 1, a missing table or key at the line of the table
+  that lacks it, and every other at the line of the key or header that holds
+  what is refused. `tests/config/layout.table` holds each one.
+- **Writing.** The text is canonical: the header comment, `version` and
+  `active`, then each tab with `name`, `focus` and `zoomed` always written,
+  then its nodes in preorder, each header followed by its keys in a fixed
+  order. A string escapes `"`, `\`, U+0000 to U+001F and U+007F, and nothing
+  else. A leaf gets `cwd` only when warren learnt its pane's directory (OSC 7
+  or /proc), so a pane at its session's start directory is written without one
+  and starts where the loading session starts; it gets `command` only when its
+  pane was started with one. Writing the reading of a written file gives the
+  same bytes.
+
+### Where a layout file is
+
+`NAME` is a file in the layouts directory, `$XDG_CONFIG_HOME/warren/layouts/
+NAME.toml`, else `~/.config/warren/layouts/NAME.toml`. A NAME may not be empty,
+start with `.` or hold a control byte. A word holding `/` is a file path
+instead, read from the directory the verb came from when relative (`warren
+layout load ./dev.toml`); at the `:` line, from the focused pane's directory.
+
+### Saving
+
+`layout save NAME` writes the target's session, every tab. The text goes to
+`PATH.tmp`, made exclusively at 0600 (a stale one is removed first), synced
+and closed, then renamed over `PATH`; an existing file is replaced. The
+layouts directory is made at 0700 when it is missing (a path's directory is
+never made). It prints the file's path. A destination that is a directory,
+and a text past the file bound, are refused and nothing is written, so every
+file save writes, load reads.
+
+### Loading
+
+`layout load NAME` opens the file's tabs after the target session's and
+prints each new tab's id, one a line. From a shell the active tab and the
+focus stay; at the `:` line the first new tab becomes active, as `:new-tab`'s
+does. The file's `active` is not used. `new-session -l NAME` makes a session
+whose tabs, focus, zoom and active tab are the file's.
+
+A refused load changes nothing. Before anything is made it checks the file
+(by line); every leaf's directory and program (by line, as `-c` and `--` are);
+the session's 32-pane cap; every leaf getting at least one cell at the
+session's size (`too small for this layout at 80x24`); and the memory budget
+for all the leaves together. All slots are held before the first spawn, and
+the verb waits while slots are made, as `split` does. A refusal spends no pane
+or tab id. A spawn that fails after the checks ends the panes this load made
+and closes its tabs; their ids stay spent.
+
 ## Rows
 
 | row | what it holds | where |
@@ -233,6 +337,10 @@ are written and read through this form.
 | goldens | 59 operation scripts, each with the expected `dump_at` and every refusal, resize answer and `pane_at` query, computed by hand from this file | `src/layout_rows/goldens.lu` |
 | properties | seeded random sequences of 50 operations at 20x6, 80x24, 81x25, 320x90 and 512x512, the invariants below held after every operation, and grids of every shape up to 4x4 built at each size | `src/layout_rows/properties.lu` |
 | regions | every operation applied inside a region to a layout that outlives it, read back after the region's arena is reused | `src/layout_region_test.lu` |
+| `toml-subset-table` | warren's TOML subset case by case: each reading, or the refusal's line and form, held to Python's tomllib on Linux | `tests/config/toml.table` |
+| `layout-file-refusals` | every schema refusal of a layout file, each text valid TOML to tomllib, by line and reason | `tests/config/layout.table` |
+| `layout-file-goldens` | three layouts written byte for byte as `tests/config/layout/*.toml`, each read back to its layout | `src/layout_golden_test.lu` |
+| `layout-file-round-trip` | after each property sequence, the layout and hostile leaf data written, read and rebuilt with fresh ids: shapes, names, focus, zoom, the active tab and the leaf data equal, and writing the reading gives the same bytes; its first 512 files held to tomllib (`layout-files-tomllib`) | `src/layout_rows/files.lu` |
 | `layout-shape-add-tree` | a tab's shape read back from the tab `add_tree` builds from it, with that tab's panes, focus, focus order, zoom and name, and each refusal leaving the layout's dump and next tab id as they were; the same for the layout `from_tree` makes, whose one-leaf tree is `new`'s layout | `src/layout_rows/shape.lu` |
 
 The entries: `src/layout_native.lu` runs every golden and 2000 sequences at
