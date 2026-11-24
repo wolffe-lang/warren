@@ -62,51 +62,64 @@ share is sent from one server-wide reply buffer, one reply at a time, which
 grows in place to the largest reply sent (at most 8 MiB and its fragment
 headers) and is counted at that size from then on.
 
-Most of a pane's resident size is the emulator's history ring, which is made
-whole, zero-filled, when the pane is made (warren#67). As measured on Linux
-(glibc 2.39), making it takes four cap-sized allocations in turn, each written
-in full before the one before it is freed; the last is the copy out of the
-short-lived region that becomes the ring (wolf-lang#1176). At most three are
-live at once, so a pane's creation peaks at three times its cap. glibc's
-malloc gives the first of the freed buffers back to the system, which raises
-its threshold for mapping large buffers, so the later ones come from its heap,
-and the one freed there stays resident: a made pane keeps two times its cap,
-the ring and that freed buffer, and with glibc's threshold pinned
-(`MALLOC_MMAP_THRESHOLD_`) it keeps one (wolf-lang#1175). A first resize has
-a cost of its own, the blocks it allocates, the same whatever the cap: 1.4
-to 1.9 MB on Linux and 1.97 MB on macOS, as measured at cap 0. Whether it
-shows in a pane's peak depends on the system's allocator. On Linux and macOS 15
-it is hidden under the peak the ring's creation set: at a 2 MiB cap the resize
-adds -0.5 to +0.2 MB on Linux and 0.34 MB on macOS 15. On macOS 26 the freed
-creation buffers stay resident and the resize's blocks land elsewhere, so it
-adds its whole cost, 1.95 MB (warren#88). The first pane
-made in a process also pays 1.3 to 1.6 MB once, the emulator's code and first
-allocations. So the first pane at the 2 MiB cap peaks at 7.5 to 7.9 MB, and
-the projection, six times the cap and the screens and 1 MiB (13.2 MiB at
-80x24), is deliberately above that by 1.76 times; the `ring-resident-rows`
-step measures each stage on each host, holds it to the takes recorded in
-`tests/vt/ring-resident-takes.json` and holds the projection at or above it.
-A resize row above cap 0 is held to at least the resize row's bound at cap 0:
-the first resize costs the same at every cap, and whether a cap's peak shows
-that cost is the allocator's, so an allocator that hides it can lower a
-reading but does not set the bound, and macOS 26, whose allocator does not
-hide it, holds against the takes recorded on macOS 15, whose allocator did.
+A pane's history ring is reserved at the cap when the pane's first line goes
+into history, in the ring's own storage, and written as history arrives
+(warren#67). Pages the ring has not reached are never touched, so a pane is
+resident only as far as its history has reached: a pane with no history yet
+costs what a pane with no ring does, and a filled ring costs one cap. As
+measured at the 2 MiB cap, over six runs of three takes on Linux and two on
+macOS:
+- A new pane costs 1.1 to 1.8 MB on Linux and 0.49 MB on macOS. That is
+  what it costs at cap 0 within the runs' spread: its screens, and what the
+  first pane in a process pays once (the emulator's code and first
+  allocations).
+- A filled ring adds 1.9 to 2.5 MB on Linux and 2.36 to 2.39 MB on macOS;
+  at an 8 MiB cap, 8.4 to 8.7 MB on Linux and 8.65 MB on macOS.
+- N panes' rings cost the history they hold, rounded to pages. 32 panes,
+  each fed 2,300 lines (264,132 bytes of history each), grow 8.1 to 8.7 MB
+  on Linux against 8.52 MB written, and 8.96 to 9.01 MB on macOS against
+  8.91 MB. 32 idle panes grow nothing beyond the runs' noise.
+
+A first resize has a cost of its own, the blocks it allocates, the same
+whatever the cap: 1.4 to 2.0 MB on Linux and 1.92 to 1.95 MB on macOS. While
+the ring was made whole when a pane was made, Linux's and macOS 15's
+allocators hid that cost under the peak the ring's creation set, and macOS
+26's did not (warren#88). A ring reserved at its first record sets no such
+peak. A resize row above cap 0 is still held to at least the resize row's
+bound at cap 0: the first resize costs the same at every cap, and whether a
+cap's peak shows that cost is the allocator's, so an allocator that hides it
+can lower a reading but does not set the bound.
+
+The projection is six times the cap, the screens and 1 MiB (13.2 MiB at
+80x24). It is kept as it was: it counts every pane's ring filled. It is
+above a filled ring over an empty process by 3.5 to 3.7 times on Linux and
+4.7 to 4.8 times on macOS. The `ring-resident-rows` step measures each stage
+on each host, holds it to the takes recorded in
+`tests/vt/ring-resident-takes.json`, and holds the projection at or above a
+filled ring.
+
 Each row holds the least of its takes on both sides of its subtraction: a host
 may peak a few pages higher in one take (hosted macOS runners did, by 8 to 11
 pages, in one take of three now and then), and that is not the pane's cost.
-On macOS (arm64, whose peaks are whole 16 KiB pages and, in all but such a
-take, the same to the byte from run to run) the first pane at the 2 MiB cap
-peaks at 6.75 MB, three times the cap and 0.44 MB of first-use cost, and the
-projection is above that by 2.06 times; at an 8 MiB cap one run in four peaks
-a whole cap higher. The same
-program allocates in the same order every run, so that difference is the
-system's, not the program's, and the macOS rows measure that cap and do not
-hold it. So the cap is 2 MiB a pane in this version; a ring that grows as
-history arrives would let a larger one come back. With the 2 MiB cap a
-server's resident size is about 5 MB at start on Linux, 13 MB with one 80x24
-session and its client, and 6 MB more for a second (`MEASURE server-rss`); it
-stays flat over 10,000 keystrokes beside a flooding pane and over 200 splits
-and closes (pane slots are reused, never dropped).
+macOS (arm64) peaks are whole 16 KiB pages and, in all but such a take, the
+same to the byte from run to run. While the ring was made whole, one run in
+four at an 8 MiB cap peaked a whole cap higher there. The same program
+allocates in the same order every run, so that difference was the system's,
+not the program's. In six takes with the ring reserved at its first record, a
+filled 8 MiB ring read 8.65 to 8.85 MB, and the macOS rows still measure that
+cap and do not hold it.
+
+The cap stays 2 MiB a pane. A larger one would now cost only the panes whose
+history reaches it, but the projection would still count it six times over
+for every pane. As measured in one pass of the Linux gate with the 2 MiB cap,
+a server's resident size is about 6.0 MiB at start, 8.4 MiB with one 80x24
+session and its client, and 1.2 MiB more for a second (`MEASURE server-rss`).
+It stays flat over 10,000 keystrokes beside a flooding pane whose ring has
+filled, and over 200 splits and closes (pane slots are reused, never
+dropped). Each tab of one idle pane (`/bin/cat` at 80x22) adds about 0.5 MiB:
+8.9 MiB with one tab, 12.4 MiB with 8 and 24.3 MiB with 32
+(`MEASURE pane-cost-tabs`). The row holds the per-pane cost under the
+projection's screens and fixed buffers, 1.21 MiB a pane.
 
 A reused slot keeps nothing of the pane before it. The next pane takes the
 first free slot. Its emulator is reset as a new one (`vt.reuse`): a full
@@ -764,7 +777,8 @@ and locked mode, and the key list drawn for one client and closed back to the
 exact frame, across a minute too (every cell but the clock's, which reads the
 host's time); line one at 20, 80 and 200 columns and with nine tabs at 40, the
 zoom mark, the activity and bell marks, the clock and its minute, and (with
-/proc) the threads and resident size a pane. The gate runs every row in the
+/proc) the threads and resident size a pane and a pane's resident cost from
+1 to 32 tabs. The gate runs every row in the
 pane rows' default list, the mouse rows among them, then the pane-count refusal
 and, on Linux, the rows that read /proc. The client rows drive the same
 split end to end through the real client. The key table itself is held by `src/keys_test.lu` (every binding's
