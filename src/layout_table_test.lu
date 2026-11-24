@@ -1,0 +1,91 @@
+//! member: false
+//! Every case of tests/config/layout.table, read by warren's layout file
+//! reader, is refused at the case's line for the case's reason.
+//! tests/config/layout_table.py holds each case's text to Python's tomllib:
+//! every one is valid TOML. A program, natively and under lupin:
+//! `PASS layout-file-refusals cases=N`, or a FAIL line for each case that
+//! differs; exit 1 then.
+use std.fs
+use config
+
+// The cases the table holds, so that one that goes missing is seen.
+fn table_cases() -> int { 46 }
+
+struct Case {
+    name: str,
+    text: List[byte],
+    lines: int,
+    refusal: str,
+}
+
+fn new_case(name: str) -> Case {
+    Case { name: name, text: List[byte](), lines: 0, refusal: "" }
+}
+
+// What warren makes of the case: "" when it refuses it as the table says,
+// else what it did.
+fn judge(c: Case) -> str {
+    var text = copy c.text
+    if c.lines > 0 { (mut text).push(10 as byte) }
+    let source = str_from_utf8(text) else { return "the case's text is not UTF-8" }
+    if c.refusal == "" { return "the case has no refusal line" }
+    let f = config.read_layout(source)
+    if f.ok { return "warren read it, the table refuses it: {c.refusal}" }
+    let got = "{f.line} {f.why}"
+    if got != c.refusal { return "warren refused it at {got}, the table at {c.refusal}" }
+    ""
+}
+
+// After a line's two-byte marker (`> `, `! `): the rest, "" for none.
+fn after_marker(line: str) -> str {
+    if line.len > 2 { return line[2..line.len] }
+    ""
+}
+
+fn word_or_none(xs: List[str], i: int) -> str {
+    if i < xs.len { return xs[i] }
+    "(none)"
+}
+
+fn main() -> int {
+    let table = fs.read_text("tests/config/layout.table") else {
+        print("FAIL layout-file-refusals the table did not read")
+        return 1
+    }
+    var cases = 0
+    var failed = 0
+    var open = false
+    var c = new_case("")
+    for line in table.split("\n") {
+        if line.starts_with("case ") {
+            if open {
+                let why = judge(c)
+                if why.len > 0 { print("FAIL layout-file-refusals {c.name}: {why}"); failed += 1 }
+                cases += 1
+            }
+            c = new_case(word_or_none(line.split(" "), 1))
+            open = true
+        } else if line == ">" || line.starts_with("> ") {
+            if c.lines > 0 { (mut c.text).push(10 as byte) }
+            for b in after_marker(line).bytes() { (mut c.text).push(b) }
+            c.lines += 1
+        } else if line.starts_with("! ") {
+            c.refusal = after_marker(line)
+        }
+    }
+    if open {
+        let why = judge(c)
+        if why.len > 0 { print("FAIL layout-file-refusals {c.name}: {why}"); failed += 1 }
+        cases += 1
+    }
+    if cases != table_cases() {
+        print("FAIL layout-file-refusals {cases} cases, not {table_cases()}")
+        return 1
+    }
+    if failed > 0 {
+        print("LAYOUT-FILE-REFUSALS cases={cases} failed={failed}")
+        return 1
+    }
+    print("PASS layout-file-refusals cases={cases}")
+    0
+}

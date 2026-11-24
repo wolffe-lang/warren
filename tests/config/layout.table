@@ -1,0 +1,419 @@
+# A layout file's schema refusals (src/config/layout_file.lu), case by case: each case's text is valid TOML, read
+# alike by warren's TOML subset and by Python's tomllib, that a layout file refuses. src/layout_table_test.lu holds
+# warren's layout reader to each case's refusal; tests/config/layout_table.py holds each case's text to tomllib.
+#
+# `case NAME` starts a case. `> TEXT` is a line of the case's file, as written. `! LINE REASON` is the reader's
+# refusal: a file-wide one (no version, no tab) is at line 1, a missing table or key at the line of the table that
+# lacks it, and every other at the line of the key or the header that holds what is refused.
+
+# ---- the file ----
+case no-version
+> [[tab]]
+> [tab.root]
+! 1 version is missing
+
+case version-2
+> version = 2
+> [[tab]]
+> [tab.root]
+! 1 version 2: warren reads version 1
+
+case version-string
+> version = "1"
+> [[tab]]
+> [tab.root]
+! 1 version is a string, not an integer
+
+case version-table
+> [version]
+> [[tab]]
+> [tab.root]
+! 1 version is a table, not an integer
+
+case no-tab
+> version = 1
+! 1 no [[tab]]
+
+case tab-a-table
+> version = 1
+> [tab]
+> [tab.root]
+! 2 tab is a table, not an array of tables
+
+case tab-a-string
+> version = 1
+> tab = "main"
+! 2 tab is a string, not an array of tables
+
+case active-0
+> version = 1
+> active = 0
+> [[tab]]
+> [tab.root]
+! 2 active 0: tabs count from 1
+
+case active-past-the-tabs
+> version = 1
+> active = 2
+> [[tab]]
+> [tab.root]
+! 2 active 2: the file has 1 tab
+
+case active-string
+> version = 1
+> active = "1"
+> [[tab]]
+> [tab.root]
+! 2 active is a string, not an integer
+
+case unknown-top-key
+> version = 1
+> colour = "red"
+> [[tab]]
+> [tab.root]
+! 2 unknown key colour
+
+case unknown-top-table
+> version = 1
+> [[tab]]
+> [tab.root]
+> [theme]
+! 4 unknown key theme
+
+case too-many-leaves
+> version = 1
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> [tab.root]
+! 67 a 33rd leaf: a layout holds at most 32
+
+# ---- a tab ----
+case tab-without-root
+> version = 1
+> [[tab]]
+> name = "a"
+! 2 a tab without its root
+
+case root-a-string
+> version = 1
+> [[tab]]
+> root = "x"
+! 3 root is a string, not a table
+
+case root-an-array-of-tables
+> version = 1
+> [[tab]]
+> [[tab.root]]
+! 3 root is an array of tables, not a table
+
+case name-integer
+> version = 1
+> [[tab]]
+> name = 3
+> [tab.root]
+! 3 name is an integer, not a string
+
+case zoomed-string
+> version = 1
+> [[tab]]
+> zoomed = "yes"
+> [tab.root]
+! 3 zoomed is a string, not a boolean
+
+case focus-string
+> version = 1
+> [[tab]]
+> focus = "1"
+> [tab.root]
+! 3 focus is a string, not an integer
+
+case focus-0
+> version = 1
+> [[tab]]
+> focus = 0
+> [tab.root]
+! 3 focus 0: leaves count from 1
+
+case focus-past-the-leaves
+> version = 1
+> [[tab]]
+> focus = 2
+> [tab.root]
+! 3 focus 2: the tab has 1 leaf
+
+case focus-past-three-leaves
+> version = 1
+> [[tab]]
+> focus = 4
+> [tab.root]
+> split = "cols"
+> [tab.root.first]
+> [tab.root.second]
+> split = "rows"
+> [tab.root.second.first]
+> [tab.root.second.second]
+! 3 focus 4: the tab has 3 leaves
+
+case unknown-tab-key
+> version = 1
+> [[tab]]
+> title = "a"
+> [tab.root]
+! 3 unknown key title
+
+# ---- a node ----
+case split-word
+> version = 1
+> [[tab]]
+> [tab.root]
+> split = "diagonal"
+> [tab.root.first]
+> [tab.root.second]
+! 4 split is "diagonal", not "cols" or "rows"
+
+case split-integer
+> version = 1
+> [[tab]]
+> [tab.root]
+> split = 1
+> [tab.root.first]
+> [tab.root.second]
+! 4 split is an integer, not a string
+
+case split-without-second
+> version = 1
+> [[tab]]
+> [tab.root]
+> split = "cols"
+> [tab.root.first]
+! 3 a split without its second
+
+case split-without-first
+> version = 1
+> [[tab]]
+> [tab.root]
+> split = "cols"
+> [tab.root.second]
+! 3 a split without its first
+
+case split-without-children
+> version = 1
+> [[tab]]
+> [tab.root]
+> split = "rows"
+! 3 a split without its first
+
+case first-a-string
+> version = 1
+> [[tab]]
+> [tab.root]
+> split = "cols"
+> first = "x"
+> [tab.root.second]
+! 5 first is a string, not a table
+
+case split-with-cwd
+> version = 1
+> [[tab]]
+> [tab.root]
+> split = "cols"
+> cwd = "/tmp"
+> [tab.root.first]
+> [tab.root.second]
+! 5 cwd on a split: only a leaf has one
+
+case split-with-command
+> version = 1
+> [[tab]]
+> [tab.root]
+> split = "cols"
+> command = ["top"]
+> [tab.root.first]
+> [tab.root.second]
+! 5 command on a split: only a leaf has one
+
+case share-0
+> version = 1
+> [[tab]]
+> [tab.root]
+> split = "cols"
+> share = 0
+> [tab.root.first]
+> [tab.root.second]
+! 5 share 0: a share is within 1 to 9999
+
+case share-10000
+> version = 1
+> [[tab]]
+> [tab.root]
+> split = "cols"
+> share = 10000
+> [tab.root.first]
+> [tab.root.second]
+! 5 share 10000: a share is within 1 to 9999
+
+case share-string
+> version = 1
+> [[tab]]
+> [tab.root]
+> split = "cols"
+> share = "half"
+> [tab.root.first]
+> [tab.root.second]
+! 5 share is a string, not an integer
+
+case share-on-a-leaf
+> version = 1
+> [[tab]]
+> [tab.root]
+> share = 5000
+! 4 share on a leaf: only a split has one
+
+case first-under-a-leaf
+> version = 1
+> [[tab]]
+> [tab.root]
+> [tab.root.first]
+! 4 first under a leaf: only a split has children
+
+case unknown-node-key
+> version = 1
+> [[tab]]
+> [tab.root]
+> size = 3
+! 4 unknown key size
+
+case unknown-table-under-a-split
+> version = 1
+> [[tab]]
+> [tab.root]
+> split = "cols"
+> [tab.root.first]
+> [tab.root.second]
+> [tab.root.third]
+! 7 unknown key third
+
+# ---- a leaf ----
+case command-empty
+> version = 1
+> [[tab]]
+> [tab.root]
+> command = []
+! 4 an empty command
+
+case command-string
+> version = 1
+> [[tab]]
+> [tab.root]
+> command = "vim"
+! 4 command is a string, not an array of strings
+
+case command-integer
+> version = 1
+> [[tab]]
+> [tab.root]
+> command = 7
+! 4 command is an integer, not an array of strings
+
+case cwd-integer
+> version = 1
+> [[tab]]
+> [tab.root]
+> cwd = 1
+! 4 cwd is an integer, not a string
+
+case cwd-empty
+> version = 1
+> [[tab]]
+> [tab.root]
+> cwd = ""
+! 4 an empty cwd
+
+case cwd-array
+> version = 1
+> [[tab]]
+> [tab.root]
+> cwd = ["/tmp"]
+! 4 cwd is an array of strings, not a string
+
+case second-leaf-refused
+> version = 1
+> [[tab]]
+> [tab.root]
+> split = "cols"
+> [tab.root.first]
+> [tab.root.second]
+> cwd = 2
+! 7 cwd is an integer, not a string
+
+case second-tab-refused
+> version = 1
+> [[tab]]
+> [tab.root]
+> [[tab]]
+> focus = 9
+> [tab.root]
+! 5 focus 9: the tab has 1 leaf

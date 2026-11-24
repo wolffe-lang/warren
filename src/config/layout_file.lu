@@ -1,0 +1,50 @@
+//! member: true
+//! Layout files: one TOML file a layout, read by warren's TOML subset and
+//! then by the layout schema (docs/LAYOUT.md, Layout files). A file that is
+//! refused is refused whole, by line and reason.
+
+use layout
+
+/// The most leaves a layout file holds, across all its tabs.
+pub const LAYOUT_LEAVES: int = 32
+
+/// The most bytes a layout file may hold.
+pub const LAYOUT_BYTES: int = 1048576
+
+/// One leaf of a tab: the directory its pane starts in ("" for the
+/// session's start directory) and its program's words (none for the
+/// configured shell).
+pub struct LeafFile {
+    cwd: str,
+    command: List[str],
+}
+
+/// One tab: its name (`named` false when the file gives none), its focused
+/// leaf from 1, its zoom flag, its tree's shape, and its leaves in tree
+/// order.
+pub struct TabFile {
+    name: str,
+    named: bool,
+    focus: int,
+    zoomed: bool,
+    shape: List[layout.ShapeNode],
+    leaves: List[LeafFile],
+}
+
+/// A layout file read: `ok`, the active tab from 1 and the tabs; or the
+/// `line` that refused it and `why`, with no tabs.
+pub struct LayoutFile {
+    ok: bool,
+    line: int,
+    why: str,
+    active: int,
+    tabs: List[TabFile],
+}
+
+/// Read a layout file's text: its tabs, or the first line that refuses it
+/// and why.
+pub fn read_layout(text: str) -> LayoutFile {
+    // Nothing is read yet.
+    let _unused = text.len
+    LayoutFile { ok: false, line: 0, why: "not read yet", active: 0, tabs: List[TabFile]() }
+}
