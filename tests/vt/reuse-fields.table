@@ -33,6 +33,7 @@ Pane damage reset spawn_pane_in
 Pane shown reset spawn_pane_in
 Pane at_col kept -- set when the pane is laid out shown (sync_sizes), and read only while shown, which spawn_pane_in clears
 Pane at_row kept -- set when the pane is laid out shown (sync_sizes), and read only while shown, which spawn_pane_in clears
+Pane argv reset spawn_pane_in
 
 Vt cols reset reuse>resize
 Vt rows reset reuse>resize
