@@ -95,6 +95,7 @@ pub fn parse_verb(argv: List[str]) -> Verb {
     var dashed = false
     var layout_word = ""
     var has_layout = false
+    var existing = false
     var rest = List[str]()
     var i = 1
     while i < argv.len {
@@ -119,6 +120,10 @@ pub fn parse_verb(argv: List[str]) -> Verb {
             layout_word = argv[i + 1]
             has_layout = true
             i += 2
+        } else if argv[i] == "-A" {
+            if existing { return usage_error("usage: -A given twice") }
+            existing = true
+            i += 1
         } else if argv[i] == "-c" {
             if has_dir { return usage_error("usage: -c given twice") }
             if i + 1 >= argv.len { return usage_error("usage: -c needs a directory") }
@@ -131,6 +136,7 @@ pub fn parse_verb(argv: List[str]) -> Verb {
         }
     }
     if has_layout && v != "new-session" { return usage_error("usage: -l goes with new-session") }
+    if existing && v != "new-session" { return usage_error("usage: -A goes with new-session") }
     if has_dir || dashed {
         if !makes_a_pane(v) { return usage_error("usage: {v} makes no pane: -c and -- go with split-right, split-down, new-tab and new-session") }
         if dashed && v == "new-session" { return usage_error("usage: new-session takes no command") }
@@ -146,13 +152,15 @@ pub fn parse_verb(argv: List[str]) -> Verb {
             return verb_of(VERB_LIST_SESSIONS, "", "")
         }
         if v == "new-session" {
-            if rest.len > 1 { return usage_error("usage: new-session [-c DIR] [-l LAYOUT] [NAME]") }
+            if rest.len > 1 { return usage_error("usage: new-session [-A] [-c DIR] [-l LAYOUT] [NAME]") }
+            if existing && rest.len == 0 { return usage_error("usage: -A needs a session name") }
             let name = if rest.len == 1 then rest[0] else ""
             var n = verb_of(VERB_NEW_SESSION, "", name)
             n.named = rest.len == 1
             n.dir = dir
             n.has_dir = has_dir
             n.layout = layout_word
+            n.existing = existing
             return n
         }
         if rest.len != 1 || rest[0] != "--json" { return usage_error("usage: list --json") }
