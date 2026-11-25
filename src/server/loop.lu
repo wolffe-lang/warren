@@ -2345,7 +2345,7 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
         status = cmd.EXIT_REFUSED
         let problem = name_problem(name)
         let start = if v.has_dir then command_dir(body, v.dir) else h.cwd
-        if v.existing && find_session(s, name) >= 0 {
+        if v.existing && find_session(s, "") >= 0 {
             // -A with the session there: its name, and nothing made, -c and
             // -l unread. The check and a make below are one turn's.
             status = 0
