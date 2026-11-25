@@ -21,26 +21,39 @@ pub struct Start {
 }
 
 /// The runtime directory: WARREN_RUNTIME_DIR when set (rows use it), else
-/// XDG_RUNTIME_DIR's `warren`, else a per-user directory under /tmp.
+/// XDG_RUNTIME_DIR's `warren`, else the account's /run/user/UID's `warren`
+/// when that directory is private, else a per-user directory under /tmp.
+/// WARREN_RUN_USER_ROOT stands for /run/user (rows use it).
 pub fn runtime_dir() -> str {
     let uid = env.euid() else 0 - 1
-    runtime_dir_for(env.get("WARREN_RUNTIME_DIR") else "", env.get("XDG_RUNTIME_DIR") else "", uid, "")
+    let root = env.get("WARREN_RUN_USER_ROOT") else ""
+    let run_user = run_user_dir_at(if root.len > 0 then root else "/run/user", uid)
+    runtime_dir_for(env.get("WARREN_RUNTIME_DIR") else "", env.get("XDG_RUNTIME_DIR") else "", uid, run_user)
 }
 
 /// The runtime directory from the words that choose it, in order: `own`
-/// (WARREN_RUNTIME_DIR), `xdg` (XDG_RUNTIME_DIR)'s `warren`, then a
-/// per-user directory under /tmp for the user `uid`. `run_user` is the
-/// account's /run/user/UID when private (run_user_dir_at), else "".
+/// (WARREN_RUNTIME_DIR), `xdg` (XDG_RUNTIME_DIR)'s `warren`, `run_user`'s
+/// `warren` (the account's /run/user/UID when private, run_user_dir_at;
+/// else ""), then a per-user directory under /tmp for the user `uid`. A
+/// login sets XDG_RUNTIME_DIR where an ssh session may not, so both meet in
+/// /run/user/UID.
 pub fn runtime_dir_for(own: str, xdg: str, uid: int, run_user: str) -> str {
     if own.len > 0 { return own }
     if xdg.len > 0 { return xdg + "/warren" }
+    if run_user.len > 0 { return run_user + "/warren" }
     "/tmp/warren-{uid}"
 }
 
 /// The account's directory under `root` (`/run/user`), ROOT/UID, when it is
-/// private to the user `uid`; else "". Never made here.
+/// private to the user `uid`: a directory, not a link, owned by `uid`, with
+/// no group or other bits (as private_dir holds the runtime directory);
+/// else "". Never made here.
 pub fn run_user_dir_at(root: str, uid: int) -> str {
-    ""
+    if uid < 0 { return "" }
+    let dir = root + "/{uid}"
+    let info = fs.lstat(dir) else { return "" }
+    if info.kind != 1 || info.uid != uid || info.mode & 63 != 0 { return "" }
+    dir
 }
 
 /// Where warren keeps what outlives a server (its saved sessions, the last
