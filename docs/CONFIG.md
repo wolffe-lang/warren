@@ -6,8 +6,8 @@ empty, otherwise `~/.config/warren/warren.toml`. With no file every setting
 has its default. A running server reads the file again on `source` (below).
 
 The file is a strict subset of TOML. A line is blank, a comment (`#` to the end
-of the line, also after a value), a table header such as `[clipboard]`, or
-`key = value` inside a table. Spaces around names and `=` do not matter. Values
+of the line, also after a value), a table header such as `[clipboard]`, the
+top-level key `restore` (before any table), or `key = value` inside a table. Spaces around names and `=` do not matter. Values
 are the bare words `true` and `false`. Anything else refuses the whole file: an
 unknown table or key, a key outside a table, a value of another kind, a table
 or key given twice, or a header without its `]`. A refused file changes no
@@ -29,6 +29,20 @@ A file that is refused changes no setting, and the answer names it by line:
 the same words on the hint line of the client that typed `:source`. Once a
 file is read, clients that attach later are no longer told of a refusal from
 the server's start.
+
+## `restore`
+
+| key | values | default | what it does |
+|---|---|---|---|
+| `restore` | `true`, `false` | `true` | Whether sessions are saved and made again when a server starts (CLI.md, Saved sessions). |
+
+With `restore = false` nothing is saved and nothing is restored; files saved
+before stay as they are. It is a top-level key, so it comes before any table:
+
+```toml
+# Do not keep my sessions across a restart.
+restore = false
+```
 
 ## `[clipboard]`
 
