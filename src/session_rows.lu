@@ -4147,6 +4147,79 @@ fn row_prompt_frame_minute(mut r: Rig) -> str {
     ""
 }
 
+// ---- the runtime directory ----
+
+// With neither WARREN_RUNTIME_DIR nor XDG_RUNTIME_DIR, the server and its
+// clients meet in the account's /run/user/UID when it is private (here a
+// root of the row's own, WARREN_RUN_USER_ROOT); with XDG_RUNTIME_DIR set,
+// under it instead; with no private one, in the last step's directory, whose
+// root (WARREN_TMP_ROOT) is the row's own too, so the row never makes the
+// real /tmp/warren-UID. Each server the row starts is stopped.
+fn row_runtime_dir_run_user(r: Rig) -> str {
+    let uid = env.euid() else 0 - 1
+    // Short roots: the socket path under each must stay within every host's
+    // bound (SOCKET_PATH_MAX).
+    let root = (env.cwd() else ".") + "/ru"
+    fs.remove_dir_all(root) else |_| {}
+    let mine = root + "/{uid}"
+    fs.create_dir_all(mine) else |e| { return "{mine}: {e}" }
+    fs.set_mode(mine, 448) else |e| { return "{mine}'s mode: {e}" }
+    let xdg = (env.cwd() else ".") + "/rx"
+    fs.remove_dir_all(xdg) else |_| {}
+    let tmp = (env.cwd() else ".") + "/rt"
+    fs.remove_dir_all(tmp) else |_| {}
+    fs.create_dir_all(tmp) else |e| { return "{tmp}: {e}" }
+    fs.create_dir_all(xdg) else |e| { return "{xdg}: {e}" }
+    fs.set_mode(xdg, 448) else |e| { return "{xdg}'s mode: {e}" }
+    let was = env.get("WARREN_RUNTIME_DIR") else ""
+    let xdg_was = env.get("XDG_RUNTIME_DIR") else ""
+    env.unset("WARREN_RUNTIME_DIR") else |_| {}
+    env.unset("XDG_RUNTIME_DIR") else |_| {}
+    env.set("WARREN_RUN_USER_ROOT", root) else |_| {}
+    env.set("WARREN_TMP_ROOT", tmp) else |_| {}
+    let why = run_user_case(r, mine, xdg, tmp)
+    // Each server by the environment that reached it, whatever the case left set.
+    env.unset("XDG_RUNTIME_DIR") else |_| {}
+    env.set("WARREN_RUN_USER_ROOT", root) else |_| {}
+    let _a = run_client(r, line_words("kill-server"))
+    env.set("XDG_RUNTIME_DIR", xdg) else |_| {}
+    let _b = run_client(r, line_words("kill-server"))
+    env.unset("XDG_RUNTIME_DIR") else |_| {}
+    env.set("WARREN_RUN_USER_ROOT", root + "/none") else |_| {}
+    let _c = run_client(r, line_words("kill-server"))
+    env.unset("WARREN_RUN_USER_ROOT") else |_| {}
+    env.unset("WARREN_TMP_ROOT") else |_| {}
+    if was.len > 0 { env.set("WARREN_RUNTIME_DIR", was) else |_| {} }
+    if xdg_was.len > 0 { env.set("XDG_RUNTIME_DIR", xdg_was) else |_| {} }
+    why
+}
+
+fn run_user_case(r: Rig, mine: str, xdg: str, tmp: str) -> str {
+    let n = run_client(r, line_words("new -d -s main"))
+    if n.status != 0 || n.out != "main\n" { return "new -d -s main: {n.status} '{n.out.trim()}' '{n.err.trim()}'" }
+    let sock = mine + "/warren/default"
+    if !fs.exists(sock) { return "no socket at {sock}: the server went elsewhere" }
+    let l = run_client(r, line_words("ls"))
+    if l.status != 0 || !l.out.starts_with("main:") { return "ls: {l.status} '{l.out.trim()}' '{l.err.trim()}'" }
+    env.set("XDG_RUNTIME_DIR", xdg) else |_| {}
+    let m = run_client(r, line_words("new -d -s other"))
+    let there = fs.exists(xdg + "/warren/default")
+    env.unset("XDG_RUNTIME_DIR") else |_| {}
+    if m.status != 0 || m.out != "other\n" { return "new -d -s other under XDG_RUNTIME_DIR: {m.status} '{m.out.trim()}' '{m.err.trim()}'" }
+    if !there { return "no socket under XDG_RUNTIME_DIR {xdg}/warren" }
+    let l2 = run_client(r, line_words("ls"))
+    if l2.out.contains("other") { return "the /run/user server holds other: '{l2.out.trim()}'" }
+    // With no private run-user directory, the last step: under the root
+    // standing for /tmp.
+    let uid = env.euid() else 0 - 1
+    env.set("WARREN_RUN_USER_ROOT", (env.get("WARREN_RUN_USER_ROOT") else "") + "/none") else |_| {}
+    let t = run_client(r, line_words("new -d -s last"))
+    let in_tmp = fs.exists(tmp + "/warren-{uid}/default")
+    if t.status != 0 || t.out != "last\n" { return "new -d -s last with no run-user directory: {t.status} '{t.out.trim()}' '{t.err.trim()}'" }
+    if !in_tmp { return "no socket at {tmp}/warren-{uid}/default for the last step" }
+    ""
+}
+
 fn run_row(warren: str, name: str) -> str {
     var r = rig(warren, name)
     fresh_state(name)
@@ -4231,6 +4304,7 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "host-name-this-host" { why = row_host_name_this_host(mut r) }
     else if name == "host-name-stand-in" { why = row_host_name_stand_in(mut r) }
     else if name == "host-name-stand-in-fails" { why = row_host_name_stand_in_fails(mut r) }
+    else if name == "runtime-dir-run-user" { why = row_runtime_dir_run_user(r) }
     else if name == "split-runs-command" { why = row_split_runs_command(mut r) }
     else if name == "split-prints-new-id" { why = row_split_prints_new_id(mut r) }
     else if name == "create-refusals-change-nothing" { why = row_create_refusals(mut r) }
@@ -4261,7 +4335,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited pane-start-dir-kept saved-on-change saved-once-a-second saved-at-stop saved-follows-rename saved-removed-at-end stop-writes-in-bound saved-off restore-after-kill-server restore-keeps-cwd restore-commands-not-run restore-off restore-refused-kept restore-printed restore-discard restore-after-kill layout-load-saved-file split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file layout-load-adds-tabs layout-refused-changes-nothing layout-program-missing layout-too-many-panes layout-too-small layout-unknown-name layout-relative-cwd layout-path-save-load layout-save-bound new-l-makes-session layout-save-load-round-trip".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited pane-start-dir-kept saved-on-change saved-once-a-second saved-at-stop saved-follows-rename saved-removed-at-end stop-writes-in-bound saved-off restore-after-kill-server restore-keeps-cwd restore-commands-not-run restore-off restore-refused-kept restore-printed restore-discard restore-after-kill layout-load-saved-file split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails runtime-dir-run-user layout-save-writes-file layout-load-adds-tabs layout-refused-changes-nothing layout-program-missing layout-too-many-panes layout-too-small layout-unknown-name layout-relative-cwd layout-path-save-load layout-save-bound new-l-makes-session layout-save-load-round-trip".split(" ") {
         (mut x).push(n)
     }
     x
