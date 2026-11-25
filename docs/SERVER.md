@@ -149,10 +149,11 @@ it can outruns every client there, and each is detached as too slow (the
 too-slow row was red on PAX). A title is state, not an event (one TITLE
 waits in a client's queue at most), so a title flood no longer detaches a
 client; neither this nor the stream's size was measured on PAX again for
-this version. Surviving a console logout depends on
-pid 1 staying (pax#358, not merged): until an image with it proves the
-logout case, the server's promise on PAX is that it outlives the client
-process that started it.
+this version. An installed PAX keeps pid 1 at a console logout and hangs
+up only the session that ended; the server leads a session of its own, so
+it should go on, but no row has measured the logout case: until one does,
+the server's promise on PAX is that it outlives the client process that
+started it.
 
 ## 2. One turn
 

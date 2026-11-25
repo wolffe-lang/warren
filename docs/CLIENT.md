@@ -30,9 +30,10 @@ The server runs in a session of its own, detached from the terminal of the
 client that started it: that client can end, or its terminal go away, and the
 server and its sessions stay for the next `warren attach`. The server stops on
 `kill-server`, or a while after its last session has ended with no client
-connected. On PAX the server outlives the client that started it; surviving a
-logout of the console waits on PAX keeping its first process (pax#358) and is
-not promised here.
+connected. On PAX the server outlives the client that started it. An
+installed PAX now keeps its first process at a console logout and hangs up
+only the session that ended, so a server in a session of its own should go
+on; no row has measured that yet, and it is not promised here.
 
 A command the server does not know is refused with the usage status and its
 name, so a newer client facing an older server fails cleanly.

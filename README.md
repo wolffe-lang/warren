@@ -109,7 +109,7 @@ in panes may write the clipboard too; by default they may not. `vt-dump` is a di
 |---|---|---|
 | W0 | the map: pins, CI, the oracle, the survey, the prediction | in progress |
 | W1 | the emulator | pure core/history/reflow, diagnostic CLI and full-frame/property gates |
-| W2 | one pane; detach and attach | server, terminal client, new, attach, detach and a second client, with rows on Linux, macOS and PAX under QEMU; surviving a PAX console logout waits on PAX |
+| W2 | one pane; detach and attach | server, terminal client, new, attach, detach and a second client, with rows on Linux, macOS and PAX under QEMU; surviving a console logout on an installed PAX is not yet measured |
 | W3 | panes, tabs, the bar, keys | pure layout module; panes and tabs in the server, borders and the focus mark, the bar's lines (tabs with activity, bell and zoom marks, the mode, the clock); modes per client, the hint line and the key list from one key table, a minimal command line; configuration planned |
 | W4 | mouse, scrollback, copy | pane/tab clicks, minimum-clamped border dragging, wheel and key scrollback per client, drag selection copied on release into the session's register and the terminal's clipboard (OSC 52), pasted with prefix `]`; programs' OSC 52 writes off unless `warren.toml` allows them; search in scroll mode |
 | W5 | layouts, commands, persistence | ids and targets, every command line verb, `list --json`, `send-keys`, `capture-pane`, `source`, layout files, saved sessions and restore, with rows on Linux, macOS and PAX under QEMU |
