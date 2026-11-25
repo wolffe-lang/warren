@@ -239,8 +239,10 @@ emitted cell must differ from the preceding image; [SERVER](docs/SERVER.md)
 states the measured byte arithmetic and headroom.
 
 Unlabelled pull requests run the unit gate. The `ci` label requests the Linux
-gate, and `full-matrix` requests Linux and macOS. Pushes to `trunk`, the
-nightly run and a manual dispatch run everything.
+gate, and `full-matrix` requests Linux and macOS. The nightly run and a manual
+dispatch run everything. A push to `trunk` runs everything too, except the
+macOS gate when a pull request or dispatch run at the same commit, over the
+same tree, already ran it green; the run names that run.
 
 ## Layout
 
