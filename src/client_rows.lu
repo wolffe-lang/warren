@@ -686,6 +686,58 @@ fn row_new_session(warren: str) -> str {
     ""
 }
 
+// `new -A -s NAME` on a terminal attaches to session NAME when it exists: no
+// second session, the client attached to it, and a detach says so.
+fn row_new_a_attaches(warren: str) -> str {
+    var d = launch_as(warren, "new-a-attaches", "d", words("new -d -s main"), 80, 24) else |e| { return "launch: {e}" }
+    let why = ends_plain(mut d, 0, "main")
+    close_quiet(d)
+    if why.len > 0 {
+        stop_server()
+        return "new -d -s main: " + why
+    }
+    var a = launch_as(warren, "new-a-attaches", "a", words("new -A -s main"), 80, 24) else |e| { return "launch: {e}" }
+    if !until_screen(mut a, "$", 10000) {
+        close_run(a)
+        stop_server()
+        return "new -A -s main drew no prompt: " + output_text(a).trim()
+    }
+    let list = reply_out("list-sessions")
+    type_text(mut a, "\u{0}d")
+    let why2 = ends_with(mut a, 0, "[detached from main]")
+    close_quiet(a)
+    stop_server()
+    let lines = list.trim().split("\n")
+    if lines.len != 1 || !lines[0].contains("main: 80x24 (1 attached)") { return "list-sessions while attached: " + list.replace("\n", " | ") }
+    if why2.len > 0 { return "new -A -s main: " + why2 }
+    ""
+}
+
+// `new -A -d -s NAME` prints NAME and makes nothing when NAME exists; `new
+// -A` with no name is refused by name (status 2) and makes nothing.
+fn row_new_a_detached(warren: str) -> str {
+    var d = launch_as(warren, "new-a-detached", "d", words("new -d -s main"), 80, 24) else |e| { return "launch: {e}" }
+    let why = ends_plain(mut d, 0, "main")
+    close_quiet(d)
+    if why.len > 0 {
+        stop_server()
+        return "new -d -s main: " + why
+    }
+    var e = launch_as(warren, "new-a-detached", "e", words("new -A -d -s main"), 80, 24) else |x| { return "launch: {x}" }
+    let why2 = ends_plain(mut e, 0, "main")
+    close_quiet(e)
+    var f = launch_as(warren, "new-a-detached", "f", words("new -A -d"), 80, 24) else |x| { return "launch: {x}" }
+    let why3 = ends_plain(mut f, 2, "-A needs a session name")
+    close_quiet(f)
+    let list = reply_out("list-sessions")
+    stop_server()
+    if why2.len > 0 { return "new -A -d -s main: " + why2 }
+    if why3.len > 0 { return "new -A -d: " + why3 }
+    let lines = list.trim().split("\n")
+    if lines.len != 1 || !lines[0].starts_with("main:") { return "list-sessions: " + list.replace("\n", " | ") }
+    ""
+}
+
 // Two terminal clients of one session: the pane is sized to the smaller,
 // both draw what is typed, either may go without closing the pane or the
 // other, and with nobody attached the session keeps its last size.
@@ -1638,6 +1690,8 @@ fn run_row(warren: str, name: str) -> str {
     if name == "kill-reported" { return row_kill_reported(warren) }
     if name == "terminal-gone" { return row_terminal_gone(warren) }
     if name == "new-session" { return row_new_session(warren) }
+    if name == "new-a-attaches" { return row_new_a_attaches(warren) }
+    if name == "new-a-detached" { return row_new_a_detached(warren) }
     if name == "second-client" { return row_second_client(warren) }
     if name == "server-outlives-client" { return row_server_outlives_client(warren) }
     if name == "unknown-verb" { return row_unknown_verb(warren) }
@@ -1688,7 +1742,7 @@ fn main() -> int {
     }
     let quick_defaults = rows.len == 0
     if rows.len == 0 {
-        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session second-client server-outlives-client unknown-verb session-names split-e2e mouse-sgr mouse-legacy clipboard-osc52 clipboard-console console-term-linux console-term-linux-variable console-term-linux-overridden console-term-other zero-window zero-window-env window-too-large reply-slower-than-a-second")
+        rows = words("detach-reattach server-stopping too-small refused server-eof image-refused terminate hangup suspend-continue kill-reported terminal-gone new-session new-a-attaches new-a-detached second-client server-outlives-client unknown-verb session-names split-e2e mouse-sgr mouse-legacy clipboard-osc52 clipboard-console console-term-linux console-term-linux-variable console-term-linux-overridden console-term-other zero-window zero-window-env window-too-large reply-slower-than-a-second")
         // The memory row reads the client's resident set from /proc.
         if fs.exists("/proc/self/status") {
             (mut rows).push("memory-bounded")
