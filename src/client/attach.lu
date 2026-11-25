@@ -54,8 +54,9 @@ pub fn self_path() -> str {
 }
 
 // Start `warren server` detached: a session of its own, reparented, its
-// standard streams on /dev/null, the client's terminal not inherited.
-fn start_server() -> str {
+// standard streams on /dev/null, the client's terminal not inherited, and
+// `token` in its environment (server.START_TOKEN) to mark what it restores.
+fn start_server(token: str) -> str {
     let a = process.fork() else |e| { return "fork: {e}" }
     if process.is_child(a) {
         process.lead_session() else |_| { process.exit(40) }
@@ -73,7 +74,9 @@ fn start_server() -> str {
             process.set_stdin(mut c, null)
             process.set_stdout(mut c, null)
             process.set_stderr(mut c, null)
-            process.exec(c, env.vars()) else |_| {}
+            var vars = env.vars()
+            (mut vars).push(server.START_TOKEN + "=" + token)
+            process.exec(c, vars) else |_| {}
             process.exit(127)
         }
         process.exit(0)
@@ -102,16 +105,31 @@ pub fn dial_or_start(create: bool) -> Peer ! DialErrors {
         if why == "not_found" { return not_found }
         return refused
     }
-    if start_server().len > 0 { return io }
+    let token = "{env.pid()}-{now_ms()}"
+    if start_server(token).len > 0 { return io }
     let t0 = now_ms()
     while ms_since(t0) < START_MS {
         var p = dial(sock) else |_| {
             time.sleep(time.millis(20))
             continue
         }
+        restore_notice(token)
         return p
     }
     refused
+}
+
+/// What the server this client started restored, once, on standard error:
+/// `last-restore` in the state directory when its first line is this
+/// client's token (the server writes it before it binds its socket).
+fn restore_notice(token: str) {
+    let state = server.state_dir()
+    if state.len == 0 { return }
+    let text = fs.read_text(state + "/last-restore") else { return }
+    let first = token + "\n"
+    if !text.starts_with(first) { return }
+    let rest = text[first.len..text.len]
+    if rest.len > 0 { io.write_err(rest) }
 }
 
 fn env_lists(mut names: List[str], mut values: List[str]) {

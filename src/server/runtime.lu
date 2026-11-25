@@ -31,6 +31,23 @@ pub fn runtime_dir() -> str {
     "/tmp/warren-{uid}"
 }
 
+/// Where warren keeps what outlives a server (its saved sessions, the last
+/// start's restore notice and restore.log): `$XDG_STATE_HOME/warren`, or
+/// `~/.local/state/warren`; "" when neither names one. A relative
+/// XDG_STATE_HOME is ignored, as the XDG base directory rules say.
+pub fn state_dir() -> str {
+    let xdg = env.get("XDG_STATE_HOME") else ""
+    if xdg.starts_with("/") { return xdg + "/warren" }
+    let home = env.get("HOME") else ""
+    if home.len == 0 { return "" }
+    home + "/.local/state/warren"
+}
+
+/// The environment word a starting client gives the server it starts: the
+/// server writes it as `last-restore`'s first line, so that the client
+/// prints that file only when its own server wrote it.
+pub const START_TOKEN: str = "WARREN_START_TOKEN"
+
 /// The socket a client dials in a runtime directory.
 pub fn socket_path(dir: str) -> str {
     dir + "/default"
@@ -84,7 +101,8 @@ fn release(take lock: fs.File) {
     fs.close(take l) else |_| {}
 }
 
-/// Take the start lock and bind the socket, or say why not.
+/// Take the start lock and clear a stale socket of this user's, or say why
+/// not; the socket is bound later, by listen_at.
 pub fn start(dir: str) -> Start {
     let why = private_dir(dir)
     if why.len > 0 { return refused(1, why, dir) }
@@ -125,16 +143,20 @@ pub fn start(dir: str) -> Start {
             return refused(1, "stale-remove-{e}", dir)
         }
     }
-    var listener = unix.listen(path) else |e| {
-        release(take lock)
-        return refused(1, "bind-{e}", dir)
-    }
-    fs.set_mode(path, 0o600) else |e| {
+    Start { code: 0, reason: "", dir: dir, socket: path, lock: lock, listener: net.Listener { fd: 0 - 1 } }
+}
+
+/// Bind and listen at a started place's socket, at 0600: after the start
+/// lock is held and the saved sessions are made, so a client that dials
+/// finds them. "" or why not (the caller then finishes the place).
+pub fn listen_at(mut st: Start) -> str {
+    var listener = unix.listen(st.socket) else |e| { return "bind-{e}" }
+    fs.set_mode(st.socket, 0o600) else |e| {
         net.close_listener(take listener) else |_| {}
-        release(take lock)
-        return refused(1, "socket-mode-{e}", dir)
+        return "socket-mode-{e}"
     }
-    Start { code: 0, reason: "", dir: dir, socket: path, lock: lock, listener: listener }
+    st.listener = listener
+    ""
 }
 
 /// Close the listener (which unlinks its path) and release the lock.
