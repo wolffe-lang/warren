@@ -1,0 +1,63 @@
+//! member: false
+//! Where a server and its clients meet: the runtime directory's order
+//! (WARREN_RUNTIME_DIR, XDG_RUNTIME_DIR, the account's /run/user/UID when it
+//! is private, else /tmp or the root standing for it), and which
+//! /run/user/UID counts as private: a directory, not a link, the user's own,
+//! with no group or other bits.
+use server
+use std.env
+use std.fs
+
+fn test_order() {
+    assert(server.runtime_dir_for("/own", "/xdg", 1000, "/run/user/1000", "/tmp") == "/own", "WARREN_RUNTIME_DIR comes first")
+    assert(server.runtime_dir_for("", "/xdg", 1000, "/run/user/1000", "/tmp") == "/xdg/warren", "XDG_RUNTIME_DIR before /run/user")
+    assert(server.runtime_dir_for("", "", 1000, "/run/user/1000", "/tmp") == "/run/user/1000/warren", "the account's /run/user/UID when private")
+    assert(server.runtime_dir_for("", "", 1000, "", "/tmp") == "/tmp/warren-1000", "else a directory under /tmp")
+}
+
+// The last step's root stands for /tmp, so a row never makes the real
+// /tmp/warren-UID.
+fn test_tmp_root() {
+    assert(server.runtime_dir_for("", "", 1000, "", "/scratch/tmp") == "/scratch/tmp/warren-1000", "the last step under the root that stands for /tmp")
+}
+
+// An empty directory of this test's own under target/.
+fn fresh(name: str) -> str {
+    let root = (env.cwd() else ".") + "/target/runtime-dir-test/" + name
+    fs.remove_dir_all(root) else |_| {}
+    fs.create_dir_all(root) else |_| {}
+    root
+}
+
+fn test_run_user_private() {
+    let uid = env.euid() else 0 - 1
+    let root = fresh("private")
+    let dir = root + "/{uid}"
+    fs.create_dir_mode(dir, 448) else |_| {}
+    fs.set_mode(dir, 448) else |_| {}
+    assert(server.run_user_dir_at(root, uid) == dir, "a 0700 directory of the user's own")
+}
+
+fn test_run_user_refused() {
+    let uid = env.euid() else 0 - 1
+    let open = fresh("open")
+    fs.create_dir_mode(open + "/{uid}", 493) else |_| {}
+    fs.set_mode(open + "/{uid}", 493) else |_| {}
+    assert(server.run_user_dir_at(open, uid) == "", "a 0755 directory is not private")
+    let missing = fresh("missing")
+    assert(server.run_user_dir_at(missing, uid) == "", "a missing directory")
+    assert(!fs.exists(missing + "/{uid}"), "is not made by the asking")
+    let file = fresh("file")
+    fs.write_text(file + "/{uid}", "x") else |_| {}
+    assert(server.run_user_dir_at(file, uid) == "", "a file is not a directory")
+    let linked = fresh("link")
+    fs.create_dir_mode(linked + "/real", 448) else |_| {}
+    fs.set_mode(linked + "/real", 448) else |_| {}
+    fs.symlink(linked + "/real", linked + "/{uid}") else |_| {}
+    assert(server.run_user_dir_at(linked, uid) == "", "a link is not followed")
+    let someone = uid + 1
+    let other = fresh("other")
+    fs.create_dir_mode(other + "/{someone}", 448) else |_| {}
+    fs.set_mode(other + "/{someone}", 448) else |_| {}
+    assert(server.run_user_dir_at(other, someone) == "", "a directory another user's number names, owned by this user")
+}
