@@ -1078,7 +1078,9 @@ fn row_reply_projection(mut r: Rig) -> str {
 // A large REPLY the memory budget has no room for is refused by name
 // (status 1), and the server goes on. The projection is read from a first
 // server's trace; a second server is given that figure and 64 KiB more,
-// less than the listing's reply buffer needs.
+// less than the listing's reply buffer needs. The first server's saved
+// session is removed before the second starts, so the second holds the
+// same panes as the first and nothing restored beside them.
 fn row_reply_memory_refused(mut r: Rig) -> str {
     let path = beside(r, "trace")
     let why = traced_quoted_session(mut r, path)
@@ -1089,6 +1091,7 @@ fn row_reply_memory_refused(mut r: Rig) -> str {
     if first[0] < 0 { return "no memory line after ls" }
     let st = stop_server(mut r)
     if st != 0 { return "the first server's exit {st}" }
+    fs.remove_dir_all((env.get("XDG_STATE_HOME") else "") + "/warren/sessions") else |_| {}
     let budget = first[0] + 65536
     let path2 = beside(r, "trace-2")
     env.set("WARREN_MEMORY_BUDGET", "{budget}") else { return "env" }
