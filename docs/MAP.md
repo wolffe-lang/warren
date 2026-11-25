@@ -7,7 +7,7 @@
 | W2 | server, client, protocol v1; one pane; detach and attach | codec, server, terminal client, lifecycle (new, attach, detach, second client, the server outliving its client); session and client rows; PAX console logout waits on PAX |
 | W3 | split tree, tabs, modes, the hint bar, configuration v1 | pure layout module (tabs, split tree, geometry, operations) with golden and property rows; panes and tabs in the server, the compositor's borders and focus mark, the bar's two lines (session, tabs with their marks, mode and clock; hints, prompts and messages), modes per client from the key table, the split end to end through the real client (`keys_test`, `pane_rows`, `client_rows`, SERVER.md §8); configuration planned |
 | W4 | mouse, scrollback, copy mode, search, OSC 52 | pane focus and tab-label clicks with SGR/legacy reports, captured border dragging and all-motion transport, wheel and key scrollback per client, drag selection copied on release, register paste, OSC 52 export of copies and warren.toml's gate on programs' writes, search in scroll mode |
-| W5 | command socket, CLI verbs, layout files, save and restore | in progress: ids, targets, the verb table, `list --json`, `source`, layout files (`layout save`, `layout load`, `new -l`) |
+| W5 | command socket, CLI verbs, layout files, save and restore | ids, targets, the verb table, `list --json`, `send-keys`, `capture-pane`, `source`, layout files (`layout save`, `layout load`, `new -l`), saved sessions and restore at start |
 | W6 | static on the PAX image; rows in PAX's own suites | planned |
 
 The parser, the grid, the protocol codec, the layout module, the server with
