@@ -155,6 +155,48 @@ tmux's goes to a paste buffer, and the paste key (prefix `]`) types it.
   (status 1). tmux's `-a`, `-A`, `-b`, `-C`, `-N`, `-P`, `-q` and `-T` are
   refused by name.
 
+## Saved sessions
+
+Every live session is saved, so that a server that starts again makes it
+again. A session's file is `$XDG_STATE_HOME/warren/sessions/NAME.toml`, or
+`~/.local/state/warren/sessions/NAME.toml`; the directories are made at
+0700 and the file is 0600. It is the session as `layout save` writes it, with
+one more table, `[session]`: its name, start directory and size (LAYOUT.md,
+Layout files). Screen contents and scrollback are never written.
+
+- **When.** A session is written when its text changes, at most once a
+  second, so its file is at most a second behind; and every live session is
+  written when the server stops (`kill-server`, TERM or INT) before any
+  pane's program hangs up. Each write goes to a temporary name, is synced,
+  then renamed, so a file is whole or not there.
+- **What removes a file.** Ending the session: `kill-session`, or its last
+  pane's exit. A rename moves the file to the new name. A `kill-server`, a
+  stop by signal and a crash keep every file.
+- **Restore.** A server that starts makes every saved session again before
+  its socket is bound, in file-name order, each under its own name at its
+  saved size. Every pane starts the configured shell in its saved directory;
+  a pane's saved command is not run again, and the next save writes none for
+  it. Ids are new. After a crash every saved session comes back.
+- **What warren prints.** The client that started the server prints what was
+  restored, once, on standard error, before it attaches or runs its verb:
+
+  ```
+  warren: restored 2 saved sessions: notes, work
+  warren: not restored: mail: mail line 16: no such directory: /home/me/gone (kept: /home/me/.local/state/warren/sessions/mail.toml; remove it to discard it)
+  ```
+
+  A client that reaches a running server prints nothing. The same lines, each
+  after the time in milliseconds, go to `restore.log` beside `sessions` (the
+  newest 100 lines), with the first failed write of each session.
+- **Discarding one.** `warren kill-session -t NAME` ends a restored session and
+  removes its file. A file that cannot be made is kept as it is and tried at
+  every start; remove it to discard the session, or put back what it needs
+  (its directory, say) to have it made. Removing `NAME.toml` before a start
+  discards it too.
+- **Turning it off.** `restore = false` in `warren.toml` (CONFIG.md) saves
+  nothing and restores nothing; it is the only switch, and files already
+  written stay.
+
 ## Targets
 
 ```
