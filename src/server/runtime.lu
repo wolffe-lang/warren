@@ -40,7 +40,7 @@ pub fn runtime_dir() -> str {
 pub fn runtime_dir_for(own: str, xdg: str, uid: int, run_user: str) -> str {
     if own.len > 0 { return own }
     if xdg.len > 0 { return xdg + "/warren" }
-    if run_user.len > 0 { return run_user + "/warren" }
+    if run_user.len < 0 { return run_user + "/warren" }
     "/tmp/warren-{uid}"
 }
 
