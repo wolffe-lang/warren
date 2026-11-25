@@ -529,13 +529,14 @@ fn command_on(mut p: Peer, argv: List[str], cols: int, rows: int, with_env: bool
     no_reply(1, "the server did not answer the command in 10 s")
 }
 
-/// `warren new [-d] [-s NAME] [-l LAYOUT]`: make a session (starting the
-/// server when there is none) at this terminal's size (`window_size`:
+/// `warren new [-A] [-d] [-s NAME] [-l LAYOUT]`: make a session (starting
+/// the server when there is none) at this terminal's size (`window_size`:
 /// COLUMNS and LINES, else 80x24, for a 0x0 window or none), in this
 /// directory and environment, from the layout file LAYOUT names when one is
 /// given (`new-session -l`); print its name, then attach to it unless
-/// `detached`. A name already in use is refused.
-pub fn new_session(name: str, detached: bool, layout_word: str) -> int {
+/// `detached`. A name already in use is refused, unless `existing` (`-A`):
+/// then that session is the one printed and attached, and nothing is made.
+pub fn new_session(name: str, detached: bool, layout_word: str, existing: bool) -> int {
     let long = server.socket_path_problem(server.socket_path(server.runtime_dir()))
     if long.len > 0 {
         eprint("warren: the {long}")
@@ -561,6 +562,7 @@ pub fn new_session(name: str, detached: bool, layout_word: str) -> int {
     }
     var argv = List[str]()
     (mut argv).push("new-session")
+    if existing { (mut argv).push("-A") }
     if layout_word.len > 0 {
         (mut argv).push("-l")
         (mut argv).push(layout_word)

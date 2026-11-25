@@ -66,10 +66,13 @@ fn new_verb(args: List[str]) -> int {
     var named = false
     var layout_word = ""
     var laid = false
+    var existing = false
     var i = 1
     while i < args.len {
         if args[i] == "-d" && !detached {
             detached = true
+        } else if args[i] == "-A" && !existing {
+            existing = true
         } else if args[i] == "-s" && !named && i + 1 < args.len {
             name = args[i + 1]
             named = true
@@ -91,7 +94,11 @@ fn new_verb(args: List[str]) -> int {
         io.write_err_line("warren: new: a layout name may not be empty")
         return 2
     }
-    client.new_session(name, detached, layout_word)
+    if existing && !named {
+        io.write_err_line("warren: new: -A needs a session name")
+        return 2
+    }
+    client.new_session(name, detached, layout_word, existing)
 }
 
 // The modules and the milestone each belongs to.
