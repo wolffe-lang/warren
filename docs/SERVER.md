@@ -333,12 +333,12 @@ remove other multiplexer markers and LINES/COLUMNS, as TERM.md specifies.
 | running | listener READ | accept bounded batch; apply admission budget; register accepted peers and 5 s deadlines | running |
 | running | connection/master/child event | tables above | running |
 | running | child signal | poll/reap every tracked completed child without waiting on live children | running |
-| running | terminate/kill-server or final session ends | stop accepts; BYE server-stopping if safe; close masters; set 5 s deadline | stopping |
+| running | terminate/kill-server or final session ends | write every live session's saved file; stop accepts; BYE server-stopping if safe; close masters; set 5 s deadline | stopping |
 | running | hangup | ignored (own detached session) | running |
-| running | deadline | pace frames, clock tick, debounce persistence, connection/pane timeouts | running |
+| running | deadline | pace frames, clock tick, the saving pass (at most once a second, while something may have changed), connection/pane timeouts | running |
 | running | fatal wait error | stop accepts; best-effort cleanup as above; report failure | stopping |
 | stopping | readiness/deadline | drain clients/reap boundedly; no new sessions | stopping |
-| stopping | all queues empty and children reaped, or 5 s elapsed | close remaining sockets/master handles; close waiter; remove only owned path/lock; save structural state; exit | exited |
+| stopping | all queues empty and children reaped, or 5 s elapsed | close remaining sockets/master handles; close waiter; remove only owned path/lock; exit | exited |
 
 The host name a pane's OSC 7 report may name ([TERM](TERM.md)) is learnt once
 at start: on Linux by reading `/proc/sys/kernel/hostname`; elsewhere by running
@@ -357,6 +357,18 @@ exists-then-create test is not a lock. Runtime-directory and logout behavior
 on PAX must be measured after the pid-1/runtime-directory work, not inferred
 from Linux. No state file may contain screen/scrollback secrets; v1 saves
 only layout and working-directory metadata, not running programs.
+
+Saved sessions (CLI.md, Saved sessions). A server takes the start lock, makes
+every saved session again, writes `last-restore` (after the starting client's
+token, `WARREN_START_TOKEN`, which it then drops from its environment) and
+appends to `restore.log`, and only then binds its socket: a client that dials
+finds the sessions made, and the client that started it prints what was
+restored. While running, a pane's output, a client's message or a child's end
+marks that something may have changed; at most once a second (`SAVE_MS`) the
+turn composes each live session's saved text and writes the ones whose text
+(by a hash and its length) differs from the last write. A stop writes every
+live session before it closes any master. A session's file goes when it ends
+or is renamed.
 
 ## 6. Client terminal exit obligations
 

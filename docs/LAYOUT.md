@@ -262,6 +262,14 @@ cwd = "~/mail"
 
 - **The file.** `version = 1` is required. `active` is the active tab's index
   from 1 (default 1). At least one `[[tab]]`.
+- **A saved session's table.** A file warren saves for a session (CLI.md,
+  Saved sessions) has one more table, `[session]`, after `active`: `name`, a
+  name a session may hold (not empty, no `/`, no control byte); `cwd`, the
+  session's start directory, absolute; `cols` and `rows`, its size, each 1 to
+  65535 and at most 262144 cells together. All four are required. `layout load`
+  and `new-session -l` read such a file as a layout: they ignore its name and
+  size, and a pane that names no directory starts in the table's `cwd`
+  (`new-session -l` also starts the session there unless `-c` is given).
 - **A tab** takes `name` (default empty, as a new tab's), `focus`, its
   focused leaf's index from 1 in tree order (default 1), `zoomed` (default
   false), and its tree under `root`.
@@ -286,7 +294,8 @@ cwd = "~/mail"
   that lacks it, and every other at the line of the key or header that holds
   what is refused. `tests/config/layout.table` holds each one.
 - **Writing.** The text is canonical: the header comment, `version` and
-  `active`, then each tab with `name`, `focus` and `zoomed` always written,
+  `active`, the `[session]` table when there is one, then each tab with
+  `name`, `focus` and `zoomed` always written,
   then its nodes in preorder, each header followed by its keys in a fixed
   order. A string escapes `"`, `\`, U+0000 to U+001F and U+007F, and nothing
   else. A leaf gets `cwd` unless its pane is at its session's start directory
