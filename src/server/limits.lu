@@ -100,6 +100,9 @@ pub const DRAIN_MS: int = 2000
 pub const CLOSING_MS: int = 3000
 /// A stopping server exits after this long at most.
 pub const STOPPING_MS: int = 5000
+
+/// A saved session is written at most once in this long (and at a stop).
+pub const SAVE_MS: int = 1000
 /// Damage becomes a frame when it is this old...
 pub const FRAME_AGE_MS: int = 8
 /// ...or its pane has been quiet this long.

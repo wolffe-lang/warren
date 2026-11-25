@@ -68,7 +68,9 @@ pub struct Pane {
 /// for the layout generation they were built for. `mark_tab` and
 /// `mark_bits` hold the tabs' marks by tab id (MARK_ACTIVITY, MARK_BELL),
 /// in place: an entry whose bits are clear is free. `register` is the text
-/// the session's clients last copied, at most REGISTER_BYTES.
+/// the session's clients last copied, at most REGISTER_BYTES. `saved_hash`
+/// and `saved_len` are the hash and length of the text its saved file was
+/// last written with (0 and 0: none written yet).
 pub struct Session {
     live: bool,
     /// The session's id, from the server's counter: never handed out again.
@@ -93,6 +95,8 @@ pub struct Session {
     mark_tab: List[int],
     mark_bits: List[int],
     register: List[byte],
+    saved_hash: int,
+    saved_len: int,
 }
 
 /// What a spawn needs: the pane's size, the session's working directory
@@ -178,7 +182,7 @@ pub fn idle_session() -> Session {
         generation: 0, layout: layout.Layout { tabs: List[layout.Tab](), active: 0, next_id: 1 },
         cwd: List[byte](), env_names: List[str](), env_values: List[str](), layout_gen: 0, bar_gen: 0,
         chrome_gen: 0 - 1, owner: List[int](), border: List[vt.Cell](), last_output: 0, mark_tab: List[int](),
-        mark_bits: List[int](), register: List[byte]() }
+        mark_bits: List[int](), register: List[byte](), saved_hash: 0, saved_len: 0 }
 }
 
 /// The session's working directory as text.
