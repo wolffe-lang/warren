@@ -2363,7 +2363,9 @@ fn command_message(mut s: Server, index: int, kind: int, body: List[byte]) {
                 if lf.why.len > 0 {
                     m = Made { si: 0 - 1, code: 6, why: lf.why, later: false }
                 } else {
-                    m = make_session_from(mut s, name, cols, rows, start, h.names, h.values, lf.file, lf.label)
+                    // A saved session's file gives its start directory when -c does not.
+                    let from_file = if lf.file.session.saved && !v.has_dir then lf.file.session.cwd else start
+                    m = make_session_from(mut s, name, cols, rows, from_file, h.names, h.values, lf.file, lf.label)
                 }
             } else {
                 m = make_session(mut s, name, cols, rows, start, h.names, h.values, 0)
@@ -2915,11 +2917,9 @@ fn write_private(path: str, text: str) -> str {
 /// is saved or restored then). A relative XDG_STATE_HOME is ignored, as the
 /// XDG base directory rules say.
 fn sessions_dir() -> str {
-    let xdg = env.get("XDG_STATE_HOME") else ""
-    if xdg.starts_with("/") { return xdg + "/warren/sessions" }
-    let home = env.get("HOME") else ""
-    if home.len == 0 { return "" }
-    home + "/.local/state/warren/sessions"
+    let state = state_dir()
+    if state.len == 0 { return "" }
+    state + "/sessions"
 }
 
 /// Make the sessions directory and its `warren` parent at 0700 when they
@@ -2991,11 +2991,159 @@ fn save_session(mut s: Server, si: int, dir: str) {
     let why = write_private(dir + "/" + name + ".toml", text)
     if why.len > 0 {
         trace(s, "not saved {name}: {why}")
+        if !s.sessions[si].save_failed {
+            var line = List[str]()
+            (mut line).push("warren: not saved: {name}: {why}")
+            log_restore(state_dir(), line)
+        }
+        s.sessions[si].save_failed = true
         return
     }
+    s.sessions[si].save_failed = false
     s.sessions[si].saved_hash = h
     s.sessions[si].saved_len = text.len
     trace(s, "saved {name}: {text.len} bytes")
+}
+
+/// Whether `a` sorts before `b`, byte by byte (a prefix first).
+fn bytes_before(a: str, b: str) -> bool {
+    let x = a.bytes()
+    let y = b.bytes()
+    var i = 0
+    while i < x.len && i < y.len {
+        if x[i] != y[i] { return (x[i] as int) < (y[i] as int) }
+        i += 1
+    }
+    x.len < y.len
+}
+
+/// The saved sessions' file names in `dir` (NAME.toml), in byte order.
+fn saved_names(dir: str) -> List[str] {
+    var out = List[str]()
+    let all = fs.read_dir(dir) else { return out }
+    for f in all {
+        if !f.ends_with(".toml") || f.len <= 5 { continue }
+        var at = out.len
+        while at > 0 && bytes_before(f, out[at - 1]) { at -= 1 }
+        (mut out).insert(at, f)
+    }
+    out
+}
+
+/// Make the saved session at `path` again, named `name` (its file's stem):
+/// its file read, its table's name the file's, no live session of that name,
+/// every pane's command dropped (a restored pane runs the configured shell
+/// in its directory), then made as new-session -l makes one, at the table's
+/// size and start directory, with the server's environment. "" or why not.
+fn restore_one(mut s: Server, name: str, path: str, names: List[str], values: List[str]) -> str {
+    let text = fs.read_text(path) else |e| { return "it did not read: {e}" }
+    if text.len > config.LAYOUT_BYTES { return "it is past {config.LAYOUT_BYTES} bytes" }
+    var f = config.read_layout(text)
+    if !f.ok { return "{name} line {f.line}: {f.why}" }
+    if !f.session.saved { return "it has no [session] table" }
+    if f.session.name != name { return "its [session] table names another session" }
+    if find_session(s, name) >= 0 { return "a session named {name} already exists" }
+    var i = 0
+    while i < f.tabs.len {
+        var j = 0
+        while j < f.tabs[i].leaves.len {
+            f.tabs[i].leaves[j].command = List[str]()
+            j += 1
+        }
+        i += 1
+    }
+    var tries = 0
+    while tries < 2 * MAX_PANES + MAX_SESSIONS {
+        let m = make_session_from(mut s, name, f.session.cols, f.session.rows, f.session.cwd, names, values, f, name)
+        if !m.later {
+            if m.si < 0 { return m.why }
+            return ""
+        }
+        // Slots grow here, at start and outside any turn, as between turns.
+        if s.need_slot && s.sessions.len < MAX_SESSIONS { (mut s.sessions).push(idle_session()) }
+        s.need_slot = false
+        if s.need_pane { (mut s.panes).push(idle_pane(s.want_cols, s.want_rows)) }
+        s.need_pane = false
+        tries += 1
+    }
+    "no slot for it"
+}
+
+/// Add `lines` to restore.log in `state`, each after the time, keeping the
+/// newest RESTORE_LOG_LINES lines; nothing when there are none.
+fn log_restore(state: str, lines: List[str]) {
+    if lines.len == 0 || state.len == 0 { return }
+    let path = state + "/restore.log"
+    var kept = List[str]()
+    for l in (fs.read_text(path) else "").split("\n") {
+        if l.len > 0 { (mut kept).push(l) }
+    }
+    let stamp = time.unix_ms()
+    for l in lines { (mut kept).push("{stamp} {l}") }
+    var text = ""
+    var i = if kept.len > RESTORE_LOG_LINES then kept.len - RESTORE_LOG_LINES else 0
+    while i < kept.len {
+        text = text + kept[i] + "\n"
+        i += 1
+    }
+    let _w = write_private(path, text)
+}
+
+/// The most lines restore.log keeps.
+pub const RESTORE_LOG_LINES: int = 100
+
+/// Make every saved session again, at start, before the socket is bound
+/// (docs/SERVER.md, Saved sessions): in file-name order, each by restore_one.
+/// A file that cannot be made is kept as it is. The outcome (one line for
+/// the sessions made, one for each refusal with its file's path) is written
+/// to `last-restore`, after the token of the client that started this
+/// server, which prints it; and to restore.log. Nothing while restore is off
+/// or before anything was ever saved.
+fn restore_sessions(mut s: Server) {
+    let token = env.get(START_TOKEN) else ""
+    env.unset(START_TOKEN) else |_| {}
+    if !s.settings.restore { return }
+    let dir = sessions_dir()
+    if dir.len == 0 || !is_directory(dir) { return }
+    let state = state_dir()
+    var names = List[str]()
+    var values = List[str]()
+    for kv in env.vars() {
+        let at = kv.find("=") else 0 - 1
+        if at <= 0 { continue }
+        (mut names).push(kv[0..at])
+        (mut values).push(kv[at + 1..kv.len])
+    }
+    var made = List[str]()
+    var lines = List[str]()
+    for file in saved_names(dir) {
+        let name = file[0..file.len - 5]
+        let path = dir + "/" + file
+        let why = restore_one(mut s, name, path, names, values)
+        if why.len == 0 {
+            (mut made).push(name)
+            trace(s, "restored {name}")
+        } else {
+            (mut lines).push("warren: not restored: {name}: {why} (kept: {path}; remove it to discard it)")
+            trace(s, "not restored {name}: {why}")
+        }
+    }
+    var all = List[str]()
+    if made.len > 0 {
+        var list = ""
+        for n in made {
+            if list.len > 0 { list = list + ", " }
+            list = list + n
+        }
+        let noun = if made.len == 1 then "saved session" else "saved sessions"
+        (mut all).push("warren: restored {made.len} {noun}: {list}")
+    }
+    for l in lines { (mut all).push(l) }
+    var notice = token + "\n"
+    for l in all { notice = notice + l + "\n" }
+    let w = write_private(state + "/last-restore", notice)
+    if w.len > 0 { trace(s, "last-restore: {w}") }
+    log_restore(state, all)
 }
 
 /// A session's saved file goes when it ends or is renamed (while restore is
@@ -3146,7 +3294,10 @@ struct Loaded { tabs: List[int], why: str, later: bool }
 /// spent. The active tab and the focus do not change.
 fn load_tabs(mut s: Server, si: int, f: config.LayoutFile, label: str) -> Loaded {
     var leaves = List[LoadLeaf]()
-    let why = check_load(s, f, label, s.sessions[si].cols, s.sessions[si].rows, cwd_of(s.sessions[si]),
+    // A saved session's file loads as a layout: a pane that names no
+    // directory starts in its table's start directory.
+    let start = if f.session.saved then f.session.cwd else cwd_of(s.sessions[si])
+    let why = check_load(s, f, label, s.sessions[si].cols, s.sessions[si].rows, start,
         s.sessions[si].env_names, s.sessions[si].env_values, pane_count(s, si), mut leaves)
     if why.len > 0 { return Loaded { tabs: List[int](), why: why, later: false } }
     var free = 0
@@ -3336,6 +3487,7 @@ fn begin_session(mut s: Server, slot: int, name: str, cols: int, rows: int, cwd:
     for b in cwd.bytes() { (mut s.sessions[slot].cwd).push(b) }
     s.sessions[slot].saved_hash = 0
     s.sessions[slot].saved_len = 0
+    s.sessions[slot].save_failed = false
     s.save_due = true
     (mut s.sessions[slot].env_names).reset()
     (mut s.sessions[slot].env_values).reset()
@@ -4232,6 +4384,18 @@ pub fn serve() -> int {
         clock_hour: 0, clock_minute: 0, clock_next: 0, host_name: host, save_due: false, save_next: 0,
     }
     read_clock(mut s)
+    // Saved sessions are made before the socket is there: the first client
+    // to dial finds them, and the client that started this server reads
+    // what was restored.
+    restore_sessions(mut s)
+    let bound = listen_at(mut s.place)
+    if bound.len > 0 {
+        eprint("warren server: cannot start: {bound}")
+        begin_stop(mut s, "cannot listen")
+        poll.close(take s.w) else |_| {}
+        finish(take s.place)
+        return 1
+    }
     net.set_listener_deadline(mut s.place.listener, 1) else |_| {}
     listener_interest(mut s)
     trace(s, "listening at {s.place.socket}")
