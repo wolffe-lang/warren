@@ -22,9 +22,13 @@ pub struct Start {
 
 /// The runtime directory: WARREN_RUNTIME_DIR when set (rows use it), else
 /// XDG_RUNTIME_DIR's `warren`, else a per-user directory under /tmp.
+/// WARREN_TMP_ROOT stands for /tmp (rows use it, so none makes the real
+/// /tmp/warren-UID).
 pub fn runtime_dir() -> str {
     let uid = env.euid() else 0 - 1
-    runtime_dir_for(env.get("WARREN_RUNTIME_DIR") else "", env.get("XDG_RUNTIME_DIR") else "", uid, "", "/tmp")
+    let tmp = env.get("WARREN_TMP_ROOT") else ""
+    runtime_dir_for(env.get("WARREN_RUNTIME_DIR") else "", env.get("XDG_RUNTIME_DIR") else "", uid, "",
+        if tmp.len > 0 then tmp else "/tmp")
 }
 
 /// The runtime directory from the words that choose it, in order: `own`
@@ -35,7 +39,7 @@ pub fn runtime_dir() -> str {
 pub fn runtime_dir_for(own: str, xdg: str, uid: int, run_user: str, tmp_root: str) -> str {
     if own.len > 0 { return own }
     if xdg.len > 0 { return xdg + "/warren" }
-    "/tmp/warren-{uid}"
+    tmp_root + "/warren-{uid}"
 }
 
 /// The account's directory under `root` (`/run/user`), ROOT/UID, when it is
