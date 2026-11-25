@@ -1,0 +1,8 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# makes new-session -A never find the session it names, so a second -A on a
+# session that exists is refused as a duplicate and new-a-existing goes red
+# by name.
+floor 15
+rig verbs-step.sh sha256=12b66d2720f2501d3d1a5f4489e59d9de19d7fd5900140ba202672f6b40501ec
+rig verbs-inner.sh sha256=95984b335728135ac60b29ca421086712b5431770a9de3d30cc365da6e8fe220
+step new-a-existing tools=bash,python3 script=verbs-step.sh -- plant new-a-existing
