@@ -219,7 +219,7 @@ session_rows() (
     send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes
     capture-cases capture-register capture-full-ring capture-over-cap
     pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited split-starts-in-pane-cwd split-reported-missing
-    split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file
+    split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails runtime-dir-run-user layout-save-writes-file
     layout-load-adds-tabs layout-refused-changes-nothing layout-program-missing layout-too-many-panes layout-too-small layout-unknown-name layout-relative-cwd layout-path-save-load layout-save-bound
     new-l-makes-session layout-save-load-round-trip pane-start-dir-kept new-a-existing new-a-ignores-c-l new-a-at-once
     saved-on-change saved-once-a-second saved-at-stop saved-follows-rename saved-removed-at-end stop-writes-in-bound saved-off
