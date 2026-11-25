@@ -55,6 +55,7 @@ def main():
         (RIG, 'slot-title-plant.manifest', ['pane-title-not-inherited']),
         (RIG, 'restore-cwd-plant.manifest', ['restore-keeps-cwd']),
         (RIG, 'new-a-plant.manifest', ['new-a-existing']),
+        (RIG, 'run-user-plant.manifest', ['runtime-dir-run-user']),
         (RIG, 'ring-growth-plant.manifest', ['ring-resident-panes'])):
         raw = (rig / filename).read_text()
         steps = re.findall(r'^step (\S+)', raw, re.M)
