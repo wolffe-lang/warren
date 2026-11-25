@@ -4147,6 +4147,78 @@ fn row_prompt_frame_minute(mut r: Rig) -> str {
     ""
 }
 
+// ---- new-session -A ----
+
+// `new-session -A NAME` a second time, with NAME there, prints NAME, exits 0
+// and makes nothing; without -A the same name is still refused.
+fn row_new_a_existing(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    let a = ask(r, "new-session -A main", "")
+    if a.status != 0 || a.out != "main\n" { return "the first -A main: {a.status} '{a.out.trim()}' '{a.err.trim()}'" }
+    let b = ask(r, "new-session -A main", "")
+    if b.status != 0 || b.out != "main\n" { return "the second -A main: {b.status} '{b.out.trim()}' '{b.err.trim()}'" }
+    let c = ask(r, "new-session main", "")
+    if c.status == 0 || !c.err.contains("already exists") { return "new-session main without -A: {c.status} '{c.err.trim()}'" }
+    let l = ask(r, "ls", "")
+    let lines = l.out.trim().split("\n")
+    if l.status != 0 || lines.len != 1 || !lines[0].starts_with("main:") { return "ls: '{l.out.trim()}'" }
+    ""
+}
+
+// -A on a session that exists applies neither -c nor -l: a directory and a
+// layout that do not exist are not read, and the session is the same after.
+fn row_new_a_ignores_c_l(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    let a = ask(r, "new-session main", "")
+    if a.status != 0 { return "new-session main: {a.status} '{a.err.trim()}'" }
+    let l0 = listed(r)
+    if l0.status != 0 { return l0.err }
+    let before = session_words(l0.out, "main", true)
+    let b = ask(r, "new-session -A -c /no/such/dir/for/warren -l no-such-layout main", "")
+    if b.status != 0 || b.out != "main\n" { return "-A -c -l on main: {b.status} '{b.out.trim()}' '{b.err.trim()}'" }
+    let l1 = listed(r)
+    if l1.status != 0 { return l1.err }
+    let after = session_words(l1.out, "main", true)
+    if before.len == 0 || after != before { return "main was\n{before}\nand is\n{after}" }
+    ""
+}
+
+// Two clients send `new-session -A main` at once: one session is made, and
+// both print main and exit 0, as the check and the making are one turn.
+fn row_new_a_at_once(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    let n1 = fs.open_mode("/dev/null", 2) else { return "/dev/null" }
+    let n2 = fs.open_mode("/dev/null", 2) else { return "/dev/null" }
+    let p1 = beside(r, "first-out")
+    let p2 = beside(r, "second-out")
+    let f1 = fs.create(p1) else |e| { return "{p1}: {e}" }
+    let f2 = fs.create(p2) else |e| { return "{p2}: {e}" }
+    var c1 = process.command(r.warren)
+    var c2 = process.command(r.warren)
+    for w in line_words("new-session -A main") {
+        process.push_arg(mut c1, w)
+        process.push_arg(mut c2, w)
+    }
+    process.set_stdin(mut c1, n1)
+    process.set_stdin(mut c2, n2)
+    process.set_stdout(mut c1, f1)
+    process.set_stdout(mut c2, f2)
+    let k1 = process.start(c1) else |e| { return "start: {e}" }
+    let k2 = process.start(c2) else |e| { return "start: {e}" }
+    let s1 = process.wait_status(take k1) else 0 - 1
+    let s2 = process.wait_status(take k2) else 0 - 1
+    let a = fs.read_text(p1) else ""
+    let b = fs.read_text(p2) else ""
+    if s1 != 0 || s2 != 0 || a != "main\n" || b != "main\n" { return "the two -A main: {s1} '{a.trim()}', {s2} '{b.trim()}'" }
+    let l = ask(r, "ls", "")
+    let lines = l.out.trim().split("\n")
+    if lines.len != 1 || !lines[0].starts_with("main:") { return "ls: '{l.out.trim()}'" }
+    ""
+}
+
 fn run_row(warren: str, name: str) -> str {
     var r = rig(warren, name)
     fresh_state(name)
@@ -4224,6 +4296,9 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "layout-path-save-load" { why = row_layout_path_save_load(mut r) }
     else if name == "layout-save-bound" { why = row_layout_save_bound(mut r) }
     else if name == "new-l-makes-session" { why = row_new_l_makes_session(mut r) }
+    else if name == "new-a-existing" { why = row_new_a_existing(mut r) }
+    else if name == "new-a-ignores-c-l" { why = row_new_a_ignores_c_l(mut r) }
+    else if name == "new-a-at-once" { why = row_new_a_at_once(mut r) }
     else if name == "layout-save-load-round-trip" { why = row_layout_save_load_round_trip(mut r) }
     else if name == "split-starts-in-pane-cwd" { why = row_split_starts_in_pane_cwd(mut r) }
     else if name == "split-reported-missing" { why = row_split_reported_missing(mut r) }
@@ -4261,7 +4336,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited pane-start-dir-kept saved-on-change saved-once-a-second saved-at-stop saved-follows-rename saved-removed-at-end stop-writes-in-bound saved-off restore-after-kill-server restore-keeps-cwd restore-commands-not-run restore-off restore-refused-kept restore-printed restore-discard restore-after-kill layout-load-saved-file split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file layout-load-adds-tabs layout-refused-changes-nothing layout-program-missing layout-too-many-panes layout-too-small layout-unknown-name layout-relative-cwd layout-path-save-load layout-save-bound new-l-makes-session layout-save-load-round-trip".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited pane-start-dir-kept saved-on-change saved-once-a-second saved-at-stop saved-follows-rename saved-removed-at-end stop-writes-in-bound saved-off restore-after-kill-server restore-keeps-cwd restore-commands-not-run restore-off restore-refused-kept restore-printed restore-discard restore-after-kill layout-load-saved-file new-a-existing new-a-ignores-c-l new-a-at-once split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file layout-load-adds-tabs layout-refused-changes-nothing layout-program-missing layout-too-many-panes layout-too-small layout-unknown-name layout-relative-cwd layout-path-save-load layout-save-bound new-l-makes-session layout-save-load-round-trip".split(" ") {
         (mut x).push(n)
     }
     x
