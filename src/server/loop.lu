@@ -3048,6 +3048,7 @@ fn restore_one(mut s: Server, name: str, path: str, names: List[str], values: Li
         var j = 0
         while j < f.tabs[i].leaves.len {
             f.tabs[i].leaves[j].command = List[str]()
+            f.tabs[i].leaves[j].cwd = ""
             j += 1
         }
         i += 1
