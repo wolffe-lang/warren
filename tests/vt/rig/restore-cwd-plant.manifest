@@ -1,0 +1,7 @@
+# Use the recorder's --base and --plant mode on a plant branch whose one hunk
+# makes a restored session's panes start in the session's directory, not each
+# pane's own, so restore-keeps-cwd goes red by name.
+floor 15
+rig verbs-step.sh sha256=12b66d2720f2501d3d1a5f4489e59d9de19d7fd5900140ba202672f6b40501ec
+rig verbs-inner.sh sha256=95984b335728135ac60b29ca421086712b5431770a9de3d30cc365da6e8fe220
+step restore-keeps-cwd tools=bash,python3 script=verbs-step.sh -- plant restore-keeps-cwd
