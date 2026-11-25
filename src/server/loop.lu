@@ -100,6 +100,10 @@ pub struct Server {
     // The name this machine answers to in a pane's OSC 7 report, learnt
     // once at start (host.lu); "" when nothing named it.
     host_name: str,
+    // Something happened that may change a saved session's text, and the
+    // earliest time the next saving pass may run (SAVE_MS after the last).
+    save_due: bool,
+    save_next: int,
 }
 
 fn now_ns() -> int {
@@ -508,6 +512,7 @@ fn end_session(mut s: Server, si: int) {
         }
         k += 1
     }
+    forget_saved(mut s, si)
     s.sessions[si].live = false
     s.sessions[si].members = 0
     if live_sessions(s) == 0 {
@@ -1512,7 +1517,9 @@ fn rename_session(mut s: Server, index: int, si: int, name: str) {
         tell(mut s, index, "a session named {name} already exists")
         return
     }
+    if name != name_of(s.sessions[si]) { forget_saved(mut s, si) }
     set_name(mut s.sessions[si], name)
+    s.save_due = true
     s.sessions[si].bar_gen = s.sessions[si].bar_gen + 1
     session_changed(mut s, si, now_ns())
 }
@@ -2901,6 +2908,114 @@ fn write_private(path: str, text: str) -> str {
     failed
 }
 
+// ---- saved sessions ----
+
+/// The directory saved sessions are in: `$XDG_STATE_HOME/warren/sessions`,
+/// or `~/.local/state/warren/sessions`; "" when neither names one (nothing
+/// is saved or restored then). A relative XDG_STATE_HOME is ignored, as the
+/// XDG base directory rules say.
+fn sessions_dir() -> str {
+    let xdg = env.get("XDG_STATE_HOME") else ""
+    if xdg.starts_with("/") { return xdg + "/warren/sessions" }
+    let home = env.get("HOME") else ""
+    if home.len == 0 { return "" }
+    home + "/.local/state/warren/sessions"
+}
+
+/// Make the sessions directory and its `warren` parent at 0700 when they
+/// are missing (any directory above them as the host makes it); "" or why
+/// not.
+fn sessions_dir_made(dir: str) -> str {
+    if is_directory(dir) { return "" }
+    let parent = fs.parent(dir) else ""
+    if parent.len > 0 && !is_directory(parent) {
+        let top = fs.parent(parent) else ""
+        if top.len > 0 && !is_directory(top) {
+            fs.create_dir_all(top) else |e| { return "{top} cannot be made: {e}" }
+        }
+        fs.create_dir_mode(parent, 448) else |e| { return "{parent} cannot be made: {e}" }
+    }
+    fs.create_dir_mode(dir, 448) else |e| { return "{dir} cannot be made: {e}" }
+    ""
+}
+
+/// A session as its saved file: what `layout save` writes, with the
+/// session's table (its name, start directory and size).
+fn saved_file_of(s: Server, si: int) -> config.LayoutFile {
+    var f = layout_file_of(s, si)
+    f.session = config.SessionFile { saved: true, name: name_of(s.sessions[si]), cwd: cwd_of(s.sessions[si]),
+        cols: s.sessions[si].cols, rows: s.sessions[si].rows, line: 0 }
+    f
+}
+
+/// A text's hash for telling whether a saved file is already up to date
+/// (beside its length): a polynomial over its bytes, modulo the largest
+/// prime below 2^32.
+fn text_hash(text: str) -> int {
+    var h = 0
+    for b in text.bytes() { h = (h * 257 + (b as int) + 1) % 4294967291 }
+    h
+}
+
+/// Write every live session whose saved text changed since its last write;
+/// nothing while restore is off or no state directory is named.
+fn save_sessions(mut s: Server) {
+    if !s.settings.restore { return }
+    let dir = sessions_dir()
+    if dir.len == 0 { return }
+    var si = 0
+    while si < s.sessions.len {
+        if s.sessions[si].live { save_session(mut s, si, dir) }
+        si += 1
+    }
+}
+
+/// Write session `si` to NAME.toml in `dir` when its text changed: the
+/// directory made first, the file whole or not at all (write_private). A
+/// text past LAYOUT_BYTES, or a failure, is traced and leaves the last file
+/// as it was, to be tried again at the next pass.
+fn save_session(mut s: Server, si: int, dir: str) {
+    let text = config.write_layout(saved_file_of(s, si))
+    let h = text_hash(text)
+    if h == s.sessions[si].saved_hash && text.len == s.sessions[si].saved_len { return }
+    let name = name_of(s.sessions[si])
+    if text.len > config.LAYOUT_BYTES {
+        trace(s, "not saved {name}: {text.len} bytes, past {config.LAYOUT_BYTES}")
+        return
+    }
+    let made = sessions_dir_made(dir)
+    if made.len > 0 {
+        trace(s, "not saved {name}: {made}")
+        return
+    }
+    let why = write_private(dir + "/" + name + ".toml", text)
+    if why.len > 0 {
+        trace(s, "not saved {name}: {why}")
+        return
+    }
+    s.sessions[si].saved_hash = h
+    s.sessions[si].saved_len = text.len
+    trace(s, "saved {name}: {text.len} bytes")
+}
+
+/// A session's saved file goes when it ends or is renamed (while restore is
+/// on; with it off, files already written stay), and the next write starts
+/// afresh.
+fn forget_saved(mut s: Server, si: int) {
+    s.sessions[si].saved_hash = 0
+    s.sessions[si].saved_len = 0
+    if !s.settings.restore { return }
+    let dir = sessions_dir()
+    if dir.len == 0 { return }
+    let path = dir + "/" + name_of(s.sessions[si]) + ".toml"
+    if !fs.exists(path) { return }
+    fs.remove(path) else |e| {
+        trace(s, "not removed {path}: {e}")
+        return
+    }
+    trace(s, "removed saved {name_of(s.sessions[si])}")
+}
+
 // The value of `name` in an environment, or "".
 fn env_value(names: List[str], values: List[str], name: str) -> str {
     var i = 0
@@ -3219,6 +3334,9 @@ fn begin_session(mut s: Server, slot: int, name: str, cols: int, rows: int, cwd:
     s.next_tab = s.next_tab + 1
     (mut s.sessions[slot].cwd).reset()
     for b in cwd.bytes() { (mut s.sessions[slot].cwd).push(b) }
+    s.sessions[slot].saved_hash = 0
+    s.sessions[slot].saved_len = 0
+    s.save_due = true
     (mut s.sessions[slot].env_names).reset()
     (mut s.sessions[slot].env_values).reset()
     (mut s.sessions[slot].mark_tab).reset()
@@ -3807,6 +3925,8 @@ fn listener_interest(mut s: Server) {
 fn begin_stop(mut s: Server, why: str) {
     if s.stopping { return }
     trace(s, "stopping: {why}")
+    // Every live session is written before any pane hangs up.
+    save_sessions(mut s)
     s.stopping = true
     s.stop_deadline = now_ns() + STOPPING_MS * 1000000
     listener_interest(mut s)
@@ -3911,6 +4031,11 @@ fn next_deadline_ms(s: Server, now: int) -> int {
         i += 1
     }
     if s.stopping && (at < 0 || s.stop_deadline < at) { at = s.stop_deadline }
+    // The next saving pass, while something may have changed.
+    if s.save_due && !s.stopping {
+        let pass = if s.save_next > now then s.save_next else now
+        if at < 0 || pass < at { at = pass }
+    }
     // The clock's next minute, while a session is live.
     if s.clock_next > 0 && live_sessions(s) > 0 {
         let left = s.clock_next - time.unix_ms()
@@ -3954,6 +4079,9 @@ fn turn(mut s: Server) -> bool {
     }
     if ev.meaning == signal.child() { reap(mut s) }
     if ev.meaning == signal.terminate() || ev.meaning == signal.interrupt() { begin_stop(mut s, "signal") }
+    // A pane's output, a client's message or a child's end may change a
+    // session's saved text (its layout, or a pane's directory).
+    if ev.ready.len > 0 || ev.meaning == signal.child() { s.save_due = true }
     // Snapshot owners and generations, so an event for a key that a
     // handler in this turn reused is not applied to its new owner.
     var kinds = List[int]()
@@ -4034,6 +4162,11 @@ fn turn(mut s: Server) -> bool {
         i += 1
     }
     if live_sessions(s) > 0 || live_conns(s) > 0 { s.idle_since = now }
+    if s.save_due && !s.stopping && now >= s.save_next {
+        s.save_due = false
+        s.save_next = now + SAVE_MS * 1000000
+        save_sessions(mut s)
+    }
     listener_interest(mut s)
     s.turns = s.turns + 1
     !done(s, now_ns())
@@ -4096,7 +4229,7 @@ pub fn serve() -> int {
         want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, frames: 0, prompt_frames: 0,
         master_read: master_read,
         budget: budget, uid: env.euid() else 0 - 1, inherited: inherited, keys: keys, help: help,
-        clock_hour: 0, clock_minute: 0, clock_next: 0, host_name: host,
+        clock_hour: 0, clock_minute: 0, clock_next: 0, host_name: host, save_due: false, save_next: 0,
     }
     read_clock(mut s)
     net.set_listener_deadline(mut s.place.listener, 1) else |_| {}
