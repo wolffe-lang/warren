@@ -2275,6 +2275,278 @@ fn row_saved_off(mut r: Rig) -> str {
     ""
 }
 
+// ---- restore ----
+
+// A saved session's text as written by hand: one pane (its cwd `leaf_cwd`,
+// "" for none) and the table: `name`, start directory `cwd`, 80x24.
+fn saved_text(name: str, cwd: str, leaf_cwd: str) -> str {
+    var shape = List[layout.ShapeNode]()
+    (mut shape).push(shape_leaf())
+    var leaves = List[config.LeafFile]()
+    (mut leaves).push(config.LeafFile { cwd: leaf_cwd, command: List[str](), line: 0 })
+    var tabs = List[config.TabFile]()
+    (mut tabs).push(config.TabFile { name: "", named: true, focus: 1, zoomed: false, shape: shape, leaves: leaves })
+    var f = config.LayoutFile { ok: true, line: 0, why: "", active: 1, tabs: tabs, session: config.no_session() }
+    f.session = config.SessionFile { saved: true, name: name, cwd: cwd, cols: 80, rows: 24, line: 0 }
+    config.write_layout(f)
+}
+
+// Put a saved session's text in the state directory; its path, or "".
+fn place_saved(name: str, text: str) -> str {
+    let path = state_file(name)
+    fs.create_dir_all(fs.parent(path) else "") else |_| { return "" }
+    fs.write_text(path, text) else |_| { return "" }
+    path
+}
+
+// The runtime directory a client-started server takes: the rig's, made
+// empty (as start_traced makes it), with the rig's lifetime bound.
+fn client_env(r: Rig) -> bool {
+    fs.remove_dir_all(r.dir) else |_| {}
+    env.set("WARREN_RUNTIME_DIR", r.dir) else { return false }
+    env.set("WARREN_LIFETIME_MS", "60000") else { return false }
+    env.set("WARREN_PANE_COMMAND", "/bin/sh") else { return false }
+    true
+}
+
+// Stop a server a client started (the rig did not), and wait until it no
+// longer answers.
+fn stop_client_server(r: Rig) {
+    let _k = ask(r, "kill-server", "")
+    let until = now_ms() + 6000
+    while now_ms() < until {
+        var p = unix.connect(socket(r)) else |_| { return }
+        net.close(take p) else |_| {}
+        time.sleep(time.millis(50))
+    }
+}
+
+// Session `name` of the listing in words, or why there is none.
+fn session_now(r: Rig, name: str) -> str {
+    let l = listed(r)
+    if l.status != 0 { return "<" + l.err + ">" }
+    let w = session_words(l.out, name, true)
+    if w.len == 0 { return "<no session {name}>" }
+    w
+}
+
+// A session made again after kill-server is the one saved: two sessions
+// (one with a split and a second named tab, one started elsewhere), and
+// after the restart each has the same tabs, names, focus, zoom, pane rects
+// and pane directories.
+fn row_restore_after_kill_server(mut r: Rig) -> str {
+    let other = beside(r, "other")
+    fs.create_dir_all(other) else |e| { return "mkdir: {e}" }
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    for line in ["split-right -t work", "new-tab -t work", "rename-tab -t p3 logs", "new-session -c " + other + " away"] {
+        let v = ask(r, line, "")
+        if v.status != 0 { return "{line}: {v.status} '{v.err.trim()}'" }
+    }
+    if !until_present(state_file("away"), false, 3000) { return "away was never saved" }
+    let work = session_now(r, "work")
+    let away = session_now(r, "away")
+    client.hang_up(mut a)
+    let _k = stop_server(mut r)
+    let again = start_server(mut r, "/bin/sh")
+    if again.len > 0 { return again }
+    let work2 = session_now(r, "work")
+    if work2 != work { return "work came back as {work2}, not {work}" }
+    let away2 = session_now(r, "away")
+    if away2 != away { return "away came back as {away2}, not {away}" }
+    ""
+}
+
+// The plant's row: each pane comes back in its own directory, three of them
+// given by -c (on Linux /proc names it, elsewhere the directory the pane
+// started in).
+fn row_restore_keeps_cwd(mut r: Rig) -> str {
+    let one = beside(r, "one")
+    let two = beside(r, "two")
+    let three = beside(r, "three")
+    for d in [one, two, three] { fs.create_dir_all(d) else |e| { return "mkdir: {e}" } }
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    for line in ["split-right -t work -c " + one, "new-tab -t work -c " + two, "split-down -t p3 -c " + three] {
+        let v = ask(r, line, "")
+        if v.status != 0 { return "{line}: {v.status} '{v.err.trim()}'" }
+    }
+    let w = until_cwd(r, "p4", started_listing(three))
+    if w.len > 0 { return w }
+    let before = session_now(r, "work")
+    client.hang_up(mut a)
+    let _k = stop_server(mut r)
+    let again = start_server(mut r, "/bin/sh")
+    if again.len > 0 { return again }
+    let after = session_now(r, "work")
+    if after != before { return "the panes came back as {after}, not {before}" }
+    ""
+}
+
+// A restored pane starts the shell in its directory and not its saved
+// command: the command ran once before the restart and not again after, and
+// a save after the restore writes no command for it.
+fn row_restore_commands_not_run(mut r: Rig) -> str {
+    let layouts = layout_home(r)
+    let marker = beside(r, "ran")
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    var words = List[str]()
+    for w in "split-right -t work -- /bin/sh -c".split(" ") { (mut words).push(w) }
+    (mut words).push("echo ran >> " + marker + "; exec /bin/sh")
+    let s = ask_words(r, words, "")
+    if s.status != 0 { return "split-right --: {s.status} '{s.err.trim()}'" }
+    if !until_present(marker, false, 5000) { return "the command never ran" }
+    client.hang_up(mut a)
+    let _k = stop_server(mut r)
+    let again = start_server(mut r, "/bin/sh")
+    if again.len > 0 { return again }
+    let back = session_now(r, "work")
+    if back.starts_with("<") { return "work did not come back: " + back }
+    time.sleep(time.millis(1000))
+    let ran = fs.read_text(marker) else ""
+    if ran != "ran\n" { return "the command ran {ran.split("\n").len - 1} times, not once" }
+    let saved = ask(r, "layout save -t work after", "")
+    if saved.status != 0 { return "layout save: {saved.status} '{saved.err.trim()}'" }
+    let text = fs.read_text(layouts + "/after.toml") else ""
+    if text.contains("command =") { return "the restored pane still has a command: " + text }
+    ""
+}
+
+// restore = false: a saved session is not made at start, and its file stays
+// as it was.
+fn row_restore_off(mut r: Rig) -> str {
+    let conf = layout_home(r)
+    let config_dir = fs.parent(conf) else ""
+    fs.create_dir_all(config_dir) else |e| { return "mkdir: {e}" }
+    fs.write_text(config_dir + "/warren.toml", "restore = false\n") else |e| { return "warren.toml: {e}" }
+    let text = saved_text("kept", env.cwd() else "/", "")
+    let path = place_saved("kept", text)
+    if path.len == 0 { return "the saved file was not placed" }
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    let l = ask(r, "list-sessions", "")
+    if l.out.contains("kept") { return "kept was restored with restore = false: " + l.out }
+    if (fs.read_text(path) else "") != text { return "the saved file changed" }
+    ""
+}
+
+// A saved session that cannot be made (its pane's directory is gone) is not
+// restored: its file stays byte for byte, the client that started the server
+// says so with the file's path, and restore.log keeps the line.
+fn row_restore_refused_kept(r: Rig) -> str {
+    let text = saved_text("bad", env.cwd() else "/", "/no/such/dir/for/warren")
+    let path = place_saved("bad", text)
+    if path.len == 0 { return "the saved file was not placed" }
+    if !client_env(r) { return "env" }
+    let n = run_client(r, split_words("new -d -s probe"))
+    stop_client_server(r)
+    if n.status != 0 { return "new -d: {n.status} '{n.err.trim()}'" }
+    let want = "warren: not restored: bad: bad line 16: no such directory: /no/such/dir/for/warren (kept: " + path +
+        "; remove it to discard it)\n"
+    if n.err != want { return "the client said '{n.err}', not '{want}'" }
+    if (fs.read_text(path) else "") != text { return "the refused file changed" }
+    let sessions = fs.parent(path) else ""
+    let state = fs.parent(sessions) else ""
+    let log = fs.read_text(state + "/restore.log") else ""
+    if !log.contains("not restored: bad: bad line 16") { return "restore.log does not hold the refusal: " + log }
+    ""
+}
+
+// The client that starts a server says once what it restored; a client that
+// reaches the running server says nothing.
+fn row_restore_printed(r: Rig) -> str {
+    let here = env.cwd() else "/"
+    if place_saved("a", saved_text("a", here, "")).len == 0 { return "a was not placed" }
+    if place_saved("b", saved_text("b", here, "")).len == 0 { return "b was not placed" }
+    if !client_env(r) { return "env" }
+    let first = run_client(r, split_words("new -d -s probe"))
+    let second = run_client(r, split_words("new -d -s probe2"))
+    let l = ask(r, "list-sessions", "")
+    stop_client_server(r)
+    if first.status != 0 { return "new -d: {first.status} '{first.err.trim()}'" }
+    if first.err != "warren: restored 2 saved sessions: a, b\n" { return "the starting client said '{first.err}'" }
+    if second.status != 0 || second.err.len > 0 { return "the second client: {second.status} '{second.err}'" }
+    for name in ["a:", "b:", "probe:", "probe2:"] {
+        if !l.out.contains(name) { return "no session {name} in '{l.out}'" }
+    }
+    ""
+}
+
+// A restored session is discarded by ending it: kill-session takes its file,
+// and the next start does not make it again.
+fn row_restore_discard(mut r: Rig) -> str {
+    let path = place_saved("gone", saved_text("gone", env.cwd() else "/", ""))
+    if path.len == 0 { return "the saved file was not placed" }
+    if place_saved("stays", saved_text("stays", env.cwd() else "/", "")).len == 0 { return "stays was not placed" }
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    let l = ask(r, "list-sessions", "")
+    if !l.out.contains("gone:") { return "gone was not restored: " + l.out }
+    let k = ask(r, "kill-session -t gone", "")
+    if k.status != 0 { return "kill-session: {k.status} '{k.err.trim()}'" }
+    if !until_present(path, true, 3000) { return "kill-session left the file" }
+    let _s = stop_server(mut r)
+    let again = start_server(mut r, "/bin/sh")
+    if again.len > 0 { return again }
+    let m = ask(r, "list-sessions", "")
+    if m.out.contains("gone:") { return "gone came back: " + m.out }
+    if !m.out.contains("stays:") { return "stays did not come back: " + m.out }
+    ""
+}
+
+// A server killed outright (SIGKILL) more than a second after its last
+// change is restored as it was: the saved file is at most a second behind.
+fn row_restore_after_kill(mut r: Rig) -> str {
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    for line in ["split-right -t work", "split-down -t p2", "zoom -t p3"] {
+        let v = ask(r, line, "")
+        if v.status != 0 { return "{line}: {v.status} '{v.err.trim()}'" }
+    }
+    time.sleep(time.millis(1500))
+    let before = session_now(r, "work")
+    client.hang_up(mut a)
+    var ch = process.Child { slot: r.server }
+    process.kill(mut ch) else |e| { return "kill: {e}" }
+    let _st = process.wait_status(take ch) else 0 - 1
+    r.started = false
+    let again = start_server(mut r, "/bin/sh")
+    if again.len > 0 { return again }
+    let after = session_now(r, "work")
+    if after != before { return "after SIGKILL work came back as {after}, not {before}" }
+    ""
+}
+
+// A saved file loads as a layout: `layout load` ignores its name and size
+// and takes its start directory for a pane that names none.
+fn row_layout_load_saved_file(mut r: Rig) -> str {
+    let there = beside(r, "there")
+    fs.create_dir_all(there) else |e| { return "mkdir: {e}" }
+    let file = beside(r, "saved.toml")
+    fs.write_text(file, saved_text("elsewhere", there, "")) else |e| { return "the file: {e}" }
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var a = attach(r, 80, 24, "work", 1) else |e| { return "dial-{e}" }
+    if !client.until_text(mut a, "$", 5000) { return "no prompt: " + client.screen_text(a) }
+    let l = ask(r, "layout load -t work " + file, "")
+    if l.status != 0 || l.out != "t2\n" { return "layout load: {l.status} '{l.out.trim()}' '{l.err.trim()}'" }
+    let w = until_cwd(r, "p2", started_listing(there))
+    client.hang_up(mut a)
+    if w.len > 0 { return w }
+    let s = ask(r, "list-sessions", "")
+    if s.out.contains("elsewhere") { return "the file's name made a session: " + s.out }
+    ""
+}
+
 // A pane made in a slot another pane left does not inherit that pane's
 // report: pane 1 reports, is closed, and pane 3 takes its slot.
 fn row_pane_cwd_not_inherited(mut r: Rig) -> str {
@@ -3932,6 +4204,15 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "saved-removed-at-end" { why = row_saved_removed_at_end(mut r) }
     else if name == "stop-writes-in-bound" { why = row_stop_writes_in_bound(mut r) }
     else if name == "saved-off" { why = row_saved_off(mut r) }
+    else if name == "restore-after-kill-server" { why = row_restore_after_kill_server(mut r) }
+    else if name == "restore-keeps-cwd" { why = row_restore_keeps_cwd(mut r) }
+    else if name == "restore-commands-not-run" { why = row_restore_commands_not_run(mut r) }
+    else if name == "restore-off" { why = row_restore_off(mut r) }
+    else if name == "restore-refused-kept" { why = row_restore_refused_kept(r) }
+    else if name == "restore-printed" { why = row_restore_printed(r) }
+    else if name == "restore-discard" { why = row_restore_discard(mut r) }
+    else if name == "restore-after-kill" { why = row_restore_after_kill(mut r) }
+    else if name == "layout-load-saved-file" { why = row_layout_load_saved_file(mut r) }
     else if name == "layout-save-writes-file" { why = row_layout_save_writes_file(mut r) }
     else if name == "layout-load-adds-tabs" { why = row_layout_load_adds_tabs(mut r) }
     else if name == "layout-refused-changes-nothing" { why = row_layout_refused_changes_nothing(mut r) }
@@ -3980,7 +4261,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited pane-start-dir-kept saved-on-change saved-once-a-second saved-at-stop saved-follows-rename saved-removed-at-end stop-writes-in-bound saved-off split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file layout-load-adds-tabs layout-refused-changes-nothing layout-program-missing layout-too-many-panes layout-too-small layout-unknown-name layout-relative-cwd layout-path-save-load layout-save-bound new-l-makes-session layout-save-load-round-trip".split(" ") {
+    for n in "echo split-every-byte bad-first-frame refusals hello-timeout stale-and-future-ack fragment-interleave two-sizes never-ack-beside-active detach-reattach ctrl-c-is-a-byte inherited-ignore-reset session-end last-output late-child-reaped command start-lock max-pending max-sessions max-connections memory-budget resize-crossing-image too-slow last-output-after-ack close-causes prompt-frame prompt-frame-minute verb-split-target verb-refused-target verb-inside-pane list-json ids-never-reused kill-session-ends rename-session detach-from-shell split-in-dir split-runs-command split-prints-new-id create-refusals-change-nothing command-exits-at-once title-flood-survives title-on-focus list-json-over-queue reply-slow-reader reply-reader-over reply-reader-under reply-fast-reader two-large-replies reply-projection reply-memory-refused send-keys-bytes send-keys-refusals send-keys-skips-bindings send-keys-all-or-nothing capture-screen capture-escapes capture-cases capture-register capture-full-ring capture-over-cap pane-cwd-from-osc7 pane-cwd-start pane-cwd-not-inherited pane-title-not-inherited pane-start-dir-kept saved-on-change saved-once-a-second saved-at-stop saved-follows-rename saved-removed-at-end stop-writes-in-bound saved-off restore-after-kill-server restore-keeps-cwd restore-commands-not-run restore-off restore-refused-kept restore-printed restore-discard restore-after-kill layout-load-saved-file split-starts-in-pane-cwd split-reported-missing split-reported-file host-name-this-host host-name-stand-in host-name-stand-in-fails layout-save-writes-file layout-load-adds-tabs layout-refused-changes-nothing layout-program-missing layout-too-many-panes layout-too-small layout-unknown-name layout-relative-cwd layout-path-save-load layout-save-bound new-l-makes-session layout-save-load-round-trip".split(" ") {
         (mut x).push(n)
     }
     x
