@@ -1273,7 +1273,7 @@ fn do_action_in(mut s: Server, index: int, si: int, action: int, arg: int) -> in
         return layout_load_from_line(mut s, index, word)
     }
     if action == config.A_DETACH {
-        if index >= 0 { terminal(mut s, index, 135, 1, "detached") }
+        if index >= 0 { detach_members(mut s, si) }
         return DONE
     }
     if action == config.A_KILL_SESSION {
