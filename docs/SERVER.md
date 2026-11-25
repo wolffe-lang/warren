@@ -350,6 +350,24 @@ killed and reaped. With no name, panes take only an
 empty host and `localhost`. `WARREN_HOST_NAME_PROGRAM` names a stand-in for
 either source, for the rows that hold the failure path.
 
+A server and its clients meet in one runtime directory, the socket being its
+`default`. It is the first of:
+1. `WARREN_RUNTIME_DIR`;
+2. `$XDG_RUNTIME_DIR/warren`;
+3. `/run/user/UID/warren`, when `/run/user/UID` is a directory, not a link,
+   the user's own, with no group or other bits;
+4. `/tmp/warren-UID`.
+
+The third is for a host where a login sets `XDG_RUNTIME_DIR` and an ssh
+session does not, as on an installed PAX, whose ssh server sets one text for
+every account. There the console's client and a client over ssh would
+otherwise reach two servers. warren never makes `/run/user/UID`. A missing or
+open one is passed over for the fourth. The rows stand directories of their
+own for `/run/user` (`WARREN_RUN_USER_ROOT`) and for `/tmp`
+(`WARREN_TMP_ROOT`), as they stand one for the whole choice with
+`WARREN_RUNTIME_DIR`, so no row reads the real `/run/user` or makes the real
+`/tmp/warren-UID`.
+
 Stale-path replacement requires an exclusive atomic start lock. A failed
 connect alone is not permission to unlink somebody else's live/listening
 socket. The repository's older std pin does not establish an atomic locking
