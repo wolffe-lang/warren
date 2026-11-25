@@ -28,6 +28,9 @@ the screen: they are taken out before the replay.
      border the screen did not have before it
   C9 (before C7) `warren capture-pane -p -t p2` typed in the same pane: exit 0, and the text holds what the other
      pane printed in C3; then Ctrl-Space and d detach
+  C10 (after C7) saved and restored: `warren new -s keep` in one directory, `warren split-right -c` another typed in
+     its pane, a detach and `warren kill-server`; then `warren new -d -s probe` says it restored keep, and in
+     `warren attach -t keep` each pane's `pwd` is its own directory, the border drawn
 ROWS is a comma list (default all). Each row prints PASS or FAIL by name with the firmware and keyboard; the exit
 status is 0 only when every asked row passed. Run it from a directory of its own: WORK must not exist.
 """
@@ -46,7 +49,7 @@ ap.add_argument('iso', type=Path)
 ap.add_argument('work', type=Path)
 ap.add_argument('firmware', choices=['bios', 'uefi'])
 ap.add_argument('keyboard', choices=['usb', 'ps2'])
-ap.add_argument('rows', nargs='?', default='C0,C1,C2,C3,C4,C5,C6,C7,C8,C9')
+ap.add_argument('rows', nargs='?', default='C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10')
 args = ap.parse_args()
 ROWS = args.rows.split(',')
 FW, KBD = args.firmware, args.keyboard
@@ -343,6 +346,44 @@ try:
     if 'C7' in ROWS:
         row('C7', kk is not None and kk[1] == '0' and sc is not None and not left_over,
             f'kill-server exit {kk[1] if kk else "?"}; warren processes left: {left_over or "none"}')
+    until_stream(r'[$#] $', 10, s10)
+    s11 = len(buf)
+    typed(b'mkdir -p /tmp/wh/c10a /tmp/wh/c10b; cd /tmp/wh/c10a; warren new -s keep\r')
+    pump(3)
+    typed(b'warren split-right -c /tmp/wh/c10b; echo C10-split=$?-END\r')
+    split10 = until_screen(r'C10-split=(\d+)-END', 15)
+    pump(2)
+    prefix_then('d')
+    until_stream(r'\[detached from keep\]', 20, s11)
+    until_stream(r'[$#] $', 10, s11)
+    s12 = len(buf)
+    typed(b'warren kill-server; warren new -d -s probe; echo C10-new=$?\r')
+    newst = until_stream(r'^C10-new=(\d+)$', 40, s12)
+    notice = re.search(r'warren: restored (\d+) saved sessions?: ([^\n]*)', stream_text(s12))
+    until_stream(r'[$#] $', 10, s12)
+    s13 = len(buf)
+    typed(b'warren attach -t keep\r')
+    pump(3)
+    typed(b'echo C10-L=$(pwd)-END\r')
+    left10 = until_screen(r'C10-L=(/\S*)-END', 15)
+    prefix_then('l')
+    pump(1)
+    typed(b'echo C10-R=$(pwd)-END\r')
+    right10 = until_screen(r'C10-R=(/\S*)-END', 15)
+    bordered = border_on(screen())
+    prefix_then('d')
+    until_stream(r'\[detached from keep\]', 20, s13)
+    until_stream(r'[$#] $', 10, s13)
+    if 'C10' in ROWS:
+        ok = (split10 is not None and split10[1] == '0' and newst is not None and newst[1] == '0' and notice is not None
+              and 'keep' in notice[2].split(', ') and left10 is not None and left10[1] == '/tmp/wh/c10a'
+              and right10 is not None and right10[1] == '/tmp/wh/c10b' and bordered)
+        row('C10', ok, f'saved and restored: split {split10[1] if split10 else "?"}; new -d {newst[1] if newst else "?"}; '
+            f'{notice[0] if notice else "no restore notice"}; left pane {left10[1] if left10 else "?"}, right pane '
+            f'{right10[1] if right10 else "?"}, border {bordered}'
+            + ('' if ok else '; screen: ' + ' | '.join(line for line in screen() if line)[-400:]))
+    typed(b'warren kill-server\r')
+    pump(2)
     print('NOTE the console\'s last lines: ' + ' | '.join(stream_text().strip().splitlines()[-4:]), flush=True)
 finally:
     if c is not None:
