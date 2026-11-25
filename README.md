@@ -39,8 +39,8 @@ operation with its named refusals, and a canonical text dump
 ([LAYOUT](docs/LAYOUT.md)), held by hand-written goldens and seeded invariants
 at five sizes. `src/client` is the terminal client ([CLIENT](docs/CLIENT.md)):
 with no arguments `warren` attaches the terminal to the default session,
-starting the server and the session when there are none; `warren new [-d]
-[-s NAME]`, `warren attach -t NAME`, `kill-server` and `list-sessions` work,
+starting the server and the session when there are none; `warren new [-A]
+[-d] [-s NAME]`, `warren attach -t NAME`, `kill-server` and `list-sessions` work,
 several clients may share a session, and the server outlives the client that
 started it. Behind the prefix (Ctrl-Space) a session splits into panes and
 holds tabs, drawn with their borders and a bar (SERVER.md §8). While idle,

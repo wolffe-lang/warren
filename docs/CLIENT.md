@@ -4,7 +4,7 @@
 session, starting the server (detached, in a session of its own, its standard
 streams on `/dev/null`) and the session when there are none. `warren attach
 [-t NAME]` attaches to a session that exists and is refused when it does not.
-`warren new [-d] [-s NAME] [-l LAYOUT]` makes a session and attaches to it. `warren
+`warren new [-A] [-d] [-s NAME] [-l LAYOUT]` makes a session and attaches to it. `warren
 kill-server` and `warren list-sessions` ask a running server over the command
 role. Later verbs (`detach`, `split`, `tab`, ...) fail by name.
 
@@ -18,7 +18,10 @@ server names it with the lowest positive number not in use. A name in use is
 refused, and so are an empty name and one holding `/` or a control byte; names
 are compared as bytes. With `-l LAYOUT` the session is a layout file's: its
 tabs, panes, focus, zoom and active tab (`new-session -l`, LAYOUT.md); a
-relative path is read from this directory.
+relative path is read from this directory. With `-A` and `-s NAME`, a session
+NAME that exists is attached (or, with `-d`, its name printed) and nothing is
+made, as tmux's `new-session -A` does: `-l` is not applied to it, and two
+`new -A -s NAME` at once make one session. `-A` without `-s` is refused.
 
 Several clients may attach to one session. The pane takes the smallest
 columns and, separately, the smallest rows of the clients attached. When a

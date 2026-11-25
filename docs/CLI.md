@@ -21,7 +21,7 @@ The server's own verbs take no target:
 |---|---|
 | `kill-server` | stops the server; every attached client is told |
 | `list-sessions`, `ls` | one line a session: `NAME: COLSxROWS (N attached)` |
-| `new-session [-c DIR] [-l LAYOUT] [NAME]` | makes a session (named by the lowest free number when no name is given) and prints its name; its first pane's program starts in DIR; with `-l` its tabs, panes, focus, zoom and active tab are the layout file's (LAYOUT.md), and DIR is its start directory |
+| `new-session [-A] [-c DIR] [-l LAYOUT] [NAME]` | makes a session (named by the lowest free number when no name is given) and prints its name; its first pane's program starts in DIR; with `-l` its tabs, panes, focus, zoom and active tab are the layout file's (LAYOUT.md), and DIR is its start directory; with `-A` (which needs NAME), when session NAME exists it prints NAME and makes nothing, applying neither `-c` nor `-l` |
 | `list --json` | the server's sessions, tabs and panes as one JSON object (below) |
 
 Two verbs act on a pane but are not command line verbs (they print, or type
