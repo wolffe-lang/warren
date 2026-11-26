@@ -1283,7 +1283,7 @@ fn do_action_in(mut s: Server, index: int, si: int, action: int, arg: int) -> in
         return DONE
     }
     if action == config.A_SEND_PREFIX {
-        if from >= 0 { queue_to(mut s, from, key_bytes(s.panes[from].screen, 4, 0, s.settings.prefix)) }
+        if from >= 0 { queue_to(mut s, from, key_bytes(s.panes[from].screen, 4, 0, 32)) }
         return DONE
     }
     if action == config.A_CLOSE {
