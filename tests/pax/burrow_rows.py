@@ -13,8 +13,8 @@ replays a terminal session's bytes into a screen.
 The console is typed on COM1. Each command there is put between two lines of its own, TAG-BEGIN and TAG-END, and
 its answer is read between them, so the kernel's own lines (`user: ...`) can land anywhere. A terminal session over
 ssh (`ssh -tt`) is driven as a terminal: each cursor-position query (ESC[6n) is answered, and each line is typed
-only once the shell's prompt is there, as the shell may lose what is typed ahead of its prompt. Its window is set
-to 80x24 with stty before warren runs in it.
+only once the shell's prompt is there, as the shell may lose what is typed ahead of its prompt. Its screen is
+replayed at 80x24, the size warren draws at in such a session on the image (the image's stty cannot set a size).
 
   W1 the console makes session con and types a marker into its pane with send-keys; over ssh, `warren ls` lists con
      and `warren capture-pane -p -t con` shows the marker: the ssh side reaches the console's server
@@ -342,7 +342,6 @@ try:
     ssh('warren list-sessions', 'S3')
 
     term = Term('W2')
-    term.line(f'stty cols {COLS} rows {LINES}')
     term.line('warren attach -t con')
     at = len(term.out)
     seen = term.until(lambda: any(mark in ln.split() for ln in term.screen())
