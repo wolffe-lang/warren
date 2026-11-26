@@ -109,7 +109,7 @@ rows hold this for each way out:
 
 | how it ends | exit code | line on standard error |
 |---|---:|---|
-| detached (the prefix Ctrl-Space then `d`) | 0 | `[detached from NAME]` |
+| detached (the prefix, Ctrl-Space by default, then `d`) | 0 | `[detached from NAME]` |
 | the session ended | 0 | `[NAME ended]` |
 | the server stopped | 0 | `[the server stopped]` |
 | too small (a resize below 20x6) | 1 | `warren: the terminal is too small (...)` |
@@ -143,7 +143,7 @@ complete kitty functional-key support. A bare ESC is the Escape key at once
 
 
 What the terminal sends becomes protocol events: Unicode scalars and C0
-controls as keys (Ctrl-Space is the prefix), cursor, editing and function keys
+controls as keys (Ctrl-Space, the default prefix, among them), cursor, editing and function keys
 with xterm's modifier parameter, keypad keys in application mode, SGR and
 legacy mouse reports, bracketed paste (at most 64 KiB a PASTE; a longer paste goes as
 several) and focus reports. A read that ends in ESC is the Escape key at once
