@@ -93,7 +93,6 @@ pub struct Server {
     uid: int,
     inherited: List[int],
     keys: config.Keys,
-    help: List[str],
     clock_hour: int,
     clock_minute: int,
     clock_next: int,
@@ -1016,11 +1015,12 @@ fn bar_cells(s: Server, si: int, index: int, now: int, tab_cells: List[vt.Cell])
     let mode = s.conns[index].mode
     var bar = List[vt.Cell]()
     if mode == config.MODE_HELP && area > 0 {
+        let lines = config.help_lines_with(s.keys, s.settings.prefix)
         var r = 0
         while r < area {
             var help = blank_line(cols)
             let at = s.conns[index].help_top + r
-            if at < s.help.len { let _h = put_text(mut help, 1, cols, s.help[at], 0) }
+            if at < lines.len { let _h = put_text(mut help, 1, cols, lines[at], 0) }
             for cell in help { (mut bar).push(cell) }
             r += 1
         }
@@ -1047,12 +1047,12 @@ fn bar_cells(s: Server, si: int, index: int, now: int, tab_cells: List[vt.Cell])
     } else if mode == config.MODE_CONFIRM {
         let question = if s.conns[index].confirm == config.A_CLOSE_TAB then " close this tab and its panes?" else if pane_count(s, si) == 1 then (if cols >= 48 then " close last pane and end session?" else " end session?") else " close this pane?"
         let q = put_text(mut two, 1, cols, question, 0)
-        put_hints(mut two, q, cols, config.hint_line(s.keys, mode, cols - q + 1))
+        put_hints(mut two, q, cols, config.hint_line_with(s.keys, s.settings.prefix, mode, cols - q + 1))
     } else if s.conns[index].message_until > now && s.conns[index].message.len > 0 {
         let text = str_from_utf8(s.conns[index].message[0..s.conns[index].message.len]) else ""
         let _m = put_text(mut two, 1, cols, text, 0)
     } else {
-        put_hints(mut two, 1, cols, config.hint_line(s.keys, mode, cols))
+        put_hints(mut two, 1, cols, config.hint_line_with(s.keys, s.settings.prefix, mode, cols))
     }
     for cell in two { (mut bar).push(cell) }
     bar
@@ -1283,7 +1283,7 @@ fn do_action_in(mut s: Server, index: int, si: int, action: int, arg: int) -> in
         return DONE
     }
     if action == config.A_SEND_PREFIX {
-        if from >= 0 { queue_to(mut s, from, key_bytes(s.panes[from].screen, 4, 0, 32)) }
+        if from >= 0 { queue_to(mut s, from, key_bytes(s.panes[from].screen, 4, 0, s.settings.prefix)) }
         return DONE
     }
     if action == config.A_CLOSE {
@@ -1565,7 +1565,7 @@ fn key_event(mut s: Server, index: int, mods: int, kind: int, code: int) {
     s.conns[index].drag = layout.no_border_hit()
     let si = s.conns[index].session
     let mode = s.conns[index].mode
-    let st = config.step(s.keys, mode, mods, kind, code)
+    let st = config.step_with(s.keys, s.settings.prefix, mode, mods, kind, code)
     let a = st.action
     if a == config.A_PASS {
         if si >= 0 {
@@ -1595,7 +1595,8 @@ fn key_event(mut s: Server, index: int, mods: int, kind: int, code: int) {
     if a == config.A_SCROLL {
         let area = if si >= 0 then s.sessions[si].rows - BAR_LINES else 0
         var top = s.conns[index].help_top + st.arg
-        if top > s.help.len - area { top = s.help.len - area }
+        let total = config.help_lines_with(s.keys, s.settings.prefix).len
+        if top > total - area { top = total - area }
         if top < 0 { top = 0 }
         if top != s.conns[index].help_top {
             s.conns[index].help_top = top
@@ -2773,8 +2774,29 @@ fn source_settings(mut s: Server, path: str, label: str) -> str {
         let at = if next.line > 0 then " line {next.line}" else ""
         return "{label}{at}: {next.why}"
     }
+    let was = s.settings.prefix
     config.take_settings(mut s.settings, next)
+    if s.settings.prefix != was { prefix_moved(mut s) }
     ""
+}
+
+// The prefix changed (`source`): a client in the prefix table goes back to
+// normal, and every client's hint line, or its open key list, is drawn
+// again with the new prefix.
+fn prefix_moved(mut s: Server) {
+    var i = 0
+    while i < MAX_CONNECTIONS {
+        if s.conns[i].live && s.conns[i].member {
+            if s.conns[i].mode == config.MODE_PREFIX {
+                set_mode(mut s, i, config.MODE_NORMAL)
+            } else if s.conns[i].mode == config.MODE_HELP {
+                frame_moved(mut s, i)
+            } else {
+                bar_moved(mut s, i)
+            }
+        }
+        i += 1
+    }
 }
 
 // `:source [FILE]` typed by client `index`: a relative FILE is read from the
@@ -4368,9 +4390,9 @@ pub fn serve() -> int {
         (mut conns).push(new_conn())
         i += 1
     }
-    // The key table: the defaults until the configuration file is read.
+    // The key table. The prefix it is read with is the settings' (warren.toml's
+    // [keys] prefix), so `source` changes it without a new table.
     let keys = config.defaults()
-    let help = config.help_lines(keys)
     let waiter = poll.open() else |e| {
         eprint("warren server: no readiness set: {e}")
         finish(take place)
@@ -4386,7 +4408,7 @@ pub fn serve() -> int {
         version: vt.package_version(), again: false, need_slot: false, need_pane: false, need_view: false, settings: load_settings(), want_cols: 0,
         want_rows: 0, rotate: 0, trace: env.has("WARREN_TRACE"), turns: 0, frames: 0, prompt_frames: 0,
         master_read: master_read,
-        budget: budget, uid: env.euid() else 0 - 1, inherited: inherited, keys: keys, help: help,
+        budget: budget, uid: env.euid() else 0 - 1, inherited: inherited, keys: keys,
         clock_hour: 0, clock_minute: 0, clock_next: 0, host_name: host, save_due: false, save_next: 0,
     }
     read_clock(mut s)
