@@ -3191,7 +3191,7 @@ fn with_prefix(p: client.Peer, pk: int, code: int) -> bool {
 
 /// The read-bytes helper started in the focused pane, reading `count` bytes:
 /// its file, or "" when it did not start.
-fn reader(mut p: client.Peer, r: Rig, count: int) -> str {
+fn reader(p: client.Peer, r: Rig, count: int) -> str {
     let f = out_file(r, "bytes.txt")
     fs.remove(f) else |_| {}
     let _x = client.input(p, "{self_path()} --read-bytes {f} {count}\r")
@@ -3220,7 +3220,7 @@ fn row_prefix_configured_space_passes(mut r: Rig) -> str {
     let why = start_server(mut r, "/bin/sh")
     if why.len > 0 { return why }
     var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
-    let f = reader(mut p, r, 2)
+    let f = reader(p, r, 2)
     if f.len == 0 { return "the helper did not start:\n" + client.screen_text(p) }
     let _a = client.key(p, 4, 0, 32)
     let _z = client.key(p, 0, 0, 122)
@@ -3236,7 +3236,7 @@ fn row_prefix_configured_twice_sends_it(mut r: Rig) -> str {
     let why = start_server(mut r, "/bin/sh")
     if why.len > 0 { return why }
     var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
-    let f = reader(mut p, r, 2)
+    let f = reader(p, r, 2)
     if f.len == 0 { return "the helper did not start:\n" + client.screen_text(p) }
     let _a = client.key(p, 4, 0, 97)
     let _b = client.key(p, 4, 0, 97)
@@ -3260,7 +3260,7 @@ fn row_prefix_source_changes_it(mut r: Rig) -> str {
     if !until_hint(mut p, " C-b prefix", 3000) { return "the idle hint after source: '" + hint_of(p.image) + "'" }
     let _s = with_prefix(p, 98, 124)
     if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "C-b then | made no split:\n" + client.screen_text(p) }
-    let f = reader(mut p, r, 2)
+    let f = reader(p, r, 2)
     if f.len == 0 { return "the helper did not start:\n" + client.screen_text(p) }
     let _a = client.key(p, 4, 0, 97)
     let _z = client.key(p, 0, 0, 122)
