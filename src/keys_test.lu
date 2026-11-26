@@ -338,6 +338,111 @@ fn test_the_command_line() {
     assert(s1.ok && s1.text == "my settings.toml", "source FILE: the rest of the line")
 }
 
+// A configured prefix (warren.toml's [keys] prefix): C-a takes C-Space's
+// place everywhere the prefix is live, and C-Space becomes a program's key.
+fn test_a_configured_prefix() {
+    let k = config.defaults()
+    let n = config.MODE_NORMAL
+    let p = config.MODE_PREFIX
+    assert(key_is(config.step_with(k, 97, n, 4, 0, 97), config.A_NONE, 0, p), "C-a enters the prefix")
+    assert(key_is(config.step_with(k, 97, n, 4, 0, 32), config.A_PASS, 0, n), "C-Space goes to the pane")
+    assert(key_is(config.step_with(k, 97, p, 4, 0, 97), config.A_SEND_PREFIX, 0, n), "C-a twice sends it")
+    assert(key_is(config.step_with(k, 97, p, 0, 0, 124), config.A_SPLIT, 0, n), "the prefix table is the same")
+    for m in [config.MODE_PANE, config.MODE_TAB, config.MODE_RESIZE, config.MODE_SESSION, config.MODE_SCROLL] {
+        assert(key_is(config.step_with(k, 97, m, 4, 0, 97), config.A_NONE, 0, p), "C-a leaves a sticky mode for the prefix")
+        assert(key_is(config.step_with(k, 97, m, 4, 0, 32), config.A_NONE, 0, m), "C-Space is dropped in a sticky mode")
+    }
+    let l = config.MODE_LOCKED
+    assert(key_is(config.step_with(k, 97, l, 4, 0, 97), config.A_PASS, 0, l), "locked passes C-a")
+    assert(key_is(config.step_with(k, 97, l, 4, 0, 103), config.A_NONE, 0, n), "C-g still unlocks")
+    assert(config.hint_text_with(k, 97, n, 80) == " C-a prefix", "the idle hint names C-a")
+    assert(config.hint_text_with(k, 97, p, 80) == " C-a prefix  M-\\ M-| |- split  M-t c new tab  M-w x close  ? keys  +17", "the prefix mode's hint")
+    let lines = config.help_lines_with(k, 97)
+    var named = 0
+    var space = 0
+    for line in lines {
+        if line == "  NORMAL   C-a        prefix mode" { named += 1 }
+        if line.contains("C-Space") { space += 1 }
+    }
+    assert(named == 1, "the key list names C-a")
+    assert(space == 0, "the key list names no C-Space")
+    assert(lines.len == k.bindings.len, "C-a shadows nothing: one line a binding")
+}
+
+fn pad_to(text: str, width: int) -> str {
+    var out = text
+    var w = text.len
+    while w < width {
+        out = out + " "
+        w += 1
+    }
+    out
+}
+
+// What the key list says `key` does in `mode`, one entry a line listing it.
+fn listed(lines: List[str], mode: int, key: str) -> List[str] {
+    let head = "  " + pad_to(config.mode_name(mode), 8) + " " + pad_to(key, 10) + " "
+    var out = List[str]()
+    for line in lines {
+        if line.starts_with(head) { (mut out).push(line[head.len..line.len]) }
+    }
+    out
+}
+
+// Whatever key is the prefix shadows any binding of the same key in a mode
+// where the prefix is live: the key list shows the prefix there and nothing
+// else for that key, and the key does the prefix's step.
+fn test_the_prefix_shadows() {
+    let k = config.defaults()
+    let live = [config.MODE_NORMAL, config.MODE_PREFIX, config.MODE_PANE, config.MODE_TAB, config.MODE_RESIZE,
+        config.MODE_SESSION, config.MODE_SCROLL]
+    var prefixes = List[int]()
+    (mut prefixes).push(32)
+    var c = 97
+    while c <= 122 {
+        if c != 103 && c != 104 && c != 105 && c != 109 && c != 117 { (mut prefixes).push(c) }
+        c += 1
+    }
+    for pk in prefixes {
+        let key = config.key_name(4, 0, pk)
+        let lines = config.help_lines_with(k, pk)
+        for m in live {
+            let what = listed(lines, m, key)
+            var want = "prefix mode"
+            if m == config.MODE_PREFIX { want = "send the prefix" }
+            assert(what.len == 1 && what[0] == want, key + " in " + config.mode_name(m) + " lists only the prefix")
+            let s = config.step_with(k, pk, m, 4, 0, pk)
+            if m == config.MODE_PREFIX {
+                assert(key_is(s, config.A_SEND_PREFIX, 0, config.MODE_NORMAL), key + " twice sends it")
+            } else {
+                assert(key_is(s, config.A_NONE, 0, config.MODE_PREFIX), key + " enters the prefix from " + config.mode_name(m))
+            }
+        }
+    }
+    let v = config.MODE_SCROLL
+    assert(key_is(config.step_with(k, 98, v, 0, 1, 7), config.A_VIEW_PAGE, 2, v), "PgUp still pages with the prefix on C-b")
+    assert(key_is(config.step_with(k, 98, v, 4, 0, 102), config.A_VIEW_PAGE, -2, v), "C-f still pages with the prefix on C-b")
+    assert(key_is(config.step_with(k, 102, v, 4, 0, 98), config.A_VIEW_PAGE, 2, v), "C-b still pages with the prefix on C-f")
+    assert(key_is(config.step_with(k, 32, v, 4, 0, 98), config.A_VIEW_PAGE, 2, v), "with C-Space, C-b pages")
+    assert(config.help_lines_with(k, 98).len == k.bindings.len - 1, "C-b shadows scroll mode's C-b alone")
+    assert(config.help_lines_with(k, 102).len == k.bindings.len - 1, "C-f shadows scroll mode's C-f alone")
+    let today = config.help_lines(k)
+    let same = config.help_lines_with(k, 32)
+    assert(today.len == same.len, "C-Space lists today's key list")
+    var i = 0
+    while i < today.len {
+        assert(today[i] == same[i], "C-Space's key list line " + today[i])
+        i += 1
+    }
+    var md = 0
+    while md < config.MODES {
+        for cols in [20, 40, 80] {
+            assert(config.hint_text_with(k, 32, md, cols) == config.hint_text(k, md, cols), "C-Space's hint lines are today's")
+        }
+        md += 1
+    }
+}
+
 fn main() -> int {
     test_the_prefix_enters_and_sends_itself()
     test_prefix_free_quick_keys()
@@ -352,6 +457,8 @@ fn main() -> int {
     test_the_key_list()
     test_key_names()
     test_the_command_line()
+    test_a_configured_prefix()
+    test_the_prefix_shadows()
     io.write_line("PASS keys-table")
     0
 }
