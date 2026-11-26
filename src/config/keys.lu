@@ -369,6 +369,32 @@ fn found(action: int, arg: int, mode: int) -> Step {
     Step { action: action, arg: arg, mode: mode }
 }
 
+/// What a KEY event does in a mode when the prefix is Ctrl with the scalar
+/// `prefix` (32 Space, 97 to 122 a to z). For now the prefix is ignored:
+/// the table's own C-Space.
+pub fn step_with(k: Keys, prefix: int, mode: int, mods: int, kind: int, code: int) -> Step {
+    let _unused = prefix
+    step(k, mode, mods, kind, code)
+}
+
+/// The hint line of a mode with the prefix `prefix`. For now the prefix is
+/// ignored.
+pub fn hint_line_with(k: Keys, prefix: int, mode: int, cols: int) -> HintLine {
+    let _unused = prefix
+    hint_line(k, mode, cols)
+}
+
+/// The hint line's text alone, with the prefix `prefix`.
+pub fn hint_text_with(k: Keys, prefix: int, mode: int, cols: int) -> str {
+    hint_line_with(k, prefix, mode, cols).text
+}
+
+/// The key list with the prefix `prefix`. For now the prefix is ignored.
+pub fn help_lines_with(k: Keys, prefix: int) -> List[str] {
+    let _unused = prefix
+    help_lines(k)
+}
+
 /// What a KEY event (mods, kind, code) does in a mode. Shift is folded into
 /// scalars, so it is ignored on them. Unbound keys: normal and locked pass
 /// them to the pane; prefix mode drops them and goes back to normal; the
