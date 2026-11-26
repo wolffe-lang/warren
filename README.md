@@ -42,9 +42,10 @@ with no arguments `warren` attaches the terminal to the default session,
 starting the server and the session when there are none; `warren new [-A]
 [-d] [-s NAME]`, `warren attach -t NAME`, `kill-server` and `list-sessions` work,
 several clients may share a session, and the server outlives the client that
-started it. Behind the prefix (Ctrl-Space) a session splits into panes and
+started it. Behind the prefix (Ctrl-Space unless warren.toml sets another:
+[CONFIG](docs/CONFIG.md)) a session splits into panes and
 holds tabs, drawn with their borders and a bar (SERVER.md §8). While idle,
-the hint line shows only Ctrl-Space; pressing it reveals its actions, and
+the hint line shows only the prefix; pressing it reveals its actions, and
 leaving the prefix or a mode hides them again. In normal mode, Alt+\ splits
 side by side, Alt+| stacks panes, Alt+t opens a tab and Alt+w closes a pane
 (or its empty tab), asking before the session's final pane closes. Ctrl+t
@@ -111,7 +112,7 @@ in panes may write the clipboard too; by default they may not. `vt-dump` is a di
 | W0 | the map: pins, CI, the oracle, the survey, the prediction | in progress |
 | W1 | the emulator | pure core/history/reflow, diagnostic CLI and full-frame/property gates |
 | W2 | one pane; detach and attach | server, terminal client, new, attach, detach and a second client, with rows on Linux, macOS and PAX under QEMU; on an installed PAX image under QEMU a server started at the console outlives that console's logout |
-| W3 | panes, tabs, the bar, keys | pure layout module; panes and tabs in the server, borders and the focus mark, the bar's lines (tabs with activity, bell and zoom marks, the mode, the clock); modes per client, the hint line and the key list from one key table, a minimal command line; configuration planned |
+| W3 | panes, tabs, the bar, keys | pure layout module; panes and tabs in the server, borders and the focus mark, the bar's lines (tabs with activity, bell and zoom marks, the mode, the clock); modes per client, the hint line and the key list from one key table, a minimal command line; the prefix set in warren.toml (`[keys] prefix`); turning the hint line off planned |
 | W4 | mouse, scrollback, copy | pane/tab clicks, minimum-clamped border dragging, wheel and key scrollback per client, drag selection copied on release into the session's register and the terminal's clipboard (OSC 52), pasted with prefix `]`; programs' OSC 52 writes off unless `warren.toml` allows them; search in scroll mode |
 | W5 | layouts, commands, persistence | ids and targets, every command line verb, `list --json`, `send-keys`, `capture-pane`, `source`, layout files, saved sessions and restore, with rows on Linux, macOS and PAX under QEMU |
 | W6 | on the PAX image, on real hardware | on an installed PAX image under QEMU: attach or create (`new -A`), the console and ssh meeting in one server, rows over ssh, starting at login and the console logout; real hardware: the rows over ssh are ready, and no run is recorded |
