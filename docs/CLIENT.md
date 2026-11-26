@@ -33,13 +33,47 @@ The server runs in a session of its own, detached from the terminal of the
 client that started it: that client can end, or its terminal go away, and the
 server and its sessions stay for the next `warren attach`. The server stops on
 `kill-server`, or a while after its last session has ended with no client
-connected. On PAX the server outlives the client that started it. An
-installed PAX now keeps its first process at a console logout and hangs up
-only the session that ended, so a server in a session of its own should go
-on; no row has measured that yet, and it is not promised here.
+connected. On PAX the server outlives the client that started it, and on an
+installed PAX it outlives the console's logout too: a session made at the
+console is there, with its panes' output, after `exit` and a new login, and no
+restore was needed to make it (the console row L1, `tests/pax/login_rows.py`,
+on an installed PAX image under QEMU).
 
 A command the server does not know is refused with the usage status and its
 name, so a newer client facing an older server fails cleanly.
+
+## Starting at login
+
+PAX's `/etc/shrc` runs the account's own file, `$HOME/.config/pelt/shrc`, last,
+when it is a readable regular file. This one line there starts warren at login:
+
+```
+[ -z "$WARREN" ] && [ -t 0 ] && exec warren new -A -s main
+```
+
+- At a console login the shell is replaced by a client attached to the
+  session `main`, made when there is none (`new -A`, above).
+- A pane's environment has `WARREN` (TERM.md), so a shell in a pane does not
+  start a second client. `[ -t 0 ]` passes over a shell with no terminal.
+- Because of `exec`, a detach ends the login. On an installed PAX the system
+  then asks `login:` again. The server and `main` go on, and the next login
+  attaches to the same `main`, with its panes and their output.
+- A terminal over ssh runs the same file, and its client reaches the same
+  server as the console's (SERVER.md, the runtime directory;
+  `tests/pax/burrow_rows.py`), so it attaches to the same `main`. No row runs
+  the line over ssh yet.
+- A command over ssh (`ssh HOST COMMAND`) runs no `/etc/shrc`, so the line
+  never reaches it. That makes it a way to take the line out without a
+  terminal: `ssh HOST 'mv ~/.config/pelt/shrc ~/.config/pelt/shrc.off'`.
+- On PAX's dev and release images the console's shell is the first process,
+  and `exec` would replace it. The line is for an installed system.
+
+The console row C11 (`tests/pax/login_rows.py`, the file's path an argument)
+measures the console half on an installed PAX image under QEMU:
+- the line is written and the console logs out;
+- the next login attaches to `main`;
+- a detach from ssh brings `login:` back;
+- the login after that attaches to the same `main`, its output kept.
 
 ## The window's size
 
