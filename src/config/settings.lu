@@ -30,23 +30,49 @@ fn refuse(line: int, why: str) -> Settings {
     Settings { ok: false, why: why, line: line, clipboard_programs: false, restore: true, prefix: 32 }
 }
 
-// A line without its comment (`#` to the end: values are bare words) and the
+// A line without its comment (`#` to the end: no value holds a `#`) and the
 // blanks around it.
 fn settings_line(raw: str) -> str {
     let at = raw.find("#") else raw.len
     raw[0..at].trim()
 }
 
+// The prefix a key name gives: Ctrl with the scalar 32 (C-Space) or 97 to
+// 122 (C-a to C-z), but not C-g, C-h, C-i, C-m or C-u; 0 - 1 when refused.
+fn prefix_code(name: str) -> int {
+    if name == "C-Space" { return 32 }
+    let b = name.bytes()
+    if b.len == 3 && b[0] == 67 as byte && b[1] == 45 as byte {
+        let c = b[2] as int
+        if c >= 97 && c <= 122 && c != 103 && c != 104 && c != 105 && c != 109 && c != 117 { return c }
+    }
+    0 - 1
+}
+
+// Why a key name is refused as the prefix.
+fn prefix_why(name: str) -> str {
+    if name == "C-g" { return "C-g leaves the locked mode" }
+    if name == "C-h" { return "C-h is Backspace on a terminal without an extended keyboard protocol" }
+    if name == "C-i" { return "C-i is Tab on a terminal without an extended keyboard protocol" }
+    if name == "C-m" { return "C-m is Enter on a terminal without an extended keyboard protocol" }
+    if name == "C-u" { return "C-u clears the line in the command, rename and search prompts" }
+    "prefix takes C-Space or C-a to C-z, not {name}"
+}
+
 /// Parse a configuration file's text: blank lines, `#` comments, the
 /// top-level key `restore = true` or `false` (before any table), the table
-/// `[clipboard]` and in it `programs = true` or `false`. Anything else, a
-/// table or key given twice included, refuses the whole file by line and
-/// reason, with every setting at its default.
+/// `[clipboard]` with `programs = true` or `false`, and the table `[keys]`
+/// with `prefix = "C-a"`, a quoted key name (C-Space, or C-a to C-z but not
+/// C-g, C-h, C-i, C-m or C-u). Anything else, a table or key given twice
+/// included, refuses the whole file by line and reason, with every setting
+/// at its default.
 pub fn parse_settings(text: str) -> Settings {
     var s = default_settings()
     var table = ""
     var clipboard_seen = false
+    var keys_seen = false
     var programs_seen = false
+    var prefix_seen = false
     var restore_seen = false
     var n = 0
     for raw in text.lines() {
@@ -56,9 +82,15 @@ pub fn parse_settings(text: str) -> Settings {
         if line.starts_with("[") {
             if !line.ends_with("]") { return refuse(n, "a table header needs ]") }
             let name = line[1..line.len - 1].trim()
-            if name != "clipboard" { return refuse(n, "unknown table [{name}]") }
-            if clipboard_seen { return refuse(n, "[clipboard] appears twice") }
-            clipboard_seen = true
+            if name == "clipboard" {
+                if clipboard_seen { return refuse(n, "[clipboard] appears twice") }
+                clipboard_seen = true
+            } else if name == "keys" {
+                if keys_seen { return refuse(n, "[keys] appears twice") }
+                keys_seen = true
+            } else {
+                return refuse(n, "unknown table [{name}]")
+            }
             table = name
             continue
         }
@@ -75,6 +107,19 @@ pub fn parse_settings(text: str) -> Settings {
             continue
         }
         if table.len == 0 { return refuse(n, "a key outside a table") }
+        if table == "keys" {
+            if key != "prefix" { return refuse(n, "unknown key {key} in [keys]") }
+            if prefix_seen { return refuse(n, "prefix is set twice") }
+            if value.len < 2 || !value.starts_with("\"") || !value.ends_with("\"") {
+                return refuse(n, "prefix takes a quoted key name, like \"C-a\"")
+            }
+            let name = value[1..value.len - 1]
+            let code = prefix_code(name)
+            if code < 0 { return refuse(n, prefix_why(name)) }
+            s.prefix = code
+            prefix_seen = true
+            continue
+        }
         if key != "programs" { return refuse(n, "unknown key {key} in [{table}]") }
         if programs_seen { return refuse(n, "programs is set twice") }
         if value == "true" { s.clipboard_programs = true }
