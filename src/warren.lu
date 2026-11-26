@@ -98,7 +98,7 @@ fn new_verb(args: List[str]) -> int {
         io.write_err_line("warren: new: -A needs a session name")
         return 2
     }
-    client.new_session(name, detached, layout_word, existing)
+    client.new_session(if existing then "" else name, detached, layout_word, false)
 }
 
 // The modules and the milestone each belongs to.
