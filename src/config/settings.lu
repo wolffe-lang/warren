@@ -4,13 +4,14 @@
 //! and the defaults apply.
 
 /// What `warren.toml` sets. `ok` false names the refused `line` and `why`.
-/// `restore` says whether sessions are saved and restored.
-pub struct Settings { ok: bool, why: str, line: int, clipboard_programs: bool, restore: bool }
+/// `restore` says whether sessions are saved and restored. `prefix` is the
+/// prefix key: Ctrl with the scalar `prefix` (32 Space, 97 to 122 a to z).
+pub struct Settings { ok: bool, why: str, line: int, clipboard_programs: bool, restore: bool, prefix: int }
 
 /// Every setting at its default: programs in panes cannot write the
-/// clipboard, and sessions are saved and restored.
+/// clipboard, sessions are saved and restored, and the prefix is C-Space.
 pub fn default_settings() -> Settings {
-    Settings { ok: true, why: "", line: 0, clipboard_programs: false, restore: true }
+    Settings { ok: true, why: "", line: 0, clipboard_programs: false, restore: true, prefix: 32 }
 }
 
 /// Take an accepted file's settings into `to`, field by field: by scalar
@@ -22,10 +23,11 @@ pub fn take_settings(mut to: Settings, from: Settings) {
     to.line = 0
     to.clipboard_programs = from.clipboard_programs
     to.restore = from.restore
+    to.prefix = from.prefix
 }
 
 fn refuse(line: int, why: str) -> Settings {
-    Settings { ok: false, why: why, line: line, clipboard_programs: false, restore: true }
+    Settings { ok: false, why: why, line: line, clipboard_programs: false, restore: true, prefix: 32 }
 }
 
 // A line without its comment (`#` to the end: values are bare words) and the
