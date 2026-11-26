@@ -44,10 +44,50 @@ fn test_refusals() {
     assert(refused("[clipboard]\nprograms = yes\n", 2, "programs takes true or false"), "bad value")
     assert(refused("[clipboard]\nprograms = true\nprograms = false\n", 3, "programs is set twice"), "duplicate key")
     assert(refused("[clipboard]\ncolour = 1\n", 2, "unknown key colour in [clipboard]"), "unknown key")
-    assert(refused("[keys]\n", 1, "unknown table [keys]"), "unknown table")
+    assert(refused("[colours]\n", 1, "unknown table [colours]"), "unknown table")
     assert(refused("[clipboard\n", 1, "a table header needs ]"), "open header")
     assert(refused("[clipboard]\nprograms\n", 2, "expected key = value"), "no equals")
     assert(refused("[clipboard]\nprograms = true\n[clipboard]\n", 3, "[clipboard] appears twice"), "table twice")
+}
+
+// The prefix a file sets, or -1 when the file is refused.
+fn prefix_of(text: str) -> int {
+    let s = config.parse_settings(text)
+    if s.ok { s.prefix } else { 0 - 1 }
+}
+
+fn test_keys_prefix() {
+    assert(config.default_settings().prefix == 32, "the prefix is C-Space by default")
+    assert(prefix_of("") == 32, "no [keys] keeps C-Space")
+    assert(prefix_of("[keys]\n") == 32, "an empty [keys] keeps C-Space")
+    assert(prefix_of("[keys]\nprefix = \"C-a\"\n") == 97, "[keys] prefix = \"C-a\"")
+    assert(prefix_of("[keys]\nprefix = \"C-Space\"\n") == 32, "prefix = \"C-Space\", the default spelled out")
+    assert(prefix_of("[keys]\nprefix = \"C-z\"\n") == 122, "prefix = \"C-z\"")
+    assert(prefix_of("  [ keys ]\n  prefix=\"C-b\" # as tmux has it\n") == 98, "prefix = \"C-b\" with spaces and a comment")
+    let all = config.parse_settings("restore = false\n[clipboard]\nprograms = true\n[keys]\nprefix = \"C-f\"\n")
+    assert(all.ok && !all.restore && all.clipboard_programs && all.prefix == 102, "the prefix beside the other settings")
+}
+
+fn test_prefix_refusals() {
+    assert(refused("[keys]\nprefix = \"C-g\"\n", 2, "C-g leaves the locked mode"), "C-g")
+    assert(refused("[keys]\nprefix = \"C-h\"\n", 2, "C-h is Backspace on a terminal without an extended keyboard protocol"), "C-h")
+    assert(refused("[keys]\nprefix = \"C-i\"\n", 2, "C-i is Tab on a terminal without an extended keyboard protocol"), "C-i")
+    assert(refused("[keys]\nprefix = \"C-m\"\n", 2, "C-m is Enter on a terminal without an extended keyboard protocol"), "C-m")
+    assert(refused("[keys]\nprefix = \"C-u\"\n", 2, "C-u clears the line in the command, rename and search prompts"), "C-u")
+    assert(refused("[keys]\nprefix = \"x\"\n", 2, "prefix takes C-Space or C-a to C-z, not x"), "a printable key")
+    assert(refused("[keys]\nprefix = \"M-a\"\n", 2, "prefix takes C-Space or C-a to C-z, not M-a"), "an Alt key")
+    assert(refused("[keys]\nprefix = \"C-A\"\n", 2, "prefix takes C-Space or C-a to C-z, not C-A"), "an upper-case letter")
+    assert(refused("[keys]\nprefix = C-a\n", 2, "prefix takes a quoted key name, like \"C-a\""), "a bare word")
+    assert(refused("[keys]\nprefix = \"C-a\n", 2, "prefix takes a quoted key name, like \"C-a\""), "an open quote")
+    assert(refused("[keys]\nprefix = \"C-a\"\nprefix = \"C-b\"\n", 3, "prefix is set twice"), "prefix twice")
+    assert(refused("[keys]\n[keys]\n", 2, "[keys] appears twice"), "[keys] twice")
+    assert(refused("[keys]\nmeta = \"C-a\"\n", 2, "unknown key meta in [keys]"), "an unknown key in [keys]")
+    assert(refused("[clipboard]\nprefix = \"C-a\"\n", 2, "unknown key prefix in [clipboard]"), "prefix in [clipboard]")
+    assert(refused("prefix = \"C-a\"\n", 1, "a key outside a table"), "prefix outside a table")
+    assert(refused("[keys]\nprefix = true\n", 2, "prefix takes a quoted key name, like \"C-a\""), "a bool for prefix")
+    assert(refused("restore = \"false\"\n", 1, "restore takes true or false"), "a quoted bool stays refused")
+    let bad = config.parse_settings("[keys]\nprefix = \"C-g\"\n")
+    assert(!bad.ok && bad.prefix == 32, "a refused file leaves the prefix at C-Space")
 }
 
 fn main() -> int {
@@ -55,6 +95,8 @@ fn main() -> int {
     test_clipboard_programs()
     test_restore()
     test_refusals()
+    test_keys_prefix()
+    test_prefix_refusals()
     print("PASS config-settings")
     0
 }
