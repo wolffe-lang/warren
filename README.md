@@ -114,7 +114,7 @@ in panes may write the clipboard too; by default they may not. `vt-dump` is a di
 | W3 | panes, tabs, the bar, keys | pure layout module; panes and tabs in the server, borders and the focus mark, the bar's lines (tabs with activity, bell and zoom marks, the mode, the clock); modes per client, the hint line and the key list from one key table, a minimal command line; configuration planned |
 | W4 | mouse, scrollback, copy | pane/tab clicks, minimum-clamped border dragging, wheel and key scrollback per client, drag selection copied on release into the session's register and the terminal's clipboard (OSC 52), pasted with prefix `]`; programs' OSC 52 writes off unless `warren.toml` allows them; search in scroll mode |
 | W5 | layouts, commands, persistence | ids and targets, every command line verb, `list --json`, `send-keys`, `capture-pane`, `source`, layout files, saved sessions and restore, with rows on Linux, macOS and PAX under QEMU |
-| W6 | on the PAX image, on real hardware | planned |
+| W6 | on the PAX image, on real hardware | on an installed PAX image under QEMU: attach or create (`new -A`), the console and ssh meeting in one server, rows over ssh, starting at login and the console logout; real hardware: the rows over ssh are ready, and no run is recorded |
 
 ## Machines and pins
 
