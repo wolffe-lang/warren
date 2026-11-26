@@ -2911,11 +2911,11 @@ fn row_clip_program_config(mut r: Rig) -> str {
 // A warren.toml that does not parse is refused whole, by line and reason, on
 // each attaching client's hint line, and the defaults apply.
 fn row_config_refused(mut r: Rig) -> str {
-    let _c = config_dir(r, "[clipboard]\nprograms = true\n[keys]\n")
+    let _c = config_dir(r, "[clipboard]\nprograms = true\n[colours]\n")
     let why = start_server(mut r, "/bin/sh")
     if why.len > 0 { return why }
     var a = attach_features(r, 8, 1) else |e| { return "dial-{e}" }
-    if !until_hint(mut a, "warren.toml line 3: unknown table [keys]", 3000) { return "no refusal on the hint line: '" + hint_of(a.image) + "'" }
+    if !until_hint(mut a, "warren.toml line 3: unknown table [colours]", 3000) { return "no refusal on the hint line: '" + hint_of(a.image) + "'" }
     if !client.until_text(mut a, "$", 5000) { return "no prompt" }
     let _o = program_osc52(a)
     if !until_rect(mut a, "osc-5", 1, 1, 80, AREA, 3000) { return "the program did not run" }
@@ -3093,11 +3093,11 @@ fn row_source_no_file_defaults(mut r: Rig) -> str {
 // that attaches; once `source` has read a good one, a client that attaches
 // is told nothing.
 fn row_source_clears_start_refusal(mut r: Rig) -> str {
-    let _c = config_dir(r, "[clipboard]\nprograms = true\n[keys]\n")
+    let _c = config_dir(r, "[clipboard]\nprograms = true\n[colours]\n")
     let why = start_server(mut r, "/bin/sh")
     if why.len > 0 { return why }
     var a = attach_features(r, 8, 1) else |e| { return "dial-{e}" }
-    if !until_hint(mut a, "warren.toml line 3: unknown table [keys]", 3000) {
+    if !until_hint(mut a, "warren.toml line 3: unknown table [colours]", 3000) {
         return "no refusal at the first attach: '" + hint_of(a.image) + "'"
     }
     if !write_config(r, "[clipboard]\nprograms = true\n") { return "write warren.toml" }
@@ -3178,6 +3178,143 @@ fn row_layout_at_command_line(mut r: Rig) -> str {
     }
     if !listing.contains("\"active_tab\":\"t2\"") { return "the loaded tab is not active: {listing}" }
     finish(mut r, mut a)
+}
+
+// ---------------- the prefix: warren.toml's [keys] prefix ----------------
+
+const PREFIX_C_A: str = "[keys]\nprefix = \"C-a\"\n"
+
+/// Ctrl with the scalar `pk` (a configured prefix), then a key.
+fn with_prefix(p: client.Peer, pk: int, code: int) -> bool {
+    client.key(p, 4, 0, pk) && client.key(p, 0, 0, code)
+}
+
+/// The read-bytes helper started in the focused pane, reading `count` bytes:
+/// its file, or "" when it did not start.
+fn reader(mut p: client.Peer, r: Rig, count: int) -> str {
+    let f = out_file(r, "bytes.txt")
+    fs.remove(f) else |_| {}
+    let _x = client.input(p, "{self_path()} --read-bytes {f} {count}\r")
+    if !until_file(f, "ready", 5000) { return "" }
+    f
+}
+
+// With the prefix on C-a, C-a then | splits the pane, and the idle hint names
+// C-a.
+fn row_prefix_configured_splits(mut r: Rig) -> str {
+    let _c = config_dir(r, PREFIX_C_A)
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    if !client.until_text(mut p, "$", 5000) { return "no prompt" }
+    let _s = with_prefix(p, 97, 124)
+    if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "C-a then | made no split:\n" + client.screen_text(p) }
+    if !until_hint(mut p, " C-a prefix", 3000) { return "the idle hint: '" + hint_of(p.image) + "'" }
+    finish(mut r, mut p)
+}
+
+// With the prefix on C-a, C-Space is a program's key: the pane reads it as
+// NUL, and the z after it too.
+fn row_prefix_configured_space_passes(mut r: Rig) -> str {
+    let _c = config_dir(r, PREFIX_C_A)
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let f = reader(mut p, r, 2)
+    if f.len == 0 { return "the helper did not start:\n" + client.screen_text(p) }
+    let _a = client.key(p, 4, 0, 32)
+    let _z = client.key(p, 0, 0, 122)
+    if !until_file(f, "bytes 00 7a", 5000) { return "C-Space then z did not reach the pane: " + (fs.read_text(f) else "") }
+    if !until_mode(mut p, "NORMAL", 3000) { return "not in normal mode: " + mode_of(p.image) }
+    finish(mut r, mut p)
+}
+
+// The configured prefix pressed twice: the pane reads that key (C-a, 01),
+// once, and then the z after it.
+fn row_prefix_configured_twice_sends_it(mut r: Rig) -> str {
+    let _c = config_dir(r, PREFIX_C_A)
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let f = reader(mut p, r, 2)
+    if f.len == 0 { return "the helper did not start:\n" + client.screen_text(p) }
+    let _a = client.key(p, 4, 0, 97)
+    let _b = client.key(p, 4, 0, 97)
+    let _z = client.key(p, 0, 0, 122)
+    if !until_file(f, "bytes 01 7a", 5000) { return "C-a C-a then z: the pane read " + (fs.read_text(f) else "") }
+    if !until_mode(mut p, "NORMAL", 3000) { return "not back to normal: " + mode_of(p.image) }
+    finish(mut r, mut p)
+}
+
+// `source` of a file with the prefix on C-b applies at once: C-b then |
+// splits, the idle hint names C-b, and C-a is a program's key again.
+fn row_prefix_source_changes_it(mut r: Rig) -> str {
+    let _c = config_dir(r, PREFIX_C_A)
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    if !client.until_text(mut p, "$", 5000) { return "no prompt" }
+    if !write_config(r, "[keys]\nprefix = \"C-b\"\n") { return "write warren.toml" }
+    let s = ask(r, ["source"], here())
+    if !answered(s, 0, "") { return "source: {s.status} '{s.out}' '{s.err}'" }
+    if !until_hint(mut p, " C-b prefix", 3000) { return "the idle hint after source: '" + hint_of(p.image) + "'" }
+    let _s = with_prefix(p, 98, 124)
+    if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "C-b then | made no split:\n" + client.screen_text(p) }
+    let f = reader(mut p, r, 2)
+    if f.len == 0 { return "the helper did not start:\n" + client.screen_text(p) }
+    let _a = client.key(p, 4, 0, 97)
+    let _z = client.key(p, 0, 0, 122)
+    if !until_file(f, "bytes 01 7a", 5000) { return "C-a then z after source: the pane read " + (fs.read_text(f) else "") }
+    finish(mut r, mut p)
+}
+
+// A file refused by `source` (the prefix on C-g) changes nothing: the
+// answer names its line and reason, and C-a still splits.
+fn row_prefix_refused_keeps_it(mut r: Rig) -> str {
+    let _c = config_dir(r, PREFIX_C_A)
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    if !client.until_text(mut p, "$", 5000) { return "no prompt" }
+    if !write_config(r, "[keys]\nprefix = \"C-g\"\n") { return "write warren.toml" }
+    let s = ask(r, ["source"], here())
+    if !answered(s, 1, "warren: source: warren.toml line 2: C-g leaves the locked mode\n") {
+        return "source: {s.status} '{s.out}' '{s.err}'"
+    }
+    let _s = with_prefix(p, 97, 124)
+    if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "C-a made no split after the refusal:\n" + client.screen_text(p) }
+    finish(mut r, mut p)
+}
+
+// The prefix wins where it is live. With C-Space the prefix, C-b pages in
+// scroll mode; with the prefix moved to C-b by `source`, C-b leaves scroll
+// mode for the prefix (C-b then | splits) and PgUp still pages.
+fn row_prefix_wins_in_scroll(mut r: Rig) -> str {
+    let _c = config_dir(r, "")
+    let why = start_server(mut r, "/bin/sh")
+    if why.len > 0 { return why }
+    var p = session(r, 80, 24, "") else |e| { return "dial-{e}" }
+    let at = numbered_output(mut p, 80, 1, 80)
+    if at == 0 { return "no numbered output:\n" + client.screen_text(p) }
+    let _enter = prefix(p, 91)
+    if !until_mode(mut p, "SCROLL", 3000) { return "prefix [ did not enter scroll mode: '" + mode_of(p.image) + "'" }
+    let _page = client.key(p, 0, 1, 7)
+    if !until_rect_line(mut p, "L58", 1, at, 80, 1, 3000) { return "PgUp did not look back a window" }
+    let _cb = client.key(p, 4, 0, 98)
+    if !until_rect_line(mut p, "L36", 1, at, 80, 1, 3000) { return "with C-Space the prefix, C-b did not look back a window" }
+    let _q = type_keys(p, "q")
+    if !until_mode(mut p, "NORMAL", 3000) { return "q did not leave scroll mode" }
+    if !write_config(r, "[keys]\nprefix = \"C-b\"\n") { return "write warren.toml" }
+    let s = ask(r, ["source"], here())
+    if !answered(s, 0, "") { return "source: {s.status} '{s.out}' '{s.err}'" }
+    if !until_hint(mut p, " C-b prefix", 3000) { return "the idle hint after source: '" + hint_of(p.image) + "'" }
+    let _again = with_prefix(p, 98, 91)
+    if !until_mode(mut p, "SCROLL", 3000) { return "C-b [ did not enter scroll mode: '" + mode_of(p.image) + "'" }
+    let _pg = client.key(p, 0, 1, 7)
+    if !until_rect_line(mut p, "L58", 1, at, 80, 1, 3000) { return "PgUp did not look back a window with the prefix on C-b" }
+    let _split = with_prefix(p, 98, 124)
+    if !until_rect_line(mut p, "$", 41, 1, 40, AREA, 5000) { return "C-b then | made no split from scroll mode:\n" + client.screen_text(p) }
+    finish(mut r, mut p)
 }
 
 // ---------------- a selection's pane and its slot ----------------
@@ -3439,6 +3576,12 @@ fn run_row(warren: str, name: str) -> str {
     else if name == "clip-program-default" { why = row_clip_program_default(mut r) }
     else if name == "clip-program-config" { why = row_clip_program_config(mut r) }
     else if name == "config-refused" { why = row_config_refused(mut r) }
+    else if name == "prefix-configured-splits" { why = row_prefix_configured_splits(mut r) }
+    else if name == "prefix-configured-space-passes" { why = row_prefix_configured_space_passes(mut r) }
+    else if name == "prefix-configured-twice-sends-it" { why = row_prefix_configured_twice_sends_it(mut r) }
+    else if name == "prefix-source-changes-it" { why = row_prefix_source_changes_it(mut r) }
+    else if name == "prefix-refused-keeps-it" { why = row_prefix_refused_keeps_it(mut r) }
+    else if name == "prefix-wins-in-scroll" { why = row_prefix_wins_in_scroll(mut r) }
     else if name == "source-applies-live" { why = row_source_applies_live(mut r) }
     else if name == "source-refused-keeps" { why = row_source_refused_keeps(mut r) }
     else if name == "source-named-file" { why = row_source_named_file(mut r) }
@@ -3508,7 +3651,7 @@ fn run_row(warren: str, name: str) -> str {
 
 fn all_rows() -> List[str] {
     var x = List[str]()
-    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-live-edit scroll-reporting-child scroll-two-clients scroll-alternate select-drag-sgr select-drag-legacy select-reporting-child select-origin-clamp select-two-clients select-in-scroll paste-bracketed clip-copy clip-program-default clip-program-config config-refused source-applies-live source-refused-keeps source-named-file source-missing-file source-no-file-defaults source-clears-start-refusal source-at-command-line layout-at-command-line select-ends-when-its-pane-goes search-older search-repeat search-newer search-live search-wrapped search-not-found search-cancel mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay help-overlay-minute bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
+    for n in "mouse-tab-snapshot-sgr mouse-tab-snapshot-x10 mouse-tab-removed-sgr mouse-tab-removed-x10 mouse-tab-identity-frame mouse-border-sgr mouse-border-legacy scroll-wheel-sgr scroll-wheel-legacy scroll-keys scroll-live-edit scroll-reporting-child scroll-two-clients scroll-alternate select-drag-sgr select-drag-legacy select-reporting-child select-origin-clamp select-two-clients select-in-scroll paste-bracketed clip-copy clip-program-default clip-program-config config-refused source-applies-live source-refused-keeps source-named-file source-missing-file source-no-file-defaults source-clears-start-refusal source-at-command-line prefix-configured-splits prefix-configured-space-passes prefix-configured-twice-sends-it prefix-source-changes-it prefix-refused-keeps-it prefix-wins-in-scroll layout-at-command-line select-ends-when-its-pane-goes search-older search-repeat search-newer search-live search-wrapped search-not-found search-cancel mouse-sgr-off mouse-sgr-sgr mouse-sgr-legacy mouse-tabs-sgr mouse-legacy-off mouse-legacy-sgr mouse-legacy-legacy mouse-tabs-legacy split-sizes keys-reach-focused sigwinch-on-change close-hangs-up exit-closes-pane tabs resize-all-tabs zoom too-small pane-memory frame-golden damage-in-rect focus-bytes focus-prefix-bytes keys-in-split split-latency mode-field hint-line prefix-twice locked pane-mode tab-mode resize-mode session-mode confirm-close rename-tab command-mode modes-per-client input-in-modes help-overlay help-overlay-minute bar-line-one zoom-mark activity-marks clock clock-tick".split(" ") {
         (mut x).push(n)
     }
     x
