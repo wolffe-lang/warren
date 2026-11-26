@@ -196,6 +196,9 @@ Layout files). Screen contents and scrollback are never written.
 - **Turning it off.** `restore = false` in `warren.toml` (CONFIG.md) saves
   nothing and restores nothing; it is the only switch, and files already
   written stay.
+- **On PAX.** Saved sessions last one boot. PAX keeps its files in memory
+  until it has storage, so after a reboot there is nothing to restore.
+  Within a boot, a restart of the server restores them, as everywhere.
 
 ## Targets
 
