@@ -59,7 +59,6 @@ pub fn self_path() -> str {
 fn start_server(token: str) -> str {
     let a = process.fork() else |e| { return "fork: {e}" }
     if process.is_child(a) {
-        process.lead_session() else |_| { process.exit(40) }
         let b = process.fork() else |_| {
             process.exit(41)
             return ""
