@@ -17,10 +17,11 @@ its saved sessions and its configuration are RUN's, never the account's own. It 
 stops its own server with kill-server, which keeps the saved files in RUN/state. Outside DIR it only reads (`uname`,
 `id -u`, `ls`).
 
-  R1 `warren new -d -s v5` exits 0, and `list --json` shows one session, v5, with one pane, in RUN/home
+  R1 `warren new -d -s v5 -c RUN/work` exits 0, and `list --json` shows one session, v5, with one pane, in RUN/work
   R2 a marker typed into v5's pane with send-keys, and `capture-pane -p -t v5` shows it
-  R3 saved sessions within a boot: v5's pane goes to RUN/work; `kill-server`; `new -d -s probe` says it restored v5,
-     and `list --json` shows v5 again with its pane in RUN/work
+  R3 saved sessions within a boot: `kill-server`; `new -d -s probe` says it restored v5, and `list --json` shows v5
+     again with its pane in RUN/work (the directory it was made in: a host that reports no pane's later `cd`, with
+     no /proc and no OSC 7, still knows that one)
   X0 the account's own warren state has the same names after the rows as before: /run/user/UID/warren,
      /tmp/warren-UID and $HOME/.local/state/warren/sessions (a session the account itself starts or ends during the
      run shows here too)
@@ -132,12 +133,12 @@ def rows(prefix, base, dry):
     h.raw(f'mkdir -p {q(r + "/home")} {q(r + "/state")} {q(r + "/config")} {q(r + "/work")} {q(r + "/rt")} '
           f'&& chmod 700 {q(r + "/rt")} && echo S1 MADE=0', 'S1')
 
-    made = h.inside('warren new -d -s v5 2>&1; echo R1 NEW=$?', 'R1') or ''
+    made = h.inside(f'warren new -d -s v5 -c {q(r + "/work")} 2>&1; echo R1 NEW=$?', 'R1') or ''
     p1 = panes(listing(h.inside('warren list --json 2>&1', 'R1-list')), 'v5')
     one = listing(h.inside('warren list --json 2>&1', 'R1-again'))
     names = [s.get('name') for s in (one or {}).get('sessions', [])]
     row('R1', 'R1 NEW=0' in made and names == ['v5'] and p1 is not None and len(p1) == 1
-        and p1[0].get('cwd') == r + '/home',
+        and p1[0].get('cwd') == r + '/work',
         f'new exit 0: {"R1 NEW=0" in made}; sessions {names}; panes {len(p1) if p1 else 0}; '
         f'cwd {p1[0].get("cwd") if p1 else None}')
 
@@ -152,23 +153,14 @@ def rows(prefix, base, dry):
         time.sleep(0.5)
     row('R2', seen, f'capture-pane shows {mark}: {seen}')
 
-    h.inside(f"warren send-keys -t v5 'cd {r}/work' Enter 2>&1", 'R3-cd')
-    moved = False
-    for _ in range(1 if dry else 10):
-        p = panes(listing(h.inside('warren list --json 2>&1', 'R3-list')), 'v5')
-        moved = bool(p) and p[0].get('cwd') == r + '/work'
-        if moved:
-            break
-        time.sleep(0.5)
     time.sleep(0 if dry else 1.5)
     stopped = h.inside('warren kill-server 2>&1; echo R3 KILL=$?', 'R3-kill') or ''
     again = h.inside('warren new -d -s probe 2>&1; echo R3 NEW=$?', 'R3-new') or ''
     p3 = panes(listing(h.inside('warren list --json 2>&1', 'R3-after')), 'v5')
     restored = bool(re.search(r'restored 1 saved session: v5', again))
     kept = bool(p3) and p3[0].get('cwd') == r + '/work'
-    row('R3', moved and 'R3 KILL=0' in stopped and 'R3 NEW=0' in again and restored and kept,
-        f'pane in {r}/work before: {moved}; kill-server exit 0: {"R3 KILL=0" in stopped}; restored v5 said: '
-        f'{restored}; v5 back in {r}/work: {kept}')
+    row('R3', 'R3 KILL=0' in stopped and 'R3 NEW=0' in again and restored and kept,
+        f'kill-server exit 0: {"R3 KILL=0" in stopped}; restored v5 said: {restored}; v5 back in {r}/work: {kept}')
 
     h.inside('warren kill-server 2>&1; echo END KILL=$?', 'S2')
     after = h.raw(OUTSIDE, 'X0-after')
