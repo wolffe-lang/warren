@@ -17,7 +17,8 @@ its saved sessions and its configuration are RUN's, never the account's own. It 
 stops its own server with kill-server, which keeps the saved files in RUN/state. Outside DIR it only reads (`uname`,
 `id -u`, `ls`).
 
-  R1 `warren new -d -s v5 -c RUN/work` exits 0, and `list --json` shows one session, v5, with one pane, in RUN/work
+  R1 `warren new -d -s v5`, run in RUN/work, exits 0, and `list --json` shows one session, v5, with one pane, in
+     RUN/work
   R2 a marker typed into v5's pane with send-keys, and `capture-pane -p -t v5` shows it
   R3 saved sessions within a boot: `kill-server`; `new -d -s probe` says it restored v5, and `list --json` shows v5
      again with its pane in RUN/work (the directory it was made in: a host that reports no pane's later `cd`, with
@@ -133,7 +134,7 @@ def rows(prefix, base, dry):
     h.raw(f'mkdir -p {q(r + "/home")} {q(r + "/state")} {q(r + "/config")} {q(r + "/work")} {q(r + "/rt")} '
           f'&& chmod 700 {q(r + "/rt")} && echo S1 MADE=0', 'S1')
 
-    made = h.inside(f'warren new -d -s v5 -c {q(r + "/work")} 2>&1; echo R1 NEW=$?', 'R1') or ''
+    made = h.inside(f'cd {q(r + "/work")} && warren new -d -s v5 2>&1; echo R1 NEW=$?', 'R1') or ''
     p1 = panes(listing(h.inside('warren list --json 2>&1', 'R1-list')), 'v5')
     one = listing(h.inside('warren list --json 2>&1', 'R1-again'))
     names = [s.get('name') for s in (one or {}).get('sessions', [])]
