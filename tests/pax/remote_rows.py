@@ -17,8 +17,20 @@ its saved sessions and its configuration are RUN's, never the account's own. It 
 stops its own server with kill-server, which keeps the saved files in RUN/state. Outside DIR it only reads (`uname`,
 `id -u`, `ls`).
 
-  R1 `warren new -d -s v5`, run in RUN/work, exits 0, and `list --json` shows one session, v5, with one pane, in
-     RUN/work
+That holds only for a warren that keeps its socket where WARREN_RUNTIME_DIR says. Another one (any warren before
+2026-11-14 ignores the variable) would reach the account's own server, and the rows would make a session in it and
+then kill it. Two guards stop that before it can happen:
+  G0 first, before any warren runs in RUN: `warren list-sessions` with WARREN_RUNTIME_DIR set to a path under RUN
+     too long for a socket. A warren that honours the variable refuses it by name, status 1, before dialing
+     anything. G0 passes only when the path it names is exactly that one's `default`. Any other answer (`no server
+     is running`, a listing, another path) fails G0. R1, R2 and R3 are then skipped (SKIP, not counted), no warren
+     verb runs and nothing is killed. X0 still runs.
+  R1's socket check: after `new`, RUN/rt/default must be a socket. When it is not, R2 and R3 are skipped and nothing
+     is killed. Each kill-server runs behind the same test, in the same command.
+
+  G0 the probe above: nothing is made, dialed or killed
+  R1 `warren new -d -s v5`, run in RUN/work, exits 0, its socket is RUN/rt/default, and `list --json` shows one
+     session, v5, with one pane, in RUN/work
   R2 a marker typed into v5's pane with send-keys, and `capture-pane -p -t v5` shows it
   R3 saved sessions within a boot: `kill-server`; `new -d -s probe` says it restored v5, and `list --json` shows v5
      again with its pane in RUN/work (the directory it was made in: a host that reports no pane's later `cd`, with
@@ -26,9 +38,10 @@ stops its own server with kill-server, which keeps the saved files in RUN/state.
   X0 the account's own warren state has the same names after the rows as before: /run/user/UID/warren,
      /tmp/warren-UID and $HOME/.local/state/warren/sessions (a session the account itself starts or ends during the
      run shows here too)
---dry prints each command it would run, one a line starting `DRY `, and runs none. Each row prints PASS or FAIL by
-name, then `ROWS-END failed=N`. Exit 0 when every asked row passed, 1 when one failed, 2 when the host could not
-be reached (`ROWS-STOPPED why`).
+--dry prints each command it would run, one a line starting `DRY `, and runs none; it prints every command, as if
+each guard held. Each row prints PASS, FAIL or SKIP by name, then `ROWS-END failed=N`. G0 always runs, whatever
+--rows asks. Exit 0 when every asked row passed, 1 when one failed (G0 included), 2 when the host could not be
+reached (`ROWS-STOPPED why`).
 """
 import argparse
 import json
@@ -118,11 +131,16 @@ def rows(prefix, base, dry):
     bad = []
 
     def row(name, ok, what):
-        if dry or name not in ASKED:
+        if dry or (name not in ASKED and name != 'G0'):
             return
         print(f'{"PASS" if ok else "FAIL"} {name}: {what}', flush=True)
         if not ok:
             bad.append(name)
+
+    def skip(names, why):
+        for name in names:
+            if not dry and name in ASKED:
+                print(f'SKIP {name}: {why}', flush=True)
 
     h = Remote(prefix, base, dry)
     r = h.run
@@ -131,39 +149,61 @@ def rows(prefix, base, dry):
         raise SystemExit('the host could not be reached')
     before = h.raw(OUTSIDE, 'X0-before')
     q = shlex.quote
-    h.raw(f'mkdir -p {q(r + "/home")} {q(r + "/state")} {q(r + "/config")} {q(r + "/work")} {q(r + "/rt")} '
-          f'&& chmod 700 {q(r + "/rt")} && echo S1 MADE=0', 'S1')
+    rt = r + '/rt'
+    h.raw(f'mkdir -p {q(r + "/home")} {q(r + "/state")} {q(r + "/config")} {q(r + "/work")} {q(rt)} '
+          f'&& chmod 700 {q(rt)} && echo S1 MADE=0', 'S1')
 
-    made = h.inside(f'cd {q(r + "/work")} && warren new -d -s v5 2>&1; echo R1 NEW=$?', 'R1') or ''
-    p1 = panes(listing(h.inside('warren list --json 2>&1', 'R1-list')), 'v5')
-    one = listing(h.inside('warren list --json 2>&1', 'R1-again'))
-    names = [s.get('name') for s in (one or {}).get('sessions', [])]
-    row('R1', 'R1 NEW=0' in made and names == ['v5'] and p1 is not None and len(p1) == 1
-        and p1[0].get('cwd') == r + '/work',
-        f'new exit 0: {"R1 NEW=0" in made}; sessions {names}; panes {len(p1) if p1 else 0}; '
-        f'cwd {p1[0].get("cwd") if p1 else None}')
+    # G0: a runtime directory under RUN too long for a socket. Only a warren that keeps its socket where
+    # WARREN_RUNTIME_DIR says refuses it, by this path, before it dials anything.
+    stem = r + '/g0-'
+    long = stem + 'x' * max(1, 112 - len(stem + '/default'))
+    probe = h.inside(f'WARREN_RUNTIME_DIR={q(long)} warren list-sessions 2>&1; echo G0 STATUS=$?', 'G0') or ''
+    st = re.search(r'G0 STATUS=(\d+)', probe)
+    named = re.search(r'over the \d+ every host takes: (\S+)', probe)
+    g0 = dry or (st is not None and st[1] == '1' and named is not None and named[1] == long + '/default')
+    answer = ' | '.join(l for l in probe.splitlines() if l.strip() and not l.startswith('G0 STATUS'))
+    row('G0', g0, f'status {st[1] if st else None}; path named {named[1] if named else None}; wanted '
+        f'{long}/default; answer: {answer[:200]}')
+    ours = False
+    if not g0:
+        skip(('R1', 'R2', 'R3'), 'G0 failed: this warren may not keep its socket in RUN, so nothing is run')
+    else:
+        made = h.inside(f'cd {q(r + "/work")} && warren new -d -s v5 2>&1; echo R1 NEW=$?; '
+                        f'test -S {q(rt + "/default")} && echo R1 SOCKET=yes || echo R1 SOCKET=no', 'R1') or ''
+        ours = dry or 'R1 SOCKET=yes' in made
+        p1 = panes(listing(h.inside('warren list --json 2>&1', 'R1-list')), 'v5') if ours else None
+        one = listing(h.inside('warren list --json 2>&1', 'R1-again')) if ours else None
+        names = [s.get('name') for s in (one or {}).get('sessions', [])]
+        row('R1', 'R1 NEW=0' in made and ours and names == ['v5'] and p1 is not None and len(p1) == 1
+            and p1[0].get('cwd') == r + '/work',
+            f'new exit 0: {"R1 NEW=0" in made}; socket {rt}/default: {ours}; sessions {names}; '
+            f'panes {len(p1) if p1 else 0}; cwd {p1[0].get("cwd") if p1 else None}')
+        if not ours:
+            skip(('R2', 'R3'), f'no socket at {rt}/default: the server is not RUN\'s, so nothing is sent or killed')
 
-    n = 1000 + int(time.time()) % 9000
-    mark = f'R-{n + 1}'
-    h.inside(f"warren send-keys -t v5 'echo R-$(({n}+1))' Enter 2>&1", 'R2-keys')
-    seen = False
-    for _ in range(1 if dry else 10):
-        seen = mark in (h.inside('warren capture-pane -p -t v5 2>&1', 'R2-capture') or '').splitlines()
-        if seen:
-            break
-        time.sleep(0.5)
-    row('R2', seen, f'capture-pane shows {mark}: {seen}')
+    if ours:
+        n = 1000 + int(time.time()) % 9000
+        mark = f'R-{n + 1}'
+        h.inside(f"warren send-keys -t v5 'echo R-$(({n}+1))' Enter 2>&1", 'R2-keys')
+        seen = False
+        for _ in range(1 if dry else 10):
+            seen = mark in (h.inside('warren capture-pane -p -t v5 2>&1', 'R2-capture') or '').splitlines()
+            if seen:
+                break
+            time.sleep(0.5)
+        row('R2', seen, f'capture-pane shows {mark}: {seen}')
 
-    time.sleep(0 if dry else 1.5)
-    stopped = h.inside('warren kill-server 2>&1; echo R3 KILL=$?', 'R3-kill') or ''
-    again = h.inside('warren new -d -s probe 2>&1; echo R3 NEW=$?', 'R3-new') or ''
-    p3 = panes(listing(h.inside('warren list --json 2>&1', 'R3-after')), 'v5')
-    restored = bool(re.search(r'restored 1 saved session: v5', again))
-    kept = bool(p3) and p3[0].get('cwd') == r + '/work'
-    row('R3', 'R3 KILL=0' in stopped and 'R3 NEW=0' in again and restored and kept,
-        f'kill-server exit 0: {"R3 KILL=0" in stopped}; restored v5 said: {restored}; v5 back in {r}/work: {kept}')
+        time.sleep(0 if dry else 1.5)
+        live = f'test -S {q(rt + "/default")} && '
+        stopped = h.inside(live + 'warren kill-server 2>&1; echo R3 KILL=$?', 'R3-kill') or ''
+        again = h.inside('warren new -d -s probe 2>&1; echo R3 NEW=$?', 'R3-new') or ''
+        p3 = panes(listing(h.inside('warren list --json 2>&1', 'R3-after')), 'v5')
+        restored = bool(re.search(r'restored 1 saved session: v5', again))
+        kept = bool(p3) and p3[0].get('cwd') == r + '/work'
+        row('R3', 'R3 KILL=0' in stopped and 'R3 NEW=0' in again and restored and kept,
+            f'kill-server exit 0: {"R3 KILL=0" in stopped}; restored v5 said: {restored}; v5 back in {r}/work: {kept}')
 
-    h.inside('warren kill-server 2>&1; echo END KILL=$?', 'S2')
+        h.inside(live + 'warren kill-server 2>&1; echo END KILL=$?', 'S2')
     after = h.raw(OUTSIDE, 'X0-after')
     row('X0', before is not None and before == after, 'the account\'s own warren state ' +
         ('unchanged' if before == after else f'before: {" | ".join((before or "?").splitlines())}; after: '
