@@ -150,10 +150,11 @@ too-slow row was red on PAX). A title is state, not an event (one TITLE
 waits in a client's queue at most), so a title flood no longer detaches a
 client; neither this nor the stream's size was measured on PAX again for
 this version. An installed PAX keeps pid 1 at a console logout and hangs
-up only the session that ended; the server leads a session of its own, so
-it should go on, but no row has measured the logout case: until one does,
-the server's promise on PAX is that it outlives the client process that
-started it.
+up only the session that ended. The server leads a session of its own, so it
+goes on: the console row L1 (`tests/pax/login_rows.py`) finds the console's
+session, with its output, after a logout and a new login, on an installed PAX
+image under QEMU. L1 goes red when the server is left in the login's session
+instead, because the logout then ends it.
 
 ## 2. One turn
 
@@ -373,8 +374,10 @@ connect alone is not permission to unlink somebody else's live/listening
 socket. The repository's older std pin does not establish an atomic locking
 primitive; W2 must verify one or obtain it as a dependency. A plain
 exists-then-create test is not a lock. Runtime-directory and logout behavior
-on PAX must be measured after the pid-1/runtime-directory work, not inferred
-from Linux. No state file may contain screen/scrollback secrets; v1 saves
+on PAX is measured on PAX, not inferred from Linux: a console client and a
+client over ssh meet in one server (`tests/pax/burrow_rows.py`), and the
+console's server outlives its logout (L1, `tests/pax/login_rows.py`). No state
+file may contain screen/scrollback secrets; v1 saves
 only layout and working-directory metadata, not running programs.
 
 Saved sessions (CLI.md, Saved sessions). A server takes the start lock, makes
