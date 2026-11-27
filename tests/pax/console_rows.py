@@ -236,7 +236,10 @@ try:
     while not com.exists() and time.monotonic() - t0 < 30:
         time.sleep(0.1)
     c = socket.socket(socket.AF_UNIX)
-    c.connect(str(com))
+    try:
+        c.connect(str(com))
+    except OSError as e:
+        raise SystemExit(f'the console could not be reached: {e}') from None
     up = until_stream(r'[$#] $', 300, 0)
     print(f'the console\'s prompt: {up is not None} after {time.monotonic() - t0:.0f} s; '
           + next((line for line in stream_text().splitlines() if line.startswith('kernel: ')), '(no kernel line)'), flush=True)
