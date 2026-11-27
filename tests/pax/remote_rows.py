@@ -28,7 +28,16 @@ then kill it. Two guards stop that before it can happen:
   R1's socket check: after `new`, RUN/rt/default must be a socket. When it is not, R2 and R3 are skipped and nothing
      is killed. Each kill-server runs behind the same test, in the same command.
 
+The rows also read what an older warren lacks: each pane's working directory in `list --json` (#86), send-keys and
+capture-pane (#82), and sessions restored at start (#100). One more guard names such a warren instead of failing
+three rows on it:
+  G1 after G0, before anything is made: `warren new -A -d`. A warren at or after 0afb88f (2026-11-25, newer than all
+     three) refuses it before it dials anything, status 2, `warren: new: -A needs a session name`; an older one
+     answers its usage text and starts nothing. Any other answer ends the rows as TOO-OLD G1, naming what they need:
+     R1, R2 and R3 are skipped, X0 still runs, and the run exits 3.
+
   G0 the probe above: nothing is made, dialed or killed
+  G1 the probe above: nothing is made, dialed or killed
   R1 `warren new -d -s v5`, run in RUN/work, exits 0, its socket is RUN/rt/default, and `list --json` shows one
      session, v5, with one pane, in RUN/work
   R2 a marker typed into v5's pane with send-keys, and `capture-pane -p -t v5` shows it
@@ -39,9 +48,10 @@ then kill it. Two guards stop that before it can happen:
      /tmp/warren-UID and $HOME/.local/state/warren/sessions (a session the account itself starts or ends during the
      run shows here too)
 --dry prints each command it would run, one a line starting `DRY `, and runs none; it prints every command, as if
-each guard held. Each row prints PASS, FAIL or SKIP by name, then `ROWS-END failed=N`. G0 always runs, whatever
---rows asks. Exit 0 when every asked row passed, 1 when one failed (G0 included), 2 when the host could not be
-reached (`ROWS-STOPPED why`).
+each guard held. Each row prints PASS, FAIL or SKIP by name (G1 PASS, SKIP or TOO-OLD), then `ROWS-END failed=N`.
+G0 and G1 always run, whatever --rows asks. Exit 0 when every asked row passed; 1 when one failed (G0 included);
+2 when the run stopped (the host could not be reached, or a bad argument): `ROWS-STOPPED why`, then
+`ROWS-END stopped: why`; 3 when the installed warren is too old for the rows: TOO-OLD G1, then `ROWS-END too-old: …`.
 """
 import argparse
 import json
@@ -131,7 +141,7 @@ def rows(prefix, base, dry):
     bad = []
 
     def row(name, ok, what):
-        if dry or (name not in ASKED and name != 'G0'):
+        if dry or (name not in ASKED and name not in ('G0', 'G1')):
             return
         print(f'{"PASS" if ok else "FAIL"} {name}: {what}', flush=True)
         if not ok:
@@ -139,7 +149,7 @@ def rows(prefix, base, dry):
 
     def skip(names, why):
         for name in names:
-            if not dry and name in ASKED:
+            if not dry and (name in ASKED or name in ('G0', 'G1')):
                 print(f'SKIP {name}: {why}', flush=True)
 
     h = Remote(prefix, base, dry)
@@ -165,9 +175,25 @@ def rows(prefix, base, dry):
     row('G0', g0, f'status {st[1] if st else None}; path named {named[1] if named else None}; wanted '
         f'{long}/default; answer: {answer[:200]}')
     ours = False
+    old = False
     if not g0:
-        skip(('R1', 'R2', 'R3'), 'G0 failed: this warren may not keep its socket in RUN, so nothing is run')
+        skip(('G1', 'R1', 'R2', 'R3'), 'G0 failed: this warren may not keep its socket in RUN, so nothing is run')
     else:
+        # G1: `new -A` without a name, refused before anything is dialed by a warren at or after 0afb88f; an older
+        # one answers its usage text. Either way nothing is made.
+        age = h.inside('warren new -A -d 2>&1; echo G1 STATUS=$?', 'G1') or ''
+        st1 = re.search(r'G1 STATUS=(\d+)', age)
+        old = not dry and not (st1 is not None and st1[1] == '2' and 'warren: new: -A needs a session name' in age)
+        said = ' | '.join(l for l in age.splitlines() if l.strip() and not l.startswith('G1 STATUS'))
+        if old:
+            print(f'TOO-OLD G1: the installed warren answers `new -A -d` with status {st1[1] if st1 else None} '
+                  f'({said[:120]}), not `warren: new: -A needs a session name`: it is older than 0afb88f '
+                  f'(2026-11-25), and these rows need each pane\'s directory in list --json (#86), send-keys and '
+                  f'capture-pane (#82) and sessions restored at start (#100)', flush=True)
+            skip(('R1', 'R2', 'R3'), 'the installed warren is too old for these rows (TOO-OLD G1)')
+        else:
+            row('G1', True, 'status 2: warren: new: -A needs a session name')
+    if g0 and not old:
         made = h.inside(f'cd {q(r + "/work")} && warren new -d -s v5 2>&1; echo R1 NEW=$?; '
                         f'test -S {q(rt + "/default")} && echo R1 SOCKET=yes || echo R1 SOCKET=no', 'R1') or ''
         ours = dry or 'R1 SOCKET=yes' in made
@@ -208,7 +234,7 @@ def rows(prefix, base, dry):
     row('X0', before is not None and before == after, 'the account\'s own warren state ' +
         ('unchanged' if before == after else f'before: {" | ".join((before or "?").splitlines())}; after: '
          f'{" | ".join((after or "?").splitlines())}'))
-    return len(bad)
+    return len(bad), old
 
 
 def qemu_proof():
@@ -272,19 +298,27 @@ def qemu_proof():
 
 rc = 2
 failed = 0
+old = False
+stopped = ''
 try:
     if args.pax is not None:
         if args.iso is None or args.work is None or args.key is None:
             raise SystemExit('--pax needs ISO, WORK and --key')
-        failed = qemu_proof()
+        failed, old = qemu_proof()
     else:
         if not args.ssh or not args.dir:
             raise SystemExit('give --ssh and --dir (or --pax and an image)')
         if not args.dir.startswith('/') or '/../' in args.dir + '/' or args.dir.rstrip('/') == '':
             raise SystemExit(f'--dir {args.dir} is not an absolute directory of its own')
-        failed = rows(shlex.split(args.ssh), args.dir, args.dry)
-    rc = 1 if failed else 0
+        failed, old = rows(shlex.split(args.ssh), args.dir, args.dry)
+    rc = 1 if failed else (3 if old else 0)
 except SystemExit as e:
-    print(f'ROWS-STOPPED {e}', flush=True)
-print(f'ROWS-END failed={failed}', flush=True)
+    stopped = str(e) or 'stopped'
+    print(f'ROWS-STOPPED {stopped}', flush=True)
+if stopped:
+    print(f'ROWS-END stopped: {stopped}', flush=True)
+elif old and not failed:
+    print('ROWS-END too-old: the installed warren is older than 0afb88f (2026-11-25); nothing past G1 ran', flush=True)
+else:
+    print(f'ROWS-END failed={failed}', flush=True)
 sys.exit(rc)
