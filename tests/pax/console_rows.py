@@ -207,7 +207,7 @@ class Mon:
                 reply = json.loads(self.r.readline())
                 if 'return' in reply or 'error' in reply:
                     return reply
-        except (OSError, ValueError) as e:
+        except () as e:
             raise SystemExit(f'the monitor failed: {e}') from None
 
     def sendkey(self, keys):
