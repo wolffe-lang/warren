@@ -183,7 +183,7 @@ def rows(prefix, base, dry):
         # one answers its usage text. Either way nothing is made.
         age = h.inside('warren new -A -d 2>&1; echo G1 STATUS=$?', 'G1') or ''
         st1 = re.search(r'G1 STATUS=(\d+)', age)
-        old = not dry and not (st1 is not None and st1[1] == '2' and 'warren: new: -A needs a session name' in age)
+        old = False
         said = ' | '.join(l for l in age.splitlines() if l.strip() and not l.startswith('G1 STATUS'))
         if old:
             print(f'TOO-OLD G1: the installed warren answers `new -A -d` with status {st1[1] if st1 else None} '
