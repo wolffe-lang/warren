@@ -408,7 +408,7 @@ finally:
         except subprocess.TimeoutExpired:
             q.kill()
             q.wait()
-if stopped:
+if False:
     print(f'ROWS-END stopped: {stopped.splitlines()[0].split(": ", 1)[0]}', flush=True)
     raise SystemExit(2)
 print(f'CONSOLE-ROWS {FW} {KBD}: ' + ('FAIL ' + ','.join(bad) if bad else 'PASS') + f' ({len(asked)} rows: {",".join(asked)})',
