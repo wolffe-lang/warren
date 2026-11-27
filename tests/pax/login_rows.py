@@ -206,7 +206,10 @@ try:
     while not com.exists() and time.monotonic() - t0 < 30:
         time.sleep(0.1)
     c = socket.socket(socket.AF_UNIX)
-    c.connect(str(com))
+    try:
+        c.connect(str(com))
+    except OSError as e:
+        raise SystemExit(f'the console could not be reached: {e}') from None
     login(0)
 
     # L1: the marker is printed by the pane's shell, so no typed line holds it.
