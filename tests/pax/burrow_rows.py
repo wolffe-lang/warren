@@ -28,9 +28,10 @@ They run in that order (W4 before the console attaches). ROWS is a comma list (d
 rows need runs either way. Each row prints PASS or FAIL by name. The last line says how the run ended:
   ROWS-END failed=0      every asked row passed: exit 0
   ROWS-END failed=N      N of them failed: exit 1
-  ROWS-END stopped: WHY  the boot, the login or ssh could not be reached: exit 2. It follows `ROWS-STOPPED why`, which
-                         carries what the console last showed; WHY is why up to its first `: `. A row that ran before
-                         the stop keeps its line, and no count is printed.
+  ROWS-END stopped: WHY  the work directory could not be made; the boot, the login or ssh could not be reached; or
+                         the console closed: exit 2. It follows `ROWS-STOPPED why`, which carries what the console
+                         last showed; WHY is why up to its first `: `. A row that ran before the stop keeps its line,
+                         and no count is printed.
 Run it from a directory of its own: WORK must not exist.
 """
 import argparse
@@ -55,7 +56,12 @@ args = ap.parse_args()
 ASKED = args.rows.split(',')
 COLS, LINES = 80, 24
 WORK = args.work.resolve()
-WORK.mkdir(parents=True, exist_ok=False)
+try:
+    WORK.mkdir(parents=True, exist_ok=False)
+except OSError as e:
+    print(f'ROWS-STOPPED the work directory could not be made: {e}', flush=True)
+    print('ROWS-END stopped: the work directory could not be made', flush=True)
+    raise SystemExit(2)
 raw = WORK / 'console-bios.serial'
 raw.write_bytes(b'')
 buf = bytearray()
@@ -126,7 +132,10 @@ def until(pattern, timeout, since):
 def typed(b):
     """A line through COM1's input, 20 ms a byte."""
     for ch in b:
-        c.sendall(bytes([ch]))
+        try:
+            c.sendall(bytes([ch]))
+        except OSError as e:
+            raise SystemExit(f'the console closed: {e}') from None
         time.sleep(0.02)
         pump(0)
 
