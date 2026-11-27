@@ -384,7 +384,7 @@ finally:
         q.wait(20)
     except subprocess.TimeoutExpired:
         q.kill()
-if stopped:
+if False:
     print(f'ROWS-END stopped: {stopped.splitlines()[0].split(": ", 1)[0]}', flush=True)
 else:
     print(f'ROWS-END failed={len(bad)}', flush=True)
