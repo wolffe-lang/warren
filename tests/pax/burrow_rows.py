@@ -292,7 +292,10 @@ try:
     while not com.exists() and time.monotonic() - t0 < 30:
         time.sleep(0.1)
     c = socket.socket(socket.AF_UNIX)
-    c.connect(str(com))
+    try:
+        c.connect(str(com))
+    except OSError as e:
+        raise SystemExit(f'the console could not be reached: {e}') from None
     if not until(r'^burrowd: host key [^\n]*\n', 300, 0):
         raise SystemExit('no burrowd host key line: ' + text()[-600:])
     if not until(r'login: $', 120, 0):
