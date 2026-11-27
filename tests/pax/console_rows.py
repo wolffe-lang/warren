@@ -31,8 +31,14 @@ the screen: they are taken out before the replay.
   C10 (after C7) saved and restored: `warren new -s keep` in one directory, `warren split-right -c` another typed in
      its pane, a detach and `warren kill-server`; then `warren new -d -s probe` says it restored keep, and in
      `warren attach -t keep` each pane's `pwd` is its own directory, the border drawn
-ROWS is a comma list (default all). Each row prints PASS or FAIL by name with the firmware and keyboard; the exit
-status is 0 only when every asked row passed. Run it from a directory of its own: WORK must not exist.
+ROWS is a comma list (default all). Each row prints PASS or FAIL by name with the firmware and keyboard. The last
+line says how the run ended:
+  CONSOLE-ROWS FIRMWARE KEYBOARD: PASS (N rows: …)   every asked row passed: exit 0 (exit 1 when no row ran)
+  CONSOLE-ROWS FIRMWARE KEYBOARD: FAIL Cn,… (…)      the rows named failed: exit 1
+  ROWS-END stopped: WHY   the boot or the console's prompt could not be reached: exit 2. It follows `ROWS-STOPPED
+                          why`, which carries what the console last showed; WHY is why up to its first `: `. No
+                          CONSOLE-ROWS line is printed, so a reader of that line sees a leg that did not finish.
+Run it from a directory of its own: WORK must not exist.
 """
 import argparse
 import json
@@ -224,6 +230,7 @@ q = subprocess.Popen(argv, cwd=args.pax, stdin=subprocess.DEVNULL, stdout=open(W
                      stderr=subprocess.STDOUT)
 c = None
 mon = None
+stopped = ''
 try:
     t0 = time.monotonic()
     while not com.exists() and time.monotonic() - t0 < 30:
@@ -385,6 +392,9 @@ try:
     typed(b'warren kill-server\r')
     pump(2)
     print('NOTE the console\'s last lines: ' + ' | '.join(stream_text().strip().splitlines()[-4:]), flush=True)
+except SystemExit as e:
+    stopped = str(e) or 'stopped'
+    print(f'ROWS-STOPPED {stopped}', flush=True)
 finally:
     if c is not None:
         c.close()
@@ -395,6 +405,9 @@ finally:
         except subprocess.TimeoutExpired:
             q.kill()
             q.wait()
+if stopped:
+    print(f'ROWS-END stopped: {stopped.splitlines()[0].split(": ", 1)[0]}', flush=True)
+    raise SystemExit(2)
 print(f'CONSOLE-ROWS {FW} {KBD}: ' + ('FAIL ' + ','.join(bad) if bad else 'PASS') + f' ({len(asked)} rows: {",".join(asked)})',
       flush=True)
 raise SystemExit(1 if bad or not asked else 0)
