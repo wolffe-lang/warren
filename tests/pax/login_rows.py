@@ -24,9 +24,13 @@ its answer is read between them, so the kernel's own lines (`user: ...`) can lan
      `warren detach -t main` ends that client and with it the login shell it replaced, and `login:` is asked again;
      after one more login, main has 1 attached again and its pane still shows the marker: the same main. It fails
      on an image whose /etc/shrc does not run PATH.
-ROWS is a comma list (default all). Each row prints PASS or FAIL by name, then `ROWS-END failed=N`. Exit 0 when every
-asked row passed, 1 when one failed, 2 when the boot or the login could not be reached (`ROWS-STOPPED why`). Run it
-from a directory of its own: WORK must not exist.
+ROWS is a comma list (default all). Each row prints PASS or FAIL by name. The last line says how the run ended:
+  ROWS-END failed=0      every asked row passed: exit 0
+  ROWS-END failed=N      N of them failed: exit 1
+  ROWS-END stopped: WHY  the boot, the login or ssh (C11's) could not be reached: exit 2. It follows `ROWS-STOPPED
+                         why`, which carries what the console last showed; WHY is why up to its first `: `. A row
+                         that ran before the stop keeps its line, and no count is printed.
+Run it from a directory of its own: WORK must not exist.
 """
 import argparse
 import re
@@ -196,6 +200,7 @@ q = subprocess.Popen(argv, cwd=args.pax, stdin=subprocess.DEVNULL, stdout=open(W
                      stderr=subprocess.STDOUT)
 c = None
 rc = 2
+stopped = ''
 try:
     t0 = time.monotonic()
     while not com.exists() and time.monotonic() - t0 < 30:
@@ -273,7 +278,8 @@ try:
             f'again: {second}; {mark} kept: {kept}')
     rc = 1 if bad else 0
 except SystemExit as e:
-    print(f'ROWS-STOPPED {e}', flush=True)
+    stopped = str(e) or 'stopped'
+    print(f'ROWS-STOPPED {stopped}', flush=True)
 finally:
     if c is not None:
         c.close()
@@ -282,5 +288,8 @@ finally:
         q.wait(20)
     except subprocess.TimeoutExpired:
         q.kill()
-print(f'ROWS-END failed={len(bad)}', flush=True)
+if stopped:
+    print(f'ROWS-END stopped: {stopped.splitlines()[0].split(": ", 1)[0]}', flush=True)
+else:
+    print(f'ROWS-END failed={len(bad)}', flush=True)
 raise SystemExit(rc)
