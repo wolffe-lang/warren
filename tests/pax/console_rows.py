@@ -35,9 +35,11 @@ ROWS is a comma list (default all). Each row prints PASS or FAIL by name with th
 line says how the run ended:
   CONSOLE-ROWS FIRMWARE KEYBOARD: PASS (N rows: …)   every asked row passed: exit 0 (exit 1 when no row ran)
   CONSOLE-ROWS FIRMWARE KEYBOARD: FAIL Cn,… (…)      the rows named failed: exit 1
-  ROWS-END stopped: WHY   the boot or the console's prompt could not be reached: exit 2. It follows `ROWS-STOPPED
-                          why`, which carries what the console last showed; WHY is why up to its first `: `. No
-                          CONSOLE-ROWS line is printed, so a reader of that line sees a leg that did not finish.
+  ROWS-END stopped: WHY   the work directory could not be made; the boot, the console's prompt or the monitor could
+                          not be reached; the console closed; or the monitor failed: exit 2. It follows
+                          `ROWS-STOPPED why`, which carries what the console last showed; WHY is why up to its first
+                          `: `. No CONSOLE-ROWS line is printed, so a reader of that line sees a leg that did not
+                          finish.
 Run it from a directory of its own: WORK must not exist.
 """
 import argparse
@@ -61,7 +63,12 @@ ROWS = args.rows.split(',')
 FW, KBD = args.firmware, args.keyboard
 COLS, LINES = 160, 50
 WORK = args.work.resolve()
-WORK.mkdir(parents=True, exist_ok=False)
+try:
+    WORK.mkdir(parents=True, exist_ok=False)
+except OSError as e:
+    print(f'ROWS-STOPPED the work directory could not be made: {e}', flush=True)
+    print('ROWS-END stopped: the work directory could not be made', flush=True)
+    raise SystemExit(2)
 raw = WORK / f'console-{FW}-{KBD}.serial'
 raw.write_bytes(b'')
 bad, asked = [], []
@@ -167,7 +174,10 @@ def until_screen(pattern, timeout):
 def typed(b):
     """A command line through COM1's input, 20 ms a byte."""
     for ch in b:
-        c.sendall(bytes([ch]))
+        try:
+            c.sendall(bytes([ch]))
+        except OSError as e:
+            raise SystemExit(f'the console closed: {e}') from None
         time.sleep(0.02)
         pump(0)
 
@@ -179,20 +189,26 @@ class Mon:
             time.sleep(0.1)
         self.s = socket.socket(socket.AF_UNIX)
         self.s.settimeout(30)
-        self.s.connect(str(path))
-        self.r = self.s.makefile('rb')
-        json.loads(self.r.readline())
+        try:
+            self.s.connect(str(path))
+            self.r = self.s.makefile('rb')
+            json.loads(self.r.readline())
+        except (OSError, ValueError) as e:
+            raise SystemExit(f'the monitor could not be reached: {e}') from None
         self.cmd('qmp_capabilities')
 
     def cmd(self, name, arguments=None):
         p = {'execute': name}
         if arguments is not None:
             p['arguments'] = arguments
-        self.s.sendall(json.dumps(p).encode() + b'\n')
-        while True:
-            reply = json.loads(self.r.readline())
-            if 'return' in reply or 'error' in reply:
-                return reply
+        try:
+            self.s.sendall(json.dumps(p).encode() + b'\n')
+            while True:
+                reply = json.loads(self.r.readline())
+                if 'return' in reply or 'error' in reply:
+                    return reply
+        except (OSError, ValueError) as e:
+            raise SystemExit(f'the monitor failed: {e}') from None
 
     def sendkey(self, keys):
         """The monitor's own `sendkey KEYS` on the emulated keyboard."""
